@@ -6,3 +6,6 @@
 
 部署方式和环境变量和原仓库保持一致。
 
+## 前端开源地址
+
+前端开源，参见[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub?tab=readme-ov-file)项目。
