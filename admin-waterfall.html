@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Waterfall</title>
+<style>
+  body{
+    background: linear-gradient(90deg, #ffd7e4 0%, #c8f1ff 100%);
+  }
+  ::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+
+ ::-webkit-scrollbar-corner {
+	background-color: transparent;
+}
+
+ ::-webkit-scrollbar-thumb {
+	background-color: #49b1f5;
+	background-image: -webkit-linear-gradient(45deg, hsla(0, 0%, 100%, .4) 25%, transparent 0, transparent 50%, hsla(0, 0%, 100%, .4) 0, hsla(0, 0%, 100%, .4) 75%, transparent 0, transparent);
+	border-radius: 2em;
+}
+
+ ::-webkit-scrollbar-track {
+	background-color: rgba(73, 177, 245, .2);
+	border-radius: 2em;
+}
+  .box {
+      position: relative;
+  }
+  img {
+      width: 200px;
+      height: auto;
+      padding: 5px;
+	  margin-left: 1.25%;
+      border-radius: 20px;
+  }
+  #bigimg {
+	display: none;
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background-color: rgba(0, 0, 0, 0.5);
+}
+#bigimg img {
+	position: absolute;
+	width: 90%;
+	height: 100%;
+	top: 50%;
+	left: 50%;
+	object-fit: contain;
+	transform: translate(-50%, -50%);
+}
+</style>
+</head>
+<body>
+  <div class="box">
+  </div>
+  <!-- 放大遮罩层 -->
+    <div id="bigimg" onclick="closeBigImg();"></div>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js"></script>
+<script>
+  var imgList
+  $.ajax({
+    url: "./api/manage/list",
+    async: false,
+    dataType: "json",
+    success: function(data) {
+      imgList = data; // 将请求的数据赋值给全局变量
+    }
+});
+  var targetElement = document.querySelector('.box');
+    let str ='';
+    for (let i = 0; i < imgList.length; i++){
+      if(imgList[i].name.indexOf(".mp4")>0)continue;
+      str += '<img onclick="showBigImg(this)" data-original='+"/file/"+imgList[i].name+' src='+"/file/"+imgList[i].name +'>';
+    }
+    targetElement.innerHTML = str
+</script>
+</body>
+<script>
+  window.onload = $(function () {
+      // 获取图片的宽度(200px)
+      let imgWidth = $('img').outerWidth(); // 200
+      //console.log(imgWidth)
+      waterfallHandler();
+
+      // 瀑布流处理
+      function waterfallHandler() {
+          // 获取图片的列数
+          let column = parseInt($(window).width() / imgWidth);
+          //console.log(column)
+          // 高度数组
+          let heightArr = [];
+          for(let i=0; i<column; i++) {
+              heightArr[i] = 0;
+          }
+          $.each($('img'), function (index, item) {
+              // 当前元素的高度
+              let itemHeight = $(item).outerHeight();
+              // 高度数组最小的高度
+              let minHeight = Math.min(...heightArr);
+              // 高度数组最小的高度的索引
+              let minIndex = heightArr.indexOf(minHeight);
+              $(item).css({
+                  position: 'absolute',
+                  top: minHeight + 'px',
+                  left: minIndex * imgWidth + 'px'
+              });
+
+              heightArr[minIndex] += itemHeight;
+          });
+      }
+
+      // 窗口大小改变
+      $(window).resize(function () {
+          waterfallHandler();
+      });
+  });
+  function showBigImg(img) {
+	var bigImg = document.getElementById('bigimg');
+	var imgUrl = img.getAttribute('data-original');
+	bigImg.innerHTML = '<img src="' + imgUrl + '">';
+	bigImg.style.display = 'block';
+	// 获取屏幕的宽度和高度
+	//var screenWidth = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
+	//var screenHeight = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight;
+	//bigImg.style.maxWidth = screenWidth * 0.9 + 'px';
+	//bigImg.style.maxHeight = screenHeight * 0.9 + 'px';
+}
+
+function closeBigImg() {
+	var bigImg = document.getElementById('bigimg');
+	bigImg.style.display = 'none';
+	bigImg.innerHTML = '';
+}
+</script>
+</html>
