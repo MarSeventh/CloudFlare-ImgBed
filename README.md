@@ -1,4 +1,4 @@
-# Telegraph-Image
+# CloudFlare-ImgBed
 
 **注意**：本仓库为[Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的前端重制版，如果你觉得本项目不错，在支持本项目的同时，也请支持原项目。
 
