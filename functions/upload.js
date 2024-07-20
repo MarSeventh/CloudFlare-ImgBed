@@ -27,14 +27,7 @@ function isDomainDefined(domain) {
 }
 
 function isUploadPageRequest(referer) {
-    if (referer) {
-        if (isDomainDefined(env.DOMAIN)) {    
-            let refererUrl = new URL(referer);
-            let domainPattern = new RegExp(`(^|\\.)${env.DOMAIN.replace('.', '\\.')}$`); // Escape dot in domain
-            return domainPattern.test(refererUrl.hostname);
-        }
-    }
-    return false;
+    return true;
 }
 export async function onRequestPost(context) {  // Contents of context object
     const { request, env, params, waitUntil, next, data } = context;
