@@ -19,6 +19,8 @@
 - 上传显示实时上传进度
 - 支持整体复制和单独复制（整体复制即将所有链接通过换行串联起来后复制）
 - 上传后图片无需手动点击，可直接展示在管理页面中
+- 支持API上传认证
+- 支持访问域名限制
 
 ## 3.Deployment
 
@@ -45,6 +47,14 @@
 #### 后台管理及图片审核功能
 
 请参照[原项目仓库](https://github.com/cf-pages/Telegraph-Image)设置对应的环境变量。
+
+#### API上传认证
+
+环境变量增加`AUTH_CODE`，使用如：https://cloudflare-imgbed.域名?authcode=`AUTH_CODE`
+
+#### 访问域名限制
+
+环境变量增加`ALLOWED_DOMAINS`，多个允许的域名用英文`,`分割，如：域名.xyz,域名.cloudns.be,域名.pp.ua
 
 ### 3.2定制化修改
 
