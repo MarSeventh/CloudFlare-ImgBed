@@ -30,7 +30,8 @@ function isUploadPageRequest(referer) {
     if (referer) {
         if (isDomainDefined(env.DOMAIN)) {    
             let refererUrl = new URL(referer);
-            return refererUrl.hostname === env.DOMAIN;
+            let domainPattern = new RegExp(`(^|\\.)${env.DOMAIN.replace('.', '\\.')}$`); // Escape dot in domain
+            return domainPattern.test(refererUrl.hostname);
         }
     }
     return false;
