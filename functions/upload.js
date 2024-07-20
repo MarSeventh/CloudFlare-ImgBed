@@ -23,13 +23,15 @@ function isAuthCodeDefined(authCode) {
 }
 
 function isDomainDefined(domain) {
-    return domain !== undefined && domain !== null && domain.trim() !== '';
+    return true;
 }
 
 function isUploadPageRequest(referer) {
     if (referer) {
         if (isDomainDefined(env.DOMAIN)) {    
-            return true;
+            let refererUrl = new URL(referer);
+            let domainPattern = new RegExp(`(^|\\.)${env.DOMAIN.replace('.', '\\.')}$`); // Escape dot in domain
+            return domainPattern.test(refererUrl.hostname);
         }
     }
     return false;
