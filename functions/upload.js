@@ -27,9 +27,11 @@ function isDomainDefined(domain) {
 }
 
 function isUploadPageRequest(referer) {
-    if (referer && isDomainDefined(env.DOMAIN)) {
-        let refererUrl = new URL(referer);
-        return refererUrl.hostname === env.DOMAIN;
+    if (referer) {
+        if (isDomainDefined(env.DOMAIN)) {    
+            let refererUrl = new URL(referer);
+            return refererUrl.hostname === env.DOMAIN;
+        }
     }
     return false;
 }
@@ -39,7 +41,7 @@ export async function onRequestPost(context) {  // Contents of context object
     // const authCode = new URLSearchParams(new URL(referer).search).get('authcode');
     const authCode = new URL(request.url).searchParams.get('authcode');
     const clonedRequest = request.clone();
-    if (isAuthCodeDefined(env.AUTH_CODE) && !isValidAuthCode(env.AUTH_CODE, authCode)) {
+    if (!isUploadPageRequest(referer) && isAuthCodeDefined(env.AUTH_CODE) && !isValidAuthCode(env.AUTH_CODE, authCode)) {
         return new UnauthorizedException("error");
     }
     await errorHandling(context);
