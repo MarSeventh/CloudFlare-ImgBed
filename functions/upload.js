@@ -24,8 +24,9 @@ function isAuthCodeDefined(authCode) {
 
 export async function onRequestPost(context) {  // Contents of context object
     const { request, env, params, waitUntil, next, data } = context;
-    const referer = request.headers.get('Referer');
-    const authCode = new URLSearchParams(new URL(referer).search).get('authcode');
+    // const referer = request.headers.get('Referer');
+    // const authCode = new URLSearchParams(new URL(referer).search).get('authcode');
+    const authCode = new URL(request.url).searchParams.get('authcode');
     const clonedRequest = request.clone();
     if (isAuthCodeDefined(env.AUTH_CODE) && !isValidAuthCode(env.AUTH_CODE, authCode)) {
         return new UnauthorizedException("error");
