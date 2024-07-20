@@ -22,13 +22,24 @@ function isAuthCodeDefined(authCode) {
     return authCode !== undefined && authCode !== null && authCode.trim() !== '';
 }
 
+function isDomainDefined(domain) {
+    return domain !== undefined && domain !== null && domain.trim() !== '';
+}
+
+function isUploadPageRequest(referer) {
+    if (referer && isDomainDefined(env.DOMAIN)) {
+        let refererUrl = new URL(referer);
+        return refererUrl.hostname === env.DOMAIN;
+    }
+    return false;
+}
 export async function onRequestPost(context) {  // Contents of context object
     const { request, env, params, waitUntil, next, data } = context;
-    // const referer = request.headers.get('Referer');
+    const referer = request.headers.get('Referer');
     // const authCode = new URLSearchParams(new URL(referer).search).get('authcode');
     const authCode = new URL(request.url).searchParams.get('authcode');
     const clonedRequest = request.clone();
-    if (isAuthCodeDefined(env.AUTH_CODE) && !isValidAuthCode(env.AUTH_CODE, authCode)) {
+    if (isUploadPageRequest(referer) || (isAuthCodeDefined(env.AUTH_CODE) && !isValidAuthCode(env.AUTH_CODE, authCode))) {
         return new UnauthorizedException("error");
     }
     await errorHandling(context);
