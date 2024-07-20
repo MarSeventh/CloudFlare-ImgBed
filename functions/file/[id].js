@@ -1,15 +1,33 @@
-export async function onRequest(context) {  // Contents of context object  
+export async function onRequest(context) {  // Contents of context object
     const {
-        request, // same as existing Worker API    
-        env, // same as existing Worker API    
-        params, // if filename includes [id] or [[path]]   
-        waitUntil, // same as ctx.waitUntil in existing Worker API    
-        next, // used for middleware or to fetch assets    
-        data, // arbitrary space for passing data between middlewares 
+        request, // same as existing Worker API
+        env, // same as existing Worker API
+        params, // if filename includes [id] or [[path]]
+        waitUntil, // same as ctx.waitUntil in existing Worker API
+        next, // used for middleware or to fetch assets
+        data, // arbitrary space for passing data between middlewares
     } = context;
 
     const url = new URL(request.url);
-    
+    let Referer = request.headers.get('Referer')
+    if (Referer) {
+        try {
+            let refererUrl = new URL(Referer);
+            if (env.ALLOWED_DOMAINS && env.ALLOWED_DOMAINS.trim() !== '') {
+                let allowedDomains = env.ALLOWED_DOMAINS.split(',');
+                let isAllowed = allowedDomains.some(domain => {
+                    let domainPattern = new RegExp(`(^|\\.)${domain.replace('.', '\\.')}$`); // Escape dot in domain
+                    return domainPattern.test(refererUrl.hostname);
+                });
+                if (!isAllowed) {
+                    return Response.redirect(new URL("/block-img.html", request.url).href, 302); // Ensure URL is correctly formed
+                }
+            }
+        } catch (e) {
+            return Response.redirect(new URL("/block-img.html", request.url).href, 302); // Ensure URL is correctly formed
+        }
+    }
+
     const response = fetch('https://telegra.ph/' + url.pathname + url.search, {
         method: request.method,
         headers: request.headers,
@@ -85,21 +103,21 @@ export async function onRequest(context) {  // Contents of context object
                 }
             } else {
                 await fetch(`https://api.moderatecontent.com/moderate/?key=` + apikey + `&url=https://telegra.ph/` + url.pathname + url.search).
-                    then(async (response) => {
-                        let moderate_data = await response.json();
-                        console.log(moderate_data)
-                        console.log("---env.img_url---")
-                        console.log(env.img_url == "true")
-                        if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") { } else {
-                            //add image to kv
-                            await env.img_url.put(params.id, "", {
-                                metadata: { ListType: "None", Label: moderate_data.rating_label, TimeStamp: time },
-                            });
-                        }
-                        if (moderate_data.rating_label == "adult") {
-                            return Response.redirect(url.origin + "/block-img.html", 302)
-                        }
-                    });
+                then(async (response) => {
+                    let moderate_data = await response.json();
+                    console.log(moderate_data)
+                    console.log("---env.img_url---")
+                    console.log(env.img_url == "true")
+                    if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") { } else {
+                        //add image to kv
+                        await env.img_url.put(params.id, "", {
+                            metadata: { ListType: "None", Label: moderate_data.rating_label, TimeStamp: time },
+                        });
+                    }
+                    if (moderate_data.rating_label == "adult") {
+                        return Response.redirect(url.origin + "/block-img.html", 302)
+                    }
+                });
 
             }
         }
