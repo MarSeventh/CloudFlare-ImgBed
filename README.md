@@ -48,11 +48,9 @@
 
 请参照[原项目仓库](https://github.com/cf-pages/Telegraph-Image)设置对应的环境变量。
 
-#### API上传认证
+#### API上传认证（开发中）
 
 环境变量增加`AUTH_CODE`，使用如：https://cloudflare-imgbed.域名?authcode=`AUTH_CODE`
-
-同时，必须增加`DOMAIN`环境变量，否则上传页面也无法正常上传。内容填写上传页面的域名即可（如sanyue.site）
 
 #### 访问域名限制
 
