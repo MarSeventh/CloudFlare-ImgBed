@@ -29,11 +29,7 @@ function isDomainDefined(domain) {
 function isUploadPageRequest(referer) {
     if (referer) {
         if (isDomainDefined(env.DOMAIN)) {    
-            console.log(env.DOMAIN);
-            console.log(referer);
-            let refererUrl = new URL(referer);
-            let domainPattern = new RegExp(`(^|\\.)${env.DOMAIN.replace('.', '\\.')}$`); // Escape dot in domain
-            return domainPattern.test(refererUrl.hostname);
+            return true;
         }
     }
     return false;
