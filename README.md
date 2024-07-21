@@ -4,9 +4,9 @@
 
 ## 1.Introduction
 
-[cf-pages/Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，实现了**登录鉴权**、**上传图片预览**，**多文件上传**，**拖拽上传**，**整体复制**等功能。
+[cf-pages/Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，实现了**登录鉴权**、**上传图片预览**、**多文件上传**、**拖拽上传**、**整体复制**等功能。
 
-![image-20240721113955315](https://alist.sanyue.site/d/imgbed/202407211140999.png)
+![](https://alist.sanyue.site/d/imgbed/202407211140999.png)
 
 ![](https://alist.sanyue.site/d/imgbed/202407201643245.png)
 
@@ -68,6 +68,7 @@ Web端在登录页面输入你的认证码即可。
 
 1. 增加粘贴图片上传功能
 2. 增加markdown、html等格式链接复制功能
+3. 上传页面增加管理端入口
 
 ## 5.Tips
 
