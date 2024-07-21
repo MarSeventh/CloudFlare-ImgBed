@@ -56,13 +56,6 @@ export async function onRequestPost(context) {  // Contents of context object
             authCode = getCookieValue(cookies, 'authCode');
         }
     }
-    // 如果Cookie中没有 authCode，从请求体中获取
-    if (!authCode && request.headers.get('content-type').includes('multipart/form-data')) {
-        const formData = await request.formData();
-        authCode = formData.get('authCode');
-        formData.delete('authCode');  // 删除表单中的 authCode
-    }
-
     if (isAuthCodeDefined(env.AUTH_CODE) && !isValidAuthCode(env.AUTH_CODE, authCode)) {
         return new UnauthorizedException("error");
     }
@@ -79,18 +72,6 @@ export async function onRequestPost(context) {  // Contents of context object
     // 复制请求头并剔除 authCode
     const headers = new Headers(clonedRequest.headers);
     headers.delete('authCode');
-    // 处理请求体，剔除 authCode
-    let body = clonedRequest.body;
-    if (clonedRequest.headers.get('content-type').includes('multipart/form-data')) {
-        const formData = new FormData();
-        const originalFormData = await clonedRequest.formData();
-        originalFormData.forEach((value, key) => {
-            if (key !== 'authCode') {
-                formData.append(key, value);
-            }
-        });
-        body = formData;
-    }
     const response = await fetch(targetUrl.href, {
         method: clonedRequest.method,
         headers: headers,
