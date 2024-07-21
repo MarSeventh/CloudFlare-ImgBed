@@ -33,22 +33,25 @@ export async function onRequestPost(context) {  // Contents of context object
     const url = new URL(request.url);
     // 优先从请求 URL 获取 authCode
     let authCode = url.searchParams.get('authCode');
+    console.log(authCode)
     // 如果 URL 中没有 authCode，从 Referer 中获取
     if (!authCode) {
         const referer = request.headers.get('Referer');
         if (referer) {
             try {
                 const refererUrl = new URL(referer);
-                authCode = new URLSearchParams(refererUrl.search).get('authcode');
+                authCode = new URLSearchParams(refererUrl.search).get('authCode');
             } catch (e) {
                 console.error('Invalid referer URL:', e);
             }
         }
     }
+    console.log(authCode)
     // 如果 Referer 中没有 authCode，从请求头中获取
     if (!authCode) {
         authCode = request.headers.get('authCode');
     }
+    console.log(authCode)
     // 如果请求头中没有 authCode，从 Cookie 中获取
     if (!authCode) {
         const cookies = request.headers.get('Cookie');
@@ -56,6 +59,8 @@ export async function onRequestPost(context) {  // Contents of context object
             authCode = getCookieValue(cookies, 'authCode');
         }
     }
+    console.log(authCode)
+    console.log(env.AUTH_CODE)
     if (isAuthCodeDefined(env.AUTH_CODE) && !isValidAuthCode(env.AUTH_CODE, authCode)) {
         return new UnauthorizedException("error");
     }
