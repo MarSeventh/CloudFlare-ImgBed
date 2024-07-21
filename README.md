@@ -52,7 +52,7 @@
 
 #### Web和API上传认证
 
-环境变量增加`AUTH_CODE`，API使用如：https://cloudflare-imgbed.域名?authcode=`AUTH_CODE`
+环境变量增加`AUTH_CODE`，API使用如：https://cloudflare-imgbed.域名?authCode=`AUTH_CODE`
 
 Web端在登录页面输入你的认证码即可。
 
