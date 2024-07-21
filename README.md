@@ -4,7 +4,7 @@
 
 ## 1.Introduction
 
-[cf-pages/Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，实现了**登录鉴权**、**上传图片预览**、**多文件上传**、**拖拽上传**、**整体复制**等功能。
+[cf-pages/Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，实现了**登录鉴权**、**上传图片预览**、**多文件上传**、**拖拽上传**、**整体复制**、**多格式复制**等功能。
 
 ![](https://alist.sanyue.site/d/imgbed/202407211140999.png)
 
@@ -20,6 +20,7 @@
 - 上传文件实现呼吸灯效果
 - 上传显示实时上传进度
 - 支持整体复制和单独复制（整体复制即将所有链接通过换行串联起来后复制）
+- 支持MarkDown、HTML和原始链接三种格式复制
 - 上传后图片无需手动点击，可直接展示在管理页面中
 - 支持Web和API上传认证（感谢[hl128k](https://github.com/hl128k)）
 - 支持访问域名限制（感谢[hl128k](https://github.com/hl128k)）
@@ -67,7 +68,7 @@ Web端在登录页面输入你的认证码即可。
 ## 4.TODO
 
 1. 增加粘贴图片上传功能
-2. 增加markdown、html等格式链接复制功能
+2. ~~增加markdown、html等格式链接复制功能（2024.7.21已完成）~~
 3. ~~上传页面增加管理端入口（2024.7.21已完成）~~
 
 ## 5.Tips
