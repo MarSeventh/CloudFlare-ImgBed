@@ -80,7 +80,7 @@ export async function onRequestPost(context) {  // Contents of context object
     const response = await fetch(targetUrl.href, {
         method: clonedRequest.method,
         headers: headers,
-        body: body,
+        body: clonedRequest.body,
     });
     return response;
 }
