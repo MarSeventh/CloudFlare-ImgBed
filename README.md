@@ -1,10 +1,12 @@
 # CloudFlare-ImgBed
 
-**注意**：本仓库为[Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的前端重制版，如果你觉得本项目不错，在支持本项目的同时，也请支持原项目。
+**注意**：本仓库为[Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，如果你觉得本项目不错，在支持本项目的同时，也请支持原项目。
 
 ## 1.Introduction
 
-[cf-pages/Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的前端重制版，实现了**上传图片预览**，**多文件上传**，**拖拽上传**，**整体复制**等功能。
+[cf-pages/Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，实现了**登录鉴权**、**上传图片预览**，**多文件上传**，**拖拽上传**，**整体复制**等功能。
+
+![image-20240721113955315](https://alist.sanyue.site/d/imgbed/202407211140999.png)
 
 ![](https://alist.sanyue.site/d/imgbed/202407201643245.png)
 
@@ -19,7 +21,7 @@
 - 上传显示实时上传进度
 - 支持整体复制和单独复制（整体复制即将所有链接通过换行串联起来后复制）
 - 上传后图片无需手动点击，可直接展示在管理页面中
-- 支持API上传认证（感谢[hl128k](https://github.com/hl128k)）
+- 支持Web和API上传认证（感谢[hl128k](https://github.com/hl128k)）
 - 支持访问域名限制（感谢[hl128k](https://github.com/hl128k)）
 
 ## 3.Deployment
@@ -48,9 +50,11 @@
 
 请参照[原项目仓库](https://github.com/cf-pages/Telegraph-Image)设置对应的环境变量。
 
-#### API上传认证（开发中）
+#### Web和API上传认证
 
-环境变量增加`AUTH_CODE`，使用如：https://cloudflare-imgbed.域名?authcode=`AUTH_CODE`
+环境变量增加`AUTH_CODE`，API使用如：https://cloudflare-imgbed.域名?authcode=`AUTH_CODE`
+
+Web端在登录页面输入你的认证码即可。
 
 #### 访问域名限制
 
