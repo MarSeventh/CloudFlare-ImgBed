@@ -12,7 +12,7 @@
 
 ![image-20240722104406761](https://alist.sanyue.site/d/imgbed/202407221044182.png)
 
-![image-20240722104418816](C:\Users\King.xx\AppData\Roaming\Typora\typora-user-images\image-20240722104418816.png)
+![image-20240722104418816](https://alist.sanyue.site/d/imgbed/202407221052575.png)
 
 ## 2.Features
 
