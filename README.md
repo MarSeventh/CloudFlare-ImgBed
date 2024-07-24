@@ -32,7 +32,7 @@
   - 支持MarkDown、HTML和原始链接三种格式复制
 - **支持身份认证、防滥用**
   - 支持Web和API上传认证（感谢[hl128k](https://github.com/hl128k)）
-  - 支持访问域名限制（感谢[hl128k](https://github.com/hl128k)
+  - 支持访问域名限制（感谢[hl128k](https://github.com/hl128k)）
 
 ## 3.Deployment
 
