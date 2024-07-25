@@ -105,9 +105,6 @@ export async function onRequest(context) {  // Contents of context object
                 await fetch(`https://api.moderatecontent.com/moderate/?key=` + apikey + `&url=https://telegra.ph/` + url.pathname + url.search).
                 then(async (response) => {
                     let moderate_data = await response.json();
-                    console.log(moderate_data)
-                    console.log("---env.img_url---")
-                    console.log(env.img_url == "true")
                     if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") { } else {
                         //add image to kv
                         await env.img_url.put(params.id, "", {

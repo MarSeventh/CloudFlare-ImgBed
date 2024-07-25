@@ -8,7 +8,6 @@ export async function errorHandling(context) {
     let remoteSampleRate = 0.001;
     try {
       const sampleRate = await fetchSampleRate(context)
-      console.log("sampleRate", sampleRate);
       //check if the sample rate is not null
       if (sampleRate) {
         remoteSampleRate = sampleRate;
