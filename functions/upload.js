@@ -113,6 +113,7 @@ export async function onRequestPost(context) {  // Contents of context object
         console.error('Error:', error);
     } finally {
         console.log('upload.clog:' + JSON.stringify(response));
+        await env.img_url.put(id + 'res:', '', response);
         return response;
     }
 }
