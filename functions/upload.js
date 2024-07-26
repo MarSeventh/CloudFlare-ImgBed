@@ -72,7 +72,7 @@ export async function onRequestPost(context) {  // Contents of context object
     // 复制请求头并剔除 authCode
     const headers = new Headers(clonedRequest.headers);
     headers.delete('authCode');
-    const response = await fetch(targetUrl.href, {
+    let response = await fetch(targetUrl.href, {
         method: clonedRequest.method,
         headers: headers,
         body: clonedRequest.body,
@@ -84,6 +84,19 @@ export async function onRequestPost(context) {  // Contents of context object
         const id = src.split('/').pop();
         const img_url = env.img_url;
         const apikey = env.ModerateContentApiKey;
+
+        const res = {
+            'success': true,
+            'code': 'success',
+            'message': 'Upload success.',
+            'data': {
+                'storename': id,
+                'path': src,
+                'url': url.origin + src
+            },
+            'RequestId': id
+        };
+        response = new Response(JSON.stringify(res));
 
         if (img_url == undefined || img_url == null || img_url == "") {
             // img_url 未定义或为空的处理逻辑
