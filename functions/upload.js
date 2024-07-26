@@ -84,7 +84,7 @@ export async function onRequestPost(context) {  // Contents of context object
         const id = src.split('/').pop();
         const img_url = env.img_url;
         const apikey = env.ModerateContentApiKey;
-    
+
         if (img_url == undefined || img_url == null || img_url == "") {
             // img_url 未定义或为空的处理逻辑
         } else {
@@ -112,6 +112,7 @@ export async function onRequestPost(context) {  // Contents of context object
     } catch (error) {
         console.error('Error:', error);
     } finally {
+        console.log('upload.clog:' + JSON.stringify(response));
         return response;
     }
 }
