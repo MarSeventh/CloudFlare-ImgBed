@@ -8,6 +8,10 @@ export async function onRequest(context) {
       next, // used for middleware or to fetch assets
       data, // arbitrary space for passing data between middlewares
     } = context;
+    const requestUrl = new URL(request.url);
+    const protocol = requestUrl.protocol;
+    const domain = requestUrl.hostname;
+    const port = requestUrl.port;
     const list = await env.img_url.list();
     if (env.AllowRandom != "true") {
         return new Response(JSON.stringify({ error: "Random is disabled" }), { status: 403 });
@@ -17,7 +21,17 @@ export async function onRequest(context) {
     } else {
         const randomIndex = Math.floor(Math.random() * list.keys.length);
         const randomKey = list.keys[randomIndex];
-        const randomUrl = '/file/' + randomKey.name;
+        const randomPath = '/file/' + randomKey.name;
+        let randomUrl = randomPath;
+        const randomType = requestUrl.searchParams.get('type');
+        // if param 'type' is set to 'url', return the full URL
+        if (randomType == 'url') {
+            if (port) {
+                randomUrl = protocol + '//' + domain + ':' + port + randomPath;
+            } else {
+                randomUrl = protocol + '//' + domain + randomPath;
+            }
+        }
         return new Response(JSON.stringify({ url: randomUrl }), { status: 200 });
     }
 }
