@@ -85,17 +85,24 @@ export async function onRequestPost(context) {  // Contents of context object
         const img_url = env.img_url;
         const apikey = env.ModerateContentApiKey;
 
-        const res = {
-            'success': true,
-            'code': 'success',
-            'message': 'Upload success.',
-            'data': {
-                'storename': id,
-                'path': src,
-                'url': url.origin + src
-            },
-            'RequestId': id
-        };
+        let res = [];
+        for (const item of clonedRes) {
+            const src = item.src;
+            const id = src.split('/').pop();
+            const resObj = {
+                'success': true,
+                'code': 'success',
+                'message': 'Upload success.',
+                'data': {
+                    'storename': id,
+                    'path': src,
+                    'url': url.origin + src
+                },
+                'RequestId': id
+            };
+            res.push(resObj);
+        }
+
         response = new Response(JSON.stringify(res));
 
         if (img_url == undefined || img_url == null || img_url == "") {
