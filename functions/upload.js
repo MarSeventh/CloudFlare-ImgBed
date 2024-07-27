@@ -85,25 +85,25 @@ export async function onRequestPost(context) {  // Contents of context object
         const img_url = env.img_url;
         const apikey = env.ModerateContentApiKey;
 
-        let res = [];
-        for (const item of clonedRes) {
-            const src = item.src;
-            const id = src.split('/').pop();
-            const resObj = {
-                'success': true,
-                'code': 'success',
-                'message': 'Upload success.',
-                'data': {
-                    'storename': id,
-                    'path': src,
-                    'url': url.origin + src
-                },
-                'RequestId': id
-            };
-            res.push(resObj);
-        }
+        // let res = [];
+        // for (const item of clonedRes) {
+        //     const src = item.src;
+        //     const id = src.split('/').pop();
+        const resObj = {
+            'success': true,
+            'code': 'success',
+            'message': 'Upload success.',
+            'data': {
+                'storename': id,
+                'path': src,
+                'url': url.origin + src
+            },
+            'RequestId': id
+        };
+        //     res.push(resObj);
+        // }
 
-        response = new Response(JSON.stringify(res));
+        response = new Response(JSON.stringify(resObj));
 
         if (img_url == undefined || img_url == null || img_url == "") {
             // img_url 未定义或为空的处理逻辑
