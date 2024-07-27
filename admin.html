@@ -28,7 +28,7 @@
          font-size: xx-large;
          position: relative;
      ">Dashboard
-     
+
 
      <span style="
      position: absolute;
@@ -49,19 +49,19 @@
       <el-button
                     size="mini"
                     type="info"
-                    @click="handleLogout()">退出登录</el-button></span></div> 
+                    @click="handleLogout()">退出登录</el-button></span></div>
         </el-header>
         <el-main><el-row :gutter="12">
             <el-col :span="24">
               <el-card shadow="always">
                 记录总数量:
-                {{ Number }} 
+                {{ Number }}
               </el-card>
             </el-col>
             <!--<el-col :span="8">
               <el-card shadow="hover">
                 <el-tooltip class="item" effect="dark" content="白名单数量" placement="top-start">
-                   
+
                 </el-tooltip>
                 白名单数量：{{ WhiteList }}
               </el-card>
@@ -69,7 +69,7 @@
             <el-col :span="8">
               <el-card shadow="hover">
                 <el-tooltip class="item" effect="dark" content="黑名单数量" placement="top-start">
-                
+
               </el-tooltip>
               黑名单数量：{{ BlackList }}
               </el-card>
@@ -187,7 +187,7 @@
           .then(result => {console.log(result);
             this.tableData[index].metadata=result;})
           .catch(error =>  {alert("An error occurred while synchronizing data with the server, please check the network connection");console.log('error', error)});
-        
+
         } else {
         console.log("No")
       }
@@ -207,7 +207,7 @@
           .then(response => response.text())
           .then(result => {console.log(result);this.tableData.remove(index);})
           .catch(error =>  {alert("An error occurred while synchronizing data with the server, please check the network connection");console.log('error', error)});
-        
+
         } else {
         console.log("No")
       }
@@ -226,7 +226,7 @@
           .then(response => response.text())
           .then(result => {console.log(result);this.tableData[index].metadata=result;})
           .catch(error =>  {alert("An error occurred while synchronizing data with the server, please check the network connection");console.log('error', error)});
-        
+
         } else {
         console.log("No")
       }
@@ -262,7 +262,7 @@
         });
       },
     },
-      
+
     mounted () {
       //check if the user is logged in
       //read the basic auth credientials from the browser
@@ -278,7 +278,7 @@
           if(result=="true"){
             this.showLogoutButton=true;
           }else if(result=="Not using basic auth."){
-            
+
           }
           else{
             window.location.href="./api/manage/login";
@@ -298,7 +298,7 @@
   redirect: 'follow',
   //include authorization credientials
   credentials: 'include'
-  
+
 };
 
 
@@ -313,29 +313,12 @@ fetch("./api/manage/list", requestOptions)
       return response;
     }
   })
-  .then(response => response.text()) 
+  .then(response => response.text())
   .then(result => {this.tableData=JSON.parse(result);console.log(result);this.Number=this.tableData.length})
   .catch(error => {alert("An error occurred while synchronizing data with the server, please check the network connection");console.log('error', error)});
 
     }
     })
-    
+
   </script><!-- Hotjar Tracking Code -->
-<script>
-    (function(h,o,t,j,a,r){
-        h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
-        h._hjSettings={hjid:2531461,hjsv:6};
-        a=o.getElementsByTagName('head')[0];
-        r=o.createElement('script');r.async=1;
-        r.src=t+h._hjSettings.hjid+j+h._hjSettings.hjsv;
-        a.appendChild(r);
-    })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');
-</script>
-<script type="text/javascript">
-  (function(c,l,a,r,i,t,y){
-      c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-      t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-      y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-  })(window, document, "clarity", "script", "7t5ai7agat");
-</script>
 </html>
