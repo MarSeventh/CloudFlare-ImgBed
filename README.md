@@ -171,3 +171,7 @@ API格式：
 前端开源，参见[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub?tab=readme-ov-file)项目。
 
 **如果觉得项目不错希望您能给个免费的star✨✨✨，非常感谢！**
+
+## 6.Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=MarSeventh/CloudFlare-ImgBed&type=Date)](https://star-history.com/#MarSeventh/CloudFlare-ImgBed&Date)
