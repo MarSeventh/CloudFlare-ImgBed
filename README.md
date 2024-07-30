@@ -166,12 +166,19 @@ API格式：
 
 1. ~~修复API上传无法直接展示在后台的问题（2024.7.25已修复）~~
 
-## 5.Tips
+## 5.Q&A
+
+### 5.1未设置`ALLOWED_DOMAINS`，但无法跨域访问？
+
+- 请检查你的cloudflare防火墙设置（例如hotlink保护是否开启）
+- 参见[Issue #8](https://github.com/MarSeventh/CloudFlare-ImgBed/issues/8)
+
+## 6.Tips
 
 前端开源，参见[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub?tab=readme-ov-file)项目。
 
 **如果觉得项目不错希望您能给个免费的star✨✨✨，非常感谢！**
 
-## 6.Star History
+## 7.Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=MarSeventh/CloudFlare-ImgBed&type=Date)](https://star-history.com/#MarSeventh/CloudFlare-ImgBed&Date)
