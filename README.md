@@ -150,7 +150,7 @@ API格式：
 
 ### 3.2定制化修改
 
-按照`3.1`步骤部署完成后，前往仓库[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub?tab=readme-ov-file)，按照操作说明进行DIY和打包操作，最后将打包好的`/dist`目录中的内容替换到该仓库的根目录下即可（复制+替换）。
+按照`3.1`步骤部署完成后，前往仓库[MarSeventh/Sanyue-ImgHub](https://inner.icu/Sanyue-ImgHub?tab=readme-ov-file)，按照操作说明进行DIY和打包操作，最后将打包好的`/dist`目录中的内容替换到该仓库的根目录下即可（复制+替换）。
 
 ## 4.TODO
 
@@ -171,11 +171,11 @@ API格式：
 ### 5.1未设置`ALLOWED_DOMAINS`，但无法跨域访问？
 
 - 请检查你的cloudflare防火墙设置（例如hotlink保护是否开启）
-- 参见[Issue #8](https://github.com/MarSeventh/CloudFlare-ImgBed/issues/8)
+- 参见[Issue #8](http://inner.icu//issues/8)
 
 ## 6.Tips
 
-前端开源，参见[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub?tab=readme-ov-file)项目。
+前端开源，参见[MarSeventh/Sanyue-ImgHub](https://inner.icu/Sanyue-ImgHub?tab=readme-ov-file)项目。
 
 **如果觉得项目不错希望您能给个免费的star✨✨✨，非常感谢！**
 
