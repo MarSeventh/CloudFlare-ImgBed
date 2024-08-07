@@ -33,6 +33,16 @@ export async function onRequest(context) {
                 randomUrl = protocol + '//' + domain + randomPath;
             }
         }
+        // if param 'type' is set to 'img', return the image
+        if (randomType === 'img') {
+            // Return an image response
+            randomUrl = protocol + '//' + domain + ':' + port + randomPath;
+            return new Response(await fetch(randomUrl).then(res => res.blob()), {
+                headers: { 'Content-Type': 'image/jpeg' },
+                status: 200
+            });
+        }
+        
         if (resType == 'text') {
             return new Response(randomUrl, { status: 200 });
         } else {
