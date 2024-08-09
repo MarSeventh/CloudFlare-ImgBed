@@ -12,6 +12,6 @@
     "concurrently": "^8.2.2",
     "mocha": "^10.6.0",
     "wait-on": "^7.2.0",
-    "wrangler": "^3.63.0"
+    "wrangler": "^3.7.0"
   }
 }

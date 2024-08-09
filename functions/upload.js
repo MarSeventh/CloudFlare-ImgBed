@@ -85,10 +85,6 @@ export async function onRequestPost(context) {  // Contents of context object
         const img_url = env.img_url;
         const apikey = env.ModerateContentApiKey;
 
-        // let res = [];
-        // for (const item of clonedRes) {
-        //     const src = item.src;
-        //     const id = src.split('/').pop();
         const resObj = {
             'success': true,
             'code': 'success',
@@ -100,8 +96,6 @@ export async function onRequestPost(context) {  // Contents of context object
             },
             'RequestId': id
         };
-        //     res.push(resObj);
-        // }
 
         response = new Response(JSON.stringify(resObj));
 
