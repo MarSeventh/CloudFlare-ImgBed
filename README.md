@@ -98,7 +98,7 @@
 
    正常启动，控制台输出如下：
 
-   ![](https://alist.sanyue.site/d/imgbed/202408191829163.png)
+   ![202408191829163](https://alist.sanyue.site/d/imgbed/202408191855625.png)
 
 #### 3.1.3后台管理
 
