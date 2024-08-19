@@ -6,13 +6,13 @@
 
 [cf-pages/Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，实现了**登录鉴权**、**上传图片预览**、**一键切换上传方式**（**拖拽上传**、**粘贴上传**）、**多文件上传**、**整体复制**、**多格式复制**等功能。
 
-![](https://alist.sanyue.site/d/imgbed/202407211140999.png)
+![](https://alist.sanyue.site/d/imgbed/202408191757569.png)
 
-![image-20240722104315281](https://alist.sanyue.site/d/imgbed/202407221043832.png)
+![](https://alist.sanyue.site/d/imgbed/202407221043832.png)
 
-![image-20240722104406761](https://alist.sanyue.site/d/imgbed/202407221044182.png)
+![](https://alist.sanyue.site/d/imgbed/202407221044182.png)
 
-![image-20240722104418816](https://alist.sanyue.site/d/imgbed/202407221052575.png)
+![](https://alist.sanyue.site/d/imgbed/202407221052575.png)
 
 ## 2.Features
 
@@ -41,15 +41,25 @@
 
 ### 3.1直接使用
 
-部署方式和环境变量和原仓库保持一致。
+**部署方式**与**环境变量**和原仓库保持一致。
 
 #### 3.1.1提前准备
 
-你唯一需要提前准备的就是一个 Cloudflare 账户 （如果需要在自己的服务器上部署，不依赖 Cloudflare，可参考[#46](https://github.com/cf-pages/Telegraph-Image/issues/46) ）
+- **部署于Cloudflare**
+
+  只需准备一个**Cloudflare账户**，然后按照[3.1.2.1节](#3.1.2.1部署于Cloudflare)的步骤即可完成部署。
+
+- **部署于服务器**
+
+  如果Cloudflare的KV数据库**访问次数限制**不能满足你的需求，并且你拥有自己的服务器，可以参照[3.1.2.2节](#3.1.2.2部署于服务器)的教程在服务器上模拟Cloudflare的环境，并开放对应的端口访问服务。
+
+  注意由于服务器操作系统、硬件版本复杂多样，相关教程**无法确保适合每一位用户**，遇到报错请尽量利用搜索引擎解决，无法解决也可以提issue寻求帮助。
 
 #### 3.1.2手把手教程
 
-简单 3 步，即可部署本项目，拥有自己的图床
+##### 3.1.2.1部署于Cloudflare
+
+依托于CF的强大能力，只需简单 3 步，即可部署本项目，拥有自己的图床。
 
 1. Fork 本仓库 (注意：必须使用 Git 或者 Wrangler 命令行工具部署后才能正常使用，[文档](https://developers.cloudflare.com/pages/functions/get-started/#deploy-your-function))
 
@@ -58,6 +68,37 @@
 ![1](https://alist.sanyue.site/d/imgbed/202407201047300.png)
 
 3. 按照页面提示输入项目名称，选择需要连接的 git 仓库，点击`部署站点`即可完成部署
+
+##### 3.1.2.2部署于服务器
+
+1. 安装服务器操作系统对应的`node.js`，经测试`v22.5.1`版本可以正常使用。（安装教程自行search）
+
+2. 切换到项目根目录，运行`npm install`，安装所需依赖。
+
+3. 在项目根目录下新建`wrangler.toml`配置文件，其内容为项目名称，环境变量等，可根据后文环境变量配置进行个性化修改。（详情参见官方文档[Configuration - Wrangler (cloudflare.com)](https://developers.cloudflare.com/workers/wrangler/configuration/)）
+
+   > 配置文件样例：
+   >
+   > ```toml
+   > name = "cloudflare-imgbed"
+   > compatibility_date = "2024-07-24"
+   > 
+   > [vars]
+   > ModerateContentApiKey = "your_key"
+   > AllowRandom = "true"
+   > BASIC_USER = "user"
+   > BASIC_PASS = "pass"
+   > ```
+
+4. 在项目根目录下运行`npm run start`，至此，正常情况下项目已经成功部署。
+
+   程序默认运行在`8080`端口上，使用`nginx`等服务器反代`127.0.0.1:8080`即可外网访问服务。如需修改端口，可在`package.json`中修改`start`脚本的`port`参数（如下图）。
+
+   ![](https://alist.sanyue.site/d/imgbed/202408191832173.png)
+
+   正常启动，控制台输出如下：
+
+   ![](https://alist.sanyue.site/d/imgbed/202408191829163.png)
 
 #### 3.1.3后台管理
 
