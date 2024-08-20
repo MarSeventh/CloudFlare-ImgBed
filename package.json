@@ -2,7 +2,7 @@
   "scripts": {
     "ci-test": "concurrently --kill-others \"npm start\" \"wait-on http://localhost:8080 && mocha\"",
     "test": "mocha",
-    "start": "npx wrangler pages dev ./ --kv \"img_url\" --port 8080 --binding BASIC_USER=admin --binding BASIC_PASS=123 --persist-to ./data"
+    "start": "npx wrangler pages dev ./ --kv \"img_url\" --port 8080 --persist-to ./data"
   },
   "dependencies": {
     "@cloudflare/pages-plugin-sentry": "^1.1.3",
