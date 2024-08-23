@@ -34,7 +34,7 @@ export async function onRequest(context) {
             }
         }
         // if param 'type' is set to 'img', return the image
-        if (randomType === 'img') {
+        if (randomType == 'img') {
             // Return an image response
             randomUrl = protocol + '//' + domain + ':' + port + randomPath;
             return new Response(await fetch(randomUrl).then(res => res.blob()), {
