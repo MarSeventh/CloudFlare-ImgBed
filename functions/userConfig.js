@@ -1,4 +1,4 @@
-export async function onRequestPost(context) {
+export async function onRequestGet(context) {
     const { request, env, params, waitUntil, next, data } = context;
     const userConfig = env.USER_CONFIG;
 
