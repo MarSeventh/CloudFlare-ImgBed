@@ -302,7 +302,7 @@ API格式：
 
   ![](https://alist.sanyue.site/d/imgbed/202408231141491.png)
 
-- 打开`图床设置`->`自定义Web图床`->`Default`，然后按照下图方式配置，注意API地址和自定义图片URL前缀按照自己的域名进行修改：
+- 打开`图床设置`->`自定义Web图床`->`Default`，然后按照下图方式配置，注意API地址和自定义图片URL前缀按照自己的域名进行修改。（**如果设置了`AUTH_CODE`，一定以`?authCode=your_authCode`的方式添加到API地址后面**）：
 
   ![](https://alist.sanyue.site/d/imgbed/202408231145750.png)
 
