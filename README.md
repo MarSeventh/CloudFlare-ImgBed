@@ -304,7 +304,7 @@ API格式：
 
 - 打开`图床设置`->`自定义Web图床`->`Default`，然后按照下图方式配置，注意API地址和自定义图片URL前缀按照自己的域名进行修改。（**如果设置了`AUTH_CODE`，一定以`?authCode=your_authCode`的方式添加到API地址后面**）：
 
-  ![](https://alist.sanyue.site/d/imgbed/202408231145750.png)
+  ![](https://alist.sanyue.site/d/imgbed/202408261959174.png)
 
 - 设置完成，确定即可使用PicGo上传到自建的图床。
 
