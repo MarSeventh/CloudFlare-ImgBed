@@ -1,12 +1,16 @@
 # CloudFlare-ImgBed
 
-**注意**：本仓库为[Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，如果你觉得本项目不错，在支持本项目的同时，也请支持原项目。
+免费图片托管解决方案，基于 Cloudflare Pages 和 telegra.ph 。
+
+**体验地址**：[Sanyue ImgHub (demo-cloudflare-imgbed.pages.dev)](https://demo-cloudflare-imgbed.pages.dev/)
 
 **体验视频**：[CloudFlare免费图床，轻松守护你的每一份精彩！_哔哩哔哩_bilibili](https://www.bilibili.com/video/BV1y3WGe4EGh/?vd_source=da5ecbe595e41089cd1bed95932b8bfd)
 
+**注意**：本仓库为[Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，如果你觉得本项目不错，在支持本项目的同时，也请支持原项目。
+
 ## 1.Introduction
 
-[cf-pages/Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，实现了**登录鉴权**、**页面自定义**、**上传图片预览**、**一键切换上传方式**（**拖拽上传**、**粘贴上传**）、**多文件上传**、**整体复制**、**多格式复制**等功能。
+免费图片托管解决方案，保留原版全部功能的基础上，实现了**登录鉴权**、**页面自定义**、**上传图片预览**、**一键切换上传方式**（**拖拽上传**、**粘贴上传**）、**多文件上传**、**整体复制**、**多格式复制**等功能。
 
 ![](https://alist.sanyue.site/d/imgbed/202408191757569.png)
 
@@ -24,25 +28,41 @@
 - **炫酷的动效（**
   - 流畅丝滑的过渡动画~
   - 上传文件实现呼吸灯效果
+  
 - **人性化上传**
   - 支持一键切换上传方式（**拖拽点击、粘贴**）
   - 粘贴上传支持**文件**和**URL**
   - 支持批量上传（不限同时选择文件数量，但为了保证稳定性，同时处于上传状态的文件最多为10个）
   - 上传显示实时上传进度
   - **上传后图片无需手动点击，可直接展示在管理页面中**
+  
 - **多样化复制**
   - 支持**整体复制**和**单独复制**（整体复制即将所有链接通过换行串联起来后复制）
   - 支持**MarkDown、HTML、BBCode和原始链接**四种格式复制
   - 上传完成后直观展示四种格式链接
+  
 - **支持身份认证、防滥用**
   - 支持Web和API**上传认证**（感谢[hl128k](https://github.com/hl128k)）
   - 支持访问域名限制（感谢[hl128k](https://github.com/hl128k)）
+  
 - **支持页面自定义**
   - 页面背景支持**单图**、**自定义多图轮播**、**bing随机图轮播**等多种模式
   - 自定义图床名称和Logo
   
 - **一些小功能**
   - 支持**随机图**API，从图床中随机返回一张图片
+  
+- **以及原版所有特性**
+
+  > 1.无限图片储存数量，你可以上传不限数量的图片
+  >
+  > 2.无需购买服务器，托管于 Cloudflare 的网络上，当使用量不超过 Cloudflare 的免费额度时，完全免费
+  >
+  > 3.无需购买域名，可以使用 Cloudflare Pages 提供的`*.pages.dev`的免费二级域名，同时也支持绑定自定义域名
+  >
+  > 4.支持图片审查 API，可根据需要开启，开启后不良图片将自动屏蔽，不再加载
+  >
+  > 5.支持后台图片管理，可以对上传的图片进行在线预览，添加白名单，黑名单等操作
 
 
 ## 3.Deployment
