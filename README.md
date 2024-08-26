@@ -1,6 +1,6 @@
 # CloudFlare-ImgBed
 
-免费图片托管解决方案，基于 Cloudflare Pages 和 telegra.ph 。
+免费图片托管解决方案，基于 Cloudflare Pages 和 telegra.ph（图片通过压缩，不受5MB大小限制） 。
 
 **体验地址**：[Sanyue ImgHub (demo-cloudflare-imgbed.pages.dev)](https://demo-cloudflare-imgbed.pages.dev/)
 
