@@ -39,7 +39,8 @@
   - 支持访问域名限制（感谢[hl128k](https://github.com/hl128k)）
 - **支持页面自定义**
   - 页面背景支持**单图**、**自定义多图轮播**、**bing随机图轮播**等多种模式
-
+  - 自定义图床名称和Logo
+  
 - **一些小功能**
   - 支持**随机图**API，从图床中随机返回一张图片
 
@@ -186,6 +187,8 @@ API格式：
 | ----------- | ------------------ | ----------- | ------------------------------------------------------------ |
 | loginBkImg  | 自定义登录页面背景 | 列表/字符串 | 1、当字段类型为`列表`时，列表中元素为需要添加到轮播列表中的图片链接（列表中只有一张图时即为固定背景），形如`["1.jpg","2.jpg"]`<br />2、当字段类型为`字符串`时，目前**仅支持**字符串值为`bing`，设置为该值时启用bing随机图片轮播模式。 |
 | uploadBkImg | 自定义上传页面背景 | 列表/字符串 | 同上                                                         |
+| ownerName   | 图床名称           | 字符串      | 只支持`字符串`类型，设置为你自定义的图床名称（默认为`Sanyue`） |
+| logoUrl     | 图床logo           | 字符串      | 只支持`字符串`类型，设置为你自定义的图床logo                 |
 
 > 整体示例：
 >
@@ -193,7 +196,9 @@ API格式：
 > 轮播模式：
 > {
 > "uploadBkImg": ["https://imgbed.sanyue.site/file/6910f0b5e65ed462c1362.jpg","https://imgbed.sanyue.site/file/a73c97a1e8149114dc750.jpg"],
-> "loginBkImg":["https://imgbed.sanyue.site/file/ef803977f35a4ef4c03c2.jpg","https://imgbed.sanyue.site/file/0dbd5add3605a0b2e8994.jpg"]
+> "loginBkImg":["https://imgbed.sanyue.site/file/ef803977f35a4ef4c03c2.jpg","https://imgbed.sanyue.site/file/0dbd5add3605a0b2e8994.jpg"],
+> "ownerName": "Sanyue",
+> "logoUrl": "https://demo-cloudflare-imgbed.pages.dev/random?type=img"
 > }
 > bing随机图模式：
 > {
@@ -254,6 +259,7 @@ API格式：
 3. ~~上传页面增加管理端入口（2024.7.21已完成）~~
 4. 增加用户个性化配置接口
    - ~~登录页面和上传页面背景图自定义（2024.8.25已完成）~~
+   - ~~图床名称和Logo自定义（2024.8.26已完成）~~
 5. ~~增加随机图API（2024.7.25已完成）~~
 6. ~~完善多格式链接展示形式，增加ubb格式链接支持（2024.8.21已完成）~~
 7. ~~完善登录逻辑，后端增加认证码校验接口（2024.8.21已完成）~~
