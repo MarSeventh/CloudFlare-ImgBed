@@ -94,9 +94,9 @@
 
   2. 创建一个新的频道（Channel），进入新建的频道，选择频道管理，将刚才创建的机器人设为频道管理员。
 
-     <img src="C:\Users\King.xx\AppData\Roaming\Typora\typora-user-images\image-20240907174731039.png" style="zoom:50%;" />
+     ![](https://alist.sanyue.site/d/imgbed/202409071758534.png)
 
-     <img src="C:\Users\King.xx\AppData\Roaming\Typora\typora-user-images\image-20240907174830310.png" alt="image-20240907174830310" style="zoom:50%;" />
+     ![](https://alist.sanyue.site/d/imgbed/202409071758796.png)
 
   3. 向[@VersaToolsBot](https://t.me/VersaToolsBot)发消息，按步骤操作获取`CHAT_ID`（频道ID）
 
