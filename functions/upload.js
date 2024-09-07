@@ -30,7 +30,30 @@ function getCookieValue(cookies, name) {
 
 export async function onRequestPost(context) {  // Contents of context object
     const { request, env, params, waitUntil, next, data } = context;
+
+    // await errorHandling(context);
+    // telemetryData(context);
+
     const url = new URL(request.url);
+    const clonedRequest = await request.clone();
+
+    const formdata = await request.formData();
+    const fileType = formdata.get('file').type;
+    const fileName = formdata.get('file').name;
+
+    const fileTypeMap = {
+        'image/': {'url': 'sendPhoto', 'type': 'photo'},
+        'video/': {'url': 'sendVideo', 'type': 'video'},
+        'audio/': {'url': 'sendAudio', 'type': 'audio'},
+        'application/pdf': {'url': 'sendDocument', 'type': 'document'},
+    };
+
+    const defaultType = {'url': 'sendDocument', 'type': 'document'};
+
+    const sendFunction = Object.keys(fileTypeMap).find(key => fileType.startsWith(key)) 
+        ? fileTypeMap[Object.keys(fileTypeMap).find(key => fileType.startsWith(key))] 
+        : defaultType;
+
     // 优先从请求 URL 获取 authCode
     let authCode = url.searchParams.get('authCode');
     // 如果 URL 中没有 authCode，从 Referer 中获取
@@ -59,11 +82,14 @@ export async function onRequestPost(context) {  // Contents of context object
     if (isAuthCodeDefined(env.AUTH_CODE) && !isValidAuthCode(env.AUTH_CODE, authCode)) {
         return new UnauthorizedException("error");
     }
-    const clonedRequest = request.clone();
-    await errorHandling(context);
-    telemetryData(context);
+
     // 构建目标 URL 时剔除 authCode 参数
-    const targetUrl = new URL(url.pathname, 'https://telegra.ph');
+    // const targetUrl = new URL(url.pathname, 'https://telegra.ph'); // telegraph接口，已失效，缅怀
+    const targetUrl = new URL(`https://api.telegram.org/bot${env.TG_BOT_TOKEN}/${sendFunction.url}`); // telegram接口
+    let newFormdata = new FormData();
+    newFormdata.append('chat_id', env.TG_CHAT_ID);
+    newFormdata.append(sendFunction.type, formdata.get('file'));
+
     url.searchParams.forEach((value, key) => {
         if (key !== 'authCode') {
             targetUrl.searchParams.append(key, value);
@@ -72,16 +98,33 @@ export async function onRequestPost(context) {  // Contents of context object
     // 复制请求头并剔除 authCode
     const headers = new Headers(clonedRequest.headers);
     headers.delete('authCode');
-    const response = await fetch(targetUrl.href, {
-        method: clonedRequest.method,
-        headers: headers,
-        body: clonedRequest.body,
-    });
+
+    let res = new Response('upload error, check your environment params!', { status: 400 });
     try {
+        const response = await fetch(targetUrl.href, {
+            method: clonedRequest.method,
+            headers: {
+				"User-Agent": " Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36 Edg/121.0.0.0"
+			},
+            body: newFormdata,
+        });
         const clonedRes = await response.clone().json(); // 等待响应克隆和解析完成
+        const fileInfo = getFile(clonedRes);
+        const filePath = await getFilePath(env, fileInfo.file_id);
+        // 若上传成功，将响应返回给客户端
+        if (response.ok) {
+            res = new Response(
+                JSON.stringify([{ 'src': `/file/${fileInfo.file_id}` }]), 
+                {
+                    status: 200,
+                    headers: { 'Content-Type': 'application/json' }
+                }
+            );
+        }
         const time = new Date().getTime();
-        const src = clonedRes[0].src;
-        const id = src.split('/').pop();
+        // const src = clonedRes[0].src;
+        // const id = src.split('/').pop();
+        const id = fileInfo.file_id;
         const img_url = env.img_url;
         const apikey = env.ModerateContentApiKey;
     
@@ -94,13 +137,13 @@ export async function onRequestPost(context) {  // Contents of context object
                 });
             } else {
                 try {
-                    const fetchResponse = await fetch(`https://api.moderatecontent.com/moderate/?key=${apikey}&url=https://telegra.ph/${src}`);
+                    const fetchResponse = await fetch(`https://api.moderatecontent.com/moderate/?key=${apikey}&url=https://api.telegram.org/file/bot${env.TG_BOT_TOKEN}/${filePath}`);
                     if (!fetchResponse.ok) {
                         throw new Error(`HTTP error! status: ${fetchResponse.status}`);
                     }
                     const moderate_data = await fetchResponse.json();
                     await env.img_url.put(id, "", {
-                        metadata: { ListType: "None", Label: moderate_data.rating_label, TimeStamp: time },
+                        metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: moderate_data.rating_label, TimeStamp: time, Channel: "Telegram", TgFilePath: filePath },
                     });
                 } catch (error) {
                     console.error('Moderate Error:', error);
@@ -112,6 +155,61 @@ export async function onRequestPost(context) {  // Contents of context object
     } catch (error) {
         console.error('Error:', error);
     } finally {
-        return response;
+        return res;
     }
+}
+
+function getFile(response) {
+    try {
+		if (!response.ok) {
+			return null;
+		}
+
+		const getFileDetails = (file) => ({
+			file_id: file.file_id,
+			file_name: file.file_name || file.file_unique_id
+		});
+
+		if (response.result.photo) {
+			const largestPhoto = response.result.photo.reduce((prev, current) =>
+				(prev.file_size > current.file_size) ? prev : current
+			);
+			return getFileDetails(largestPhoto);
+		}
+
+		if (response.result.video) {
+			return getFileDetails(response.result.video);
+		}
+
+		if (response.result.document) {
+			return getFileDetails(response.result.document);
+		}
+
+		return null;
+	} catch (error) {
+		console.error('Error getting file id:', error.message);
+		return null;
+	}
+}
+
+async function getFilePath(env, file_id) {
+    try {
+        const url = `https://api.telegram.org/bot${env.TG_BOT_TOKEN}/getFile?file_id=${file_id}`;
+        const res = await fetch(url, {
+          method: 'GET',
+          headers: {
+            "User-Agent": " Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome"
+          },
+        })
+    
+        let responseData = await res.json();
+        if (responseData.ok) {
+          const file_path = responseData.result.file_path
+          return file_path
+        } else {
+          return null;
+        }
+      } catch (error) {
+        return null;
+      }
 }

@@ -1,6 +1,6 @@
 # CloudFlare-ImgBed
 
-免费图片托管解决方案，基于 Cloudflare Pages 和 telegra.ph（图片通过压缩，不受5MB大小限制） 。
+免费图片托管解决方案，基于 Cloudflare Pages 和 Telegram 。
 
 **体验地址**：[Sanyue ImgHub (demo-cloudflare-imgbed.pages.dev)](https://demo-cloudflare-imgbed.pages.dev/)
 
@@ -16,7 +16,7 @@
 
 ## 1.Introduction
 
-免费图片托管解决方案，保留原版全部功能的基础上，实现了**登录鉴权**、**页面自定义**、**上传图片预览**、**一键切换上传方式**（**拖拽上传**、**粘贴上传**）、**多文件上传**、**整体复制**、**多格式复制**、**上传前自动压缩**（可上传>5MB图片）等功能。
+免费图片托管解决方案，保留原版全部功能的基础上，实现了**登录鉴权**、**页面自定义**、**上传图片预览**、**一键切换上传方式**（**拖拽上传**、**粘贴上传**）、**多文件上传**、**整体复制**、**多格式复制**、**上传前自动压缩**（提升加载性能）等功能。
 
 ![](https://alist.sanyue.site/d/imgbed/202408191757569.png)
 
@@ -25,6 +25,8 @@
 ![](https://alist.sanyue.site/d/imgbed/202408211614665.png)
 
 ![](https://alist.sanyue.site/d/imgbed/202408211614780.png)
+
+![](https://alist.sanyue.site/d/imgbed/202409071737881.png)
 
 ## 2.Features
 
@@ -41,7 +43,7 @@
   - 支持批量上传（不限同时选择文件数量，但为了保证稳定性，同时处于上传状态的文件最多为10个）
   - 上传显示实时上传进度
   - **上传后图片无需手动点击，可直接展示在管理页面中**
-  - **突破5MB大小限制，超过5MB的图片上传前会自动压缩**（超过5MB的视频暂不支持）
+  - **大于5MB在前端进行压缩，提升上传稳定性和加载性能**
   
 - **多样化复制**
   
@@ -78,13 +80,31 @@
 
 ### 3.1直接使用
 
-**部署方式**与**环境变量**和原仓库保持一致。（**修改完环境变量，重新部署才能生效**，见[3.1章最后一节](#3.1.10注意！！！)）
+**注意修改完环境变量，重新部署才能生效**，见[3.1章最后一节](#3.1.10注意！！！)
 
 #### 3.1.1提前准备
 
+- **Telegram的`BOT_TOKEN`和`CHAT_ID`**
+
+  首先需要拥有一个Telegram账户，然后按照以下步骤获取`BOT_TOKEN`和`CHAT_ID`。
+
+  1. 向[@BotFather](https://t.me/BotFather)发送`/newbot`，按照提示输入bot的备注、用户名等信息。成功创建后获得`BOT_TOKEN`。
+
+     ![](https://alist.sanyue.site/d/imgbed/202409071744569.png)
+
+  2. 创建一个新的频道（Channel），进入新建的频道，选择频道管理，将刚才创建的机器人设为频道管理员。
+
+     <img src="C:\Users\King.xx\AppData\Roaming\Typora\typora-user-images\image-20240907174731039.png" style="zoom:50%;" />
+
+     <img src="C:\Users\King.xx\AppData\Roaming\Typora\typora-user-images\image-20240907174830310.png" alt="image-20240907174830310" style="zoom:50%;" />
+
+  3. 向[@VersaToolsBot](https://t.me/VersaToolsBot)发消息，按步骤操作获取`CHAT_ID`（频道ID）
+
+     ![](https://alist.sanyue.site/d/imgbed/202409071751619.png)
+
 - **部署于Cloudflare**
 
-  只需准备一个**Cloudflare账户**，然后按照[3.1.2.1节](#3.1.2.1部署于Cloudflare)的步骤即可完成部署。
+  需准备一个**Cloudflare账户**，然后按照[3.1.2.1节](#3.1.2.1部署于Cloudflare)的步骤即可完成部署。
 
 - **部署于服务器**
 
@@ -96,7 +116,7 @@
 
 ##### 3.1.2.1部署于Cloudflare
 
-依托于CF的强大能力，只需简单 3 步，即可部署本项目，拥有自己的图床。
+依托于CF的强大能力，只需简单几步，即可部署本项目，拥有自己的图床。
 
 1. Fork 本仓库 (注意：必须使用 Git 或者 Wrangler 命令行工具部署后才能正常使用，[文档](https://developers.cloudflare.com/pages/functions/get-started/#deploy-your-function))
 
@@ -104,7 +124,9 @@
 
 ![1](https://alist.sanyue.site/d/imgbed/202407201047300.png)
 
-3. 按照页面提示输入项目名称，选择需要连接的 git 仓库，点击`部署站点`即可完成部署
+3. 按照页面提示输入项目名称，选择需要连接的 git 仓库，点击`部署站点`
+3. 将3.1.1中获取的`BOT_TOKEN`和`CHAT_ID`分别添加到环境变量中，对应**环境变量名为`TG_BOT_TOKEN`和`TG_CHAT_ID`**。
+3. `重试部署`，此时项目即可正常使用
 
 ##### 3.1.2.2部署于服务器
 
@@ -112,7 +134,7 @@
 
 2. 切换到项目根目录，运行`npm install`，安装所需依赖。
 
-3. 在项目根目录下新建`wrangler.toml`配置文件，其内容为项目名称，环境变量等，可根据后文环境变量配置进行个性化修改。（详情参见官方文档[Configuration - Wrangler (cloudflare.com)](https://developers.cloudflare.com/workers/wrangler/configuration/)）
+3. 在项目根目录下新建`wrangler.toml`配置文件，其内容为项目名称，环境变量（**包括`TG_BOT_TOKEN`和`TG_CHAT_ID`等必填参数**）等，可根据后文环境变量配置进行个性化修改。（详情参见官方文档[Configuration - Wrangler (cloudflare.com)](https://developers.cloudflare.com/workers/wrangler/configuration/)）
 
    > 配置文件样例：
    >
@@ -125,6 +147,8 @@
    > AllowRandom = "true"
    > BASIC_USER = "user"
    > BASIC_PASS = "pass"
+   > TG_BOT_TOKEN = "your_bot_token"
+   > TG_CHAT_ID = "your_bot_id"
    > ```
 
 4. 在项目根目录下运行`npm run start`，至此，正常情况下项目已经成功部署。
