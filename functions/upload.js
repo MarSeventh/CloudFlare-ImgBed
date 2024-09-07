@@ -133,7 +133,7 @@ export async function onRequestPost(context) {  // Contents of context object
         } else {
             if (apikey == undefined || apikey == null || apikey == "") {
                 await env.img_url.put(id, "", {
-                    metadata: { ListType: "None", Label: "None", TimeStamp: time },
+                    metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: "None", TimeStamp: time, Channel: "Telegram", TgFilePath: filePath },
                 });
             } else {
                 try {
