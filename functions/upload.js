@@ -41,10 +41,10 @@ export async function onRequestPost(context) {  // Contents of context object
     const fileType = formdata.get('file').type;
     const fileName = formdata.get('file').name;
     let fileExt = fileName.split('.').pop(); // 文件扩展名
-    if (fileExt === fileName) {
+    if (!isExtValid(fileExt)) {
         // 如果文件名中没有扩展名，尝试从文件类型中获取
         fileExt = fileType.split('/').pop();
-        if (fileExt === fileType) {
+        if (!isExtValid(fileExt)) {
             // Type中无法获取扩展名
             fileExt = 'jpeg' // 默认扩展名
         }
@@ -222,4 +222,8 @@ async function getFilePath(env, file_id) {
       } catch (error) {
         return null;
       }
+}
+
+function isExtValid(fileExt) {
+    return ['jpeg', 'jpg', 'png', 'gif', 'webp', 'mp4', 'mp3', 'ogg', 'pdf'].includes(fileExt);
 }
