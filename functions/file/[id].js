@@ -1,3 +1,5 @@
+let targetUrl = '';
+
 export async function onRequest(context) {  // Contents of context object
     const {
         request, // same as existing Worker API
@@ -29,7 +31,6 @@ export async function onRequest(context) {  // Contents of context object
     }
     const imgRecord = await env.img_url.getWithMetadata(params.id);
 
-    let targetUrl = '';
     if (imgRecord.metadata?.Channel === 'Telegram') {
         targetUrl = `https://api.telegram.org/file/bot${env.TG_BOT_TOKEN}/${imgRecord.metadata.TgFilePath}`;
     } else {
@@ -39,29 +40,33 @@ export async function onRequest(context) {  // Contents of context object
     const encodedFileName = encodeURIComponent(fileName);
     const fileType = imgRecord.metadata?.FileType || 'image/jpeg';
 
-    const response = await fetch(targetUrl, {
-        method: request.method,
-        headers: request.headers,
-        body: request.body,
-    }).then(async (response) => {
+    const response = await getFileContent(request, imgRecord, params.id, env, url);
+    
+    try {
+        const headers = new Headers(response.headers);
+        headers.set('Content-Disposition', `inline; filename="${encodedFileName}"`);
+        headers.set('Content-Type', fileType);
+        const newRes =  new Response(response.body, {
+            status: response.status,
+            statusText: response.statusText,
+            headers,
+        });
+
         if (response.ok) {
             // Referer header equal to the admin page
-            console.log(url.origin + "/admin")
             if (request.headers.get('Referer') == url.origin + "/admin") {
                 //show the image
-                return response;
+                return newRes;
             }
 
             if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") { } else {
                 //check the record from kv
                 const record = await env.img_url.getWithMetadata(params.id);
                 if (record.metadata === null) {
-
                 } else {
-
                     //if the record is not null, redirect to the image
                     if (record.metadata.ListType == "White") {
-                        return response;
+                        return newRes;
                     } else if (record.metadata.ListType == "Block") {
                         console.log("Referer")
                         console.log(request.headers.get('Referer'))
@@ -79,60 +84,77 @@ export async function onRequest(context) {  // Contents of context object
                         }
                     }
                     //check if the env variables WhiteList_Mode are set
-                    console.log("env.WhiteList_Mode:", env.WhiteList_Mode)
                     if (env.WhiteList_Mode == "true") {
                         //if the env variables WhiteList_Mode are set, redirect to the image
                         return Response.redirect(url.origin + "/whitelist-on.html", 302);
                     } else {
                         //if the env variables WhiteList_Mode are not set, redirect to the image
-                        return response;
+                        return newRes;
                     }
                 }
-
-            }
-
-            //get time
-            let time = new Date().getTime();
-
-            let apikey = env.ModerateContentApiKey
-
-            if (typeof apikey == "undefined" || apikey == null || apikey == "") {
-
-                if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") {
-                    console.log("Not enbaled KV")
-                } else {
-                    //add image to kv
-                    await env.img_url.put(params.id, "", {
-                        metadata: { ListType: "None", Label: "None", TimeStamp: time },
-                    });
-
-                }
-            } else {
-                await fetch(`https://api.moderatecontent.com/moderate/?key=` + apikey + `&url=${targetUrl}`).
-                then(async (response) => {
-                    let moderate_data = await response.json();
-                    if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") { } else {
-                        //add image to kv
-                        await env.img_url.put(params.id, "", {
-                            metadata: { ListType: "None", Label: moderate_data.rating_label, TimeStamp: time },
-                        });
-                    }
-                    if (moderate_data.rating_label == "adult") {
-                        return Response.redirect(url.origin + "/block-img.html", 302)
-                    }
-                });
-
             }
         }
-        return response;
-    });
+        return newRes;
+    } catch (error) {
+        return new Response('Error: ' + error, { status: 500 });
+    }
+}
 
-    const headers = new Headers(response.headers);
-    headers.set('Content-Disposition', `inline; filename="${encodedFileName}"`);
-    headers.set('Content-Type', fileType);
-    return new Response(response.body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers,
-    });
+async function getFileContent(request, imgRecord, file_id, env, url, max_retries = 2) {
+    let retries = 0;
+    while (retries <= max_retries) {
+        try {
+            const response = await fetch(targetUrl, {
+                method: request.method,
+                headers: request.headers,
+                body: request.body,
+            });
+            if (response.ok || response.status === 304) {
+                return response;
+            } else {
+                // 若为TG渠道，更新TgFilePath
+                if (imgRecord.metadata?.Channel === 'Telegram') {
+                    const filePath = await getFilePath(env, file_id);
+                    if (filePath) {
+                        imgRecord.metadata.TgFilePath = filePath;
+                        await env.img_url.put(file_id, "", {
+                            metadata: imgRecord.metadata,
+                        });
+                        // 更新targetUrl
+                        if (imgRecord.metadata?.Channel === 'Telegram') {
+                            targetUrl = `https://api.telegram.org/file/bot${env.TG_BOT_TOKEN}/${imgRecord.metadata.TgFilePath}`;
+                        } else {
+                            targetUrl = 'https://telegra.ph/' + url.pathname + url.search;
+                        }
+                    }
+                }
+                retries++;
+            }
+        } catch (error) {
+            retries++;
+        }
+    }
+    return null;
+}
+
+async function getFilePath(env, file_id) {
+    try {
+        const url = `https://api.telegram.org/bot${env.TG_BOT_TOKEN}/getFile?file_id=${file_id}`;
+        const res = await fetch(url, {
+          method: 'GET',
+          headers: {
+            "User-Agent": " Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome"
+          },
+        })
+    
+        let responseData = await res.json();
+        if (responseData.ok) {
+          const file_path = responseData.result.file_path
+          return file_path
+        } else {
+          return null;
+        }
+      } catch (error) {
+        return null;
+      }
 }
