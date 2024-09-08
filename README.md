@@ -93,9 +93,9 @@
 
 - **Telegram的`BOT_TOKEN`和`CHAT_ID`**
 
-  首先需要拥有一个Telegram账户，然后按照以下步骤获取`BOT_TOKEN`和`CHAT_ID`。
+  首先需要拥有一个Telegram账户，然后按照以下步骤获取`TG_BOT_TOKEN`和`TG_CHAT_ID`。
 
-  1. 向[@BotFather](https://t.me/BotFather)发送`/newbot`，按照提示输入bot的备注、用户名等信息。成功创建后获得`BOT_TOKEN`。
+  1. 向[@BotFather](https://t.me/BotFather)发送`/newbot`，按照提示输入bot的备注、用户名等信息。成功创建后获得`TG_BOT_TOKEN`。
 
      ![](https://alist.sanyue.site/d/imgbed/202409071744569.png)
 
@@ -105,7 +105,7 @@
 
      ![](https://alist.sanyue.site/d/imgbed/202409071758796.png)
 
-  3. 向[@VersaToolsBot](https://t.me/VersaToolsBot)发消息，按步骤操作获取`CHAT_ID`（频道ID）
+  3. 向[@VersaToolsBot](https://t.me/VersaToolsBot)发消息，按步骤操作获取`TG_CHAT_ID`（频道ID）
 
      ![](https://alist.sanyue.site/d/imgbed/202409071751619.png)
 
