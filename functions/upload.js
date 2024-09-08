@@ -40,6 +40,15 @@ export async function onRequestPost(context) {  // Contents of context object
     const formdata = await request.formData();
     const fileType = formdata.get('file').type;
     const fileName = formdata.get('file').name;
+    let fileExt = fileName.split('.').pop(); // 文件扩展名
+    if (fileExt === fileName) {
+        // 如果文件名中没有扩展名，尝试从文件类型中获取
+        fileExt = fileType.split('/').pop();
+        if (fileExt === fileType) {
+            // Type中无法获取扩展名
+            fileExt = 'jpeg' // 默认扩展名
+        }
+    }
 
     const fileTypeMap = {
         'image/': {'url': 'sendPhoto', 'type': 'photo'},
@@ -114,7 +123,7 @@ export async function onRequestPost(context) {  // Contents of context object
         // 若上传成功，将响应返回给客户端
         if (response.ok) {
             res = new Response(
-                JSON.stringify([{ 'src': `/file/${fileInfo.file_id}` }]), 
+                JSON.stringify([{ 'src': `/file/${fileInfo.file_id}.${fileExt}` }]), 
                 {
                     status: 200,
                     headers: { 'Content-Type': 'application/json' }
@@ -125,6 +134,7 @@ export async function onRequestPost(context) {  // Contents of context object
         // const src = clonedRes[0].src;
         // const id = src.split('/').pop();
         const id = fileInfo.file_id;
+        const fullId = id + '.' + fileExt;
         const img_url = env.img_url;
         const apikey = env.ModerateContentApiKey;
     
@@ -132,7 +142,7 @@ export async function onRequestPost(context) {  // Contents of context object
             // img_url 未定义或为空的处理逻辑
         } else {
             if (apikey == undefined || apikey == null || apikey == "") {
-                await env.img_url.put(id, "", {
+                await env.img_url.put(fullId, "", {
                     metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: "None", TimeStamp: time, Channel: "Telegram", TgFilePath: filePath },
                 });
             } else {
@@ -142,7 +152,7 @@ export async function onRequestPost(context) {  // Contents of context object
                         throw new Error(`HTTP error! status: ${fetchResponse.status}`);
                     }
                     const moderate_data = await fetchResponse.json();
-                    await env.img_url.put(id, "", {
+                    await env.img_url.put(fullId, "", {
                         metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: moderate_data.rating_label, TimeStamp: time, Channel: "Telegram", TgFilePath: filePath },
                     });
                 } catch (error) {

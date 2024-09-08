@@ -9,7 +9,7 @@ export async function onRequest(context) {  // Contents of context object
         next, // used for middleware or to fetch assets
         data, // arbitrary space for passing data between middlewares
     } = context;
-
+    const TgFileID = params.id.split('.')[0]; // 文件 ID
     const url = new URL(request.url);
     let Referer = request.headers.get('Referer')
     if (Referer) {
@@ -40,7 +40,7 @@ export async function onRequest(context) {  // Contents of context object
     const encodedFileName = encodeURIComponent(fileName);
     const fileType = imgRecord.metadata?.FileType || 'image/jpeg';
 
-    const response = await getFileContent(request, imgRecord, params.id, env, url);
+    const response = await getFileContent(request, imgRecord, TgFileID, env, url);
     
     try {
         const headers = new Headers(response.headers);
