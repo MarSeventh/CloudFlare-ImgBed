@@ -1,6 +1,6 @@
 # CloudFlare-ImgBed
 
-免费图片托管解决方案，基于 Cloudflare Pages 和 Telegram （文件大小不建议超过20MB，超过的图片会**自动压缩**）。
+免费图片托管解决方案，基于 Cloudflare Pages 和 Telegram （文件大小不建议超过20MB，过大图片会**自动压缩**）。
 
 **体验地址**：[Sanyue ImgHub (demo-cloudflare-imgbed.pages.dev)](https://demo-cloudflare-imgbed.pages.dev/)
 
@@ -50,7 +50,7 @@
   - 支持批量上传（不限同时选择文件数量，但为了保证稳定性，同时处于上传状态的文件最多为10个）
   - 上传显示实时上传进度
   - **上传后图片无需手动点击，可直接展示在管理页面中**
-  - **大于20MB在前端进行压缩，提升上传稳定性和加载性能**
+  - **过大图片在前端进行压缩，提升上传稳定性和加载性能**
   
 - **多样化复制**
   
