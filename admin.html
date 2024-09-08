@@ -227,6 +227,12 @@
       transform: scale(1.5);
       z-index: 10;
     }
+
+    .video-preview {
+      width: 100%; 
+      height: auto;
+      display: block;
+    }
   </style>
 </head>
 <body>
@@ -273,11 +279,23 @@
           <template v-for="(item, index) in paginatedTableData" :key="index">
             <el-card>
               <el-checkbox v-model="item.selected"></el-checkbox>
+              <!-- 如果文件类型是视频，使用 <video> 标签显示视频预览 -->
+              <video v-if="item.metadata?.FileType?.includes('video')" 
+                :src="'/file/' + item.name" 
+                autoplay 
+                muted
+                loop
+                class="video-preview">
+                你的浏览器不支持视频播放
+              </video>
+              <!-- 如果文件类型不是视频，显示图片预览 -->
               <el-image
+                v-else
                 :src="'/file/' + item.name"
                 :preview-src-list="['/file/' + item.name]"
                 fit="cover"
-                lazy></el-image>
+                lazy>
+              </el-image>
               <div class="image-overlay">
                 <div class="overlay-buttons">
                   <el-button size="mini" type="primary" @click.stop="handleCopy(index, item.name)">复制地址</el-button>
@@ -356,7 +374,16 @@
             type: 'warning'
           }).then(() => {
             fetch(`./api/manage/delete/${key}`, { method: 'GET', credentials: 'include' })
-              .then(response => response.ok ? this.tableData.splice(index, 1) : Promise.reject())
+              .then(response => {
+                if (response.ok) {
+                  const fileIndex = this.tableData.findIndex(file => file.name === key);
+                  if (fileIndex !== -1) {
+                    this.tableData.splice(fileIndex, 1);
+                  }
+                } else {
+                  return Promise.reject('请求失败');
+                }
+              })
               .then(() => {
                 this.updateStats();
                 this.$message.success('删除成功!');
