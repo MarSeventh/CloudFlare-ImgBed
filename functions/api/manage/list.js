@@ -8,20 +8,19 @@ export async function onRequest(context) {
       next, // used for middleware or to fetch assets
       data, // arbitrary space for passing data between middlewares
     } = context;
-    const value = await env.img_url.list();
-    //let res=[]
-    //for (let i in value.keys){
-      //add to res
-      //"metadata":{"TimeStamp":19876541,"ListType":"None","rating_label":"None"}
-      //let tmp = {
-      //  name: value.keys[i].name,
-      //  TimeStamp: value.keys[i].metadata.TimeStamp,
-      //  ListType: value.keys[i].metadata.ListType,
-      //  rating_label: value.keys[i].metadata.rating_label,
-      //}
-      //res.push(tmp)
-    //}
-    const info = JSON.stringify(value.keys);
+    let allRecords = [];
+    let cursor = null;
+
+    do {
+      const records = await env.img_url.list({
+        limit: 1000,
+        cursor,
+      });
+      allRecords.push(...records.keys);
+      cursor = records.cursor;
+    } while (cursor);
+
+    const info = JSON.stringify(allRecords);
     return new Response(info);
 
   }

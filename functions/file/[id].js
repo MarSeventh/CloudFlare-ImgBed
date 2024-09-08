@@ -27,14 +27,23 @@ export async function onRequest(context) {  // Contents of context object
             return Response.redirect(new URL("/block-img.html", request.url).href, 302); // Ensure URL is correctly formed
         }
     }
+    const imgRecord = await env.img_url.getWithMetadata(params.id);
 
-    const response = fetch('https://telegra.ph/' + url.pathname + url.search, {
+    let targetUrl = '';
+    if (imgRecord.metadata?.Channel === 'Telegram') {
+        targetUrl = `https://api.telegram.org/file/bot${env.TG_BOT_TOKEN}/${imgRecord.metadata.TgFilePath}`;
+    } else {
+        targetUrl = 'https://telegra.ph/' + url.pathname + url.search;
+    }
+    const fileName = imgRecord.metadata?.FileName || 'file';
+    const encodedFileName = encodeURIComponent(fileName);
+    const fileType = imgRecord.metadata?.FileType || 'image/jpeg';
+
+    const response = await fetch(targetUrl, {
         method: request.method,
         headers: request.headers,
         body: request.body,
     }).then(async (response) => {
-        console.log(response.ok); // true if the response status is 2xx
-        console.log(response.status); // 200
         if (response.ok) {
             // Referer header equal to the admin page
             console.log(url.origin + "/admin")
@@ -46,8 +55,6 @@ export async function onRequest(context) {  // Contents of context object
             if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") { } else {
                 //check the record from kv
                 const record = await env.img_url.getWithMetadata(params.id);
-                console.log("record")
-                console.log(record)
                 if (record.metadata === null) {
 
                 } else {
@@ -93,7 +100,6 @@ export async function onRequest(context) {  // Contents of context object
 
                 if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") {
                     console.log("Not enbaled KV")
-
                 } else {
                     //add image to kv
                     await env.img_url.put(params.id, "", {
@@ -102,7 +108,7 @@ export async function onRequest(context) {  // Contents of context object
 
                 }
             } else {
-                await fetch(`https://api.moderatecontent.com/moderate/?key=` + apikey + `&url=https://telegra.ph/` + url.pathname + url.search).
+                await fetch(`https://api.moderatecontent.com/moderate/?key=` + apikey + `&url=${targetUrl}`).
                 then(async (response) => {
                     let moderate_data = await response.json();
                     if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") { } else {
@@ -121,6 +127,12 @@ export async function onRequest(context) {  // Contents of context object
         return response;
     });
 
-    return response;
-
+    const headers = new Headers(response.headers);
+    headers.set('Content-Disposition', `inline; filename="${encodedFileName}"`);
+    headers.set('Content-Type', fileType);
+    return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+    });
 }
