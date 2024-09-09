@@ -91,7 +91,7 @@
 
 #### 3.1.1提前准备
 
-- **Telegram的`BOT_TOKEN`和`CHAT_ID`**
+- **Telegram的`TG_BOT_TOKEN`和`TG_CHAT_ID`**
 
   首先需要拥有一个Telegram账户，然后按照以下步骤获取`TG_BOT_TOKEN`和`TG_CHAT_ID`。
 
@@ -132,7 +132,7 @@
 ![1](https://alist.sanyue.site/d/imgbed/202407201047300.png)
 
 3. 按照页面提示输入项目名称，选择需要连接的 git 仓库，点击`部署站点`
-3. 将3.1.1中获取的`BOT_TOKEN`和`CHAT_ID`分别添加到环境变量中，对应**环境变量名为`TG_BOT_TOKEN`和`TG_CHAT_ID`**。
+3. 将3.1.1中获取的`TG_BOT_TOKEN`和`TG_CHAT_ID`分别添加到环境变量中，对应**环境变量名为`TG_BOT_TOKEN`和`TG_CHAT_ID`**。
 3. `重试部署`，此时项目即可正常使用
 
 ##### 3.1.2.2部署于服务器
