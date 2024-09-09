@@ -129,7 +129,7 @@
 
 依托于CF的强大能力，只需简单几步，即可部署本项目，拥有自己的图床。
 
-1. Fork 本仓库 (注意：必须使用 Git 或者 Wrangler 命令行工具部署后才能正常使用，[文档](https://developers.cloudflare.com/pages/functions/get-started/#deploy-your-function))
+1. Fork 本仓库
 
 2. 打开 Cloudflare Dashboard，进入 Pages 管理页面，选择创建项目，选择`连接到 Git 提供程序`
 
