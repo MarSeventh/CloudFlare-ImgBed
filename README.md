@@ -17,7 +17,11 @@
 
 > [!IMPORTANT]
 >
-> 由于telegraph图床被滥用，该项目上传渠道已切换至Telegram Channel，请按照文档中的部署要求设置`TG_BOT_TOKEN`和`TG_CHAT_ID`，否则将无法正常使用上传功能。
+> 由于telegraph图床被滥用，该项目上传渠道已切换至Telegram Channel，请按照文档中的部署要求**设置`TG_BOT_TOKEN`和`TG_CHAT_ID`**，否则将无法正常使用上传功能。
+>
+> 此外，目前**KV数据库为必须配置**，如果以前未配置请按照文档说明配置。
+>
+> 出现问题，请先查看第5节常见问题Q&A部分。
 
 ## 1.Introduction
 
