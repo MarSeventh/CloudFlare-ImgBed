@@ -1,6 +1,6 @@
 # CloudFlare-ImgBed
 
-免费图片托管解决方案，基于 Cloudflare Pages 和 Telegram （文件大小不建议超过20MB，超过的图片会**自动压缩**）。
+免费图片托管解决方案，基于 Cloudflare Pages 和 Telegram （文件大小不建议超过20MB，过大图片会**自动压缩**）。
 
 **体验地址**：[Sanyue ImgHub (demo-cloudflare-imgbed.pages.dev)](https://demo-cloudflare-imgbed.pages.dev/)
 
@@ -9,6 +9,7 @@
 **相关优质博文（感谢每一位鼎力支持的热心大佬）：**
 
 - [完全免费，图文教程手把手教你使用cloudflare搭建一个无限空间的私人图床 支持身份认证与成人元素鉴定！ - yunsen2025的小窝](https://www.yunsen2025.top/archives/265)
+- [利用cloudflare pages搭建telegram频道图床 (lepidus.me)](https://blogstr.lepidus.me/post/1725801323700/)
 
 **前端仓库**：[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)
 
@@ -20,7 +21,9 @@
 
 ## 1.Introduction
 
-免费图片托管解决方案，保留原版全部功能的基础上，实现了**登录鉴权**、**页面自定义**、**上传图片预览**、**一键切换上传方式**（**拖拽上传**、**粘贴上传**）、**多文件上传**、**整体复制**、**多格式复制**、**上传前自动压缩**（提升加载性能）等功能。
+免费图片托管解决方案，保留原版全部功能（**后台管理、图片审查**等）的基础上，实现了**登录鉴权**、**页面自定义**、**上传图片预览**、**一键切换上传方式**（**拖拽上传**、**粘贴上传**）、**多文件上传**、**整体复制**、**多格式复制**、**上传前自动压缩**（提升加载性能）等功能。
+
+此外，拖拽上传的方式**并没有严格限制文件类型**，理论上你可以上传**任何**不超过20MB的文件，但是暂时不会针对图片和视频外的文件进行特殊优化和适配。
 
 ![](https://alist.sanyue.site/d/imgbed/202408191757569.png)
 
@@ -47,7 +50,7 @@
   - 支持批量上传（不限同时选择文件数量，但为了保证稳定性，同时处于上传状态的文件最多为10个）
   - 上传显示实时上传进度
   - **上传后图片无需手动点击，可直接展示在管理页面中**
-  - **大于20MB在前端进行压缩，提升上传稳定性和加载性能**
+  - **过大图片在前端进行压缩，提升上传稳定性和加载性能**
   
 - **多样化复制**
   
@@ -88,11 +91,11 @@
 
 #### 3.1.1提前准备
 
-- **Telegram的`BOT_TOKEN`和`CHAT_ID`**
+- **Telegram的`TG_BOT_TOKEN`和`TG_CHAT_ID`**
 
-  首先需要拥有一个Telegram账户，然后按照以下步骤获取`BOT_TOKEN`和`CHAT_ID`。
+  首先需要拥有一个Telegram账户，然后按照以下步骤获取`TG_BOT_TOKEN`和`TG_CHAT_ID`。
 
-  1. 向[@BotFather](https://t.me/BotFather)发送`/newbot`，按照提示输入bot的备注、用户名等信息。成功创建后获得`BOT_TOKEN`。
+  1. 向[@BotFather](https://t.me/BotFather)发送`/newbot`，按照提示输入bot的备注、用户名等信息。成功创建后获得`TG_BOT_TOKEN`。
 
      ![](https://alist.sanyue.site/d/imgbed/202409071744569.png)
 
@@ -102,7 +105,7 @@
 
      ![](https://alist.sanyue.site/d/imgbed/202409071758796.png)
 
-  3. 向[@VersaToolsBot](https://t.me/VersaToolsBot)发消息，按步骤操作获取`CHAT_ID`（频道ID）
+  3. 向[@VersaToolsBot](https://t.me/VersaToolsBot)发消息，按步骤操作获取`TG_CHAT_ID`（频道ID）
 
      ![](https://alist.sanyue.site/d/imgbed/202409071751619.png)
 
@@ -129,7 +132,7 @@
 ![1](https://alist.sanyue.site/d/imgbed/202407201047300.png)
 
 3. 按照页面提示输入项目名称，选择需要连接的 git 仓库，点击`部署站点`
-3. 将3.1.1中获取的`BOT_TOKEN`和`CHAT_ID`分别添加到环境变量中，对应**环境变量名为`TG_BOT_TOKEN`和`TG_CHAT_ID`**。
+3. 将3.1.1中获取的`TG_BOT_TOKEN`和`TG_CHAT_ID`分别添加到环境变量中，对应**环境变量名为`TG_BOT_TOKEN`和`TG_CHAT_ID`**。
 3. `重试部署`，此时项目即可正常使用
 
 ##### 3.1.2.2部署于服务器
