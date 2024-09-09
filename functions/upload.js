@@ -31,13 +31,13 @@ function getCookieValue(cookies, name) {
 export async function onRequestPost(context) {  // Contents of context object
     const { request, env, params, waitUntil, next, data } = context;
 
-    // await errorHandling(context);
-    // telemetryData(context);
-
     const url = new URL(request.url);
     const clonedRequest = await request.clone();
 
-    const formdata = await request.formData();
+    await errorHandling(context);
+    telemetryData(context);
+
+    const formdata = await clonedRequest.formData();
     const fileType = formdata.get('file').type;
     const fileName = formdata.get('file').name;
     let fileExt = fileName.split('.').pop(); // 文件扩展名
