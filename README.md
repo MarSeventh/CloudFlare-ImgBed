@@ -4,6 +4,10 @@
 
 **体验地址**：[Sanyue ImgHub (demo-cloudflare-imgbed.pages.dev)](https://demo-cloudflare-imgbed.pages.dev/)
 
+> 访问码：cfbed
+>
+> **为什么有人攻击我的演示站！一直上传重复的图片什么意思？维护项目已经很累了，请自重好吗？**
+
 **体验视频**：[CloudFlare免费图床，轻松守护你的每一份精彩！_哔哩哔哩_bilibili](https://www.bilibili.com/video/BV1y3WGe4EGh/?vd_source=da5ecbe595e41089cd1bed95932b8bfd)
 
 **相关优质博文（感谢每一位鼎力支持的热心大佬）：**
