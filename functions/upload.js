@@ -31,13 +31,18 @@ function getCookieValue(cookies, name) {
 export async function onRequestPost(context) {  // Contents of context object
     const { request, env, params, waitUntil, next, data } = context;
 
-    // await errorHandling(context);
-    // telemetryData(context);
-
     const url = new URL(request.url);
     const clonedRequest = await request.clone();
 
-    const formdata = await request.formData();
+    await errorHandling(context);
+    telemetryData(context);
+
+    if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") {
+        // img_url 未定义或为空的处理逻辑
+        return new Response('Error: Please configure KV database', { status: 500 });
+    } 
+
+    const formdata = await clonedRequest.formData();
     const fileType = formdata.get('file').type;
     const fileName = formdata.get('file').name;
     let fileExt = fileName.split('.').pop(); // 文件扩展名
@@ -135,31 +140,26 @@ export async function onRequestPost(context) {  // Contents of context object
         // const id = src.split('/').pop();
         const id = fileInfo.file_id;
         const fullId = id + '.' + fileExt;
-        const img_url = env.img_url;
         const apikey = env.ModerateContentApiKey;
     
-        if (img_url == undefined || img_url == null || img_url == "") {
-            // img_url 未定义或为空的处理逻辑
+        if (apikey == undefined || apikey == null || apikey == "") {
+            await env.img_url.put(fullId, "", {
+                metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: "None", TimeStamp: time, Channel: "Telegram", TgFilePath: filePath },
+            });
         } else {
-            if (apikey == undefined || apikey == null || apikey == "") {
-                await env.img_url.put(fullId, "", {
-                    metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: "None", TimeStamp: time, Channel: "Telegram", TgFilePath: filePath },
-                });
-            } else {
-                try {
-                    const fetchResponse = await fetch(`https://api.moderatecontent.com/moderate/?key=${apikey}&url=https://api.telegram.org/file/bot${env.TG_BOT_TOKEN}/${filePath}`);
-                    if (!fetchResponse.ok) {
-                        throw new Error(`HTTP error! status: ${fetchResponse.status}`);
-                    }
-                    const moderate_data = await fetchResponse.json();
-                    await env.img_url.put(fullId, "", {
-                        metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: moderate_data.rating_label, TimeStamp: time, Channel: "Telegram", TgFilePath: filePath },
-                    });
-                } catch (error) {
-                    console.error('Moderate Error:', error);
-                } finally {
-                    console.log('Moderate Done');
+            try {
+                const fetchResponse = await fetch(`https://api.moderatecontent.com/moderate/?key=${apikey}&url=https://api.telegram.org/file/bot${env.TG_BOT_TOKEN}/${filePath}`);
+                if (!fetchResponse.ok) {
+                    throw new Error(`HTTP error! status: ${fetchResponse.status}`);
                 }
+                const moderate_data = await fetchResponse.json();
+                await env.img_url.put(fullId, "", {
+                    metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: moderate_data.rating_label, TimeStamp: time, Channel: "Telegram", TgFilePath: filePath },
+                });
+            } catch (error) {
+                console.error('Moderate Error:', error);
+            } finally {
+                console.log('Moderate Done');
             }
         }
     } catch (error) {

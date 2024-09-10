@@ -461,10 +461,19 @@
       mounted() {
         fetch("./api/manage/check", { method: 'GET', credentials: 'include' })
           .then(response => response.text())
-          .then(result => result === "true" ? this.showLogoutButton = true : window.location.href = "./api/manage/login")
-          .catch(() => this.$message.error('同步数据时出错，请检查网络连接'));
-
-        fetch("./api/manage/list", { method: 'GET', credentials: 'include' })
+          .then(result => {
+            if(result == "true"){
+              this.showLogoutButton=true;
+              // 在 check 成功后再执行 list 的 fetch 请求
+              return fetch("./api/manage/list", { method: 'GET', credentials: 'include' });
+            } else if(result=="Not using basic auth."){
+              return fetch("./api/manage/list", { method: 'GET', credentials: 'include' });
+            }
+            else{
+              window.location.href="./api/manage/login";
+              return Promise.reject();
+            }
+          })
           .then(response => response.json())
           .then(result => {
             this.tableData = result.map(file => ({ ...file, selected: false }));

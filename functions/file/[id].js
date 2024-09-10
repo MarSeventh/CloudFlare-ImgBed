@@ -29,6 +29,10 @@ export async function onRequest(context) {  // Contents of context object
             return Response.redirect(new URL("/block-img.html", request.url).href, 302); // Ensure URL is correctly formed
         }
     }
+    // 检查是否配置了 KV 数据库
+    if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") {
+        return new Response('Error: Please configure KV database', { status: 500 });
+    }
     const imgRecord = await env.img_url.getWithMetadata(params.id);
 
     if (imgRecord.metadata?.Channel === 'Telegram') {
