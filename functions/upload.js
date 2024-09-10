@@ -55,6 +55,13 @@ export async function onRequestPost(context) {  // Contents of context object
         }
     }
 
+    // 由于TG会把gif后缀的文件转为视频，所以需要修改后缀名绕过限制
+    if (fileExt === 'gif') {
+        const newFileName = fileName.replace(/\.gif$/, '.jpeg');
+        const newFile = new File([formdata.get('file')], newFileName, { type: fileType });
+        formdata.set('file', newFile);
+    }
+
     const fileTypeMap = {
         'image/': {'url': 'sendPhoto', 'type': 'photo'},
         'video/': {'url': 'sendVideo', 'type': 'video'},
@@ -64,9 +71,14 @@ export async function onRequestPost(context) {  // Contents of context object
 
     const defaultType = {'url': 'sendDocument', 'type': 'document'};
 
-    const sendFunction = Object.keys(fileTypeMap).find(key => fileType.startsWith(key)) 
+    let sendFunction = Object.keys(fileTypeMap).find(key => fileType.startsWith(key)) 
         ? fileTypeMap[Object.keys(fileTypeMap).find(key => fileType.startsWith(key))] 
         : defaultType;
+
+    // GIF 特殊处理
+    if (fileType === 'image/gif' || fileExt === 'gif') {
+        sendFunction = {'url': 'sendAnimation', 'type': 'animation'};
+    }
 
     // 优先从请求 URL 获取 authCode
     let authCode = url.searchParams.get('authCode');
@@ -103,6 +115,7 @@ export async function onRequestPost(context) {  // Contents of context object
     let newFormdata = new FormData();
     newFormdata.append('chat_id', env.TG_CHAT_ID);
     newFormdata.append(sendFunction.type, formdata.get('file'));
+
 
     url.searchParams.forEach((value, key) => {
         if (key !== 'authCode') {
