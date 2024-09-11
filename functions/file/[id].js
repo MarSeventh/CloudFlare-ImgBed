@@ -35,7 +35,7 @@ export async function onRequest(context) {  // Contents of context object
     }
     const imgRecord = await env.img_url.getWithMetadata(params.id);
     // 图片是否存在
-    if (imgRecord === null) {
+    if (imgRecord === null || imgRecord?.metadata === null) {
         return new Response('Error: Image not found', { status: 404 });
     }
 
@@ -49,6 +49,9 @@ export async function onRequest(context) {  // Contents of context object
     const fileType = imgRecord.metadata?.FileType || 'image/jpeg';
 
     const response = await getFileContent(request, imgRecord, TgFileID, env, url);
+    if (response === null) {
+        return new Response('Error: Failed to fetch image', { status: 500 });
+    }
     
     try {
         const headers = new Headers(response.headers);
