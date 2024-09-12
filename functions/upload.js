@@ -153,8 +153,6 @@ export async function onRequestPost(context) {  // Contents of context object
             );
         }
         const time = new Date().getTime();
-        // const src = clonedRes[0].src;
-        // const id = src.split('/').pop();
         const id = fileInfo.file_id;
         const fullId = id + '.' + fileExt;
         const apikey = env.ModerateContentApiKey;

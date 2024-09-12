@@ -34,6 +34,10 @@ export async function onRequest(context) {  // Contents of context object
         return new Response('Error: Please configure KV database', { status: 500 });
     }
     const imgRecord = await env.img_url.getWithMetadata(params.id);
+    // 图片是否存在
+    if (imgRecord === null || imgRecord?.metadata === null) {
+        return new Response('Error: Image not found', { status: 404 });
+    }
 
     if (imgRecord.metadata?.Channel === 'Telegram') {
         targetUrl = `https://api.telegram.org/file/bot${env.TG_BOT_TOKEN}/${imgRecord.metadata.TgFilePath}`;
@@ -45,6 +49,9 @@ export async function onRequest(context) {  // Contents of context object
     const fileType = imgRecord.metadata?.FileType || 'image/jpeg';
 
     const response = await getFileContent(request, imgRecord, TgFileID, env, url);
+    if (response === null) {
+        return new Response('Error: Failed to fetch image', { status: 500 });
+    }
     
     try {
         const headers = new Headers(response.headers);
