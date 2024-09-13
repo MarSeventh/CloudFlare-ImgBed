@@ -81,8 +81,8 @@ export async function onRequest(context) {  // Contents of context object
         });
 
         if (response.ok) {
-            // Referer header equal to the admin page
-            if (request.headers.get('Referer') == url.origin + "/admin") {
+            // Referer header equal to the dashboard page
+            if (request.headers.get('Referer') == url.origin + "/dashboard") {
                 //show the image
                 return newRes;
             }
