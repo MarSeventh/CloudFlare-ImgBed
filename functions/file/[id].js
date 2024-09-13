@@ -48,7 +48,7 @@ export async function onRequest(context) {  // Contents of context object
     const encodedFileName = encodeURIComponent(fileName);
     const fileType = imgRecord.metadata?.FileType || 'image/jpeg';
 
-    const response = await getFileContent(request, imgRecord, TgFileID, env, url);
+    const response = await getFileContent(request, imgRecord, TgFileID, params.id, env, url);
     if (response === null) {
         return new Response('Error: Failed to fetch image', { status: 500 });
     }
@@ -111,7 +111,7 @@ export async function onRequest(context) {  // Contents of context object
     }
 }
 
-async function getFileContent(request, imgRecord, file_id, env, url, max_retries = 2) {
+async function getFileContent(request, imgRecord, file_id, store_id, env, url, max_retries = 2) {
     let retries = 0;
     while (retries <= max_retries) {
         try {
@@ -128,7 +128,7 @@ async function getFileContent(request, imgRecord, file_id, env, url, max_retries
                     const filePath = await getFilePath(env, file_id);
                     if (filePath) {
                         imgRecord.metadata.TgFilePath = filePath;
-                        await env.img_url.put(file_id, "", {
+                        await env.img_url.put(store_id, "", {
                             metadata: imgRecord.metadata,
                         });
                         // 更新targetUrl
