@@ -81,9 +81,7 @@ async function errorHandling(context) {
     }else{
         if (context.request.headers.has('Authorization')) {
             // Throws exception when authorization fails.
-            const { user, pass } = basicAuthentication(context.request);
-            
-                          
+            const { user, pass } = basicAuthentication(context.request);                         
                 if (context.env.BASIC_USER !== user || context.env.BASIC_PASS !== pass) {
                     return UnauthorizedException('Invalid credentials.');
                 }else{
@@ -96,6 +94,7 @@ async function errorHandling(context) {
                 headers: {
                 // Prompts the user for credentials.
                 'WWW-Authenticate': 'Basic realm="my scope", charset="UTF-8"',
+                // 'WWW-Authenticate': 'None',
                 },
             });
         }
