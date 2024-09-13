@@ -163,7 +163,7 @@ export async function onRequestPost(context) {  // Contents of context object
         const apikey = env.ModerateContentApiKey;
     
         if (apikey == undefined || apikey == null || apikey == "") {
-            await env.img_url.put(encodedFullId, "", {
+            await env.img_url.put(fullId, "", {
                 metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: "None", TimeStamp: time, Channel: "TelegramNew", TgFilePath: filePath, TgFileId: id },
             });
         } else {
@@ -173,7 +173,7 @@ export async function onRequestPost(context) {  // Contents of context object
                     throw new Error(`HTTP error! status: ${fetchResponse.status}`);
                 }
                 const moderate_data = await fetchResponse.json();
-                await env.img_url.put(encodedFullId, "", {
+                await env.img_url.put(fullId, "", {
                     metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: moderate_data.rating_label, TimeStamp: time, Channel: "TelegramNew", TgFilePath: filePath, TgFileId: id  },
                 });
             } catch (error) {
