@@ -9,7 +9,7 @@ export async function onRequest(context) {  // Contents of context object
         next, // used for middleware or to fetch assets
         data, // arbitrary space for passing data between middlewares
     } = context;
-    const TgFileID = params.id.split('.')[0]; // 文件 ID
+
     const url = new URL(request.url);
     let Referer = request.headers.get('Referer')
     if (Referer) {
@@ -39,14 +39,29 @@ export async function onRequest(context) {  // Contents of context object
         return new Response('Error: Image not found', { status: 404 });
     }
 
-    if (imgRecord.metadata?.Channel === 'Telegram') {
+    if (isTgChannel(imgRecord)) {
         targetUrl = `https://api.telegram.org/file/bot${env.TG_BOT_TOKEN}/${imgRecord.metadata.TgFilePath}`;
     } else {
         targetUrl = 'https://telegra.ph/' + url.pathname + url.search;
     }
-    const fileName = imgRecord.metadata?.FileName || 'file';
+    const fileName = imgRecord.metadata?.FileName || params.id;
     const encodedFileName = encodeURIComponent(fileName);
-    const fileType = imgRecord.metadata?.FileType || 'image/jpeg';
+    const fileType = imgRecord.metadata?.FileType || null;
+    //const TgFileID = params.id.split('.')[0]; // 文件 ID
+
+    let TgFileID = ''; // Tg的file_id
+    if (imgRecord.metadata?.Channel === 'Telegram') {
+        // id为file_id + ext
+        TgFileID = params.id.split('.')[0];
+    } else if (imgRecord.metadata?.Channel === 'TelegramNew') {
+        // id为unique_id + file_name
+        TgFileID = imgRecord.metadata?.TgFileId;
+        if (TgFileID === null) {
+            return new Response('Error: Failed to fetch image', { status: 500 });
+        }
+    } else {
+        // 旧版telegraph
+    }
 
     const response = await getFileContent(request, imgRecord, TgFileID, params.id, env, url);
     if (response === null) {
@@ -56,7 +71,9 @@ export async function onRequest(context) {  // Contents of context object
     try {
         const headers = new Headers(response.headers);
         headers.set('Content-Disposition', `inline; filename="${encodedFileName}"`);
-        headers.set('Content-Type', fileType);
+        if (fileType) {
+            headers.set('Content-Type', fileType);
+        }
         const newRes =  new Response(response.body, {
             status: response.status,
             statusText: response.statusText,
@@ -124,7 +141,7 @@ async function getFileContent(request, imgRecord, file_id, store_id, env, url, m
                 return response;
             } else {
                 // 若为TG渠道，更新TgFilePath
-                if (imgRecord.metadata?.Channel === 'Telegram') {
+                if (isTgChannel(imgRecord)) {
                     const filePath = await getFilePath(env, file_id);
                     if (filePath) {
                         imgRecord.metadata.TgFilePath = filePath;
@@ -132,7 +149,7 @@ async function getFileContent(request, imgRecord, file_id, store_id, env, url, m
                             metadata: imgRecord.metadata,
                         });
                         // 更新targetUrl
-                        if (imgRecord.metadata?.Channel === 'Telegram') {
+                        if (isTgChannel(imgRecord)) {
                             targetUrl = `https://api.telegram.org/file/bot${env.TG_BOT_TOKEN}/${imgRecord.metadata.TgFilePath}`;
                         } else {
                             targetUrl = 'https://telegra.ph/' + url.pathname + url.search;
@@ -168,4 +185,8 @@ async function getFilePath(env, file_id) {
       } catch (error) {
         return null;
       }
+}
+
+function isTgChannel(imgRecord) {
+    return imgRecord.metadata?.Channel === 'Telegram' || imgRecord.metadata?.Channel === 'TelegramNew';
 }
