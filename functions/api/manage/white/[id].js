@@ -8,12 +8,12 @@ export async function onRequest(context) {
       next, // used for middleware or to fetch assets
       data, // arbitrary space for passing data between middlewares
     } = context;
-    console.log(env)
-    console.log(params.id)
+    // 解码params.id
+    params.id = decodeURIComponent(params.id);
+
     //read the metadata
     const value = await env.img_url.getWithMetadata(params.id);
-    console.log(value)
-    //"metadata":{"TimeStamp":19876541,"ListType":"None","rating_label":"None"}
+
     //change the metadata
     value.metadata.ListType = "White"
     await env.img_url.put(params.id,"",{metadata: value.metadata});
