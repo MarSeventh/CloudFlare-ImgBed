@@ -24,11 +24,11 @@ export async function onRequest(context) {  // Contents of context object
                     return domainPattern.test(refererUrl.hostname);
                 });
                 if (!isAllowed) {
-                    return Response.redirect(new URL("/block-img.html", request.url).href, 302); // Ensure URL is correctly formed
+                    return Response.redirect(new URL("/blockimg", request.url).href, 302); // Ensure URL is correctly formed
                 }
             }
         } catch (e) {
-            return Response.redirect(new URL("/block-img.html", request.url).href, 302); // Ensure URL is correctly formed
+            return Response.redirect(new URL("/blockimg", request.url).href, 302); // Ensure URL is correctly formed
         }
     }
     // 检查是否配置了 KV 数据库
@@ -101,22 +101,22 @@ export async function onRequest(context) {  // Contents of context object
                         console.log("Referer")
                         console.log(request.headers.get('Referer'))
                         if (typeof request.headers.get('Referer') == "undefined" || request.headers.get('Referer') == null || request.headers.get('Referer') == "") {
-                            return Response.redirect(url.origin + "/block-img.html", 302)
+                            return Response.redirect(url.origin + "/blockimg", 302)
                         } else {
-                            return Response.redirect("https://static-res.pages.dev/teleimage/img-block-compressed.png", 302)
+                            return new Response('Error: Image Blocked', { status: 404 });
                         }
 
                     } else if (record.metadata.Label == "adult") {
                         if (typeof request.headers.get('Referer') == "undefined" || request.headers.get('Referer') == null || request.headers.get('Referer') == "") {
-                            return Response.redirect(url.origin + "/block-img.html", 302)
+                            return Response.redirect(url.origin + "/blockimg", 302)
                         } else {
-                            return Response.redirect("https://static-res.pages.dev/teleimage/img-block-compressed.png", 302)
+                            return new Response('Error: Image Blocked', { status: 404 });
                         }
                     }
                     //check if the env variables WhiteList_Mode are set
                     if (env.WhiteList_Mode == "true") {
                         //if the env variables WhiteList_Mode are set, redirect to the image
-                        return Response.redirect(url.origin + "/whitelist-on.html", 302);
+                        return Response.redirect(url.origin + "/whiteliston", 302);
                     } else {
                         //if the env variables WhiteList_Mode are not set, redirect to the image
                         return newRes;
