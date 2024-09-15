@@ -3,10 +3,7 @@ name: Create Release with Zip
 on:
   push:
     branches:
-      - master
-  pull_request:
-    branches:
-      - master
+      - main
 
 jobs:
   create-release:
