@@ -9,8 +9,13 @@ export async function onRequest(context) {  // Contents of context object
         next, // used for middleware or to fetch assets
         data, // arbitrary space for passing data between middlewares
     } = context;
-    // 解码params.id
-    params.id = decodeURIComponent(params.id);
+
+    try {
+        // 解码params.id
+        params.id = decodeURIComponent(params.id);
+    } catch (e) {
+        return new Response('Error: Decode Image ID Failed', { status: 400 });
+    }
     
     const url = new URL(request.url);
     let Referer = request.headers.get('Referer')
@@ -41,11 +46,6 @@ export async function onRequest(context) {  // Contents of context object
         return new Response('Error: Image not found', { status: 404 });
     }
 
-    if (isTgChannel(imgRecord)) {
-        targetUrl = `https://api.telegram.org/file/bot${env.TG_BOT_TOKEN}/${imgRecord.metadata.TgFilePath}`;
-    } else {
-        targetUrl = 'https://telegra.ph/' + url.pathname + url.search;
-    }
     const fileName = imgRecord.metadata?.FileName || params.id;
     const encodedFileName = encodeURIComponent(fileName);
     const fileType = imgRecord.metadata?.FileType || null;
@@ -65,7 +65,19 @@ export async function onRequest(context) {  // Contents of context object
         // 旧版telegraph
     }
 
-    const response = await getFileContent(request, imgRecord, TgFileID, params.id, env, url);
+    // 构建目标 URL
+    if (isTgChannel(imgRecord)) {
+        // 获取TG图片真实地址
+        const filePath = await getFilePath(env, TgFileID);
+        if (filePath === null) {
+            return new Response('Error: Failed to fetch image path', { status: 500 });
+        }
+        targetUrl = `https://api.telegram.org/file/bot${env.TG_BOT_TOKEN}/${filePath}`;
+    } else {
+        targetUrl = 'https://telegra.ph/' + url.pathname + url.search;
+    }
+
+    const response = await getFileContent(request);
     if (response === null) {
         return new Response('Error: Failed to fetch image', { status: 500 });
     }
@@ -130,7 +142,7 @@ export async function onRequest(context) {  // Contents of context object
     }
 }
 
-async function getFileContent(request, imgRecord, file_id, store_id, env, url, max_retries = 2) {
+async function getFileContent(request, max_retries = 2) {
     let retries = 0;
     while (retries <= max_retries) {
         try {
@@ -142,22 +154,6 @@ async function getFileContent(request, imgRecord, file_id, store_id, env, url, m
             if (response.ok || response.status === 304) {
                 return response;
             } else {
-                // 若为TG渠道，更新TgFilePath
-                if (isTgChannel(imgRecord)) {
-                    const filePath = await getFilePath(env, file_id);
-                    if (filePath) {
-                        imgRecord.metadata.TgFilePath = filePath;
-                        await env.img_url.put(store_id, "", {
-                            metadata: imgRecord.metadata,
-                        });
-                        // 更新targetUrl
-                        if (isTgChannel(imgRecord)) {
-                            targetUrl = `https://api.telegram.org/file/bot${env.TG_BOT_TOKEN}/${imgRecord.metadata.TgFilePath}`;
-                        } else {
-                            targetUrl = 'https://telegra.ph/' + url.pathname + url.search;
-                        }
-                    }
-                }
                 retries++;
             }
         } catch (error) {

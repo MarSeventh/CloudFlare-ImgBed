@@ -149,7 +149,6 @@ export async function onRequestPost(context) {  // Contents of context object
         // 构建独一无二的 ID
         const unique_index = time + Math.floor(Math.random() * 10000);
         const fullId = fileName? unique_index + '_' + fileName : unique_index + '.' + fileExt;
-        const encodedFullId = encodeURIComponent(fullId);
         // 若上传成功，将响应返回给客户端
         if (response.ok) {
             res = new Response(
@@ -164,7 +163,7 @@ export async function onRequestPost(context) {  // Contents of context object
     
         if (apikey == undefined || apikey == null || apikey == "") {
             await env.img_url.put(fullId, "", {
-                metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: "None", TimeStamp: time, Channel: "TelegramNew", TgFilePath: filePath, TgFileId: id },
+                metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: "None", TimeStamp: time, Channel: "TelegramNew", TgFileId: id },
             });
         } else {
             try {
@@ -174,7 +173,7 @@ export async function onRequestPost(context) {  // Contents of context object
                 }
                 const moderate_data = await fetchResponse.json();
                 await env.img_url.put(fullId, "", {
-                    metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: moderate_data.rating_label, TimeStamp: time, Channel: "TelegramNew", TgFilePath: filePath, TgFileId: id  },
+                    metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: moderate_data.rating_label, TimeStamp: time, Channel: "TelegramNew", TgFileId: id  },
                 });
             } catch (error) {
                 console.error('Moderate Error:', error);
