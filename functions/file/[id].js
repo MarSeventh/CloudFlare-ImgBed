@@ -41,11 +41,8 @@ export async function onRequest(context) {  // Contents of context object
         return new Response('Error: Please configure KV database', { status: 500 });
     }
     const imgRecord = await env.img_url.getWithMetadata(params.id);
-    // 图片是否存在
-    if (imgRecord === null || imgRecord?.metadata === null) {
-        return new Response('Error: Image not found', { status: 404 });
-    }
-
+    // 如果meatdata不存在，只可能是之前未设置KV，且存储在Telegraph上的图片，那么在后面获取时会返回404错误，此处不用处理
+    
     const fileName = imgRecord.metadata?.FileName || params.id;
     const encodedFileName = encodeURIComponent(fileName);
     const fileType = imgRecord.metadata?.FileType || null;
@@ -80,6 +77,8 @@ export async function onRequest(context) {  // Contents of context object
     const response = await getFileContent(request);
     if (response === null) {
         return new Response('Error: Failed to fetch image', { status: 500 });
+    } else if (response.status === 404) {
+        return new Response('Error: Image Not Found', { status: 404 });
     }
     
     try {
@@ -153,6 +152,8 @@ async function getFileContent(request, max_retries = 2) {
             });
             if (response.ok || response.status === 304) {
                 return response;
+            } else if (response.status === 404) {
+                return new Response('Error: Image Not Found', { status: 404 });
             } else {
                 retries++;
             }
