@@ -12,15 +12,24 @@ export async function onRequest(context) {
     const protocol = requestUrl.protocol;
     const domain = requestUrl.hostname;
     const port = requestUrl.port;
-    const list = await env.img_url.list();
+    let allRecords = [];
+    let cursor = null;
+    do {
+        const records = await env.img_url.list({
+            limit: 1000,
+            cursor,
+        });
+        allRecords.push(...records.keys);
+        cursor = records.cursor;
+    } while (cursor);
     if (env.AllowRandom != "true") {
         return new Response(JSON.stringify({ error: "Random is disabled" }), { status: 403 });
     }
-    if (list.keys.length == 0) {
+    if (allRecords.length == 0) {
         return new Response(JSON.stringify({}), { status: 200 });
     } else {
-        const randomIndex = Math.floor(Math.random() * list.keys.length);
-        const randomKey = list.keys[randomIndex];
+        const randomIndex = Math.floor(Math.random() * allRecords.length);
+        const randomKey = allRecords[randomIndex];
         const randomPath = '/file/' + randomKey.name;
         let randomUrl = randomPath;
         const randomType = requestUrl.searchParams.get('type');
@@ -37,8 +46,12 @@ export async function onRequest(context) {
         if (randomType == 'img') {
             // Return an image response
             randomUrl = protocol + '//' + domain + ':' + port + randomPath;
-            return new Response(await fetch(randomUrl).then(res => res.blob()), {
-                headers: { 'Content-Type': 'image/jpeg' },
+            let contentType = 'image/jpeg';
+            return new Response(await fetch(randomUrl).then(res => {
+                contentType = res.headers.get('content-type');
+                return res.blob();
+            }), {
+                headers: contentType ? { 'Content-Type': contentType } : { 'Content-Type': 'image/jpeg' },
                 status: 200
             });
         }

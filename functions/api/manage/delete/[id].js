@@ -8,8 +8,9 @@ export async function onRequest(context) {
       next, // used for middleware or to fetch assets
       data, // arbitrary space for passing data between middlewares
     } = context;
-    console.log(env)
-    console.log(params.id)
+    // 解码params.id
+    params.id = decodeURIComponent(params.id);
+    
     await env.img_url.delete(params.id);
     const info = JSON.stringify(params.id);
     return new Response(info);

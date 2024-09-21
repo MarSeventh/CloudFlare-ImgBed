@@ -1,3 +1,5 @@
+let targetUrl = '';
+
 export async function onRequest(context) {  // Contents of context object
     const {
         request, // same as existing Worker API
@@ -8,6 +10,13 @@ export async function onRequest(context) {  // Contents of context object
         data, // arbitrary space for passing data between middlewares
     } = context;
 
+    try {
+        // 解码params.id
+        params.id = decodeURIComponent(params.id);
+    } catch (e) {
+        return new Response('Error: Decode Image ID Failed', { status: 400 });
+    }
+    
     const url = new URL(request.url);
     let Referer = request.headers.get('Referer')
     if (Referer) {
@@ -20,119 +29,163 @@ export async function onRequest(context) {  // Contents of context object
                     return domainPattern.test(refererUrl.hostname);
                 });
                 if (!isAllowed) {
-                    return Response.redirect(new URL("/block-img.html", request.url).href, 302); // Ensure URL is correctly formed
+                    return Response.redirect(new URL("/blockimg", request.url).href, 302); // Ensure URL is correctly formed
                 }
             }
         } catch (e) {
-            return Response.redirect(new URL("/block-img.html", request.url).href, 302); // Ensure URL is correctly formed
+            return Response.redirect(new URL("/blockimg", request.url).href, 302); // Ensure URL is correctly formed
         }
     }
+    // 检查是否配置了 KV 数据库
+    if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") {
+        return new Response('Error: Please configure KV database', { status: 500 });
+    }
     const imgRecord = await env.img_url.getWithMetadata(params.id);
+    // 如果meatdata不存在，只可能是之前未设置KV，且存储在Telegraph上的图片，那么在后面获取时会返回404错误，此处不用处理
+    
+    const fileName = imgRecord.metadata?.FileName || params.id;
+    const encodedFileName = encodeURIComponent(fileName);
+    const fileType = imgRecord.metadata?.FileType || null;
+    //const TgFileID = params.id.split('.')[0]; // 文件 ID
 
-    let targetUrl = '';
+    let TgFileID = ''; // Tg的file_id
     if (imgRecord.metadata?.Channel === 'Telegram') {
-        targetUrl = `https://api.telegram.org/file/bot${env.TG_BOT_TOKEN}/${imgRecord.metadata.TgFilePath}`;
+        // id为file_id + ext
+        TgFileID = params.id.split('.')[0];
+    } else if (imgRecord.metadata?.Channel === 'TelegramNew') {
+        // id为unique_id + file_name
+        TgFileID = imgRecord.metadata?.TgFileId;
+        if (TgFileID === null) {
+            return new Response('Error: Failed to fetch image', { status: 500 });
+        }
+    } else {
+        // 旧版telegraph
+    }
+
+    // 构建目标 URL
+    if (isTgChannel(imgRecord)) {
+        // 获取TG图片真实地址
+        const filePath = await getFilePath(env, TgFileID);
+        if (filePath === null) {
+            return new Response('Error: Failed to fetch image path', { status: 500 });
+        }
+        targetUrl = `https://api.telegram.org/file/bot${env.TG_BOT_TOKEN}/${filePath}`;
     } else {
         targetUrl = 'https://telegra.ph/' + url.pathname + url.search;
     }
-    const fileName = imgRecord.metadata?.FileName || 'file';
-    const encodedFileName = encodeURIComponent(fileName);
-    const fileType = imgRecord.metadata?.FileType || 'image/jpeg';
 
-    const response = await fetch(targetUrl, {
-        method: request.method,
-        headers: request.headers,
-        body: request.body,
-    }).then(async (response) => {
+    const response = await getFileContent(request);
+    if (response === null) {
+        return new Response('Error: Failed to fetch image', { status: 500 });
+    } else if (response.status === 404) {
+        return new Response('Error: Image Not Found', { status: 404 });
+    }
+    
+    try {
+        const headers = new Headers(response.headers);
+        headers.set('Content-Disposition', `inline; filename="${encodedFileName}"`);
+        if (fileType) {
+            headers.set('Content-Type', fileType);
+        }
+        const newRes =  new Response(response.body, {
+            status: response.status,
+            statusText: response.statusText,
+            headers,
+        });
+
         if (response.ok) {
-            // Referer header equal to the admin page
-            console.log(url.origin + "/admin")
-            if (request.headers.get('Referer') == url.origin + "/admin") {
+            // Referer header equal to the dashboard page
+            if (request.headers.get('Referer') == url.origin + "/dashboard") {
                 //show the image
-                return response;
+                return newRes;
             }
 
             if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") { } else {
                 //check the record from kv
                 const record = await env.img_url.getWithMetadata(params.id);
                 if (record.metadata === null) {
-
                 } else {
-
                     //if the record is not null, redirect to the image
                     if (record.metadata.ListType == "White") {
-                        return response;
+                        return newRes;
                     } else if (record.metadata.ListType == "Block") {
                         console.log("Referer")
                         console.log(request.headers.get('Referer'))
                         if (typeof request.headers.get('Referer') == "undefined" || request.headers.get('Referer') == null || request.headers.get('Referer') == "") {
-                            return Response.redirect(url.origin + "/block-img.html", 302)
+                            return Response.redirect(url.origin + "/blockimg", 302)
                         } else {
-                            return Response.redirect("https://static-res.pages.dev/teleimage/img-block-compressed.png", 302)
+                            return new Response('Error: Image Blocked', { status: 404 });
                         }
 
                     } else if (record.metadata.Label == "adult") {
                         if (typeof request.headers.get('Referer') == "undefined" || request.headers.get('Referer') == null || request.headers.get('Referer') == "") {
-                            return Response.redirect(url.origin + "/block-img.html", 302)
+                            return Response.redirect(url.origin + "/blockimg", 302)
                         } else {
-                            return Response.redirect("https://static-res.pages.dev/teleimage/img-block-compressed.png", 302)
+                            return new Response('Error: Image Blocked', { status: 404 });
                         }
                     }
                     //check if the env variables WhiteList_Mode are set
-                    console.log("env.WhiteList_Mode:", env.WhiteList_Mode)
                     if (env.WhiteList_Mode == "true") {
                         //if the env variables WhiteList_Mode are set, redirect to the image
-                        return Response.redirect(url.origin + "/whitelist-on.html", 302);
+                        return Response.redirect(url.origin + "/whiteliston", 302);
                     } else {
                         //if the env variables WhiteList_Mode are not set, redirect to the image
-                        return response;
+                        return newRes;
                     }
                 }
-
-            }
-
-            //get time
-            let time = new Date().getTime();
-
-            let apikey = env.ModerateContentApiKey
-
-            if (typeof apikey == "undefined" || apikey == null || apikey == "") {
-
-                if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") {
-                    console.log("Not enbaled KV")
-                } else {
-                    //add image to kv
-                    await env.img_url.put(params.id, "", {
-                        metadata: { ListType: "None", Label: "None", TimeStamp: time },
-                    });
-
-                }
-            } else {
-                await fetch(`https://api.moderatecontent.com/moderate/?key=` + apikey + `&url=${targetUrl}`).
-                then(async (response) => {
-                    let moderate_data = await response.json();
-                    if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") { } else {
-                        //add image to kv
-                        await env.img_url.put(params.id, "", {
-                            metadata: { ListType: "None", Label: moderate_data.rating_label, TimeStamp: time },
-                        });
-                    }
-                    if (moderate_data.rating_label == "adult") {
-                        return Response.redirect(url.origin + "/block-img.html", 302)
-                    }
-                });
-
             }
         }
-        return response;
-    });
+        return newRes;
+    } catch (error) {
+        return new Response('Error: ' + error, { status: 500 });
+    }
+}
 
-    const headers = new Headers(response.headers);
-    headers.set('Content-Disposition', `inline; filename="${encodedFileName}"`);
-    headers.set('Content-Type', fileType);
-    return new Response(response.body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers,
-    });
+async function getFileContent(request, max_retries = 2) {
+    let retries = 0;
+    while (retries <= max_retries) {
+        try {
+            const response = await fetch(targetUrl, {
+                method: request.method,
+                headers: request.headers,
+                body: request.body,
+            });
+            if (response.ok || response.status === 304) {
+                return response;
+            } else if (response.status === 404) {
+                return new Response('Error: Image Not Found', { status: 404 });
+            } else {
+                retries++;
+            }
+        } catch (error) {
+            retries++;
+        }
+    }
+    return null;
+}
+
+async function getFilePath(env, file_id) {
+    try {
+        const url = `https://api.telegram.org/bot${env.TG_BOT_TOKEN}/getFile?file_id=${file_id}`;
+        const res = await fetch(url, {
+          method: 'GET',
+          headers: {
+            "User-Agent": " Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome"
+          },
+        })
+    
+        let responseData = await res.json();
+        if (responseData.ok) {
+          const file_path = responseData.result.file_path
+          return file_path
+        } else {
+          return null;
+        }
+      } catch (error) {
+        return null;
+      }
+}
+
+function isTgChannel(imgRecord) {
+    return imgRecord.metadata?.Channel === 'Telegram' || imgRecord.metadata?.Channel === 'TelegramNew';
 }
