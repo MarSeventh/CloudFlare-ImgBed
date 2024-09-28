@@ -84,6 +84,11 @@ export async function onRequestPost(context) {  // Contents of context object
         sendFunction = {'url': 'sendAnimation', 'type': 'animation'};
     }
 
+    // 从参数中获取serverCompress，如果为false，则使用sendDocument接口
+    if (url.searchParams.get('serverCompress') === 'false') {
+        sendFunction = {'url': 'sendDocument', 'type': 'document'};
+    }
+
     // 优先从请求 URL 获取 authCode
     let authCode = url.searchParams.get('authCode');
     // 如果 URL 中没有 authCode，从 Referer 中获取
@@ -209,6 +214,10 @@ function getFile(response) {
 		if (response.result.video) {
 			return getFileDetails(response.result.video);
 		}
+
+        if (response.result.audio) {
+            return getFileDetails(response.result.audio);
+        }
 
 		if (response.result.document) {
 			return getFileDetails(response.result.document);

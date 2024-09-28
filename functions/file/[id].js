@@ -83,7 +83,7 @@ export async function onRequest(context) {  // Contents of context object
     
     try {
         const headers = new Headers(response.headers);
-        headers.set('Content-Disposition', `inline; filename="${encodedFileName}"`);
+        headers.set('Content-Disposition', `inline; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
         if (fileType) {
             headers.set('Content-Type', fileType);
         }
