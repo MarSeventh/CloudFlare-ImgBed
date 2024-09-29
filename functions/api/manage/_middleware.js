@@ -75,7 +75,6 @@ async function errorHandling(context) {
         return new Response('Dashboard is disabled. Please bind a KV namespace to use this feature.', { status: 200 });
     }
 
-    console.log(context.env.BASIC_USER)
     if(typeof context.env.BASIC_USER == "undefined" || context.env.BASIC_USER == null || context.env.BASIC_USER == ""){
         return context.next();
     }else{
