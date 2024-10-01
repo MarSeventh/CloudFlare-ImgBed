@@ -6,7 +6,6 @@
 
 > 访问码：cfbed
 >
-> **为什么有人攻击我的演示站！一直上传重复的图片什么意思？维护项目已经很累了，请自重好吗？**
 
 **体验视频**：[CloudFlare免费图床，轻松守护你的每一份精彩！_哔哩哔哩_bilibili](https://www.bilibili.com/video/BV1y3WGe4EGh/?vd_source=da5ecbe595e41089cd1bed95932b8bfd)
 
@@ -35,13 +34,7 @@
 
 此外，拖拽上传的方式**并没有严格限制文件类型**，理论上你可以上传**任何**不超过50MB的文件，但是暂时不会针对图片和视频外的文件进行特殊优化和适配。
 
-![image-20240928171020782](https://alist.sanyue.site/d/imgbed/202409281710586.png)
-
-![image-20240928171101034](https://alist.sanyue.site/d/imgbed/202409281711303.png)
-
-![image-20240928171136160](https://alist.sanyue.site/d/imgbed/202409281711243.png)
-
-![](https://alist.sanyue.site/d/imgbed/202409071737881.png)
+![CloudFlare](https://alist.sanyue.site/d/imgbed/202410011443570.png)
 
 ## 2.Features
 
