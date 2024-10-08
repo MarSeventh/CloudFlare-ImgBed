@@ -18,7 +18,7 @@ export async function errorHandling(context) {
     return sentryPlugin({
       dsn: "https://44b7b443108ec6d298044b125ff89d28@o4507644548022272.ingest.us.sentry.io/4507644555100160",
       tracesSampleRate: sampleRate,
-    })(context);;
+    })(context);
   }
   return context.next();
 }
