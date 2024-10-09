@@ -11,10 +11,10 @@ export async function onRequestPost(context) {
     //从POST请求中获取authCode
     const jsonRequest = await request.json();
     const authCode = jsonRequest.authCode;
-    //验证authCode
-    if (env.AUTH_CODE !== undefined && authCode !== env.AUTH_CODE) {
-      return new Response('Unauthorized', { status: 401 })
-    }
+    // //验证authCode
+    // if (env.AUTH_CODE !== undefined && authCode !== env.AUTH_CODE) {
+    //   return new Response('Unauthorized', { status: 401 })
+    // }
     //返回登录成功
     return new Response('Login success', { status: 200 })
 }
