@@ -156,7 +156,7 @@ export async function onRequestPost(context) {  // Contents of context object
         //const fullId = id + '.' + fileExt;
         // 构建独一无二的 ID
         const unique_index = time + Math.floor(Math.random() * 10000);
-        const fullId = fileName? unique_index + '_' + fileName : unique_index + '.' + fileExt;
+        const fullId = fileName? unique_index + '_' + authCode + '_' + fileName : unique_index + '.' + fileExt;
         // 若上传成功，将响应返回给客户端
         if (response.ok) {
             res = new Response(
