@@ -27,7 +27,7 @@
          line-height: 60px;
          font-size: xx-large;
          position: relative;
-     ">Dashboard
+     ">仪表板
      
 
      <span style="
@@ -52,13 +52,13 @@
                     @click="handleLogout()">退出登录</el-button></span></div> 
         </el-header>
         <el-main><el-row :gutter="12">
-            <el-col :span="24">
+            <el-col :span="8">
               <el-card shadow="always">
                 记录总数量:
                 {{ Number }} 
               </el-card>
             </el-col>
-            <!--<el-col :span="8">
+            <el-col :span="8">
               <el-card shadow="hover">
                 <el-tooltip class="item" effect="dark" content="白名单数量" placement="top-start">
                    
@@ -73,7 +73,7 @@
               </el-tooltip>
               黑名单数量：{{ BlackList }}
               </el-card>
-            </el-col>-->
+            </el-col>
           </el-row>
           <template>
             <el-table
@@ -186,7 +186,7 @@
           .then(response => response.text())
           .then(result => {console.log(result);
             this.tableData[index].metadata=result;})
-          .catch(error =>  {alert("An error occurred while synchronizing data with the server, please check the network connection");console.log('error', error)});
+          .catch(error =>  {alert("与服务器同步数据时发生错误，请检查网络连接。An error occurred while synchronizing data with the server, please check the network connection");console.log('error', error)});
         
         } else {
         console.log("No")
@@ -206,7 +206,7 @@
         fetch("./api/manage/delete/"+key, requestOptions)
           .then(response => response.text())
           .then(result => {console.log(result);this.tableData.remove(index);})
-          .catch(error =>  {alert("An error occurred while synchronizing data with the server, please check the network connection");console.log('error', error)});
+          .catch(error =>  {alert("与服务器同步数据时发生错误，请检查网络连接。An error occurred while synchronizing data with the server, please check the network connection");console.log('error', error)});
         
         } else {
         console.log("No")
@@ -219,13 +219,13 @@
       var requestOptions = {
         method: 'GET',
         redirect: 'follow',
-        //include authorization credientials
+        // 与服务器同步数据时发生错误，请检查网络连接 include authorization credientials
         credentials: 'include'
       };
       fetch("./api/manage/white/"+key, requestOptions)
           .then(response => response.text())
           .then(result => {console.log(result);this.tableData[index].metadata=result;})
-          .catch(error =>  {alert("An error occurred while synchronizing data with the server, please check the network connection");console.log('error', error)});
+          .catch(error =>  {alert("与服务器同步数据时发生错误，请检查网络连接。An error occurred while synchronizing data with the server, please check the network connection");console.log('error', error)});
         
         } else {
         console.log("No")
@@ -264,12 +264,12 @@
     },
       
     mounted () {
-      //check if the user is logged in
-      //read the basic auth credientials from the browser
+      // 检查用户是否已登录 check if the user is logged in
+      // 从浏览器中读取基本身份验证凭据 read the basic auth credientials from the browser
       var requestOptions = {
         method: 'GET',
         redirect: 'follow',
-        //include authorization credientials
+        // 包括授权证书 include authorization credientials
         credentials: 'include'
       };
       fetch("./api/manage/check", requestOptions)
@@ -284,7 +284,7 @@
             window.location.href="./api/manage/login";
           }
         })
-        .catch(error =>  {alert("An error occurred while synchronizing data with the server, please check the network connection");console.log('error', error)});
+        .catch(error =>  {alert("与服务器同步数据时发生错误，请检查网络连接。An error occurred while synchronizing data with the server, please check the network connection");console.log('error', error)});
 
 
 
@@ -296,7 +296,7 @@
       var requestOptions = {
   method: 'GET',
   redirect: 'follow',
-  //include authorization credientials
+  // 包括授权证书 include authorization credientials
   credentials: 'include'
   
 };
@@ -315,12 +315,12 @@ fetch("./api/manage/list", requestOptions)
   })
   .then(response => response.text()) 
   .then(result => {this.tableData=JSON.parse(result);console.log(result);this.Number=this.tableData.length})
-  .catch(error => {alert("An error occurred while synchronizing data with the server, please check the network connection");console.log('error', error)});
+  .catch(error => {alert("与服务器同步数据时发生错误，请检查网络连接。An error occurred while synchronizing data with the server, please check the network connection");console.log('error', error)});
 
     }
     })
     
-  </script><!-- Hotjar Tracking Code -->
+  </script><!-- Hotjar 跟踪代码。Hotjar Tracking Code -->
 <script>
     (function(h,o,t,j,a,r){
         h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
