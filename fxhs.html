@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+      }
+
+      .container {
+        margin: 150px 10px;
+        column-count: 4;
+        column-gap: 10px;
+      }
+
+      .item {
+        margin-bottom: 10px;
+      }
+
+      .item img {
+        width: 100%;
+        height: 100%;
+        border-radius: 10px;
+      }
+
+      .mark {
+        position: fixed;
+        top: 0;
+        left: 0;
+        /* height: 100em; */
+        width: 100%;
+      }
+
+      .dialog {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+
+        transform: translate(-50%, -50%);
+        background: #ffffff;
+        height: 660px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+        border-radius: 10px;
+        overflow: hidden;
+        transform-origin: 0 0;
+
+        /* width: 500px; */
+
+        transition: transform 0.4s ease 0s, width 0.4s ease 0s;
+        z-index: -1;
+      }
+
+      .box {
+        display: flex;
+        width: 800px;
+        height: 100%;
+      }
+
+      .dialog .left {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #000;
+        width: 500px;
+      }
+
+      .dialog .right {
+        width: 300px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: red;
+        font-size: 50px;
+      }
+
+      .dialog img {
+        width: 100%;
+        /* height: 100%; */
+        /* object-fit: cover; */
+      }
+
+      .dialog.blow-up {
+        animation: animateBlowUp 0.6s ease both;
+      }
+
+      .dialog.minifiaction {
+        animation: animateMinifiaction 0.7s ease both;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(1).jpeg" alt="" /></div>
+      <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(10).jpeg" alt="" /></div>
+      <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(11).jpeg" alt="" /></div>
+     <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(12).jpeg" alt="" /></div>
+     <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(13).jpeg" alt="" /></div>
+<div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(14).jpeg" alt="" /></div>
+     <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(15).jpeg" alt="" /></div>
+     <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(16).jpeg" alt="" /></div>
+     <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(17).jpeg" alt="" /></div>
+     <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(18).jpeg" alt="" /></div>
+     <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(19).jpeg" alt="" /></div>
+     <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(2).jpeg" alt="" /></div>
+     <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(20).jpeg" alt="" /></div>
+     <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(21).jpeg" alt="" /></div>
+     <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(22).jpeg" alt="" /></div>
+     <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(23).jpeg" alt="" /></div>
+     <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(24).jpeg" alt="" /></div>
+     <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(25).jpeg" alt="" /></div>
+     <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(26).jpeg" alt="" /></div>
+     <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(27).jpeg" alt="" /></div>
+     <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(28).jpeg" alt="" /></div>
+     <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(29).jpeg" alt="" /></div>
+     <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(3).jpeg" alt="" /></div>
+     <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(30).jpeg" alt="" /></div>
+     <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(4).jpeg" alt="" /></div>
+           <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(5).jpeg" alt="" /></div>
+      <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(6).jpeg" alt="" /></div>
+      <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(7).jpeg" alt="" /></div>
+      <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(8).jpeg" alt="" /></div>
+      <div class="item"><img src="https://raw.githubusercontent.com/GAODBK/lyg-photo-warehouse/main/1%20(9).jpeg" alt="" /></div>
+     
+    </div>
+    <div class="mark"></div>
+    <script>
+      const $mark = document.querySelector(".mark");
+      const $container = document.querySelector(".container");
+      let scale = 1;
+      $container.addEventListener("click", function (e) {
+        if (e.target.tagName === "IMG") {
+          setDialogAnimation(e.target);
+          console.log(e.target);
+        }
+      });
+      function setDialogAnimation(target) {
+        $mark.style.background = "rgba(255, 255, 255, 0.95)";
+        $mark.style.height = "100%";
+        $mark.style.zIndex = 100;
+        scale = target.offsetWidth / 500;
+        const rect = target.getBoundingClientRect();
+        const left = rect.left + rect.width / 2;
+        let top = rect.top + rect.height / 2;
+        
+        /*  const left = target.offsetLeft
+            let top = target.offsetTop
+            console.log(left, top); 
+            if (target.offsetHeight < 660 * scale) {
+                top = top + (660 * scale - target.offsetHeight) / 6
+            } */
+
+        const dialogHtml = `
+            <div 
+                class="dialog"
+                style="left: ${left}px; top: ${top}px; transform: scale(${scale})">
+                <div class="box">
+                    <div class="left">
+                        <img src="${target.src}" alt=""></div>
+                    <div class="right">loading....</div>
+                </div>
+            </div>`;
+        $mark.innerHTML = dialogHtml;
+
+        const $styleEL = document.createElement("style");
+        $styleEL.id = "animateBlowUp";
+        $styleEL.innerHTML = `
+            @keyframes animateBlowUp{
+               0%{
+                   width: 500px;
+                   transform: scale(0);
+               }
+               100%{
+                   width: 800px;
+                   left: calc(50% - 400px);
+                   top: calc(50% - 330px);
+                   transform: scale(1);
+               }
+            }`;
+
+        document.head.appendChild($styleEL);
+        $mark.innerHTML = dialogHtml;
+        document.querySelector(".dialog").classList.add("blow-up");
+        // window.history.pushState({}, "", target.src);
+      }
+
+      $mark.addEventListener("click", function () {
+        $mark.style.background = "transparent";
+        $mark.style.height = 0;
+        const $styleEL = document.createElement("style");
+        $styleEL.id = "animateMinifiaction";
+        $styleEL.innerHTML = `
+            @keyframes animateMinifiaction{
+                0%{
+                    width: 880px;
+                    left: calc(50% - 400px);
+                    top: calc(50% - 330px);
+                    transform: scale(1);
+                }
+                100%{
+                    width: 500px;
+                    transform: scale(0);
+                }
+            }`;
+        const $dialog = document.querySelector(".dialog");
+        document.head.appendChild($styleEL);
+        $dialog.classList.remove("blow-up");
+        $dialog.classList.add("minifiaction");
+        $dialog.addEventListener("animationend", function () {
+          $mark.style.zIndex = -1;
+          // $mark.style.height = 0
+          $mark.innerHTML = "";
+          const animateBlowUpEL = document.querySelector("#animateBlowUp");
+          const minifiactionEl = document.querySelector("#animateMinifiaction");
+          if (animateBlowUpEL) {
+            animateBlowUpEL.remove();
+          }
+
+          if (minifiactionEl) {
+            minifiactionEl.remove();
+          }
+
+          // window.history.back();
+        });
+      });
+    </script>
+  </body>
+</html>
