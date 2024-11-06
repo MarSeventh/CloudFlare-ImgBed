@@ -47,6 +47,12 @@ export async function onRequest(context) {  // Contents of context object
     const encodedFileName = encodeURIComponent(fileName);
     const fileType = imgRecord.metadata?.FileType || null;
     
+    // 检查文件可访问状态
+    let accessRes = await returnWithCheck(request, env, url, imgRecord);
+    if (accessRes.status !== 200) {
+        return accessRes; // 如果不可访问，直接返回
+    }
+
     // Cloudflare R2渠道
     if (imgRecord.metadata?.Channel === 'CloudflareR2') {
         // 检查是否配置了R2
@@ -73,7 +79,7 @@ export async function onRequest(context) {  // Contents of context object
             headers,
         });
 
-        return await returnWithCheck(newRes, request, env, params, url);
+        return newRes;
     }
 
     // Telegram及Telegraph渠道
@@ -123,7 +129,7 @@ export async function onRequest(context) {  // Contents of context object
         });
 
         if (response.ok) {
-            return await returnWithCheck(newRes, request, env, params, url);
+            return newRes;
         }
         return newRes;
     } catch (error) {
@@ -131,7 +137,9 @@ export async function onRequest(context) {  // Contents of context object
     }
 }
 
-async function returnWithCheck(response, request, env, params, url) {
+async function returnWithCheck(request, env, url, imgRecord) {
+    const response = new Response('good', { status: 200 });
+
     // Referer header equal to the dashboard page
     if (request.headers.get('Referer') == url.origin + "/dashboard") {
         //show the image
@@ -140,7 +148,7 @@ async function returnWithCheck(response, request, env, params, url) {
 
     if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") { } else {
         //check the record from kv
-        const record = await env.img_url.getWithMetadata(params.id);
+        const record = imgRecord;
         if (record.metadata === null) {
         } else {
             //if the record is not null, redirect to the image
@@ -170,7 +178,10 @@ async function returnWithCheck(response, request, env, params, url) {
             }
         }
     }
+    // other cases
+    return response;
 }
+
 async function getFileContent(request, max_retries = 2) {
     let retries = 0;
     while (retries <= max_retries) {
