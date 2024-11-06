@@ -2,16 +2,17 @@
   "scripts": {
     "ci-test": "concurrently --kill-others \"npm start\" \"wait-on http://localhost:8080 && mocha\"",
     "test": "mocha",
-    "start": "npx wrangler pages dev ./ --kv \"img_url\" --port 8080 --persist-to ./data"
+    "start": "npx wrangler pages dev ./ --kv \"img_url\" --r2 \"img_r2\" --port 8080 --persist-to ./data"
   },
   "dependencies": {
     "@cloudflare/pages-plugin-sentry": "^1.1.3",
-    "@sentry/tracing": "^7.114.0"
+    "@sentry/tracing": "^7.114.0",
+    "miniflare": "^3.20240718.0"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
     "mocha": "^10.6.0",
     "wait-on": "^7.2.0",
-    "wrangler": "^3.63.0"
+    "wrangler": "^3.66.0"
   }
 }
