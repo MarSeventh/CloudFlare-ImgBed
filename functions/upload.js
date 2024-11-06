@@ -149,6 +149,10 @@ export async function onRequestPost(context) {  // Contents of context object
                 });
             } catch (error) {
                 console.error('Moderate Error:', error);
+                // 将不带审查的图片写入数据库
+                await env.img_url.put(fullId, "", {
+                    metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: "None", TimeStamp: time, Channel: "CloudflareR2", UploadIP: uploadIp },
+                });
             } finally {
                 console.log('Moderate Done');
             }
@@ -262,6 +266,10 @@ export async function onRequestPost(context) {  // Contents of context object
                     });
                 } catch (error) {
                     console.error('Moderate Error:', error);
+                    // 将不带审查的图片写入数据库
+                    await env.img_url.put(fullId, "", {
+                        metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: "None", TimeStamp: time, Channel: "TelegramNew", TgFileId: id, UploadIP: uploadIp },
+                    });
                 } finally {
                     console.log('Moderate Done');
                 }
