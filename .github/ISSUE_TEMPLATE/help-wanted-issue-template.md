@@ -1,6 +1,6 @@
 ---
-name: Default issue template
-about: Default template.
+name: Help wanted issue template
+about: Help wanted template.
 title: ''
 labels: ''
 assignees: ''
