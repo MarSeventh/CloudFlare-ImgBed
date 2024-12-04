@@ -181,7 +181,7 @@
 
      ![](https://alist.sanyue.site/d/imgbed/202411052323183.png)
 
-     如果后续要开启公网访问，需要设置`R2PublicUrl`环境变量，值为前面记下的**R2存储桶公网访问链接**：
+     如果后续要开启**图像审查**，需要设置`R2PublicUrl`环境变量，值为前面记下的**R2存储桶公网访问链接**：
 
      ![](https://alist.sanyue.site/d/imgbed/202411052330663.png)
 
@@ -269,7 +269,7 @@ API格式：
 | ------------ | ------------------------------------------------------------ |
 | **接口功能** | 上传图片或视频                                               |
 | **请求方法** | POST                                                         |
-| **请求参数** | **Query参数**：<br />`authCode`，string类型，即为你设置的认证码<br />`serverCompress`，boolean类型，表示是否开启服务端压缩（仅针对图片文件、Telegram上传渠道生效）<br />`uploadChannel`，string类型，取值为`telegram`和`cfr2`，分别代表telegram bot渠道和Cloudflare R2渠道，默认为telegram bot渠道<br />**Body参数(application/form-data)**：<br />`file`，file类型，你要上传的文件 |
+| **请求参数** | **Query参数**：<br />`authCode`，string类型，即为你设置的认证码<br />`serverCompress`，boolean类型，表示是否开启服务端压缩（仅针对图片文件、Telegram上传渠道生效）<br />`uploadChannel`，string类型，取值为`telegram`和`cfr2`，分别代表telegram bot渠道和Cloudflare R2渠道，默认为telegram bot渠道<br />`nameType`，string类型，表示文件命名方式，可选值为`[default, index, origin]`，分别代表默认`前缀_原名`命名、仅前缀命名和仅原名命名法，默认为`default`<br />**Body参数(application/form-data)**：<br />`file`，file类型，你要上传的文件 |
 | **返回响应** | `data[0].src`为获得的图片链接（注意不包含域名，需要自己添加） |
 
 > **请求示例**：
@@ -413,7 +413,13 @@ API格式：
 17. ~~优化粘贴上传时文件命名方法~~（2024.9.26已完成）
 18. ~~增加对R2 bucket的支持~~（2024.11.5已完成）
 19. 管理端增加批量黑名单、白名单功能
-20. Telegram Channel渠道上传文件记录机器人和频道数据，便于迁移和备份
+20. ~~Telegram Channel渠道上传文件记录机器人和频道数据，便于迁移和备份~~（2024.12.4已完成）
+21. ~~支持自定义命名方式（仅原名 or 仅随机前缀 or 默认的随机前缀\_原名）~~（2024.12.4已完成）
+22. 支持上传失败自动切换其他渠道尝试
+23. 后端list接口实现分页功能
+24. ~~支持自定义链接前缀~~（2024.12.4已完成）
+25. 对接alist，或实现webdav（评估中）
+26. ~~R2渠道在管理端删除时，存储桶同步删除~~（2024.12.4已完成）
 
 ### 4.2Fix Bugs👻
 

@@ -87,6 +87,8 @@ export async function onRequestPost(context) {  // Contents of context object
             uploadChannel = 'TelegramNew';
             break;
     }
+    // 获取命名方式 deafult index origin
+    const nameType = url.searchParams.get('uploadNameType') || 'default';
 
     await errorHandling(context);
     telemetryData(context);
@@ -99,11 +101,15 @@ export async function onRequestPost(context) {  // Contents of context object
     const formdata = await clonedRequest.formData();
     const fileType = formdata.get('file').type;
     const fileName = formdata.get('file').name;
+    // 检查fileType和fileName是否存在
+    if (fileType === null || fileType === undefined || fileName === null || fileName === undefined) {
+        return new Response('Error: fileType or fileName is wrong, check the integrity of this file!', { status: 400 });
+    }
     let fileExt = fileName.split('.').pop(); // 文件扩展名
     if (!isExtValid(fileExt)) {
         // 如果文件名中没有扩展名，尝试从文件类型中获取
         fileExt = fileType.split('/').pop();
-        if (!isExtValid(fileExt)) {
+        if (fileExt === fileType || fileExt === '' || fileExt === null || fileExt === undefined) {
             // Type中无法获取扩展名
             fileExt = 'unknown' // 默认扩展名
         }
@@ -121,7 +127,14 @@ export async function onRequestPost(context) {  // Contents of context object
         // 构建文件ID
         const time = new Date().getTime();
         const unique_index = time + Math.floor(Math.random() * 10000);
-        const fullId = fileName? unique_index + '_' + fileName : unique_index + '.' + fileExt;
+        let fullId = '';
+        if (nameType === 'index') {
+            fullId = unique_index + '.' + fileExt;
+        } else if (nameType === 'origin') {
+            fullId = fileName? fileName : unique_index + '.' + fileExt;
+        } else {
+            fullId = fileName? unique_index + '_' + fileName : unique_index + '.' + fileExt;
+        }
 
         // 写入R2数据库
         await R2DataBase.put(fullId, formdata.get('file'));
@@ -168,6 +181,7 @@ export async function onRequestPost(context) {  // Contents of context object
             }
         );
     } else {
+        // Telegram New 渠道
         // 由于TG会把gif后缀的文件转为视频，所以需要修改后缀名绕过限制
         if (fileExt === 'gif') {
             const newFileName = fileName.replace(/\.gif$/, '.jpeg');
@@ -237,7 +251,14 @@ export async function onRequestPost(context) {  // Contents of context object
             //const fullId = id + '.' + fileExt;
             // 构建独一无二的 ID
             const unique_index = time + Math.floor(Math.random() * 10000);
-            const fullId = fileName? unique_index + '_' + fileName : unique_index + '.' + fileExt;
+            let fullId = '';
+            if (nameType === 'index') {
+                fullId = unique_index + '.' + fileExt;
+            } else if (nameType === 'origin') {
+                fullId = fileName? fileName : unique_index + '.' + fileExt;
+            } else {
+                fullId = fileName? unique_index + '_' + fileName : unique_index + '.' + fileExt;
+            }
             // 若上传成功，将响应返回给客户端
             if (response.ok) {
                 res = new Response(
@@ -252,7 +273,7 @@ export async function onRequestPost(context) {  // Contents of context object
         
             if (apikey == undefined || apikey == null || apikey == "") {
                 await env.img_url.put(fullId, "", {
-                    metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: "None", TimeStamp: time, Channel: "TelegramNew", TgFileId: id, UploadIP: uploadIp },
+                    metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: "None", TimeStamp: time, Channel: "TelegramNew", TgFileId: id, UploadIP: uploadIp, TgChatId: env.TG_CHAT_ID, TgBotToken: env.TG_BOT_TOKEN },
                 });
             } else {
                 try {
@@ -262,13 +283,13 @@ export async function onRequestPost(context) {  // Contents of context object
                     }
                     const moderate_data = await fetchResponse.json();
                     await env.img_url.put(fullId, "", {
-                        metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: moderate_data.rating_label, TimeStamp: time, Channel: "TelegramNew", TgFileId: id, UploadIP: uploadIp },
+                        metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: moderate_data.rating_label, TimeStamp: time, Channel: "TelegramNew", TgFileId: id, UploadIP: uploadIp, TgChatId: env.TG_CHAT_ID, TgBotToken: env.TG_BOT_TOKEN },
                     });
                 } catch (error) {
                     console.error('Moderate Error:', error);
                     // 将不带审查的图片写入数据库
                     await env.img_url.put(fullId, "", {
-                        metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: "None", TimeStamp: time, Channel: "TelegramNew", TgFileId: id, UploadIP: uploadIp },
+                        metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: "None", TimeStamp: time, Channel: "TelegramNew", TgFileId: id, UploadIP: uploadIp, TgChatId: env.TG_CHAT_ID, TgBotToken: env.TG_BOT_TOKEN },
                     });
                 } finally {
                     console.log('Moderate Done');

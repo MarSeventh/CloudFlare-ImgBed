@@ -10,9 +10,21 @@ export async function onRequest(context) {
     } = context;
     // 解码params.id
     params.id = decodeURIComponent(params.id);
-    
-    await env.img_url.delete(params.id);
-    const info = JSON.stringify(params.id);
-    return new Response(info);
 
+    try {
+      // 读取图片信息
+      const img = await env.img_url.getWithMetadata(params.id);
+
+      // 如果是R2渠道的图片，删除R2中对应的图片
+      if (img.metadata?.Channel === 'CloudflareR2') {
+        await env.img_r2.delete(params.id);
+      }
+
+      await env.img_url.delete(params.id);
+      const info = JSON.stringify(params.id);
+      
+      return new Response(info);
+    } catch (e) {
+      return new Response('Error: Delete Image Failed', { status: 400 });
+    }
   }
