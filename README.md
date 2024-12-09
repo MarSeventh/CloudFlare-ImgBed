@@ -2,6 +2,26 @@
 
 免费图片/文件托管解决方案，基于 Cloudflare Pages 和 Telegram，支持 Telegram Bot 存储渠道和 Cloudflare R2 存储渠道。
 
+**前端仓库**：[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)
+
+<details>
+    <summary>公告</summary>
+
+**注意**：本仓库为[Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，如果你觉得本项目不错，在支持本项目的同时，也请支持原项目。
+
+> [!IMPORTANT]
+>
+> 由于telegraph图床被滥用，该项目上传渠道已切换至Telegram Channel，请**更新至最新版（更新方式见第3.1章最后一节）**，按照文档中的部署要求**设置`TG_BOT_TOKEN`和`TG_CHAT_ID`**，否则将无法正常使用上传功能。
+>
+> 此外，目前**KV数据库为必须配置**，如果以前未配置请按照文档说明配置。
+>
+> 出现问题，请先查看第5节常见问题Q&A部分。
+
+</details>
+
+<details>
+    <summary>体验地址及优质博文（搭建或使用有问题可以先去里面学习哦~）</summary>
+
 **体验地址**：[Sanyue ImgHub (demo-cloudflare-imgbed.pages.dev)](https://demo-cloudflare-imgbed.pages.dev/)
 
 > 访问码：cfbed
@@ -16,17 +36,7 @@
 - [搭建基于CloudFlare和Telegram的免费图床教程 - 刘学馆 | Blog (sexy0769.com)](https://blog.sexy0769.com/skill/735.html)
 - [CloudFlare+Github，打造属于自己的免费图床 - 大头钉的小小blog (luckyting.top)](https://luckyting.top/index.php/archives/20/)
 
-**前端仓库**：[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)
-
-**注意**：本仓库为[Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，如果你觉得本项目不错，在支持本项目的同时，也请支持原项目。
-
-> [!IMPORTANT]
->
-> 由于telegraph图床被滥用，该项目上传渠道已切换至Telegram Channel，请**更新至最新版（更新方式见第3.1章最后一节）**，按照文档中的部署要求**设置`TG_BOT_TOKEN`和`TG_CHAT_ID`**，否则将无法正常使用上传功能。
->
-> 此外，目前**KV数据库为必须配置**，如果以前未配置请按照文档说明配置。
->
-> 出现问题，请先查看第5节常见问题Q&A部分。
+</details>
 
 ## 1.Introduction
 
@@ -38,10 +48,15 @@
 
 ## 2.Features
 
-- **开源**
-  - 前端开源（可自行修改、打包使用）
+<details>
+    <summary>项目特性</summary>
 
+- **开源**
+  
+  - 前端开源（可自行修改、打包使用）
+  
 - **炫酷的动效（**
+  
   - 流畅丝滑的过渡动画~
   - 上传文件实现呼吸灯效果
   
@@ -106,6 +121,8 @@
   >
   > 5.支持**后台图片管理**，可以对上传的图片进行在线预览，添加白名单，黑名单等操作
 
+</details>
+
 
 ## 3.Deployment
 
@@ -115,11 +132,20 @@
 
 **版本更新方式**，也请见[3.1章最后一节](#3.1.11注意！！！)
 
+<details>
+    <summary>操作详情</summary>
+
 #### 3.1.1提前准备
+
+<details>
+    <summary>准备内容</summary>
 
 ##### 3.1.1.1根据所需开通的渠道进行以下准备
 
 - 开通**Telegram Bot渠道**：**Telegram的`TG_BOT_TOKEN`和`TG_CHAT_ID`**
+
+  <details>
+      <summary>操作详情</summary>
 
   首先需要拥有一个Telegram账户，然后按照以下步骤获取`TG_BOT_TOKEN`和`TG_CHAT_ID`。
 
@@ -139,35 +165,60 @@
 
      ![](https://alist.sanyue.site/d/imgbed/202409071751619.png)
 
+  </details>
+
 - 开通**Cloudflare R2渠道**：新建一个Cloudflare R2存储桶，前提是需要绑定支付方式。
 
+  <details>
+      <summary>操作详情</summary>
+  
   1. 前往Cloudflare Dashboard，选择`R2 存储对象`
-
+  
      ![](https://alist.sanyue.site/d/imgbed/202411052318204.png)
-
+  
   2. 选择`创建存储桶`，名称随意，填完后点击`创建存储桶`即可完成创建
-
+  
      ![](https://alist.sanyue.site/d/imgbed/202411052319402.png)
-
+  
   3. 根据需求可选操作：如果**需要启用图像审查，需要开启存储桶的公网访问权限**，有两种开启方式，详见下图。无论你选择哪种方式，都需要记下完整的公网访问链接，格式为`https://xxxx.xxx`
-
+  
      ![image-20241105232759131](https://alist.sanyue.site/d/imgbed/202411052327191.png)
+  
+  </details>
 
 ##### 3.1.1.2根据部署方式进行以下准备
 
 - **部署于Cloudflare**
 
+  <details>
+      <summary>操作详情</summary>
+
   需准备一个**Cloudflare账户**，然后按照[3.1.2.1节](#3.1.2.1部署于Cloudflare)的步骤即可完成部署。
+
+  </details>
 
 - **部署于服务器**
 
+  <details>
+      <summary>操作详情</summary>
+  
   如果Cloudflare的**有限访问次数**不能满足你的需求，并且你拥有自己的服务器，可以参照[3.1.2.2节](#3.1.2.2部署于服务器)的教程在服务器上模拟Cloudflare的环境，并开放对应的端口访问服务。
-
+  
   注意由于服务器操作系统、硬件版本复杂多样，相关教程**无法确保适合每一位用户**，遇到报错请尽量利用搜索引擎解决，无法解决也可以提issue寻求帮助。
+  
+  </details>
+
+</details>
 
 #### 3.1.2手把手教程
 
+<details>
+    <summary>根据自己需求部署在CloudFlare或服务器上</summary>
+
 ##### 3.1.2.1部署于Cloudflare
+
+<details>
+    <summary>部署方式</summary>
 
 依托于CF的强大能力，只需简单几步，即可部署本项目，拥有自己的图床。
 
@@ -185,13 +236,18 @@
 
    - `Cloudflare R2 渠道`：
 
+     <details>
+         <summary>设置方式</summary>
+     
      将前面新建的存储桶绑定到项目，名称为`img_r2`
-
+     
      ![](https://alist.sanyue.site/d/imgbed/202411052323183.png)
-
+     
      如果后续要开启**图像审查**，需要设置`R2PublicUrl`环境变量，值为前面记下的**R2存储桶公网访问链接**：
-
+     
      ![](https://alist.sanyue.site/d/imgbed/202411052330663.png)
+     
+     </details>
 
 3. **绑定KV数据库**：
 
@@ -205,7 +261,12 @@
 
 3. `重试部署`，此时项目即可正常使用
 
+</details>
+
 ##### 3.1.2.2部署于服务器
+
+<details>
+    <summary>部署方式</summary>
 
 1. 安装服务器操作系统对应的`node.js`，经测试`v22.5.1`版本可以正常使用。（安装教程自行search）
 
@@ -243,8 +304,18 @@
    正常启动，控制台输出如下：
 
    ![202408191829163](https://alist.sanyue.site/d/imgbed/202408191855625.png)
+   
+   </details>
+
+</details>
+
+<details>
+    <summary>其他设置项</summary>
 
 #### 3.1.3后台管理认证
+
+<details>
+    <summary>设置方式</summary>
 
 后台管理页面默认**不设密码**，需按照如下方式**设置认证**：
 
@@ -257,7 +328,12 @@
 
    - 部署完成后，访问`http(s)://你的域名/dashboard`即可进入后台管理页面
 
+</details>
+
 #### 3.1.4图片审查
+
+<details>
+    <summary>设置方式</summary>
 
 支持成人内容审查和自动屏蔽，开启步骤如下：
 
@@ -265,7 +341,12 @@
 - 打开 Cloudflare Pages 项目的管理页面，依次点击`设置`，`环境变量`，`添加环境变量`
 - 添加一个`变量名称`为`ModerateContentApiKey`，`值`为第一步获得的`API key`，点击`保存`即可
 
+</details>
+
 #### 3.1.5Web和API上传认证
+
+<details>
+    <summary>设置方式</summary>
 
 环境变量增加认证码`AUTH_CODE`，值为你想要设置的认证码。
 
@@ -300,6 +381,8 @@ API格式：
 > ]
 > ```
 
+</details>
+
 #### 3.1.6访问域名限制
 
 环境变量增加`ALLOWED_DOMAINS`，多个允许的域名用英文`,`分割，如：`域名.xyz,域名.cloudns.be,域名.pp.ua`
@@ -309,6 +392,9 @@ API格式：
 环境变量增加`WhiteList_Mode`，设置为`true`即可开启白名单模式，仅设置为白名单的图片可被访问。
 
 #### 3.1.8页面自定义（DIY接口）
+
+<details>
+    <summary>设置方式</summary>
 
 环境变量增加`USER_CONFIG`，JSON格式，具体字段用途及内容规范见下表。
 
@@ -341,11 +427,16 @@ API格式：
 > }
 > ```
 
+</details>
+
 #### 3.1.9远端遥测
 
 便于开发者进行bug的捕捉和定位，但是**过程中可能收集到访问链接、域名等信息**，如您不愿意泄露类似信息给项目开发者，可在环境变量中添加`disable_telemetry`为`true`来退出遥测。
 
 #### 3.1.10随机图API
+
+<details>
+    <summary>API说明</summary>
 
 | 接口名称     | /random                                                      |
 | ------------ | ------------------------------------------------------------ |
@@ -370,9 +461,14 @@ API格式：
 > }
 > ```
 
+</details>
+</details>
+
 #### 3.1.11注意！！！
 
 **修改环境变量方式**：
+
+<details>
 
 ![](https://alist.sanyue.site/d/imgbed/202408261040233.png)
 
@@ -380,13 +476,21 @@ API格式：
 
 ![](https://alist.sanyue.site/d/imgbed/202408261041507.png)
 
-**更新方式**：
+</details>
+
+**程序更新方式**：
+
+<details>
 
 去到 Github 你之前 fork 过的仓库依次选择`Sync fork`->`Update branch`即可，稍等一会，Cloudflare Pages 检测到仓库更新之后便会自动部署最新代码。
 
 如果有新的环境变量需要添加，请根据文档要求进行添加，然后重试部署。
 
 ![](https://alist.sanyue.site/d/imgbed/202409161736365.png)
+
+</details>
+
+</details>
 
 ### 3.2定制化修改
 
@@ -396,51 +500,63 @@ API格式：
 
 ### 4.1Add Features💕
 
-1. ~~增加粘贴图片上传功能~~（2024.7.22已完成）
-2. ~~增加markdown、html等格式链接复制功能~~（2024.7.21已完成）
-3. ~~上传页面增加管理端入口~~（2024.7.21已完成）
-4. 增加用户个性化配置接口
+<details>
+
+1. :white_check_mark: ~~增加粘贴图片上传功能~~（2024.7.22已完成）
+2. :white_check_mark:~~增加markdown、html等格式链接复制功能~~（2024.7.21已完成）
+3. :white_check_mark:~~上传页面增加管理端入口~~（2024.7.21已完成）
+4. :memo:增加用户个性化配置接口
    - ~~登录页面和上传页面背景图自定义~~（2024.8.25已完成）
    - ~~图床名称和Logo自定义~~（2024.8.26已完成）
    - ~~网站标题和Icon自定义~~（2024.8.26已完成）
    - ~~背景切换时间自定义~~（2024.9.11已完成）
    - ~~背景透明度支持自定义~~（2024.9.12已完成）
    - ~~页脚自定义传送门~~（2024.10.20已完成）
-5. ~~增加随机图API~~（2024.7.25已完成）
-6. ~~完善多格式链接展示形式，增加ubb格式链接支持~~（2024.8.21已完成）
-7. ~~完善登录逻辑，后端增加认证码校验接口~~（2024.8.21已完成）
-8. ~~支持URL粘贴上传~~（2024.8.23已完成）
-9. ~~支持大于5MB的图片上传前自动压缩~~（2024.8.26已完成）
-10. ~~上传页面右下角工具栏样式重构，支持上传页自定义压缩（上传前+存储端）~~（2024.9.28已完成）
-11. 重构管理端，认证+显示效果优化，增加图片详情页
-12. 管理端增加访问量统计，IP记录、IP黑名单、上传IP黑名单等
-13. ~~上传页面点击链接，自动复制到剪切板~~(2024.9.27已完成)
-14. ~~上传设置记忆（上传方式、链接格式等）~~（2024.9.27已完成，**两种上传方式合并**）
-15. ~~若未设置密码，无需跳转进入登录页~~（2024.9.27已完成）
-16. ~~增加仅删除上传成功图片、上传失败图片重试~~（2024.9.28已完成）
-17. ~~优化粘贴上传时文件命名方法~~（2024.9.26已完成）
-18. ~~增加对R2 bucket的支持~~（2024.11.5已完成）
-19. 管理端增加批量黑名单、白名单功能
-20. ~~Telegram Channel渠道上传文件记录机器人和频道数据，便于迁移和备份~~（2024.12.4已完成）
-21. ~~支持自定义命名方式（仅原名 or 仅随机前缀 or 默认的随机前缀\_原名）~~（2024.12.4已完成）
-22. 支持上传失败自动切换其他渠道尝试
-23. 后端list接口实现分页功能
-24. ~~支持自定义链接前缀~~（2024.12.4已完成）
-25. 对接alist，或实现webdav（评估中）
-26. 文件详情增加文件大小记录
-27. 支持管理员自定义全局默认链接前缀
-28. ~~开放更多文件格式~~（2024.12.9已完成）
+5. :white_check_mark:~~增加随机图API~~（2024.7.25已完成）
+6. :white_check_mark:~~完善多格式链接展示形式，增加ubb格式链接支持~~（2024.8.21已完成）
+7. :white_check_mark:~~完善登录逻辑，后端增加认证码校验接口~~（2024.8.21已完成）
+8. :white_check_mark:~~支持URL粘贴上传~~（2024.8.23已完成）
+9. :white_check_mark:~~支持大于5MB的图片上传前自动压缩~~（2024.8.26已完成）
+10. :white_check_mark:~~上传页面右下角工具栏样式重构，支持上传页自定义压缩（上传前+存储端）~~（2024.9.28已完成）
+11. :hourglass_flowing_sand:重构管理端，认证+显示效果优化，增加图片详情页
+12. :hourglass_flowing_sand:管理端增加访问量统计，IP记录、IP黑名单、上传IP黑名单等
+13. :white_check_mark:~~上传页面点击链接，自动复制到剪切板~~(2024.9.27已完成)
+14. :white_check_mark:~~上传设置记忆（上传方式、链接格式等）~~（2024.9.27已完成，**两种上传方式合并**）
+15. :white_check_mark:~~若未设置密码，无需跳转进入登录页~~（2024.9.27已完成）
+16. :white_check_mark:~~增加仅删除上传成功图片、上传失败图片重试~~（2024.9.28已完成）
+17. :white_check_mark:~~优化粘贴上传时文件命名方法~~（2024.9.26已完成）
+18. :white_check_mark:~~增加对R2 bucket的支持~~（2024.11.5已完成）
+19. :hourglass_flowing_sand:管理端增加批量黑名单、白名单功能
+20. :white_check_mark:~~Telegram Channel渠道上传文件记录机器人和频道数据，便于迁移和备份~~（2024.12.4已完成）
+21. :white_check_mark:~~支持自定义命名方式（仅原名 or 仅随机前缀 or 默认的随机前缀\_原名）~~（2024.12.4已完成）
+22. :hourglass_flowing_sand:支持上传失败自动切换其他渠道尝试
+23. :hourglass_flowing_sand:后端list接口实现分页功能
+24. :white_check_mark:~~支持自定义链接前缀~~（2024.12.4已完成）
+25. :memo:对接alist，或实现webdav（评估中）
+26. :hourglass_flowing_sand:文件详情增加文件大小记录
+27. :hourglass_flowing_sand:支持管理员自定义全局默认链接前缀
+28. :white_check_mark:~~开放更多文件格式~~（2024.12.9已完成）
+
+</details>
 
 ### 4.2Fix Bugs👻
 
-1. ~~修复API上传无法直接展示在后台的问题~~（2024.7.25已修复）
-1. ~~由于telegra.ph关闭上传，迁移至TG频道上传~~（2024.9.7已修复）
-1. ~~修复未设管理员认证时管理端无限刷新的问题~~（2024.9.9已修复）
-1. ~~修复部分视频无法预览播放的问题~~（经测试，暂定为文件自身存在问题，暂无法修复）
-1. 增加新的图片审查渠道
-1. ~~R2渠道在管理端删除时，存储桶同步删除~~（2024.12.4已修复）
+<details>
+
+1. :white_check_mark:~~修复API上传无法直接展示在后台的问题~~（2024.7.25已修复）
+1. :white_check_mark:~~由于telegra.ph关闭上传，迁移至TG频道上传~~（2024.9.7已修复）
+1. :white_check_mark:~~修复未设管理员认证时管理端无限刷新的问题~~（2024.9.9已修复）
+1. :white_check_mark:~~修复部分视频无法预览播放的问题~~（经测试，暂定为文件自身存在问题，暂无法修复）
+1. :white_check_mark:增加新的图片审查渠道
+1. :white_check_mark:~~R2渠道在管理端删除时，存储桶同步删除~~（2024.12.4已修复）
+1. :white_check_mark:~~读取文件响应头增加允许跨域头`access-control-allow-origin: *`~~（2024.12.9已修复）
+
+</details>
 
 ## 5.Q&A
+
+<details>
+    <summary>常见问题解答</summary>
 
 ### 5.1未设置`ALLOWED_DOMAINS`，但无法跨域访问？
 
@@ -474,6 +590,8 @@ API格式：
 ### 5.5进入后台页面加载不出记录或图片
 
 - 网络问题，尝试刷新页面
+
+</details>
 
 ## 6.Tips
 
