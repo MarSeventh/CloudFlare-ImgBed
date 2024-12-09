@@ -20,7 +20,7 @@
 </details>
 
 <details>
-    <summary>体验地址及优质博文（搭建或使用有问题可以先去里面学习哦~）</summary>
+    <summary>体验地址及优质博文、视频（搭建或使用有问题可以先去里面学习哦~）</summary>
 
 **体验地址**：[Sanyue ImgHub (demo-cloudflare-imgbed.pages.dev)](https://demo-cloudflare-imgbed.pages.dev/)
 
@@ -28,6 +28,10 @@
 >
 
 **体验视频**：[CloudFlare免费图床，轻松守护你的每一份精彩！_哔哩哔哩_bilibili](https://www.bilibili.com/video/BV1y3WGe4EGh/?vd_source=da5ecbe595e41089cd1bed95932b8bfd)
+
+**相关教程视频**：
+
+- [利用Cloudflare R2 +Pages搭建在线图床系统，不限空间，不被墙，超级简单，完全免费 (youtube.com)](https://www.youtube.com/watch?v=T8VayuUMOzM)
 
 **相关优质博文（感谢每一位鼎力支持的热心大佬）：**
 
@@ -126,16 +130,14 @@
 
 ## 3.Deployment
 
-### 3.1直接使用
+### 3.1部署使用
 
-**注意修改完环境变量，重新部署才能生效**，见[3.1章最后一节](#3.1.4注意！！！)
-
-**版本更新方式**，也请见[3.1章最后一节](#3.1.4注意！！！)
+**注意修改完环境变量，重新部署才能生效**，见[3.1章最后一节](#3.1.4注意！！！)；**版本更新方式**，也请见[3.1章最后一节](#3.1.4注意！！！)
 
 <details>
     <summary>操作详情</summary>
 
-#### 3.1.1提前准备
+#### 3.1.1前期准备
 
 <details>
     <summary>准备内容</summary>
@@ -190,27 +192,20 @@
 
 - **部署于Cloudflare**
 
-  <details>
-      <summary>操作详情</summary>
-
+  
   需准备一个**Cloudflare账户**，然后按照[3.1.2.1节](#3.1.2.1部署于Cloudflare)的步骤即可完成部署。
-
-  </details>
 
 - **部署于服务器**
 
-  <details>
-      <summary>操作详情</summary>
   
   如果Cloudflare的**有限访问次数**不能满足你的需求，并且你拥有自己的服务器，可以参照[3.1.2.2节](#3.1.2.2部署于服务器)的教程在服务器上模拟Cloudflare的环境，并开放对应的端口访问服务。
   
   注意由于服务器操作系统、硬件版本复杂多样，相关教程**无法确保适合每一位用户**，遇到报错请尽量利用搜索引擎解决，无法解决也可以提issue寻求帮助。
   
-  </details>
 
 </details>
 
-#### 3.1.2手把手教程
+#### 3.1.2部署教程
 
 <details>
     <summary>根据自己需求部署在CloudFlare或服务器上</summary>
@@ -309,15 +304,13 @@
 
 </details>
 
-#### 3.1.3其他设置项
+#### 3.1.3其他可选配置
 
 <details>
     <summary>后台认证、API格式、自定义页面等设置</summary>
 
 ##### 3.1.3.1后台管理认证
 
-<details>
-    <summary>设置方式</summary>
 
 后台管理页面默认**不设密码**，需按照如下方式**设置认证**：
 
@@ -330,12 +323,8 @@
 
    - 部署完成后，访问`http(s)://你的域名/dashboard`即可进入后台管理页面
 
-</details>
-
 ##### 3.1.3.2图片审查
 
-<details>
-    <summary>设置方式</summary>
 
 支持成人内容审查和自动屏蔽，开启步骤如下：
 
@@ -343,47 +332,12 @@
 - 打开 Cloudflare Pages 项目的管理页面，依次点击`设置`，`环境变量`，`添加环境变量`
 - 添加一个`变量名称`为`ModerateContentApiKey`，`值`为第一步获得的`API key`，点击`保存`即可
 
-</details>
-
 ##### 3.1.3.3Web和API上传认证
 
-<details>
-    <summary>设置方式</summary>
 
 环境变量增加认证码`AUTH_CODE`，值为你想要设置的认证码。
 
-Web端在登录页面输入你的**认证码**即可登录使用。
-
-API格式：
-
-| 接口名称     | /upload                                                      |
-| ------------ | ------------------------------------------------------------ |
-| **接口功能** | 上传图片或视频                                               |
-| **请求方法** | POST                                                         |
-| **请求参数** | **Query参数**：<br />`authCode`，string类型，即为你设置的认证码<br />`serverCompress`，boolean类型，表示是否开启服务端压缩（仅针对图片文件、Telegram上传渠道生效）<br />`uploadChannel`，string类型，取值为`telegram`和`cfr2`，分别代表telegram bot渠道和Cloudflare R2渠道，默认为telegram bot渠道<br />`nameType`，string类型，表示文件命名方式，可选值为`[default, index, origin]`，分别代表默认`前缀_原名`命名、仅前缀命名和仅原名命名法，默认为`default`<br />**Body参数(application/form-data)**：<br />`file`，file类型，你要上传的文件 |
-| **返回响应** | `data[0].src`为获得的图片链接（注意不包含域名，需要自己添加） |
-
-> **请求示例**：
->
-> ```bash
-> curl --location --request POST 'https://your.domain/upload?authCode=your_authCode' \
-> 
-> --header 'User-Agent: Apifox/1.0.0 (https://apifox.com)' \
-> 
-> --form 'file=@"D:\\杂文件\\壁纸\\genshin109.jpg"'
-> ```
->
-> **响应示例**：
->
-> ```json
-> [
->     {
->         "src": "/file/738a8aaacf4d88d1590f9.jpg"
->     }
-> ]
-> ```
-
-</details>
+Web端在登录页面输入你的**认证码**即可登录使用；API端需要在上传链接中后缀`authCode`参数，详见[API文档](#4.2.1上传API)。
 
 ##### 3.1.3.4访问域名限制
 
@@ -437,8 +391,85 @@ API格式：
 
 ##### 3.1.3.8随机图API
 
+设置`AllowRandom`环境变量，值为`true`，以从图床中随机获取一张图片，详见[API文档](#4.2.2随机图API)。
+
+##### </details>
+
+#### 3.1.4注意！！！
+
 <details>
-    <summary>API说明</summary>
+    <summary>环境变量修改、程序更新等教程</summary>
+
+1. **修改环境变量方式**：
+
+
+![](https://alist.sanyue.site/d/imgbed/202408261040233.png)
+
+**修改环境变量后需要重新部署才能生效！**
+
+![](https://alist.sanyue.site/d/imgbed/202408261041507.png)
+
+2. **程序更新方式**：
+
+
+去到 Github 你之前 fork 过的仓库依次选择`Sync fork`->`Update branch`即可，稍等一会，Cloudflare Pages 检测到仓库更新之后便会自动部署最新代码。
+
+如果有新的环境变量需要添加，请根据文档要求进行添加，然后重试部署。
+
+![](https://alist.sanyue.site/d/imgbed/202409161736365.png)
+
+</details>
+
+</details>
+
+### 3.2定制化修改
+
+按照`3.1`步骤部署完成后，前往仓库[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub?tab=readme-ov-file)，按照操作说明进行DIY和打包操作，最后将打包好的`/dist`目录中的内容替换到该仓库的根目录下即可（复制+替换）。
+
+## 4.Usage
+
+### 4.1Web端使用方式
+
+![](https://alist.sanyue.site/d/imgbed/202412092301397.png)
+
+![](https://alist.sanyue.site/d/imgbed/202412092305405.png)
+
+### 4.2API文档
+
+<details>
+    <summary>API文档</summary>
+
+#### 4.2.1上传API
+
+| 接口名称     | /upload                                                      |
+| ------------ | ------------------------------------------------------------ |
+| **接口功能** | 上传图片或视频                                               |
+| **请求方法** | POST                                                         |
+| **请求参数** | **Query参数**：<br />`authCode`，string类型，即为你设置的认证码<br />`serverCompress`，boolean类型，表示是否开启服务端压缩（仅针对图片文件、Telegram上传渠道生效）<br />`uploadChannel`，string类型，取值为`telegram`和`cfr2`，分别代表telegram bot渠道和Cloudflare R2渠道，默认为telegram bot渠道<br />`nameType`，string类型，表示文件命名方式，可选值为`[default, index, origin]`，分别代表默认`前缀_原名`命名、仅前缀命名和仅原名命名法，默认为`default`<br />**Body参数(application/form-data)**：<br />`file`，file类型，你要上传的文件 |
+| **返回响应** | `data[0].src`为获得的图片链接（注意不包含域名，需要自己添加） |
+
+> **请求示例**：
+>
+> ```bash
+> curl --location --request POST 'https://your.domain/upload?authCode=your_authCode' \
+> 
+> --header 'User-Agent: Apifox/1.0.0 (https://apifox.com)' \
+> 
+> --form 'file=@"D:\\杂文件\\壁纸\\genshin109.jpg"'
+> ```
+>
+> **响应示例**：
+>
+> ```json
+> [
+>  {
+>      "src": "/file/738a8aaacf4d88d1590f9.jpg"
+>  }
+> ]
+> ```
+
+#### 4.2.2随机图API
+
 
 | 接口名称     | /random                                                      |
 | ------------ | ------------------------------------------------------------ |
@@ -459,48 +490,15 @@ API格式：
 >
 > ```json
 > {
->     "url": "/file/4fab4d423d039b4665a27.jpg"
+>  "url": "/file/4fab4d423d039b4665a27.jpg"
 > }
 > ```
 
 </details>
-</details>
 
-#### 3.1.4注意！！！
+## 5.TODO
 
-1. **修改环境变量方式**：
-
-<details>
-
-![](https://alist.sanyue.site/d/imgbed/202408261040233.png)
-
-**修改环境变量后需要重新部署才能生效！**
-
-![](https://alist.sanyue.site/d/imgbed/202408261041507.png)
-
-</details>
-
-2. **程序更新方式**：
-
-<details>
-
-去到 Github 你之前 fork 过的仓库依次选择`Sync fork`->`Update branch`即可，稍等一会，Cloudflare Pages 检测到仓库更新之后便会自动部署最新代码。
-
-如果有新的环境变量需要添加，请根据文档要求进行添加，然后重试部署。
-
-![](https://alist.sanyue.site/d/imgbed/202409161736365.png)
-
-</details>
-
-</details>
-
-### 3.2定制化修改
-
-按照`3.1`步骤部署完成后，前往仓库[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub?tab=readme-ov-file)，按照操作说明进行DIY和打包操作，最后将打包好的`/dist`目录中的内容替换到该仓库的根目录下即可（复制+替换）。
-
-## 4.TODO
-
-### 4.1Add Features💕
+### 5.1Add Features💕
 
 <details>
 
@@ -541,7 +539,7 @@ API格式：
 
 </details>
 
-### 4.2Fix Bugs👻
+### 5.2Fix Bugs👻
 
 <details>
 
@@ -549,23 +547,23 @@ API格式：
 1. :white_check_mark:~~由于telegra.ph关闭上传，迁移至TG频道上传~~（2024.9.7已修复）
 1. :white_check_mark:~~修复未设管理员认证时管理端无限刷新的问题~~（2024.9.9已修复）
 1. :white_check_mark:~~修复部分视频无法预览播放的问题~~（经测试，暂定为文件自身存在问题，暂无法修复）
-1. :white_check_mark:增加新的图片审查渠道
+1. :hourglass_flowing_sand:增加新的图片审查渠道
 1. :white_check_mark:~~R2渠道在管理端删除时，存储桶同步删除~~（2024.12.4已修复）
 1. :white_check_mark:~~读取文件响应头增加允许跨域头`access-control-allow-origin: *`~~（2024.12.9已修复）
 
 </details>
 
-## 5.Q&A
+## 6.Q&A
 
 <details>
     <summary>常见问题解答</summary>
 
-### 5.1未设置`ALLOWED_DOMAINS`，但无法跨域访问？
+### 6.1未设置`ALLOWED_DOMAINS`，但无法跨域访问？
 
 - 请检查你的cloudflare防火墙设置（例如hotlink保护是否开启）
 - 参见[Issue #8](https://github.com/MarSeventh/CloudFlare-ImgBed/issues/8)
 
-### 5.2如何通过PicGo上传？
+### 6.2如何通过PicGo上传？
 
 - PicGo插件设置中搜索`web-uploader`，安装可自定义前缀的版本，如图：
 
@@ -577,7 +575,7 @@ API格式：
 
 - 设置完成，确定即可使用PicGo上传到自建的图床。
 
-### 5.3上传失败怎么办？
+### 6.3上传失败怎么办？
 
 - 是否正确配置`TG_BOT_TOKEN`、`TG_CHAT_ID`等环境变量
 - 是否给机器人管理员配置**足够的权限**
@@ -585,22 +583,22 @@ API格式：
 - 是否更新至**最新版**
 - 前往issues寻找相似问题
 
-### 5.4`TG_CHAT_ID`前面有没有`-`
+### 6.4`TG_CHAT_ID`前面有没有`-`
 
 - 注意看图，前面有`-`
 
-### 5.5进入后台页面加载不出记录或图片
+### 6.5进入后台页面加载不出记录或图片
 
 - 网络问题，尝试刷新页面
 
 </details>
 
-## 6.Tips
+## 7.Tips
 
 前端开源，参见[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)项目。
 
-**如果觉得项目不错希望您能给个免费的star✨✨✨，非常感谢！**
-
-## 7.Star History
+## 8.Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=MarSeventh/CloudFlare-ImgBed,MarSeventh/Sanyue-ImgHub&type=Date)](https://star-history.com/#MarSeventh/CloudFlare-ImgBed&MarSeventh/Sanyue-ImgHub&Date)
+
+**如果觉得项目不错希望您能给个免费的star✨✨✨，非常感谢！**
