@@ -53,6 +53,8 @@ export async function onRequest(context) {  // Contents of context object
         return accessRes; // 如果不可访问，直接返回
     }
 
+
+
     // Cloudflare R2渠道
     if (imgRecord.metadata?.Channel === 'CloudflareR2') {
         // 检查是否配置了R2
@@ -70,6 +72,7 @@ export async function onRequest(context) {  // Contents of context object
         const headers = new Headers();
         object.writeHttpMetadata(headers)
         headers.set('Content-Disposition', `inline; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
+        headers.set('Access-Control-Allow-Origin', '*');
         if (fileType) {
             headers.set('Content-Type', fileType);
         }
@@ -82,6 +85,9 @@ export async function onRequest(context) {  // Contents of context object
         return newRes;
     }
 
+
+
+    
     // Telegram及Telegraph渠道
     let TgFileID = ''; // Tg的file_id
     if (imgRecord.metadata?.Channel === 'Telegram') {
@@ -119,6 +125,7 @@ export async function onRequest(context) {  // Contents of context object
     try {
         const headers = new Headers(response.headers);
         headers.set('Content-Disposition', `inline; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
+        headers.set('Access-Control-Allow-Origin', '*');
         if (fileType) {
             headers.set('Content-Type', fileType);
         }
