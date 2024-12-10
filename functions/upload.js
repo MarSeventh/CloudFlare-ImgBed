@@ -98,9 +98,21 @@ export async function onRequestPost(context) {  // Contents of context object
         return new Response('Error: Please configure KV database', { status: 500 });
     } 
 
+    const time = new Date().getTime();
     const formdata = await clonedRequest.formData();
     const fileType = formdata.get('file').type;
     const fileName = formdata.get('file').name;
+    const fileSize = (formdata.get('file').size / 1024 / 1024).toFixed(2); // 文件大小，单位MB
+    const metadata = {
+        FileName: fileName,
+        FileType: fileType,
+        FileSize: fileSize,
+        UploadIP: uploadIp,
+        ListType: "None",
+        TimeStamp: time,
+    }
+
+
     // 检查fileType和fileName是否存在
     if (fileType === null || fileType === undefined || fileName === null || fileName === undefined) {
         return new Response('Error: fileType or fileName is wrong, check the integrity of this file!', { status: 400 });
@@ -115,6 +127,17 @@ export async function onRequestPost(context) {  // Contents of context object
         }
     }
 
+    // 构建文件ID
+    const unique_index = time + Math.floor(Math.random() * 10000);
+    let fullId = '';
+    if (nameType === 'index') {
+        fullId = unique_index + '.' + fileExt;
+    } else if (nameType === 'origin') {
+        fullId = fileName? fileName : unique_index + '.' + fileExt;
+    } else {
+        fullId = fileName? unique_index + '_' + fileName : unique_index + '.' + fileExt;
+    }
+
     // CloudFlare R2 渠道
     if (uploadChannel === 'CloudflareR2') {
         // 检查R2数据库是否配置
@@ -124,27 +147,13 @@ export async function onRequestPost(context) {  // Contents of context object
         
         const R2DataBase = env.img_r2;
 
-        // 构建文件ID
-        const time = new Date().getTime();
-        const unique_index = time + Math.floor(Math.random() * 10000);
-        let fullId = '';
-        if (nameType === 'index') {
-            fullId = unique_index + '.' + fileExt;
-        } else if (nameType === 'origin') {
-            fullId = fileName? fileName : unique_index + '.' + fileExt;
-        } else {
-            fullId = fileName? unique_index + '_' + fileName : unique_index + '.' + fileExt;
-        }
-
         // 写入R2数据库
         await R2DataBase.put(fullId, formdata.get('file'));
 
         // 图像审查
         const apikey = env.ModerateContentApiKey;
         if (apikey == undefined || apikey == null || apikey == "") {
-            await env.img_url.put(fullId, "", {
-                metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: "None", TimeStamp: time, Channel: "CloudflareR2", UploadIP: uploadIp },
-            });
+            metadata.Label = "None";
         } else {
             try {
                 // 检查R2公网链接是否配置
@@ -157,18 +166,24 @@ export async function onRequestPost(context) {  // Contents of context object
                     throw new Error(`HTTP error! status: ${fetchResponse.status}`);
                 }
                 const moderate_data = await fetchResponse.json();
-                await env.img_url.put(fullId, "", {
-                    metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: moderate_data.rating_label, TimeStamp: time, Channel: "CloudflareR2", UploadIP: uploadIp },
-                });
+                metadata.Label = moderate_data.rating_label;
             } catch (error) {
                 console.error('Moderate Error:', error);
                 // 将不带审查的图片写入数据库
-                await env.img_url.put(fullId, "", {
-                    metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: "None", TimeStamp: time, Channel: "CloudflareR2", UploadIP: uploadIp },
-                });
+                metadata.Label = "None";
             } finally {
                 console.log('Moderate Done');
             }
+        }
+
+        // 更新metadata，写入KV数据库
+        try {
+            metadata.Channel = "CloudflareR2";
+            await env.img_url.put(fullId, "", {
+                metadata: metadata,
+            });
+        } catch (error) {
+            return new Response('Error: Failed to write to KV database', { status: 500 });
         }
 
 
@@ -245,20 +260,10 @@ export async function onRequestPost(context) {  // Contents of context object
             const clonedRes = await response.clone().json(); // 等待响应克隆和解析完成
             const fileInfo = getFile(clonedRes);
             const filePath = await getFilePath(env, fileInfo.file_id);
-
-            const time = new Date().getTime();
             const id = fileInfo.file_id;
-            //const fullId = id + '.' + fileExt;
-            // 构建独一无二的 ID
-            const unique_index = time + Math.floor(Math.random() * 10000);
-            let fullId = '';
-            if (nameType === 'index') {
-                fullId = unique_index + '.' + fileExt;
-            } else if (nameType === 'origin') {
-                fullId = fileName? fileName : unique_index + '.' + fileExt;
-            } else {
-                fullId = fileName? unique_index + '_' + fileName : unique_index + '.' + fileExt;
-            }
+            // 更新FileSize
+            metadata.FileSize = (fileInfo.file_size / 1024 / 1024).toFixed(2);
+
             // 若上传成功，将响应返回给客户端
             if (response.ok) {
                 res = new Response(
@@ -272,9 +277,7 @@ export async function onRequestPost(context) {  // Contents of context object
             const apikey = env.ModerateContentApiKey;
         
             if (apikey == undefined || apikey == null || apikey == "") {
-                await env.img_url.put(fullId, "", {
-                    metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: "None", TimeStamp: time, Channel: "TelegramNew", TgFileId: id, UploadIP: uploadIp, TgChatId: env.TG_CHAT_ID, TgBotToken: env.TG_BOT_TOKEN },
-                });
+                metadata.Label = "None";
             } else {
                 try {
                     const fetchResponse = await fetch(`https://api.moderatecontent.com/moderate/?key=${apikey}&url=https://api.telegram.org/file/bot${env.TG_BOT_TOKEN}/${filePath}`);
@@ -282,9 +285,7 @@ export async function onRequestPost(context) {  // Contents of context object
                         throw new Error(`HTTP error! status: ${fetchResponse.status}`);
                     }
                     const moderate_data = await fetchResponse.json();
-                    await env.img_url.put(fullId, "", {
-                        metadata: { FileName: fileName, FileType: fileType, ListType: "None", Label: moderate_data.rating_label, TimeStamp: time, Channel: "TelegramNew", TgFileId: id, UploadIP: uploadIp, TgChatId: env.TG_CHAT_ID, TgBotToken: env.TG_BOT_TOKEN },
-                    });
+                    metadata.Label = moderate_data.rating_label;
                 } catch (error) {
                     console.error('Moderate Error:', error);
                     // 将不带审查的图片写入数据库
@@ -294,6 +295,19 @@ export async function onRequestPost(context) {  // Contents of context object
                 } finally {
                     console.log('Moderate Done');
                 }
+            }
+
+            // 更新metadata，写入KV数据库
+            try {
+                metadata.Channel = "TelegramNew";
+                metadata.TgFileId = id;
+                metadata.TgChatId = env.TG_CHAT_ID;
+                metadata.TgBotToken = env.TG_BOT_TOKEN;
+                await env.img_url.put(fullId, "", {
+                    metadata: metadata,
+                });
+            } catch (error) {
+                res = new Response('Error: Failed to write to KV database', { status: 500 });
             }
         } catch (error) {
             console.error('Error:', error);
@@ -311,7 +325,8 @@ function getFile(response) {
 
 		const getFileDetails = (file) => ({
 			file_id: file.file_id,
-			file_name: file.file_name || file.file_unique_id
+			file_name: file.file_name || file.file_unique_id,
+            file_size: file.file_size,
 		});
 
 		if (response.result.photo) {
