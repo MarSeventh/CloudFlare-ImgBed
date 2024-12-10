@@ -353,7 +353,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 <details>
     <summary>设置方式</summary>
 
-环境变量增加`USER_CONFIG`，JSON格式，具体字段用途及内容规范见下表。
+环境变量增加`USER_CONFIG`，JSON格式（设置时类型选`text`即可），具体字段用途及内容规范见下表。
 
 | 字段名      | 用途                 | 类型          | 内容规范                                                     |
 | ----------- | -------------------- | ------------- | ------------------------------------------------------------ |
@@ -446,7 +446,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 | ------------ | ------------------------------------------------------------ |
 | **接口功能** | 上传图片或视频                                               |
 | **请求方法** | POST                                                         |
-| **请求参数** | **Query参数**：<br />`authCode`，string类型，即为你设置的认证码<br />`serverCompress`，boolean类型，表示是否开启服务端压缩（仅针对图片文件、Telegram上传渠道生效）<br />`uploadChannel`，string类型，取值为`telegram`和`cfr2`，分别代表telegram bot渠道和Cloudflare R2渠道，默认为telegram bot渠道<br />`nameType`，string类型，表示文件命名方式，可选值为`[default, index, origin]`，分别代表默认`前缀_原名`命名、仅前缀命名和仅原名命名法，默认为`default`<br />**Body参数(application/form-data)**：<br />`file`，file类型，你要上传的文件 |
+| **请求参数** | **Query参数**：<br />`authCode`: string类型，即为你设置的认证码<br />`serverCompress`: boolean类型，表示是否开启服务端压缩（仅针对图片文件、Telegram上传渠道生效，默认为`true`）<br />`uploadChannel`: string类型，取值为`telegram`和`cfr2`，分别代表telegram bot渠道和Cloudflare R2渠道，默认为`telegram` 渠道<br />`uploadNameType`: string类型，表示文件命名方式，可选值为`[default, index, origin]`，分别代表默认`前缀_原名`命名、`仅前缀`命名和`仅原名`命名法，默认为`default`<br />**Body参数(application/form-data)**：<br />`file`: file类型，你要上传的文件 |
 | **返回响应** | `data[0].src`为获得的图片链接（注意不包含域名，需要自己添加） |
 
 > **请求示例**：
@@ -477,7 +477,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 | **接口功能** | 从图床中随机返回一张图片的链接（注意会消耗列出次数）         |
 | **前置条件** | 设置`AllowRandom`环境变量，值为`true`                        |
 | **请求方法** | GET                                                          |
-| **请求参数** | **Query参数**：<br />`type`：设为`img`时直接返回图片（此时form不生效）；设为`url`时返回完整url链接；否则返回随机图的文件路径。<br />`form`:设为`text`时直接返回文本，否则返回json格式内容。 |
+| **请求参数** | **Query参数**：<br />`type`: 设为`img`时直接返回图片（此时form不生效）；设为`url`时返回完整url链接；否则返回随机图的文件路径。<br />`form`: 设为`text`时直接返回文本，否则返回json格式内容。 |
 | **响应格式** | 1、当`type`为`img`时：<br />返回格式为`image/jpeg`<br />2、当`type`为其他值时：<br />当`form`不是`text`时，返回JSON格式内容，`data.url`为返回的链接/文件路径。<br />否则，直接返回链接/文件路径。 |
 
 > **请求示例**：
