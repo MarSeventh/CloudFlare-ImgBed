@@ -42,7 +42,7 @@
 
 </details>
 
-## 1.Introduction
+# 1.Introduction
 
 免费图片托管解决方案（支持存储绝大多数常见格式的**图片、视频、动图**等），具有**后台管理、图片审查**、**登录鉴权**、**页面自定义**、**多种方式及多文件上传**、**多文件及多格式链接复制**等功能（详见[第2章](#2.Features))。
 
@@ -50,7 +50,7 @@
 
 ![CloudFlare](static/202410011443570.png)
 
-## 2.Features
+# 2.Features
 
 <details>
     <summary>项目特性</summary>
@@ -128,21 +128,21 @@
 </details>
 
 
-## 3.Deployment
+# 3.Deployment
 
-### 3.1部署使用
+## 3.1部署使用
 
-**注意修改完环境变量，重新部署才能生效**，见[3.1章最后一节](#3.1.4注意！！！)；**版本更新方式**，也请见[3.1章最后一节](#3.1.4注意！！！)
+**注意修改完环境变量，重新部署才能生效**，见[3.1章最后一节](#3.1.4其他操作指南)；**版本更新方式**，也请见[3.1章最后一节](#3.1.4其他操作指南)
 
 <details>
     <summary>操作详情</summary>
 
-#### 3.1.1前期准备
+### 3.1.1前期准备
 
 <details>
     <summary>准备内容</summary>
 
-##### 3.1.1.1根据所需开通的渠道进行以下准备
+#### 3.1.1.1根据所需开通的渠道进行以下准备
 
 - 开通**Telegram Bot渠道**：**Telegram的`TG_BOT_TOKEN`和`TG_CHAT_ID`**
 
@@ -188,7 +188,7 @@
   
   </details>
 
-##### 3.1.1.2根据部署方式进行以下准备
+#### 3.1.1.2根据部署方式进行以下准备
 
 - **部署于Cloudflare**
 
@@ -205,12 +205,12 @@
 
 </details>
 
-#### 3.1.2部署教程
+### 3.1.2部署教程
 
 <details>
     <summary>根据自己需求部署在CloudFlare或服务器上</summary>
 
-##### 3.1.2.1部署于Cloudflare
+#### 3.1.2.1部署于Cloudflare
 
 <details>
     <summary>部署方式</summary>
@@ -258,7 +258,7 @@
 
 </details>
 
-##### 3.1.2.2部署于服务器
+#### 3.1.2.2部署于服务器
 
 <details>
     <summary>部署方式</summary>
@@ -304,12 +304,13 @@
 
 </details>
 
-#### 3.1.3其他可选配置
+### 3.1.3可选配置
 
 <details>
-    <summary>后台认证、API格式、自定义页面等设置</summary>
+    <summary>后台认证、自定义页面等设置</summary>
 
-##### 3.1.3.1后台管理认证
+
+#### 3.1.3.1后台管理认证
 
 
 后台管理页面默认**不设密码**，需按照如下方式**设置认证**：
@@ -323,7 +324,7 @@
 
    - 部署完成后，访问`http(s)://你的域名/dashboard`即可进入后台管理页面
 
-##### 3.1.3.2图片审查
+#### 3.1.3.2图片审查
 
 
 支持成人内容审查和自动屏蔽，开启步骤如下：
@@ -332,22 +333,22 @@
 - 打开 Cloudflare Pages 项目的管理页面，依次点击`设置`，`环境变量`，`添加环境变量`
 - 添加一个`变量名称`为`ModerateContentApiKey`，`值`为第一步获得的`API key`，点击`保存`即可
 
-##### 3.1.3.3Web和API上传认证
+#### 3.1.3.3Web和API上传认证
 
 
 环境变量增加认证码`AUTH_CODE`，值为你想要设置的认证码。
 
 Web端在登录页面输入你的**认证码**即可登录使用；API端需要在上传链接中后缀`authCode`参数，详见[API文档](#4.2.1上传API)。
 
-##### 3.1.3.4访问域名限制
+#### 3.1.3.4访问域名限制
 
 环境变量增加`ALLOWED_DOMAINS`，多个允许的域名用英文`,`分割，如：`域名.xyz,域名.cloudns.be,域名.pp.ua`
 
-##### 3.1.3.5白名单模式
+#### 3.1.3.5白名单模式
 
 环境变量增加`WhiteList_Mode`，设置为`true`即可开启白名单模式，仅设置为白名单的图片可被访问。
 
-##### 3.1.3.6页面自定义（DIY接口）
+#### 3.1.3.6页面自定义（DIY接口）
 
 <details>
     <summary>设置方式</summary>
@@ -385,17 +386,17 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 
 </details>
 
-##### 3.1.3.7远端遥测
+#### 3.1.3.7远端遥测
 
 便于开发者进行bug的捕捉和定位，但是**过程中可能收集到访问链接、域名等信息**，如您不愿意泄露类似信息给项目开发者，可在环境变量中添加`disable_telemetry`为`true`来退出遥测。
 
-##### 3.1.3.8随机图API
+#### 3.1.3.8随机图API
 
 设置`AllowRandom`环境变量，值为`true`，以从图床中随机获取一张图片，详见[API文档](#4.2.2随机图API)。
 
 ##### </details>
 
-#### 3.1.4注意！！！
+### 3.1.4其他操作指南
 
 <details>
     <summary>环境变量修改、程序更新等教程</summary>
@@ -422,24 +423,24 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 
 </details>
 
-### 3.2定制化修改
+## 3.2定制化修改
 
 按照`3.1`步骤部署完成后，前往仓库[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub?tab=readme-ov-file)，按照操作说明进行DIY和打包操作，最后将打包好的`/dist`目录中的内容替换到该仓库的根目录下即可（复制+替换）。
 
-## 4.Usage
+# 4.Usage
 
-### 4.1Web端使用方式
+## 4.1Web端使用方式
 
 ![](static/202412092301397.png)
 
 ![](static/202412092305405.png)
 
-### 4.2API文档
+## 4.2API文档
 
 <details>
     <summary>API文档</summary>
 
-#### 4.2.1上传API
+### 4.2.1上传API
 
 | 接口名称     | /upload                                                      |
 | ------------ | ------------------------------------------------------------ |
@@ -468,7 +469,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 > ]
 > ```
 
-#### 4.2.2随机图API
+### 4.2.2随机图API
 
 
 | 接口名称     | /random                                                      |
@@ -496,9 +497,9 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 
 </details>
 
-## 5.TODO
+# 5.TODO
 
-### 5.1Add Features💕
+## 5.1Add Features💕
 
 <details>
 
@@ -539,7 +540,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 
 </details>
 
-### 5.2Fix Bugs👻
+## 5.2Fix Bugs👻
 
 <details>
 
@@ -553,17 +554,17 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 
 </details>
 
-## 6.Q&A
+# 6.Q&A
 
 <details>
     <summary>常见问题解答</summary>
 
-### 6.1未设置`ALLOWED_DOMAINS`，但无法跨域访问？
+## 6.1未设置`ALLOWED_DOMAINS`，但无法跨域访问？
 
 - 请检查你的cloudflare防火墙设置（例如hotlink保护是否开启）
 - 参见[Issue #8](https://github.com/MarSeventh/CloudFlare-ImgBed/issues/8)
 
-### 6.2如何通过PicGo上传？
+## 6.2如何通过PicGo上传？
 
 - PicGo插件设置中搜索`web-uploader`，安装可自定义前缀的版本，如图：
 
@@ -575,7 +576,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 
 - 设置完成，确定即可使用PicGo上传到自建的图床。
 
-### 6.3上传失败怎么办？
+## 6.3上传失败怎么办？
 
 - 是否正确配置`TG_BOT_TOKEN`、`TG_CHAT_ID`等环境变量
 - 是否给机器人管理员配置**足够的权限**
@@ -583,21 +584,21 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 - 是否更新至**最新版**
 - 前往issues寻找相似问题
 
-### 6.4`TG_CHAT_ID`前面有没有`-`
+## 6.4`TG_CHAT_ID`前面有没有`-`
 
 - 注意看图，前面有`-`
 
-### 6.5进入后台页面加载不出记录或图片
+## 6.5进入后台页面加载不出记录或图片
 
 - 网络问题，尝试刷新页面
 
 </details>
 
-## 7.Tips
+# 7.Tips
 
 前端开源，参见[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)项目。
 
-## 8.Star History
+# 8.Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=MarSeventh/CloudFlare-ImgBed,MarSeventh/Sanyue-ImgHub&type=Date)](https://star-history.com/#MarSeventh/CloudFlare-ImgBed&MarSeventh/Sanyue-ImgHub&Date)
 
