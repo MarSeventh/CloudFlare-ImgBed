@@ -534,7 +534,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 23. :hourglass_flowing_sand:后端list接口实现分页功能
 24. :white_check_mark:~~支持自定义链接前缀~~（2024.12.4已完成）
 25. :memo:对接alist，或实现webdav（评估中）
-26. :hourglass_flowing_sand:文件详情增加文件大小记录
+26. :white_check_mark:~~文件详情增加文件大小记录~~（2024.12.10已完成）
 27. :hourglass_flowing_sand:支持管理员自定义全局默认链接前缀
 28. :white_check_mark:~~开放更多文件格式~~（2024.12.9已完成）
 
