@@ -126,7 +126,7 @@ export async function onRequest(context) {  // Contents of context object
     if (response === null) {
         return new Response('Error: Failed to fetch image', { status: 500 });
     } else if (response.status === 404) {
-        return new Response('Error: Image Not Found', { status: 404 });
+        return Response.redirect(url.origin + "/static/404.png", 302);
     }
     
     try {
@@ -192,7 +192,11 @@ async function returnWithCheck(request, env, url, imgRecord) {
             //check if the env variables WhiteList_Mode are set
             if (env.WhiteList_Mode == "true") {
                 //if the env variables WhiteList_Mode are set, redirect to the image
-                return Response.redirect(url.origin + "/whiteliston", 302);
+                if (typeof request.headers.get('Referer') == "undefined" || request.headers.get('Referer') == null || request.headers.get('Referer') == "") {
+                    return Response.redirect(url.origin + "/whiteliston", 302)
+                } else {
+                    return response.redirect(url.origin + "/static/WhiteListOn.png", 302);
+                }
             } else {
                 //if the env variables WhiteList_Mode are not set, redirect to the image
                 return response;

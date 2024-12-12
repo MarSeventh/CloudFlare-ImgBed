@@ -42,6 +42,18 @@
 
 </details>
 
+<details>
+    <summary>更新日志</summary>
+
+## 2024.12.12
+
+Add Features: 
+
+- 后端支持上传失败自动切换其他渠道重试
+- 优化404、blockimg、whitelistmode等返回状态的显示样式
+
+</details>
+
 # 1.Introduction
 
 免费图片托管解决方案（支持存储绝大多数常见格式的**图片、视频、动图**等），具有**后台管理、图片审查**、**登录鉴权**、**页面自定义**、**多种方式及多文件上传**、**多文件及多格式链接复制**等功能（详见[第2章](#2.Features))。
@@ -467,7 +479,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 | ------------ | ------------------------------------------------------------ |
 | **接口功能** | 上传图片或视频                                               |
 | **请求方法** | POST                                                         |
-| **请求参数** | **Query参数**：<br />`authCode`: string类型，即为你设置的认证码<br />`serverCompress`: boolean类型，表示是否开启服务端压缩（仅针对图片文件、Telegram上传渠道生效，默认为`true`）<br />`uploadChannel`: string类型，取值为`telegram`和`cfr2`，分别代表telegram bot渠道和Cloudflare R2渠道，默认为`telegram` 渠道<br />`uploadNameType`: string类型，表示文件命名方式，可选值为`[default, index, origin]`，分别代表默认`前缀_原名`命名、`仅前缀`命名和`仅原名`命名法，默认为`default`<br />**Body参数(application/form-data)**：<br />`file`: file类型，你要上传的文件 |
+| **请求参数** | **Query参数**：<br />`authCode`: string类型，即为你设置的认证码<br />`serverCompress`: boolean类型，表示是否开启服务端压缩（仅针对图片文件、Telegram上传渠道生效，默认为`true`）<br />`uploadChannel`: string类型，取值为`telegram`和`cfr2`，分别代表telegram bot渠道和Cloudflare R2渠道，默认为`telegram` 渠道<br />`autoRetry`: boolean类型，表示是否开启上传失败自动切换渠道重试，默认开启<br />`uploadNameType`: string类型，表示文件命名方式，可选值为`[default, index, origin]`，分别代表默认`前缀_原名`命名、`仅前缀`命名和`仅原名`命名法，默认为`default`<br />**Body参数(application/form-data)**：<br />`file`: file类型，你要上传的文件 |
 | **返回响应** | `data[0].src`为获得的图片链接（注意不包含域名，需要自己添加） |
 
 > **请求示例**：
@@ -551,7 +563,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 19. :hourglass_flowing_sand:管理端增加批量黑名单、白名单功能
 20. :white_check_mark:~~Telegram Channel渠道上传文件记录机器人和频道数据，便于迁移和备份~~（2024.12.4已完成）
 21. :white_check_mark:~~支持自定义命名方式（仅原名 or 仅随机前缀 or 默认的随机前缀\_原名）~~（2024.12.4已完成）
-22. :hourglass_flowing_sand:支持上传失败自动切换其他渠道尝试
+22. :white_check_mark:~~支持上传失败自动切换其他渠道尝试~~（2024.12.12已完成）
 23. :hourglass_flowing_sand:后端list接口实现分页功能
 24. :white_check_mark:~~支持自定义链接前缀~~（2024.12.4已完成）
 25. :memo:对接alist，或实现webdav（评估中）

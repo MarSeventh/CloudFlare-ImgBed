@@ -143,190 +143,232 @@ export async function onRequestPost(context) {  // Contents of context object
 
 
     // ====================================不同渠道上传=======================================
+    // 出错是否切换渠道自动重试，默认开启
+    const autoRetry = url.searchParams.get('autoRetry') === 'false' ? false : true;
 
-
+    let err = '';
+    // 上传到不同渠道
     if (uploadChannel === 'CloudflareR2') {
         // -------------CloudFlare R2 渠道---------------
-
-        // 检查R2数据库是否配置
-        if (typeof env.img_r2 == "undefined" || env.img_r2 == null || env.img_r2 == "") {
-            return new Response('Error: Please configure R2 database', { status: 500 });
-        }
-        
-        const R2DataBase = env.img_r2;
-
-        // 写入R2数据库
-        await R2DataBase.put(fullId, formdata.get('file'));
-
-        // 图像审查
-        const apikey = env.ModerateContentApiKey;
-        if (apikey == undefined || apikey == null || apikey == "") {
-            metadata.Label = "None";
+        const res = await uploadFileToCloudflareR2(env, formdata, fullId, metadata);
+        if (res.status === 200 || !autoRetry) {
+            return res;
         } else {
-            try {
-                // 检查R2公网链接是否配置
-                if (typeof env.R2PublicUrl == "undefined" || env.R2PublicUrl == null || env.R2PublicUrl == "") {
-                    return new Response('Error: Please configure R2 public url', { status: 500 });
-                }
-                const R2PublicUrl = env.R2PublicUrl;
-                const fetchResponse = await fetch(`https://api.moderatecontent.com/moderate/?key=${apikey}&url=${R2PublicUrl}/${fullId}`);
-                if (!fetchResponse.ok) {
-                    throw new Error(`HTTP error! status: ${fetchResponse.status}`);
-                }
-                const moderate_data = await fetchResponse.json();
-                metadata.Label = moderate_data.rating_label;
-            } catch (error) {
-                console.error('Moderate Error:', error);
-                // 将不带审查的图片写入数据库
-                metadata.Label = "None";
-            } finally {
-                console.log('Moderate Done');
+            err = await res.text();
+        }
+    } else {
+        // ----------------Telegram New 渠道-------------------
+        const res = await uploadFileToTelegram(env, formdata, fullId, metadata, fileExt, fileName, fileType, url, clonedRequest);
+        if (res.status === 200 || !autoRetry) {
+            return res;
+        } else {
+            err = await res.text();
+        }
+    }
+
+    // 上传失败，开始自动切换渠道重试
+    const res = await tryRetry(err, env, uploadChannel, formdata, fullId, metadata, fileExt, fileName, fileType, url, clonedRequest);
+    return res;
+}
+
+
+// 自动切换渠道重试
+async function tryRetry(err, env, uploadChannel, formdata, fullId, metadata, fileExt, fileName, fileType, url, clonedRequest) {
+    // 渠道列表
+    const channelList = ['CloudflareR2', 'TelegramNew'];
+    const errMessages = {};
+    errMessages[uploadChannel] = 'Error: ' + uploadChannel + err;
+    for (let i = 0; i < channelList.length; i++) {
+        if (channelList[i] !== uploadChannel) {
+            let res = null;
+            if (channelList[i] === 'CloudflareR2') {
+                res = await uploadFileToCloudflareR2(env, formdata, fullId, metadata);
+            } else if (channelList[i] === 'TelegramNew') {
+                res = await uploadFileToTelegram(env, formdata, fullId, metadata, fileExt, fileName, fileType, url, clonedRequest);
+            }
+            if (res.status === 200) {
+                return res;
+            } else {
+                errMessages[channelList[i]] = 'Error: ' + channelList[i] + await res.text();
             }
         }
+    }
+
+    return new Response(JSON.stringify(errMessages), { status: 500 });
+}
+
+
+// 上传到Cloudflare R2
+async function uploadFileToCloudflareR2(env, formdata, fullId, metadata) {
+    // 检查R2数据库是否配置
+    if (typeof env.img_r2 == "undefined" || env.img_r2 == null || env.img_r2 == "") {
+        return new Response('Error: Please configure R2 database', { status: 500 });
+    }
+    
+    const R2DataBase = env.img_r2;
+
+    // 写入R2数据库
+    await R2DataBase.put(fullId, formdata.get('file'));
+
+    // 图像审查
+    const R2PublicUrl = env.R2PublicUrl;
+    const moderateUrl = `${R2PublicUrl}/${fullId}`;
+    metadata = await moderateContent(env, moderateUrl, metadata);
+
+    // 更新metadata，写入KV数据库
+    try {
+        metadata.Channel = "CloudflareR2";
+        await env.img_url.put(fullId, "", {
+            metadata: metadata,
+        });
+    } catch (error) {
+        return new Response('Error: Failed to write to KV database', { status: 500 });
+    }
+
+
+    // 成功上传，将文件ID返回给客户端
+    return new Response(
+        JSON.stringify([{ 'src': `/file/${fullId}` }]), 
+        {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+        }
+    );
+}
+
+
+// 上传到Telegram
+async function uploadFileToTelegram(env, formdata, fullId, metadata, fileExt, fileName, fileType, url, clonedRequest) {
+    // 由于TG会把gif后缀的文件转为视频，所以需要修改后缀名绕过限制
+    if (fileExt === 'gif') {
+        const newFileName = fileName.replace(/\.gif$/, '.jpeg');
+        const newFile = new File([formdata.get('file')], newFileName, { type: fileType });
+        formdata.set('file', newFile);
+    } else if (fileExt === 'webp') {
+        const newFileName = fileName.replace(/\.webp$/, '.jpeg');
+        const newFile = new File([formdata.get('file')], newFileName, { type: fileType });
+        formdata.set('file', newFile);
+    }
+
+    // 选择对应的发送接口
+    const fileTypeMap = {
+        'image/': {'url': 'sendPhoto', 'type': 'photo'},
+        'video/': {'url': 'sendVideo', 'type': 'video'},
+        'audio/': {'url': 'sendAudio', 'type': 'audio'},
+        'application/pdf': {'url': 'sendDocument', 'type': 'document'},
+    };
+
+    const defaultType = {'url': 'sendDocument', 'type': 'document'};
+
+    let sendFunction = Object.keys(fileTypeMap).find(key => fileType.startsWith(key)) 
+        ? fileTypeMap[Object.keys(fileTypeMap).find(key => fileType.startsWith(key))] 
+        : defaultType;
+
+    // GIF 发送接口特殊处理
+    if (fileType === 'image/gif' || fileType === 'image/webp' || fileExt === 'gif' || fileExt === 'webp') {
+        sendFunction = {'url': 'sendAnimation', 'type': 'animation'};
+    }
+
+    // 根据服务端压缩设置处理接口：从参数中获取serverCompress，如果为false，则使用sendDocument接口
+    if (url.searchParams.get('serverCompress') === 'false') {
+        sendFunction = {'url': 'sendDocument', 'type': 'document'};
+    }
+
+    // 根据发送接口向表单嵌入chat_id
+    let newFormdata = new FormData();
+    newFormdata.append('chat_id', env.TG_CHAT_ID);
+    newFormdata.append(sendFunction.type, formdata.get('file'));
+
+    
+    // 构建目标 URL 
+    // const targetUrl = new URL(url.pathname, 'https://telegra.ph'); // telegraph接口，已失效，缅怀
+    const targetUrl = new URL(`https://api.telegram.org/bot${env.TG_BOT_TOKEN}/${sendFunction.url}`); // telegram接口
+    // 目标 URL 剔除 authCode 参数
+    url.searchParams.forEach((value, key) => {
+        if (key !== 'authCode') {
+            targetUrl.searchParams.append(key, value);
+        }
+    });
+    // 复制请求头并剔除 authCode
+    const headers = new Headers(clonedRequest.headers);
+    headers.delete('authCode');
+
+
+    // 向目标 URL 发送请求
+    let res = new Response('upload error, check your environment params about telegram channel!', { status: 400 });
+    try {
+        const response = await fetch(targetUrl.href, {
+            method: clonedRequest.method,
+            headers: {
+                "User-Agent": " Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36 Edg/121.0.0.0"
+            },
+            body: newFormdata,
+        });
+        const clonedRes = await response.clone().json(); // 等待响应克隆和解析完成
+        const fileInfo = getFile(clonedRes);
+        const filePath = await getFilePath(env, fileInfo.file_id);
+        const id = fileInfo.file_id;
+        // 更新FileSize
+        metadata.FileSize = (fileInfo.file_size / 1024 / 1024).toFixed(2);
+
+        // 若上传成功，将响应返回给客户端
+        if (response.ok) {
+            res = new Response(
+                JSON.stringify([{ 'src': `/file/${fullId}` }]), 
+                {
+                    status: 200,
+                    headers: { 'Content-Type': 'application/json' }
+                }
+            );
+        }
+
+
+        // 图像审查
+        const moderateUrl = `https://api.telegram.org/file/bot${env.TG_BOT_TOKEN}/${filePath}`;
+        metadata = await moderateContent(env, moderateUrl, metadata);
 
         // 更新metadata，写入KV数据库
         try {
-            metadata.Channel = "CloudflareR2";
+            metadata.Channel = "TelegramNew";
+            metadata.TgFileId = id;
+            metadata.TgChatId = env.TG_CHAT_ID;
+            metadata.TgBotToken = env.TG_BOT_TOKEN;
             await env.img_url.put(fullId, "", {
                 metadata: metadata,
             });
         } catch (error) {
-            return new Response('Error: Failed to write to KV database', { status: 500 });
+            res = new Response('Error: Failed to write to KV database', { status: 500 });
         }
+    } catch (error) {
+        res = new Response('upload error, check your environment params about telegram channel!', { status: 400 });
+    } finally {
+        return res;
+    }
+}
 
 
-        // 成功上传，将文件ID返回给客户端
-        return new Response(
-            JSON.stringify([{ 'src': `/file/${fullId}` }]), 
-            {
-                status: 200,
-                headers: { 'Content-Type': 'application/json' }
-            }
-        );
+// 图像审查
+async function moderateContent(env, url, metadata) {
+    const apikey = env.ModerateContentApiKey;
+    if (apikey == undefined || apikey == null || apikey == "") {
+        metadata.Label = "None";
     } else {
-        // ----------------Telegram New 渠道-------------------
-        
-        // 由于TG会把gif后缀的文件转为视频，所以需要修改后缀名绕过限制
-        if (fileExt === 'gif') {
-            const newFileName = fileName.replace(/\.gif$/, '.jpeg');
-            const newFile = new File([formdata.get('file')], newFileName, { type: fileType });
-            formdata.set('file', newFile);
-        } else if (fileExt === 'webp') {
-            const newFileName = fileName.replace(/\.webp$/, '.jpeg');
-            const newFile = new File([formdata.get('file')], newFileName, { type: fileType });
-            formdata.set('file', newFile);
-        }
-
-        // 选择对应的发送接口
-        const fileTypeMap = {
-            'image/': {'url': 'sendPhoto', 'type': 'photo'},
-            'video/': {'url': 'sendVideo', 'type': 'video'},
-            'audio/': {'url': 'sendAudio', 'type': 'audio'},
-            'application/pdf': {'url': 'sendDocument', 'type': 'document'},
-        };
-
-        const defaultType = {'url': 'sendDocument', 'type': 'document'};
-
-        let sendFunction = Object.keys(fileTypeMap).find(key => fileType.startsWith(key)) 
-            ? fileTypeMap[Object.keys(fileTypeMap).find(key => fileType.startsWith(key))] 
-            : defaultType;
-
-        // GIF 发送接口特殊处理
-        if (fileType === 'image/gif' || fileType === 'image/webp' || fileExt === 'gif' || fileExt === 'webp') {
-            sendFunction = {'url': 'sendAnimation', 'type': 'animation'};
-        }
-
-        // 根据服务端压缩设置处理接口：从参数中获取serverCompress，如果为false，则使用sendDocument接口
-        if (url.searchParams.get('serverCompress') === 'false') {
-            sendFunction = {'url': 'sendDocument', 'type': 'document'};
-        }
-
-        // 根据发送接口向表单嵌入chat_id
-        let newFormdata = new FormData();
-        newFormdata.append('chat_id', env.TG_CHAT_ID);
-        newFormdata.append(sendFunction.type, formdata.get('file'));
-
-        
-        // 构建目标 URL 
-        // const targetUrl = new URL(url.pathname, 'https://telegra.ph'); // telegraph接口，已失效，缅怀
-        const targetUrl = new URL(`https://api.telegram.org/bot${env.TG_BOT_TOKEN}/${sendFunction.url}`); // telegram接口
-        // 目标 URL 剔除 authCode 参数
-        url.searchParams.forEach((value, key) => {
-            if (key !== 'authCode') {
-                targetUrl.searchParams.append(key, value);
-            }
-        });
-        // 复制请求头并剔除 authCode
-        const headers = new Headers(clonedRequest.headers);
-        headers.delete('authCode');
-
-
-        // 向目标 URL 发送请求
-        let res = new Response('upload error, check your environment params about telegram channel!', { status: 400 });
         try {
-            const response = await fetch(targetUrl.href, {
-                method: clonedRequest.method,
-                headers: {
-                    "User-Agent": " Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36 Edg/121.0.0.0"
-                },
-                body: newFormdata,
-            });
-            const clonedRes = await response.clone().json(); // 等待响应克隆和解析完成
-            const fileInfo = getFile(clonedRes);
-            const filePath = await getFilePath(env, fileInfo.file_id);
-            const id = fileInfo.file_id;
-            // 更新FileSize
-            metadata.FileSize = (fileInfo.file_size / 1024 / 1024).toFixed(2);
-
-            // 若上传成功，将响应返回给客户端
-            if (response.ok) {
-                res = new Response(
-                    JSON.stringify([{ 'src': `/file/${fullId}` }]), 
-                    {
-                        status: 200,
-                        headers: { 'Content-Type': 'application/json' }
-                    }
-                );
+            const fetchResponse = await fetch(`https://api.moderatecontent.com/moderate/?key=${apikey}&url=${url}`);
+            if (!fetchResponse.ok) {
+                throw new Error(`HTTP error! status: ${fetchResponse.status}`);
             }
-            const apikey = env.ModerateContentApiKey;
-        
-            if (apikey == undefined || apikey == null || apikey == "") {
-                metadata.Label = "None";
-            } else {
-                try {
-                    const fetchResponse = await fetch(`https://api.moderatecontent.com/moderate/?key=${apikey}&url=https://api.telegram.org/file/bot${env.TG_BOT_TOKEN}/${filePath}`);
-                    if (!fetchResponse.ok) {
-                        throw new Error(`HTTP error! status: ${fetchResponse.status}`);
-                    }
-                    const moderate_data = await fetchResponse.json();
-                    metadata.Label = moderate_data.rating_label;
-                } catch (error) {
-                    console.error('Moderate Error:', error);
-                    // 将不带审查的图片写入数据库
-                    metadata.Label = "None";
-                } finally {
-                    console.log('Moderate Done');
-                }
-            }
-
-            // 更新metadata，写入KV数据库
-            try {
-                metadata.Channel = "TelegramNew";
-                metadata.TgFileId = id;
-                metadata.TgChatId = env.TG_CHAT_ID;
-                metadata.TgBotToken = env.TG_BOT_TOKEN;
-                await env.img_url.put(fullId, "", {
-                    metadata: metadata,
-                });
-            } catch (error) {
-                res = new Response('Error: Failed to write to KV database', { status: 500 });
-            }
+            const moderate_data = await fetchResponse.json();
+            metadata.Label = moderate_data.rating_label;
         } catch (error) {
-            res = new Response('upload error, check your environment params about telegram channel!', { status: 400 });
+            console.error('Moderate Error:', error);
+            // 将不带审查的图片写入数据库
+            metadata.Label = "None";
         } finally {
-            return res;
+            console.log('Moderate Done');
         }
     }
+    return metadata;
 }
 
 function getFile(response) {
