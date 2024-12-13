@@ -21,10 +21,10 @@
 
 <details>
     <summary>体验地址及优质博文、视频（搭建或使用有问题可以先去里面学习哦~）</summary>
+
 **体验地址**：[CloudFlare ImgBed](https://cfbed.1314883.xyz/)
 
 > 访问码：cfbed
->
 
 **体验视频**：[CloudFlare免费图床，轻松守护你的每一份精彩！_哔哩哔哩_bilibili](https://www.bilibili.com/video/BV1y3WGe4EGh/?vd_source=da5ecbe595e41089cd1bed95932b8bfd)
 
