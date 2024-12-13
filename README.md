@@ -21,8 +21,7 @@
 
 <details>
     <summary>体验地址及优质博文、视频（搭建或使用有问题可以先去里面学习哦~）</summary>
-
-**体验地址**：[Sanyue ImgHub (demo-cloudflare-imgbed.pages.dev)](https://demo-cloudflare-imgbed.pages.dev/)
+**体验地址**：[CloudFlare ImgBed](https://cfbed.1314883.xyz/)
 
 > 访问码：cfbed
 >
@@ -177,19 +176,15 @@ Add Features:
 
   1. 向[@BotFather](https://t.me/BotFather)发送`/newbot`，按照提示输入bot的备注、用户名等信息。成功创建后获得`TG_BOT_TOKEN`。
 
-     ![](static/readme/202409071744569.png)
+     <img src="static/readme/202409071744569.png" style="zoom: 50%;" />
 
   2. 创建一个新的频道（Channel），进入新建的频道，选择频道管理，将刚才创建的机器人设为频道管理员。
 
-     ![](static/readme/202409071758534.png)
-
-     ![](static/readme/202409071758796.png)
-
-     ![](static/readme/202410291531473.png)
+     <img src="static/readme/202409071758534.png" style="display:inline-block; width:33%"/><img src="static/readme/202409071758796.png" style="display:inline-block; width:32%"/><img src="static/readme/202410291531473.png" style="width:33%;display: inline-block" />
 
   3. 向[@VersaToolsBot](https://t.me/VersaToolsBot)**转发**一条第2步新建频道中的消息，获取`TG_CHAT_ID`（频道ID）
 
-     ![](static/readme/202409071751619.png)
+     <img src="static/readme/202409071751619.png" style="zoom: 67%;" />
 
   </details>
 
@@ -245,7 +240,7 @@ Add Features:
 
 2. 打开 Cloudflare Dashboard，进入 Pages 管理页面，选择创建项目，选择`连接到 Git 提供程序`
 
-![1](static/readme/202407201047300.png)
+<img src="static/readme/202407201047300.png" alt="1" style="zoom: 50%;" />
 
 3. 按照页面提示输入项目名称，选择需要连接的 git 仓库，点击`部署站点`
 
@@ -547,6 +542,8 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 ## 5.1Add Features💕
 
 <details>
+    <summary>功能更新列表</summary>
+
 
 1. :white_check_mark: ~~增加粘贴图片上传功能~~（2024.7.22已完成）
 2. :white_check_mark:~~增加markdown、html等格式链接复制功能~~（2024.7.21已完成）
@@ -589,6 +586,8 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 ## 5.2Fix Bugs👻
 
 <details>
+    <summary>Bug修复列表</summary>
+
 
 1. :white_check_mark:~~修复API上传无法直接展示在后台的问题~~（2024.7.25已修复）
 1. :white_check_mark:~~由于telegra.ph关闭上传，迁移至TG频道上传~~（2024.9.7已修复）
@@ -639,11 +638,20 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 
 - 网络问题，尝试刷新页面
 
+## 6.6后台进行删除、拉黑等操作时不能立即生效
+
+- 与CDN缓存有关
+- 详见[[重要\]关于CDN缓存的说明（删除、拉黑等操作延迟生效解决方案） · Issue #123 · MarSeventh/CloudFlare-ImgBed (github.com)](https://github.com/MarSeventh/CloudFlare-ImgBed/issues/123)
+
 </details>
 
 # 7.Tips
 
 前端开源，参见[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)项目。
+
+**打赏**：项目维护不易，喜欢本项目的话，可以作者大大一点小小的鼓励哦，您的每一份支持都是我前进的动力~
+
+<img src="static/readme/award.png" alt="award" style="zoom:33%;display: inline-block" />
 
 # 8.Star History
 
