@@ -163,20 +163,22 @@ Add Features:
 ### 3.1.1前期准备
 
 <details>
-    <summary>准备内容</summary>
+    <summary>开始部署前需要准备的东西</summary>
+
 
 #### 3.1.1.1根据所需开通的渠道进行以下准备
 
 - 开通**Telegram Bot渠道**：**Telegram的`TG_BOT_TOKEN`和`TG_CHAT_ID`**
 
   <details>
-      <summary>操作详情</summary>
+      <summary>TG_BOT_TOKEN和TG_CHAT_ID的获取方式</summary>
+
 
   首先需要拥有一个Telegram账户，然后按照以下步骤获取`TG_BOT_TOKEN`和`TG_CHAT_ID`。
 
   1. 向[@BotFather](https://t.me/BotFather)发送`/newbot`，按照提示输入bot的备注、用户名等信息。成功创建后获得`TG_BOT_TOKEN`。
 
-     <img src="static/readme/202409071744569.png" style="zoom: 50%;" />
+     <img src="static/readme/202409071744569.png" style="width: 50%;" />
 
   2. 创建一个新的频道（Channel），进入新建的频道，选择频道管理，将刚才创建的机器人设为频道管理员。
 
@@ -184,14 +186,15 @@ Add Features:
 
   3. 向[@VersaToolsBot](https://t.me/VersaToolsBot)**转发**一条第2步新建频道中的消息，获取`TG_CHAT_ID`（频道ID）
 
-     <img src="static/readme/202409071751619.png" style="zoom: 67%;" />
+     <img src="static/readme/202409071751619.png" style="width: 67%;" />
 
   </details>
 
 - 开通**Cloudflare R2渠道**：新建一个Cloudflare R2存储桶，前提是需要绑定支付方式。
 
   <details>
-      <summary>操作详情</summary>
+      <summary>Cloudflare R2渠道开通方式</summary>
+  
   
   1. 前往Cloudflare Dashboard，选择`R2 存储对象`
   
@@ -232,7 +235,8 @@ Add Features:
 #### 3.1.2.1部署于Cloudflare
 
 <details>
-    <summary>部署方式</summary>
+    <summary>部署在Cloudflare上的方式</summary>
+
 
 依托于CF的强大能力，只需简单几步，即可部署本项目，拥有自己的图床。
 
@@ -240,7 +244,7 @@ Add Features:
 
 2. 打开 Cloudflare Dashboard，进入 Pages 管理页面，选择创建项目，选择`连接到 Git 提供程序`
 
-<img src="static/readme/202407201047300.png" alt="1" style="zoom: 50%;" />
+<img src="static/readme/202407201047300.png" alt="1" style="width: 50%;" />
 
 3. 按照页面提示输入项目名称，选择需要连接的 git 仓库，点击`部署站点`
 
@@ -251,7 +255,7 @@ Add Features:
    - `Cloudflare R2 渠道`：
 
      <details>
-         <summary>设置方式</summary>
+         <summary>R2渠道设置方式</summary>
      
      将前面新建的存储桶绑定到项目，名称为`img_r2`
      
@@ -651,7 +655,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 
 **打赏**：项目维护不易，喜欢本项目的话，可以作者大大一点小小的鼓励哦，您的每一份支持都是我前进的动力~
 
-<img src="static/readme/award.png" alt="award" style="zoom:33%;display: inline-block" />
+<img src="static/readme/award.png" alt="award" style="width:33%;display: inline-block" />
 
 # 8.Star History
 
