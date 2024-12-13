@@ -141,6 +141,10 @@ export async function onRequestPost(context) {  // Contents of context object
         fullId = fileName? unique_index + '_' + fileName : unique_index + '.' + fileExt;
     }
 
+    // 清除CDN缓存
+    const cdnUrl = `https://${url.hostname}/file/${fullId}`;
+    await purgeCDNCache(env, cdnUrl);
+
 
     // ====================================不同渠道上传=======================================
     // 出错是否切换渠道自动重试，默认开启
@@ -429,6 +433,16 @@ async function getFilePath(env, file_id) {
       } catch (error) {
         return null;
       }
+}
+
+async function purgeCDNCache(env, cdnUrl) {
+    const options = {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-Auth-Email': `${env.CF_EMAIL}`, 'X-Auth-Key': `${env.CF_API_KEY}`},
+        body: `{"files":["${ cdnUrl }"]}`
+    };
+
+    await fetch(`https://api.cloudflare.com/client/v4/zones/${ env.CF_ZONE_ID }/purge_cache`, options);
 }
 
 function isExtValid(fileExt) {

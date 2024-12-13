@@ -44,6 +44,11 @@
 
 <details>
     <summary>更新日志</summary>
+## 2024.12.13
+
+Add Features:
+
+- 优化blockimg、whitelistmode、404等返回状态的缓存策略，尽可能减少回源请求
 
 ## 2024.12.12
 

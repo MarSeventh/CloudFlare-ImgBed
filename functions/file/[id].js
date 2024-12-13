@@ -126,7 +126,13 @@ export async function onRequest(context) {  // Contents of context object
     if (response === null) {
         return new Response('Error: Failed to fetch image', { status: 500 });
     } else if (response.status === 404) {
-        return Response.redirect(url.origin + "/static/404.png", 302);
+        return new Response(null, {
+            status: 302,
+            headers: {
+                "Location": url.origin + "/static/404.png",
+                "Cache-Control": "public, max-age=31536000"
+            }
+        })
     }
     
     try {
@@ -176,27 +182,32 @@ async function returnWithCheck(request, env, url, imgRecord) {
             if (record.metadata.ListType == "White") {
                 return response;
             } else if (record.metadata.ListType == "Block") {
-                if (typeof request.headers.get('Referer') == "undefined" || request.headers.get('Referer') == null || request.headers.get('Referer') == "") {
-                    return Response.redirect(url.origin + "/blockimg", 302)
-                } else {
-                    return Response.redirect(url.origin + "/static/BlockImg.png", 302);
-                }
-
+                return new Response(null, {
+                    status: 302,
+                    headers: {
+                        "Location": url.origin + "/static/BlockImg.png",
+                        "Cache-Control": "public, max-age=31536000"
+                    }
+                })
             } else if (record.metadata.Label == "adult") {
-                if (typeof request.headers.get('Referer') == "undefined" || request.headers.get('Referer') == null || request.headers.get('Referer') == "") {
-                    return Response.redirect(url.origin + "/blockimg", 302)
-                } else {
-                    return Response.redirect(url.origin + "/static/BlockImg.png", 302);
-                }
+                return new Response(null, {
+                    status: 302,
+                    headers: {
+                        "Location": url.origin + "/static/BlockImg.png",
+                        "Cache-Control": "public, max-age=31536000"
+                    }
+                })
             }
             //check if the env variables WhiteList_Mode are set
             if (env.WhiteList_Mode == "true") {
                 //if the env variables WhiteList_Mode are set, redirect to the image
-                if (typeof request.headers.get('Referer') == "undefined" || request.headers.get('Referer') == null || request.headers.get('Referer') == "") {
-                    return Response.redirect(url.origin + "/whiteliston", 302)
-                } else {
-                    return response.redirect(url.origin + "/static/WhiteListOn.png", 302);
-                }
+                return new Response(null, {
+                    status: 302,
+                    headers: {
+                        "Location": url.origin + "/static/WhiteListOn.png",
+                        "Cache-Control": "public, max-age=31536000"
+                    }
+                })
             } else {
                 //if the env variables WhiteList_Mode are not set, redirect to the image
                 return response;
