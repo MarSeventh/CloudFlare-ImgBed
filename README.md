@@ -7,10 +7,9 @@
 <details>
     <summary>公告</summary>
 
+
 **注意**：本仓库为[Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，如果你觉得本项目不错，在支持本项目的同时，也请支持原项目。
 
-> [!IMPORTANT]
->
 > 由于telegraph图床被滥用，该项目上传渠道已切换至Telegram Channel，请**更新至最新版（更新方式见第3.1章最后一节）**，按照文档中的部署要求**设置`TG_BOT_TOKEN`和`TG_CHAT_ID`**，否则将无法正常使用上传功能。
 >
 > 此外，目前**KV数据库为必须配置**，如果以前未配置请按照文档说明配置。
@@ -21,6 +20,7 @@
 
 <details>
     <summary>体验地址及优质博文、视频（搭建或使用有问题可以先去里面学习哦~）</summary>
+
 
 **体验地址**：[CloudFlare ImgBed](https://cfbed.1314883.xyz/)
 
@@ -44,6 +44,7 @@
 <details>
     <summary>更新日志</summary>
 
+
 ## 2024.12.13
 
 Add Features:
@@ -62,6 +63,8 @@ Add Features:
 Add Features:
 
 - 进行删除、加入白名单、加入黑名单等操作时，自动清除CF CDN缓存，避免延迟生效(参考文档`3.1.3.9管理端删除、拉黑等操作优化`进行设置)
+
+**更详细的更新日志请前往文档第5章查看\~**
 
 </details>
 
@@ -163,10 +166,9 @@ Add Features:
 ### 3.1.1前期准备
 
 <details>
-    <summary>开始部署前需要准备的东西</summary>
+    <summary>根据所需开通的渠道进行以下准备</summary>
 
 
-#### 3.1.1.1根据所需开通的渠道进行以下准备
 
 - 开通**Telegram Bot渠道**：**Telegram的`TG_BOT_TOKEN`和`TG_CHAT_ID`**
 
@@ -210,21 +212,6 @@ Add Features:
   
   </details>
 
-#### 3.1.1.2根据部署方式进行以下准备
-
-- **部署于Cloudflare**
-
-  
-  需准备一个**Cloudflare账户**，然后按照[3.1.2.1节](#3.1.2.1部署于Cloudflare)的步骤即可完成部署。
-
-- **部署于服务器**
-
-  
-  如果Cloudflare的**有限访问次数**不能满足你的需求，并且你拥有自己的服务器，可以参照[3.1.2.2节](#3.1.2.2部署于服务器)的教程在服务器上模拟Cloudflare的环境，并开放对应的端口访问服务。
-  
-  注意由于服务器操作系统、硬件版本复杂多样，相关教程**无法确保适合每一位用户**，遇到报错请尽量利用搜索引擎解决，无法解决也可以提issue寻求帮助。
-  
-
 </details>
 
 ### 3.1.2部署教程
@@ -232,7 +219,10 @@ Add Features:
 <details>
     <summary>根据自己需求部署在CloudFlare或服务器上</summary>
 
+
 #### 3.1.2.1部署于Cloudflare
+
+需准备一个**Cloudflare账户**，然后按照以下步骤即可完成部署。
 
 <details>
     <summary>部署在Cloudflare上的方式</summary>
@@ -244,7 +234,7 @@ Add Features:
 
 2. 打开 Cloudflare Dashboard，进入 Pages 管理页面，选择创建项目，选择`连接到 Git 提供程序`
 
-<img src="static/readme/202407201047300.png" alt="1" style="width: 50%;" />
+   > ![](static/readme/202407201047300.png)
 
 3. 按照页面提示输入项目名称，选择需要连接的 git 仓库，点击`部署站点`
 
@@ -254,18 +244,13 @@ Add Features:
 
    - `Cloudflare R2 渠道`：
 
-     <details>
-         <summary>R2渠道设置方式</summary>
+     - 将前面新建的存储桶绑定到项目，名称为`img_r2`
      
-     将前面新建的存储桶绑定到项目，名称为`img_r2`
+       > ![](static/readme/202411052323183.png)
      
-     ![](static/readme/202411052323183.png)
+     - 如果后续要开启**图像审查**，需要设置`R2PublicUrl`环境变量，值为前面记下的**R2存储桶公网访问链接**：
      
-     如果后续要开启**图像审查**，需要设置`R2PublicUrl`环境变量，值为前面记下的**R2存储桶公网访问链接**：
-     
-     ![](static/readme/202411052330663.png)
-     
-     </details>
+       > ![](static/readme/202411052330663.png)
 
 3. **绑定KV数据库**：
 
@@ -282,6 +267,10 @@ Add Features:
 </details>
 
 #### 3.1.2.2部署于服务器
+
+如果Cloudflare的**有限访问次数**不能满足你的需求，并且你拥有自己的服务器，可以参照[3.1.2.2节](#3.1.2.2部署于服务器)的教程在服务器上模拟Cloudflare的环境，并开放对应的端口访问服务。
+
+注意由于服务器操作系统、硬件版本复杂多样，相关教程**无法确保适合每一位用户**，遇到报错请尽量利用搜索引擎解决，无法解决也可以提issue寻求帮助。
 
 <details>
     <summary>部署方式</summary>
