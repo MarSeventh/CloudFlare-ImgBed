@@ -148,7 +148,7 @@ export async function onRequestPost(context) {  // Contents of context object
 
     // 清除CDN缓存
     const cdnUrl = `https://${url.hostname}/file/${fullId}`;
-    await purgeCDNCache(env, cdnUrl);
+    await purgeCDNCache(env, cdnUrl, url);
 
 
     // ====================================不同渠道上传=======================================
@@ -440,7 +440,7 @@ async function getFilePath(env, file_id) {
       }
 }
 
-async function purgeCDNCache(env, cdnUrl) {
+async function purgeCDNCache(env, cdnUrl, url) {
     // 清除CDN缓存，包括图片和randomFileList接口的缓存
     const randomFileListUrl = `https://${url.hostname}/api/randomFileList`;
     const options = {
