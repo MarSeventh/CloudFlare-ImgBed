@@ -8,6 +8,7 @@ export async function onRequest(context) {
       next, // used for middleware or to fetch assets
       data, // arbitrary space for passing data between middlewares
     } = context;
+    
     let allRecords = [];
     let cursor = null;
 
@@ -23,6 +24,11 @@ export async function onRequest(context) {
     } while (cursor);
 
     const info = JSON.stringify(allRecords);
-    return new Response(info);
+    let res = new Response(info, {
+        headers: {
+            "Content-Type": "application/json",
+        }
+    });
 
-  }
+    return res;
+}

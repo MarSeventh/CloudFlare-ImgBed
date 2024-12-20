@@ -19,6 +19,14 @@ export async function onRequest(context) {
         return new Response('Error: Please configure KV database', { status: 500 });
     }
 
+    // 看缓存中是否有记录，有则直接返回
+    const cache = caches.default;
+    const cacheRes = await cache.match(request.url);
+    if (cacheRes) {
+        return cacheRes;
+    }
+
+    // 缓存未命中
     let allRecords = [];
     let cursor = null;
 
@@ -43,14 +51,17 @@ export async function onRequest(context) {
         }
     });
 
-    // 返回所有记录，设置缓存时间为1天
+    // 返回所有记录
     const info = JSON.stringify(allRecords);
-    return new Response(info,
-        {
-            headers: {
-                "Content-Type": "application/json",
-                "Cache-Control": "public, max-age=86400",
-            }
+    const res = new Response(info,{
+        headers: {
+            "Content-Type": "application/json",
         }
-    );
+    });
+
+    // 缓存结果，缓存时间为24小时
+    await cache.put(request.url, res.clone(), {
+        expirationTtl: 24 * 60 * 60
+    });
+    return res;
 }

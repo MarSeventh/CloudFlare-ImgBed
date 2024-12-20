@@ -52,6 +52,7 @@ Add Features:
 - 管理端支持拉黑上传IP（Dashboard->用户管理->允许上传）
 - 管理端批量操作支持按照用户选择的顺序进行（[#issue124](https://github.com/MarSeventh/CloudFlare-ImgBed/issues/124)）
 - `random`接口优化，减少KV操作次数，增加`content`参数，支持返回指定类型的文件
+- 接入CloudFlare Cache API，提升 list 相关接口访问速度
 
 ## 2024.12.14
 

@@ -149,7 +149,7 @@ export async function onRequestPost(context) {  // Contents of context object
     // 清除CDN缓存
     const cdnUrl = `https://${url.hostname}/file/${fullId}`;
     await purgeCDNCache(env, cdnUrl, url);
-
+   
 
     // ====================================不同渠道上传=======================================
     // 出错是否切换渠道自动重试，默认开启
@@ -441,15 +441,25 @@ async function getFilePath(env, file_id) {
 }
 
 async function purgeCDNCache(env, cdnUrl, url) {
-    // 清除CDN缓存，包括图片和randomFileList接口的缓存
-    const randomFileListUrl = `https://${url.hostname}/api/randomFileList`;
     const options = {
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'X-Auth-Email': `${env.CF_EMAIL}`, 'X-Auth-Key': `${env.CF_API_KEY}`},
-        body: `{"files":["${ cdnUrl }", "${ randomFileListUrl }"]}`
+        body: `{"files":["${ cdnUrl }"]}`
     };
 
     await fetch(`https://api.cloudflare.com/client/v4/zones/${ env.CF_ZONE_ID }/purge_cache`, options);
+
+    // 清除api/randomFileList API缓存
+    try {
+        const cache = caches.default;
+        // await cache.delete(`${url.origin}/api/randomFileList`); delete有bug，通过写入一个max-age=0的response来清除缓存
+        const nullResponse = new Response(null, {
+            headers: { 'Cache-Control': 'max-age=0' },
+        });
+        await cache.put(`${url.origin}/api/randomFileList`, nullResponse);
+    } catch (error) {
+        console.error('Failed to clear cache:', error);
+    }
 }
 
 function isExtValid(fileExt) {
