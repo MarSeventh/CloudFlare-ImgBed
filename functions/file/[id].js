@@ -246,11 +246,10 @@ function isTgChannel(imgRecord) {
 async function return404(url) {
     const Img404 = await fetch(url.origin + "/static/404.png");
     if (!Img404.ok) {
-        return new Response(null,
+        return new Response('Error: Image Not Found',
             {
-                status: 302,
+                status: 404,
                 headers: {
-                    "Location": url.origin + "/static/404.png",
                     "Cache-Control": "public, max-age=86400"
                 }
             }
@@ -273,7 +272,7 @@ async function returnBlockImg(url) {
         return new Response(null, {
             status: 302,
             headers: {
-                "Location": url.origin + "/static/BlockImg.png",
+                "Location": url.origin + "/blockimg",
                 "Cache-Control": "public, max-age=86400"
             }
         })
@@ -295,7 +294,7 @@ async function returnWhiteListImg(url) {
         return new Response(null, {
             status: 302,
             headers: {
-                "Location": url.origin + "/static/WhiteListOn.png",
+                "Location": url.origin + "/whiteliston",
                 "Cache-Control": "public, max-age=86400"
             }
         })

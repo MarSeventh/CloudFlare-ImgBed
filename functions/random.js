@@ -9,22 +9,33 @@ export async function onRequest(context) {
       data, // arbitrary space for passing data between middlewares
     } = context;
     const requestUrl = new URL(request.url);
-    const protocol = requestUrl.protocol;
-    const domain = requestUrl.hostname;
-    const port = requestUrl.port;
-    let allRecords = [];
-    let cursor = null;
-    do {
-        const records = await env.img_url.list({
-            limit: 1000,
-            cursor,
-        });
-        allRecords.push(...records.keys);
-        cursor = records.cursor;
-    } while (cursor);
+
+    // 检查是否启用了随机图功能
     if (env.AllowRandom != "true") {
         return new Response(JSON.stringify({ error: "Random is disabled" }), { status: 403 });
     }
+
+    // 检查是否配置了KV数据库
+    if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") {
+        return new Response('Error: Please configure KV database', { status: 500 });
+    }
+
+    // 从params中读取返回的文件类型
+    let fileType = requestUrl.searchParams.get('content');
+    if (fileType == null) {
+        fileType = ['image'];
+    } else {
+        fileType = fileType.split(',');
+    }
+
+    // 调用randomFileList接口，读取KV数据库中的所有记录
+    let allRecords = [];
+    allRecords = JSON.parse(await fetch(requestUrl.origin + '/api/randomFileList').then(res => res.text()));
+
+    // 筛选出符合fileType要求的记录
+    allRecords = allRecords.filter(item => { return fileType.some(type => item.FileType.includes(type)) });
+
+
     if (allRecords.length == 0) {
         return new Response(JSON.stringify({}), { status: 200 });
     } else {
@@ -32,20 +43,19 @@ export async function onRequest(context) {
         const randomKey = allRecords[randomIndex];
         const randomPath = '/file/' + randomKey.name;
         let randomUrl = randomPath;
+
         const randomType = requestUrl.searchParams.get('type');
         const resType = requestUrl.searchParams.get('form');
+        
         // if param 'type' is set to 'url', return the full URL
         if (randomType == 'url') {
-            if (port) {
-                randomUrl = protocol + '//' + domain + ':' + port + randomPath;
-            } else {
-                randomUrl = protocol + '//' + domain + randomPath;
-            }
+            randomUrl = requestUrl.origin + randomPath;
         }
+
         // if param 'type' is set to 'img', return the image
         if (randomType == 'img') {
             // Return an image response
-            randomUrl = protocol + '//' + domain + ':' + port + randomPath;
+            randomUrl = requestUrl.origin + randomPath;
             let contentType = 'image/jpeg';
             return new Response(await fetch(randomUrl).then(res => {
                 contentType = res.headers.get('content-type');

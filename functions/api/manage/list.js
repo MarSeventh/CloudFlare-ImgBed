@@ -16,6 +16,8 @@ export async function onRequest(context) {
         limit: 1000,
         cursor,
       });
+      // 除去records中key以manage@开头的记录
+      records.keys = records.keys.filter(item => !item.name.startsWith("manage@"));
       allRecords.push(...records.keys);
       cursor = records.cursor;
     } while (cursor);

@@ -27,11 +27,12 @@ export async function onRequest(context) {
       await env.img_url.delete(params.id);
       const info = JSON.stringify(params.id);
 
-      // 清除CDN缓存
+      // 清除CDN缓存，包括图片和randomFileList接口的缓存
+      const randomFileListUrl = `https://${url.hostname}/api/randomFileList`;
       const options = {
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'X-Auth-Email': `${env.CF_EMAIL}`, 'X-Auth-Key': `${env.CF_API_KEY}`},
-        body: `{"files":["${ cdnUrl }"]}`
+        body: `{"files":["${ cdnUrl }", "${ randomFileListUrl }"]}`
       };
       await fetch(`https://api.cloudflare.com/client/v4/zones/${ env.CF_ZONE_ID }/purge_cache`, options);
       

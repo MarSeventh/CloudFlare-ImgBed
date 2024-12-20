@@ -73,7 +73,12 @@ export async function onRequestPost(context) {  // Contents of context object
 
     // 获得上传IP
     const uploadIp = request.headers.get("cf-connecting-ip") || request.headers.get("x-real-ip") || request.headers.get("x-forwarded-for") || request.headers.get("x-client-ip") || request.headers.get("x-host") || request.headers.get("x-originating-ip") || request.headers.get("x-cluster-client-ip") || request.headers.get("forwarded-for") || request.headers.get("forwarded") || request.headers.get("via") || request.headers.get("requester") || request.headers.get("true-client-ip") || request.headers.get("client-ip") || request.headers.get("x-remote-ip") || request.headers.get("x-originating-ip") || request.headers.get("fastly-client-ip") || request.headers.get("akamai-origin-hop") || request.headers.get("x-remote-ip") || request.headers.get("x-remote-addr") || request.headers.get("x-remote-host") || request.headers.get("x-client-ip") || request.headers.get("x-client-ips") || request.headers.get("x-client-ip")
-    
+    // 判断上传ip是否被封禁
+    const isBlockedIp = await isBlockedUploadIp(env, uploadIp);
+    if (isBlockedIp) {
+        return new Response('Error: Your IP is blocked', { status: 403 });
+    }
+
     // 获得上传渠道
     const urlParamUploadChannel = url.searchParams.get('uploadChannel');
     let uploadChannel = 'TelegramNew';
@@ -436,10 +441,12 @@ async function getFilePath(env, file_id) {
 }
 
 async function purgeCDNCache(env, cdnUrl) {
+    // 清除CDN缓存，包括图片和randomFileList接口的缓存
+    const randomFileListUrl = `https://${url.hostname}/api/randomFileList`;
     const options = {
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'X-Auth-Email': `${env.CF_EMAIL}`, 'X-Auth-Key': `${env.CF_API_KEY}`},
-        body: `{"files":["${ cdnUrl }"]}`
+        body: `{"files":["${ cdnUrl }", "${ randomFileListUrl }"]}`
     };
 
     await fetch(`https://api.cloudflare.com/client/v4/zones/${ env.CF_ZONE_ID }/purge_cache`, options);
@@ -452,4 +459,21 @@ function isExtValid(fileExt) {
     'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'pdf', 
     'txt', 'md', 'json', 'xml', 'html', 'css', 'js', 'ts', 'go', 'java', 'php', 'py', 'rb', 'sh', 'bat', 'cmd', 'ps1', 'psm1', 'psd', 'ai', 'sketch', 'fig', 'svg', 'eps', 'zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'apk', 'exe', 'msi', 'dmg', 'iso', 'torrent', 'webp', 'ico', 'svg', 'ttf', 'otf', 'woff', 'woff2', 'eot', 'apk', 'crx', 'xpi', 'deb', 'rpm', 'jar', 'war', 'ear', 'img', 'iso', 'vdi', 'ova', 'ovf', 'qcow2', 'vmdk', 'vhd', 'vhdx', 'pvm', 'dsk', 'hdd', 'bin', 'cue', 'mds', 'mdf', 'nrg', 'ccd', 'cif', 'c2d', 'daa', 'b6t', 'b5t', 'bwt', 'isz', 'isz', 'cdi', 'flp', 'uif', 'xdi', 'sdi'
     ].includes(fileExt);
+}
+
+async function isBlockedUploadIp(env, uploadIp) {
+    // 检查是否配置了KV数据库
+    if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") {
+        return false;
+    }
+
+    const kv = env.img_url;
+    let list = await kv.get("manage@blockipList");
+    if (list == null) {
+        list = [];
+    } else {
+        list = list.split(",");
+    }
+
+    return list.includes(uploadIp);
 }
