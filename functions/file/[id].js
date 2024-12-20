@@ -76,11 +76,11 @@ export async function onRequest(context) {  // Contents of context object
         if (fileType) {
             headers.set('Content-Type', fileType);
         }
-        // 根据Referer设置CDN缓存策略，如果是从/或/dashboard等访问，则仅允许浏览器缓存；否则设置为public，缓存时间为1年
+        // 根据Referer设置CDN缓存策略，如果是从/或/dashboard等访问，则仅允许浏览器缓存；否则设置为public，缓存时间为7天
         if (Referer && Referer.includes(url.origin)) {
             headers.set('Cache-Control', 'private, max-age=86400');
         } else {
-            headers.set('Cache-Control', 'public, max-age=31536000');
+            headers.set('Cache-Control', 'public, max-age=604800');
         }
 
         // 返回图片
@@ -136,11 +136,11 @@ export async function onRequest(context) {  // Contents of context object
         if (fileType) {
             headers.set('Content-Type', fileType);
         }
-        // 根据Referer设置CDN缓存策略，如果是从/或/dashboard等访问，则仅允许浏览器缓存；否则设置为public，缓存时间为1年
+        // 根据Referer设置CDN缓存策略，如果是从/或/dashboard等访问，则仅允许浏览器缓存；否则设置为public，缓存时间为7天
         if (Referer && Referer.includes(url.origin)) {
             headers.set('Cache-Control', 'private, max-age=86400');
         } else {
-            headers.set('Cache-Control', 'public, max-age=31536000');
+            headers.set('Cache-Control', 'public, max-age=604800');
         }
 
         const newRes =  new Response(response.body, {

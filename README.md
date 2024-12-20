@@ -53,6 +53,7 @@ Add Features:
 - 管理端批量操作支持按照用户选择的顺序进行（[#issue124](https://github.com/MarSeventh/CloudFlare-ImgBed/issues/124)）
 - `random`接口优化，减少KV操作次数，增加`content`参数，支持返回指定类型的文件
 - 接入CloudFlare Cache API，提升 list 相关接口访问速度
+- 正常读取返回图片的CDN缓存时间从1年调整为7天，防止缓存清除不成功的情况下图片长时间内仍可以访问的问题
 
 ## 2024.12.14
 

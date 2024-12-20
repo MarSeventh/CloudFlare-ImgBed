@@ -29,8 +29,7 @@ export async function onRequest(context) {
     }
 
     // 调用randomFileList接口，读取KV数据库中的所有记录
-    let allRecords = [];
-    allRecords = JSON.parse(await fetch(requestUrl.origin + '/api/randomFileList').then(res => res.text()));
+    let allRecords = await getRandomFileList(env, requestUrl);
 
     // 筛选出符合fileType要求的记录
     allRecords = allRecords.filter(item => { return fileType.some(type => item.FileType.includes(type)) });
@@ -72,4 +71,48 @@ export async function onRequest(context) {
             return new Response(JSON.stringify({ url: randomUrl }), { status: 200 });
         }
     }
+}
+
+async function getRandomFileList(env, url) {
+    // 检查缓存中是否有记录，有则直接返回
+    const cache = caches.default;
+    const cacheRes = await cache.match(`${url.origin}/api/randomFileList`);
+    if (cacheRes) {
+        return JSON.parse(await cacheRes.text());
+    }
+
+    let allRecords = [];
+    let cursor = null;
+
+    do {
+        const records = await env.img_url.list({
+            limit: 1000,
+            cursor,
+        });
+        // 除去records中key以manage@开头的记录
+        records.keys = records.keys.filter(item => !item.name.startsWith("manage@"));
+        // 保留metadata中fileType为image或video的记录
+        records.keys = records.keys.filter(item => item.metadata?.FileType?.includes("image") || item.metadata?.FileType?.includes("video"));
+        allRecords.push(...records.keys);
+        cursor = records.cursor;
+    } while (cursor);
+
+    // 仅保留记录的name和metadata中的FileType字段
+    allRecords = allRecords.map(item => {
+        return {
+            name: item.name,
+            FileType: item.metadata?.FileType
+        }
+    });
+
+    // 缓存结果，缓存时间为24小时
+    await cache.put(`${url.origin}/api/randomFileList`, new Response(JSON.stringify(allRecords), {
+        headers: {
+            "Content-Type": "application/json",
+        }
+    }), {
+        expirationTtl: 24 * 60 * 60
+    });
+    
+    return allRecords;
 }
