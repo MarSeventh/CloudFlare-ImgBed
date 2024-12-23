@@ -8,6 +8,7 @@ export async function onRequest(context) {
       next, // used for middleware or to fetch assets
       data, // arbitrary space for passing data between middlewares
     } = context;
+    
     let allRecords = [];
     let cursor = null;
 
@@ -16,11 +17,18 @@ export async function onRequest(context) {
         limit: 1000,
         cursor,
       });
+      // 除去records中key以manage@开头的记录
+      records.keys = records.keys.filter(item => !item.name.startsWith("manage@"));
       allRecords.push(...records.keys);
       cursor = records.cursor;
     } while (cursor);
 
     const info = JSON.stringify(allRecords);
-    return new Response(info);
+    let res = new Response(info, {
+        headers: {
+            "Content-Type": "application/json",
+        }
+    });
 
-  }
+    return res;
+}

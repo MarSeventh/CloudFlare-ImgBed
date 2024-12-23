@@ -6,11 +6,10 @@
 
 <details>
     <summary>公告</summary>
+部署使用出现问题，请先仔细查阅文档、常见问题解答以及已有issues。
 
 **注意**：本仓库为[Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，如果你觉得本项目不错，在支持本项目的同时，也请支持原项目。
 
-> [!IMPORTANT]
->
 > 由于telegraph图床被滥用，该项目上传渠道已切换至Telegram Channel，请**更新至最新版（更新方式见第3.1章最后一节）**，按照文档中的部署要求**设置`TG_BOT_TOKEN`和`TG_CHAT_ID`**，否则将无法正常使用上传功能。
 >
 > 此外，目前**KV数据库为必须配置**，如果以前未配置请按照文档说明配置。
@@ -22,10 +21,10 @@
 <details>
     <summary>体验地址及优质博文、视频（搭建或使用有问题可以先去里面学习哦~）</summary>
 
-**体验地址**：[Sanyue ImgHub (demo-cloudflare-imgbed.pages.dev)](https://demo-cloudflare-imgbed.pages.dev/)
+
+**体验地址**：[CloudFlare ImgBed](https://cfbed.1314883.xyz/)
 
 > 访问码：cfbed
->
 
 **体验视频**：[CloudFlare免费图床，轻松守护你的每一份精彩！_哔哩哔哩_bilibili](https://www.bilibili.com/video/BV1y3WGe4EGh/?vd_source=da5ecbe595e41089cd1bed95932b8bfd)
 
@@ -39,6 +38,167 @@
 - [利用cloudflare pages搭建telegram频道图床 (lepidus.me)](https://blogstr.lepidus.me/post/1725801323700/)
 - [搭建基于CloudFlare和Telegram的免费图床教程 - 刘学馆 | Blog (sexy0769.com)](https://blog.sexy0769.com/skill/735.html)
 - [CloudFlare+Github，打造属于自己的免费图床 - 大头钉的小小blog (luckyting.top)](https://luckyting.top/index.php/archives/20/)
+
+</details>
+
+<details>
+    <summary>更新日志</summary>
+
+
+## 2024.12.20
+
+Add Features:
+
+- 管理端支持拉黑上传IP（Dashboard->用户管理->允许上传）
+- 管理端批量操作支持按照用户选择的顺序进行（[#issue124](https://github.com/MarSeventh/CloudFlare-ImgBed/issues/124)）
+- `random`接口优化，减少KV操作次数，增加`content`参数，支持返回指定类型的文件
+- 接入CloudFlare Cache API，提升 list 相关接口访问速度
+- 正常读取返回图片的CDN缓存时间从1年调整为7天，防止缓存清除不成功的情况下图片长时间内仍可以访问的问题
+
+## 2024.12.14
+
+Add Features:
+
+- 管理端增加批量黑名单、白名单功能
+
+## 2024.12.13
+
+Add Features:
+
+- 优化blockimg、whitelistmode、404等返回状态的缓存策略，尽可能减少回源请求(参考文档`3.1.3.9管理端删除、拉黑等操作优化`进行设置)
+
+## 2024.12.12
+
+Add Features: 
+
+- 后端支持上传失败自动切换其他渠道重试
+- 优化404、blockimg、whitelistmode等返回状态的显示样式
+
+## 2024.12.11
+
+Add Features:
+
+- 进行删除、加入白名单、加入黑名单等操作时，自动清除CF CDN缓存，避免延迟生效(参考文档`3.1.3.9管理端删除、拉黑等操作优化`进行设置)
+
+## 2024.12.10
+
+Add Features:
+
+- 文件详情增加文件大小记录
+
+## 2024.12.09
+
+Add Features:
+
+- 开放更多文件格式
+
+Fix Bugs:
+
+- 读取文件响应头增加允许跨域头`access-control-allow-origin: *`
+
+## 2024.12.04
+
+Add Features:
+
+- 支持自定义命名方式（仅原名 or 仅随机前缀 or 默认的随机前缀_原名）
+- Telegram Channel渠道上传文件记录机器人和频道数据，便于迁移和备份
+- 支持自定义链接前缀
+
+Fix Bugs:
+
+- R2渠道在管理端删除时，存储桶同步删除
+
+## 2024.11.05
+
+Add Features:
+
+- 增加对R2 bucket的支持
+
+## 2024.10.20
+
+Add Features:
+
+- 页脚增加自定义传送门功能
+
+## 2024.09.28
+
+Add Features:
+
+- 上传页面右下角工具栏样式重构，支持上传页自定义压缩（上传前+存储端）
+- 增加仅删除上传成功图片、上传失败图片重试
+
+## 2024.09.27
+
+Add Features:
+
+- 上传页面点击链接时，自动复制到剪切板
+- 上传设置记忆（上传方式、链接格式等）
+
+Fix Bugs:
+
+- 若未设置密码，无需跳转登录页
+
+## 2024.09.26
+
+Add Features:
+
+- 优化粘贴上传时的文件命名方法
+
+## 2024.09.12
+
+Add Features:
+
+- 增加背景透明度支持自定义
+
+## 2024.09.11
+
+Add Features:
+
+- 支持背景切换时间自定义
+
+## 2024.08.26
+
+Add Features:
+
+- 支持大于5MB的图片上传前自动压缩
+- 图床名称和Logo支持自定义
+- 网站标题和Icon支持自定义
+
+## 2024.08.23
+
+Add Features:
+
+- 支持URL粘贴上传
+
+## 2024.08.21
+
+Add Features:
+
+- 完善多格式链接展示形式，增加UBB格式链接支持
+- 完善登录逻辑，后端增加认证码校验接口
+
+## 2024.07.25
+
+Add Features:
+
+- 增加随机图API
+
+Fix Bugs:
+
+- 修复API上传无法直接展示在后台的问题
+
+## 2024.07.22
+
+Add Features:
+
+- 增加粘贴图片上传功能
+
+## 2024.07.21
+
+Add Features:
+
+- 增加Markdown、HTML等格式链接复制功能
+- 上传页面增加管理端入口
 
 </details>
 
@@ -96,7 +256,7 @@
 - **支持身份认证、防滥用**
   - 支持Web和API**上传认证**（感谢[hl128k](https://github.com/hl128k)）
   - 支持访问域名限制（感谢[hl128k](https://github.com/hl128k)）
-  - 支持上传IP统计
+  - 支持上传IP统计，支持禁止指定IP上传
   
 - **支持页面自定义**
   - **背景自定义**
@@ -135,44 +295,43 @@
 **注意修改完环境变量，重新部署才能生效**，见[3.1章最后一节](#3.1.4其他操作指南)；**版本更新方式**，也请见[3.1章最后一节](#3.1.4其他操作指南)
 
 <details>
-    <summary>操作详情</summary>
+    <summary>详细部署教程</summary>
+
 
 ### 3.1.1前期准备
 
 <details>
-    <summary>准备内容</summary>
+    <summary>根据所需开通的渠道进行以下准备</summary>
 
-#### 3.1.1.1根据所需开通的渠道进行以下准备
+
 
 - 开通**Telegram Bot渠道**：**Telegram的`TG_BOT_TOKEN`和`TG_CHAT_ID`**
 
   <details>
-      <summary>操作详情</summary>
+      <summary>TG_BOT_TOKEN和TG_CHAT_ID的获取方式</summary>
+
 
   首先需要拥有一个Telegram账户，然后按照以下步骤获取`TG_BOT_TOKEN`和`TG_CHAT_ID`。
 
   1. 向[@BotFather](https://t.me/BotFather)发送`/newbot`，按照提示输入bot的备注、用户名等信息。成功创建后获得`TG_BOT_TOKEN`。
 
-     ![](static/readme/202409071744569.png)
+     <img src="static/readme/202409071744569.png" style="width: 50%;" />
 
   2. 创建一个新的频道（Channel），进入新建的频道，选择频道管理，将刚才创建的机器人设为频道管理员。
 
-     ![](static/readme/202409071758534.png)
-
-     ![](static/readme/202409071758796.png)
-
-     ![](static/readme/202410291531473.png)
+     <img src="static/readme/202409071758534.png" style="display:inline-block; width:33%"/><img src="static/readme/202409071758796.png" style="display:inline-block; width:32%"/><img src="static/readme/202410291531473.png" style="width:33%;display: inline-block" />
 
   3. 向[@VersaToolsBot](https://t.me/VersaToolsBot)**转发**一条第2步新建频道中的消息，获取`TG_CHAT_ID`（频道ID）
 
-     ![](static/readme/202409071751619.png)
+     <img src="static/readme/202409071751619.png" style="width: 67%;" />
 
   </details>
 
 - 开通**Cloudflare R2渠道**：新建一个Cloudflare R2存储桶，前提是需要绑定支付方式。
 
   <details>
-      <summary>操作详情</summary>
+      <summary>Cloudflare R2渠道开通方式</summary>
+  
   
   1. 前往Cloudflare Dashboard，选择`R2 存储对象`
   
@@ -188,21 +347,6 @@
   
   </details>
 
-#### 3.1.1.2根据部署方式进行以下准备
-
-- **部署于Cloudflare**
-
-  
-  需准备一个**Cloudflare账户**，然后按照[3.1.2.1节](#3.1.2.1部署于Cloudflare)的步骤即可完成部署。
-
-- **部署于服务器**
-
-  
-  如果Cloudflare的**有限访问次数**不能满足你的需求，并且你拥有自己的服务器，可以参照[3.1.2.2节](#3.1.2.2部署于服务器)的教程在服务器上模拟Cloudflare的环境，并开放对应的端口访问服务。
-  
-  注意由于服务器操作系统、硬件版本复杂多样，相关教程**无法确保适合每一位用户**，遇到报错请尽量利用搜索引擎解决，无法解决也可以提issue寻求帮助。
-  
-
 </details>
 
 ### 3.1.2部署教程
@@ -210,10 +354,14 @@
 <details>
     <summary>根据自己需求部署在CloudFlare或服务器上</summary>
 
+
 #### 3.1.2.1部署于Cloudflare
 
+需准备一个**Cloudflare账户**，然后按照以下步骤即可完成部署。
+
 <details>
-    <summary>部署方式</summary>
+    <summary>部署在Cloudflare上的方式</summary>
+
 
 依托于CF的强大能力，只需简单几步，即可部署本项目，拥有自己的图床。
 
@@ -221,7 +369,7 @@
 
 2. 打开 Cloudflare Dashboard，进入 Pages 管理页面，选择创建项目，选择`连接到 Git 提供程序`
 
-![1](static/readme/202407201047300.png)
+   > ![](static/readme/202407201047300.png)
 
 3. 按照页面提示输入项目名称，选择需要连接的 git 仓库，点击`部署站点`
 
@@ -231,18 +379,13 @@
 
    - `Cloudflare R2 渠道`：
 
-     <details>
-         <summary>设置方式</summary>
+     - 将前面新建的存储桶绑定到项目，名称为`img_r2`
      
-     将前面新建的存储桶绑定到项目，名称为`img_r2`
+       > ![](static/readme/202411052323183.png)
      
-     ![](static/readme/202411052323183.png)
+     - 如果后续要开启**图像审查**，需要设置`R2PublicUrl`环境变量，值为前面记下的**R2存储桶公网访问链接**：
      
-     如果后续要开启**图像审查**，需要设置`R2PublicUrl`环境变量，值为前面记下的**R2存储桶公网访问链接**：
-     
-     ![](static/readme/202411052330663.png)
-     
-     </details>
+       > ![](static/readme/202411052330663.png)
 
 3. **绑定KV数据库**：
 
@@ -260,8 +403,13 @@
 
 #### 3.1.2.2部署于服务器
 
+如果Cloudflare的**有限访问次数**不能满足你的需求，并且你拥有自己的服务器，可以参照[3.1.2.2节](#3.1.2.2部署于服务器)的教程在服务器上模拟Cloudflare的环境，并开放对应的端口访问服务。
+
+注意由于服务器操作系统、硬件版本复杂多样，相关教程**无法确保适合每一位用户**，遇到报错请尽量利用搜索引擎解决，无法解决也可以提issue寻求帮助。
+
 <details>
-    <summary>部署方式</summary>
+    <summary>部署在服务器上的方式</summary>
+
 
 1. 安装服务器操作系统对应的`node.js`，经测试`v22.5.1`版本可以正常使用。（安装教程自行search）
 
@@ -348,7 +496,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 
 环境变量增加`WhiteList_Mode`，设置为`true`即可开启白名单模式，仅设置为白名单的图片可被访问。
 
-#### 3.1.3.6页面自定义（DIY接口）
+#### 3.1.3.6自定义配置接口
 
 <details>
     <summary>设置方式</summary>
@@ -467,7 +615,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 | ------------ | ------------------------------------------------------------ |
 | **接口功能** | 上传图片或视频                                               |
 | **请求方法** | POST                                                         |
-| **请求参数** | **Query参数**：<br />`authCode`: string类型，即为你设置的认证码<br />`serverCompress`: boolean类型，表示是否开启服务端压缩（仅针对图片文件、Telegram上传渠道生效，默认为`true`）<br />`uploadChannel`: string类型，取值为`telegram`和`cfr2`，分别代表telegram bot渠道和Cloudflare R2渠道，默认为`telegram` 渠道<br />`uploadNameType`: string类型，表示文件命名方式，可选值为`[default, index, origin]`，分别代表默认`前缀_原名`命名、`仅前缀`命名和`仅原名`命名法，默认为`default`<br />**Body参数(application/form-data)**：<br />`file`: file类型，你要上传的文件 |
+| **请求参数** | **Query参数**：<br />`authCode`: string类型，即为你设置的认证码<br />`serverCompress`: boolean类型，表示是否开启服务端压缩（仅针对图片文件、Telegram上传渠道生效，默认为`true`）<br />`uploadChannel`: string类型，取值为`telegram`和`cfr2`，分别代表telegram bot渠道和Cloudflare R2渠道，默认为`telegram` 渠道<br />`autoRetry`: boolean类型，表示是否开启上传失败自动切换渠道重试，默认开启<br />`uploadNameType`: string类型，表示文件命名方式，可选值为`[default, index, origin]`，分别代表默认`前缀_原名`命名、`仅前缀`命名和`仅原名`命名法，默认为`default`<br />**Body参数(application/form-data)**：<br />`file`: file类型，你要上传的文件 |
 | **返回响应** | `data[0].src`为获得的图片链接（注意不包含域名，需要自己添加） |
 
 > **请求示例**：
@@ -498,7 +646,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 | **接口功能** | 从图床中随机返回一张图片的链接（注意会消耗列出次数）         |
 | **前置条件** | 设置`AllowRandom`环境变量，值为`true`                        |
 | **请求方法** | GET                                                          |
-| **请求参数** | **Query参数**：<br />`type`: 设为`img`时直接返回图片（此时form不生效）；设为`url`时返回完整url链接；否则返回随机图的文件路径。<br />`form`: 设为`text`时直接返回文本，否则返回json格式内容。 |
+| **请求参数** | **Query参数**：<br />`content`:返回的文件类型，可选值有`[image, video]`，多个使用`,`分隔，默认为`image`<br />`type`: 设为`img`时直接返回图片（此时form不生效）；设为`url`时返回完整url链接；默认返回随机图的文件路径。<br />`form`: 设为`text`时直接返回文本，默认返回json格式内容。 |
 | **响应格式** | 1、当`type`为`img`时：<br />返回格式为`image/jpeg`<br />2、当`type`为其他值时：<br />当`form`不是`text`时，返回JSON格式内容，`data.url`为返回的链接/文件路径。<br />否则，直接返回链接/文件路径。 |
 
 > **请求示例**：
@@ -523,6 +671,8 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 ## 5.1Add Features💕
 
 <details>
+    <summary>功能更新列表</summary>
+
 
 1. :white_check_mark: ~~增加粘贴图片上传功能~~（2024.7.22已完成）
 2. :white_check_mark:~~增加markdown、html等格式链接复制功能~~（2024.7.21已完成）
@@ -540,18 +690,18 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 8. :white_check_mark:~~支持URL粘贴上传~~（2024.8.23已完成）
 9. :white_check_mark:~~支持大于5MB的图片上传前自动压缩~~（2024.8.26已完成）
 10. :white_check_mark:~~上传页面右下角工具栏样式重构，支持上传页自定义压缩（上传前+存储端）~~（2024.9.28已完成）
-11. :hourglass_flowing_sand:重构管理端，认证+显示效果优化，增加图片详情页
-12. :hourglass_flowing_sand:管理端增加访问量统计，IP记录、IP黑名单、上传IP黑名单等
+11. :white_check_mark:~~重构管理端，认证+显示效果优化，增加图片详情页~~（2024.12.20已完成）
+12. :white_check_mark:~~管理端增加访问量统计，IP记录、IP黑名单、上传IP黑名单等~~（2024.12.20已支持上传ip黑名单，访问记录由于对KV读写消耗太大，暂时搁置）
 13. :white_check_mark:~~上传页面点击链接，自动复制到剪切板~~(2024.9.27已完成)
 14. :white_check_mark:~~上传设置记忆（上传方式、链接格式等）~~（2024.9.27已完成，**两种上传方式合并**）
 15. :white_check_mark:~~若未设置密码，无需跳转进入登录页~~（2024.9.27已完成）
 16. :white_check_mark:~~增加仅删除上传成功图片、上传失败图片重试~~（2024.9.28已完成）
 17. :white_check_mark:~~优化粘贴上传时文件命名方法~~（2024.9.26已完成）
 18. :white_check_mark:~~增加对R2 bucket的支持~~（2024.11.5已完成）
-19. :hourglass_flowing_sand:管理端增加批量黑名单、白名单功能
+19. :white_check_mark:~~管理端增加批量黑名单、白名单功能~~（2024.12.14已完成）
 20. :white_check_mark:~~Telegram Channel渠道上传文件记录机器人和频道数据，便于迁移和备份~~（2024.12.4已完成）
 21. :white_check_mark:~~支持自定义命名方式（仅原名 or 仅随机前缀 or 默认的随机前缀\_原名）~~（2024.12.4已完成）
-22. :hourglass_flowing_sand:支持上传失败自动切换其他渠道尝试
+22. :white_check_mark:~~支持上传失败自动切换其他渠道尝试~~（2024.12.12已完成）
 23. :hourglass_flowing_sand:后端list接口实现分页功能
 24. :white_check_mark:~~支持自定义链接前缀~~（2024.12.4已完成）
 25. :memo:对接alist，或实现webdav（评估中）
@@ -559,12 +709,17 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 27. :hourglass_flowing_sand:支持管理员自定义全局默认链接前缀
 28. :white_check_mark:~~开放更多文件格式~~（2024.12.9已完成）
 29. :white_check_mark:~~进行删除、加入白名单、加入黑名单等操作时，自动清除CF CDN缓存，避免延迟生效~~（2024.12.11已完成）
+30. :white_check_mark:~~管理端批量选择时，记录用户选择的顺序~~（2024.12.20已完成）
+31. :memo:上传图片支持自定义上传路径，支持相册功能（评估中）
+32. :hourglass_flowing_sand:支持多个 Telegram Bot Token 负载均衡
 
 </details>
 
 ## 5.2Fix Bugs👻
 
 <details>
+    <summary>Bug修复列表</summary>
+
 
 1. :white_check_mark:~~修复API上传无法直接展示在后台的问题~~（2024.7.25已修复）
 1. :white_check_mark:~~由于telegra.ph关闭上传，迁移至TG频道上传~~（2024.9.7已修复）
@@ -615,11 +770,20 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 
 - 网络问题，尝试刷新页面
 
+## 6.6后台进行删除、拉黑等操作时不能立即生效
+
+- 与CDN缓存有关
+- 详见[[重要\]关于CDN缓存的说明（删除、拉黑等操作延迟生效解决方案） · Issue #123 · MarSeventh/CloudFlare-ImgBed (github.com)](https://github.com/MarSeventh/CloudFlare-ImgBed/issues/123)
+
 </details>
 
 # 7.Tips
 
 前端开源，参见[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)项目。
+
+**打赏**：项目维护不易，喜欢本项目的话，可以作者大大一点小小的鼓励哦，您的每一份支持都是我前进的动力~
+
+<img src="static/readme/award.png" alt="award" style="width:33%;display: inline-block" />
 
 # 8.Star History
 
