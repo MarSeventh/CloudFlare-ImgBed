@@ -455,7 +455,8 @@ Add Features:
 ### 3.1.3可选配置
 
 <details>
-    <summary>后台认证、自定义页面等设置</summary>
+    <summary>后台认证、自定义页面、缓存清除等设置</summary>
+
 
 
 #### 3.1.3.1后台管理认证
@@ -542,7 +543,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 
 设置`AllowRandom`环境变量，值为`true`，以从图床中随机获取一张图片，详见[API文档](#4.2.2随机图API)。
 
-#### 3.1.3.9管理端删除、拉黑等操作优化
+#### 3.1.3.9管理端删除、拉黑等操作优化（缓存删除）
 
 正常情况下，因为CloudFlare CDN缓存的存在，在管理端进行删除、拉黑、加白名单等操作不会立即生效，需要等到缓存过期才能生效。
 
@@ -779,11 +780,9 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 
 # 7.Tips
 
-前端开源，参见[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)项目。
+- 前端开源，参见[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)项目。
 
-**打赏**：项目维护不易，喜欢本项目的话，可以作者大大一点小小的鼓励哦，您的每一份支持都是我前进的动力~
-
-<img src="static/readme/award.png" alt="award" style="width:33%;display: inline-block" />
+- **[赞助（爱发电提供支持）](https://afdian.com/a/marseventh/plan)**：项目维护不易，喜欢本项目的话，可以作者大大一点小小的鼓励哦，您的每一份支持都是我前进的动力\~ 
 
 # 8.Star History
 
