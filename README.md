@@ -45,6 +45,19 @@
     <summary>更新日志</summary>
 
 
+## 2024.12.27
+
+Add Features:
+
+- 支持通过环境变量自定义全局默认链接前缀（见3.1.3.6自定义配置接口）
+- 管理端支持自定义链接前缀
+- 管理端部分页面展示效果优化
+- `/upload`API支持返回完整链接（请求时设置`returnFormat`参数，详见API文档）
+
+Fix Bugs:
+
+- 优化上传页面显示效果
+
 ## 2024.12.20
 
 Add Features:
@@ -515,6 +528,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 | siteTitle   | 网站标题             | 字符串        | 只支持`字符串`类型，设置为你自定义的网站标题                 |
 | siteIcon    | 网站图标             | 字符串        | 只支持`字符串`类型，设置为你自定义的网站图标链接             |
 | footerLink  | 页脚传送门链接       | 字符串        | 只支持`字符串`类型，设置为你自定义的传送地址（如个人博客链接） |
+| urlPrefix   | 全局默认链接前缀     | 字符串        | 只支持`字符串`类型，设置为自定义的全局默认链接前缀，该前缀会覆盖原始默认前缀，但不会覆盖用户自定义的链接前缀 |
 
 > 整体示例：
 >
@@ -616,7 +630,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 | ------------ | ------------------------------------------------------------ |
 | **接口功能** | 上传图片或视频                                               |
 | **请求方法** | POST                                                         |
-| **请求参数** | **Query参数**：<br />`authCode`: string类型，即为你设置的认证码<br />`serverCompress`: boolean类型，表示是否开启服务端压缩（仅针对图片文件、Telegram上传渠道生效，默认为`true`）<br />`uploadChannel`: string类型，取值为`telegram`和`cfr2`，分别代表telegram bot渠道和Cloudflare R2渠道，默认为`telegram` 渠道<br />`autoRetry`: boolean类型，表示是否开启上传失败自动切换渠道重试，默认开启<br />`uploadNameType`: string类型，表示文件命名方式，可选值为`[default, index, origin]`，分别代表默认`前缀_原名`命名、`仅前缀`命名和`仅原名`命名法，默认为`default`<br />**Body参数(application/form-data)**：<br />`file`: file类型，你要上传的文件 |
+| **请求参数** | **Query参数**：<br />`authCode`: string类型，即为你设置的认证码<br />`serverCompress`: boolean类型，表示是否开启服务端压缩（仅针对图片文件、Telegram上传渠道生效，默认为`true`）<br />`uploadChannel`: string类型，取值为`telegram`和`cfr2`，分别代表telegram bot渠道和Cloudflare R2渠道，默认为`telegram` 渠道<br />`autoRetry`: boolean类型，表示是否开启上传失败自动切换渠道重试，默认开启<br />`uploadNameType`: string类型，表示文件命名方式，可选值为`[default, index, origin]`，分别代表默认`前缀_原名`命名、`仅前缀`命名和`仅原名`命名法，默认为`default`<br />`returnFormat`:string类型，表示返回链接格式，可选值为`[default, full]`，分别代表默认的`/file/id`格式、完整链接格式<br />**Body参数(application/form-data)**：<br />`file`: file类型，你要上传的文件 |
 | **返回响应** | `data[0].src`为获得的图片链接（注意不包含域名，需要自己添加） |
 
 > **请求示例**：
@@ -685,6 +699,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
    - ~~背景切换时间自定义~~（2024.9.11已完成）
    - ~~背景透明度支持自定义~~（2024.9.12已完成）
    - ~~页脚自定义传送门~~（2024.10.20已完成）
+   - ~~全局自定义链接前缀~~（2024.12.27已完成）
 5. :white_check_mark:~~增加随机图API~~（2024.7.25已完成）
 6. :white_check_mark:~~完善多格式链接展示形式，增加ubb格式链接支持~~（2024.8.21已完成）
 7. :white_check_mark:~~完善登录逻辑，后端增加认证码校验接口~~（2024.8.21已完成）
@@ -707,7 +722,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 24. :white_check_mark:~~支持自定义链接前缀~~（2024.12.4已完成）
 25. :memo:对接alist，或实现webdav（评估中）
 26. :white_check_mark:~~文件详情增加文件大小记录~~（2024.12.10已完成）
-27. :hourglass_flowing_sand:支持管理员自定义全局默认链接前缀
+27. :white_check_mark:支持管理员自定义全局默认链接前缀
 28. :white_check_mark:~~开放更多文件格式~~（2024.12.9已完成）
 29. :white_check_mark:~~进行删除、加入白名单、加入黑名单等操作时，自动清除CF CDN缓存，避免延迟生效~~（2024.12.11已完成）
 30. :white_check_mark:~~管理端批量选择时，记录用户选择的顺序~~（2024.12.20已完成）
