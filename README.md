@@ -34,7 +34,7 @@
 
 **相关优质博文（感谢每一位鼎力支持的热心大佬）：**
 
-- [完全免费，图文教程手把手教你使用cloudflare搭建一个无限空间的私人图床 支持身份认证与成人元素鉴定！ - yunsen2025的小窝](https://www.yunsen2025.top/archives/265)
+- [完全免费，图文教程手把手教你使用cloudflare搭建一个无限空间的私人图床 支持身份认证与成人元素鉴定！ - yunsen2025的小窝](https://www.yunsen2025.top/blog-cfpages-syq-imgbed)
 - [利用cloudflare pages搭建telegram频道图床 (lepidus.me)](https://blogstr.lepidus.me/post/1725801323700/)
 - [搭建基于CloudFlare和Telegram的免费图床教程 - 刘学馆 | Blog (sexy0769.com)](https://blog.sexy0769.com/skill/735.html)
 - [CloudFlare+Github，打造属于自己的免费图床 - 大头钉的小小blog (luckyting.top)](https://luckyting.top/index.php/archives/20/)
@@ -728,6 +728,10 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 30. :white_check_mark:~~管理端批量选择时，记录用户选择的顺序~~（2024.12.20已完成）
 31. :memo:上传图片支持自定义上传路径，支持相册功能（评估中）
 32. :hourglass_flowing_sand:支持多个 Telegram Bot Token 负载均衡
+33. :hourglass_flowing_sand:管理端提供详细的设置信息和设置方式引导
+34. :hourglass_flowing_sand:Logo焕新、登录页面优化、多项展示效果优化
+35. :hourglass_flowing_sand:接入S3 API渠道、CF Bed渠道
+36. :hourglass_flowing_sand:支持短链接命名方式
 
 </details>
 
@@ -797,7 +801,9 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 
 - 前端开源，参见[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)项目。
 
-- **[赞助（爱发电提供支持）](https://afdian.com/a/marseventh/plan)**：项目维护不易，喜欢本项目的话，可以作者大大一点小小的鼓励哦，您的每一份支持都是我前进的动力\~ 
+- **赞助**：项目维护不易，喜欢本项目的话，可以作者大大一点小小的鼓励哦，您的每一份支持都是我前进的动力\~ 
+
+  <a href="https://afdian.com/a/marseventh"><img width="200" src="https://pic1.afdiancdn.com/static/img/welcome/button-sponsorme.png" alt=""></a>
 
 # 8.Star History
 
