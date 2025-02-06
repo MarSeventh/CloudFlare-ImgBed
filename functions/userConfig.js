@@ -5,10 +5,15 @@ export async function onRequestGet(context) {
     const PageConfig = await fetchPageConfig(env);
     const userConfigList = PageConfig.config;
     const userConfig = {};
+    console.log('userConfigList:', userConfigList);
     for (const config of userConfigList) {
         if (config.value) {
-            // 将config解析为JSON对象
-            userConfig[config.id] = JSON.parse(config.value);
+            // 将config解析为JSON对象，若解析失败则返回原始字符串
+            try {
+                userConfig[config.id] = JSON.parse(config.value);
+            } catch (error) {
+                userConfig[config.id] = config.value;
+            }
         }
     }
 
