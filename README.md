@@ -443,7 +443,7 @@ Add Features:
 
 4. 填写`项目名称`，构建命令填写`npm install`，点击`保存并部署`
 
-   ![image-20250206153848012](static/readme/202502061538139.png)
+   ![image-20250206182329361](static/readme/202502061823616.png)
 
 5. **绑定KV数据库**：
 
