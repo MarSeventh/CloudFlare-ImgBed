@@ -1,3 +1,5 @@
+import { purgeCFCache } from "../../../utils/purgeCache";
+
 export async function onRequest(context) {
     // Contents of context object
     const {
@@ -8,6 +10,7 @@ export async function onRequest(context) {
       next, // used for middleware or to fetch assets
       data, // arbitrary space for passing data between middlewares
     } = context;
+
     // 组装 CDN URL
     const url = new URL(request.url);
     const cdnUrl = `https://${url.hostname}/file/${params.id}`;
@@ -24,12 +27,7 @@ export async function onRequest(context) {
     const info = JSON.stringify(value.metadata);
 
     // 清除CDN缓存
-    const options = {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json', 'X-Auth-Email': `${env.CF_EMAIL}`, 'X-Auth-Key': `${env.CF_API_KEY}`},
-      body: `{"files":["${ cdnUrl }"]}`
-    };
-    await fetch(`https://api.cloudflare.com/client/v4/zones/${ env.CF_ZONE_ID }/purge_cache`, options);
+    await purgeCFCache(env, cdnUrl);
 
     return new Response(info);
 

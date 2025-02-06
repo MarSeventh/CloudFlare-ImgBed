@@ -1,14 +1,41 @@
 # CloudFlare-ImgBed
 
-免费图片/文件托管解决方案，基于 Cloudflare Pages 和 Telegram，支持 Telegram Bot 存储渠道和 Cloudflare R2 存储渠道。
+免费图片/文件托管解决方案，基于 Cloudflare Pages 和 Telegram，支持 Telegram Bot 、 Cloudflare R2 ，S3 API 等多种不同存储渠道。
 
 **前端仓库**：[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)
 
+> [!IMPORTANT]
+>
+> **v2.0 版本升级注意事项请查看公告！**
+
 <details>
     <summary>公告</summary>
-部署使用出现问题，请先仔细查阅文档、常见问题解答以及已有issues。
 
+
+
+## 置顶
+
+部署使用出现问题，请先仔细查阅文档、常见问题解答以及已有issues。
 **注意**：本仓库为[Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，如果你觉得本项目不错，在支持本项目的同时，也请支持原项目。
+
+## 2025.2.6  V2.0 版本升级注意事项
+
+> v2.0 beta 版已发布，相较于 v1.0 版本进行了大量改动和优化，但 beta 版本可能存在潜在不稳定性，若您追求稳定，可选择暂缓更新。
+>
+> 由于**构建命令发生了变化**，此次更新需要您**手动进行**，请按照以下步骤进行操作：
+>
+> - 同步fork的仓库至最新版（若已自动同步可忽略）
+>
+> - 前往 pages 管理页面，进入`设置`->`构建`，编辑`构建配置`，在`构建命令`处填写`npm install`
+>
+>   ![image-20250206140650497](/static/readme/202502061406685.png)
+>
+> - 新版本所有设置项已**迁移至 管理端->系统设置 界面**，原则上无需再通过环境变量的方式进行设置，通过系统设置界面进行的设置将**覆盖掉**环境变量中的设置，但为了保证 **Telegram渠道的图片** 能够与旧版本相兼容，**若您之前设置了 Telegram 渠道相关的环境变量，请将其保留！**
+>
+> - 确保上述设置完成无误后，前往 pages 管理页面，进入`部署`，对最后一次不成功的部署进行`重试操作`
+
+## 关于切换到 Telegram 渠道的通知
+
 
 > 由于telegraph图床被滥用，该项目上传渠道已切换至Telegram Channel，请**更新至最新版（更新方式见第3.1章最后一节）**，按照文档中的部署要求**设置`TG_BOT_TOKEN`和`TG_CHAT_ID`**，否则将无法正常使用上传功能。
 >
@@ -44,6 +71,31 @@
 <details>
     <summary>更新日志</summary>
 
+
+## 2025.2.6
+
+**v2.0版本焕新登场**，带来多项新功能和优化，给您焕然一新的用户体验：
+
+💪**更强大**：
+
+- 接入 S3 API 渠道，支持 Cloudflare R2 , Backblaze B2 ，七牛云，又拍云等多个服务商的对象存储服务
+- 支持设置多个 Telegram 和 S3 渠道，支持多渠道负载均衡
+- 上传文件支持短链接命名方式
+
+✈️**更高效**：
+
+- 全部设置项迁移到管理端系统设置界面，无需进行环境变量的繁琐配置，立即设置立即生效
+- 管理端 Gallery 和 用户管理 等页面实现分页读取，提升前端渲染速度，优化使用体验
+- 支持禁用、启用渠道，渠道管理自在掌握
+- 多个设置项加入提示弹窗，不用到处翻阅文档，设置更踏实
+
+✨**更精致**：
+
+- 全局支持深色模式，根据用户喜好和时间自动切换，凸显满满高级感
+- 登陆页面、图库页面、用户管理页面等多个页面细节重新打磨，操作更直观
+- 上传页全新 Tab 栏，一拉一合，灵动又便捷
+- Logo 焕新，纯手工打造，能力有限，不喜勿喷（
+- 支持自定义隐藏页脚，强迫症患者有救啦
 
 ## 2024.12.27
 
@@ -221,7 +273,7 @@ Add Features:
 
 此外，上传**并没有严格限制文件类型**，理论上你可以上传**任何**文件，但是暂时不会针对图片和视频外的文件进行特殊优化和适配。
 
-![CloudFlare](static/readme/202410011443570.png)
+![CloudFlare](static/readme/海报.png)
 
 # 2.Features
 
@@ -236,12 +288,13 @@ Add Features:
   
   - 流畅丝滑的过渡动画~
   - 上传文件实现呼吸灯效果
+  - 灵动的操作体验
   
 - **人性化上传**
   
   - **覆盖大多数文件格式**：支持绝大多数常见**图片、视频、动图**等，同时也支持其他大多数格式的文件
   
-  - **支持多种存储渠道**：支持 **Telegram Bot**, **Cloudflare R2** 等多种存储渠道一键切换
+  - **支持多种存储渠道**：支持 **Telegram Bot**, **Cloudflare R2**, **S3**  等多种存储渠道一键切换
   
     > Telegram Bot渠道：上传文件大小限制为20MB，提供客户端和服务端压缩功能
     >
@@ -282,6 +335,7 @@ Add Features:
     > 1. 自定义图床名称和Logo
     > 2. 自定义网站标题和Icon
     > 3. 页脚传送门自定义
+    > 4. 支持页脚隐藏
   
 - **一些小功能**
   - 支持**随机图**API，从图床中随机返回一张图片
@@ -359,6 +413,8 @@ Add Features:
      ![image-20241105232759131](static/readme/202411052327191.png)
   
   </details>
+  
+- **S3** API渠道：在服务提供商处，准备`S3_ACCESS_KEY_ID`、`S3_SECRET_ACCESS_KEY`、`S3_BUCKET_NAME`、`S3_ENDPOINT`等必须参数。
 
 </details>
 
@@ -373,7 +429,53 @@ Add Features:
 需准备一个**Cloudflare账户**，然后按照以下步骤即可完成部署。
 
 <details>
-    <summary>部署在Cloudflare上的方式</summary>
+    <summary>v2.0版本 部署在Cloudflare上的方式</summary>
+
+​    按照以下步骤部署图床在 CloudFlare Pages 上。
+
+1. Fork 本仓库
+
+2. 打开 Cloudflare Dashboard，进入 Pages 管理页面，选择创建项目，选择`连接到 Git 提供程序`
+
+   ![image-20250206153541017](static/readme/202502061535204.png)
+
+3. 按照页面提示输入项目名称，选择需要连接的 git 仓库，点击`开始设置`
+
+4. 填写`项目名称`，构建命令填写`npm install`，点击`保存并部署`
+
+   ![image-20250206153848012](static/readme/202502061538139.png)
+
+5. **绑定KV数据库**：
+
+   - 创建一个新的KV数据库
+
+     > ![](static/readme/202408261035367.png)
+     >
+     > ![](static/readme/202408261037971.png)
+
+   - 进入项目对应`设置`->`绑定`->`添加`->`KV 命名空间`->`变量名称`，填写`img_url`，`KV命名空间`选择刚才创建好的KV数据库
+
+6. **重试部署**：前往项目管理界面->`部署`->`最新一次部署后面的···`->`重试部署`
+
+7. 根据**所需存储渠道**进行相关设置：
+
+   - `Cloudflare R2`渠道：
+
+     将前面新建的存储桶绑定到项目（和KV绑定地方一样），**名称**为`img_r2`
+
+     > ![](static/readme/202411052323183.png)
+
+     若要启用 R2 渠道的图像审查，请进入 项目管理页面->系统设置->上传设置 处设置 R2 的公开访问链接，值为前面记下的**R2存储桶公网访问链接**
+
+   - `其他渠道`：进入项目管理页面`https://你的域名/systemConfig#upload`，按照页面提示将3.1中获取的渠道参数填写到对应渠道中，保存设置即可
+
+</details>
+
+
+
+<details>
+    <summary>v1.0版本 部署在Cloudflare上的方式</summary>
+
 
 
 依托于CF的强大能力，只需简单几步，即可部署本项目，拥有自己的图床。
@@ -386,7 +488,7 @@ Add Features:
 
 3. 按照页面提示输入项目名称，选择需要连接的 git 仓库，点击`部署站点`
 
-3. 根据**所需存储渠道**进行相关设置：
+4. 根据**所需存储渠道**进行相关设置：
 
    - `Telegram 渠道`：将3.1.1中获取的`TG_BOT_TOKEN`和`TG_CHAT_ID`分别添加到环境变量中，对应**环境变量名为`TG_BOT_TOKEN`和`TG_CHAT_ID`**
 
@@ -399,6 +501,8 @@ Add Features:
      - 如果后续要开启**图像审查**，需要设置`R2PublicUrl`环境变量，值为前面记下的**R2存储桶公网访问链接**：
      
        > ![](static/readme/202411052330663.png)
+     
+   - `S3 渠道`：将前面准备好的`S3_ACCESS_KEY_ID`、`S3_SECRET_ACCESS_KEY`、`S3_BUCKET_NAME`、`S3_ENDPOINT`及其对应值填入环境变量。
 
 3. **绑定KV数据库**：
 
@@ -421,7 +525,46 @@ Add Features:
 注意由于服务器操作系统、硬件版本复杂多样，相关教程**无法确保适合每一位用户**，遇到报错请尽量利用搜索引擎解决，无法解决也可以提issue寻求帮助。
 
 <details>
-    <summary>部署在服务器上的方式</summary>
+    <summary>v2.0 部署在服务器上的方式</summary>
+
+
+
+1. 安装服务器操作系统对应的`node.js`，经测试`v22.5.1`版本可以正常使用。（安装教程自行search）
+
+2. 切换到项目根目录，运行`npm install`，安装所需依赖。
+
+3. 在项目根目录下新建`wrangler.toml`配置文件，其内容为项目名称，环境变量等。（详情参见官方文档[Configuration - Wrangler (cloudflare.com)](https://developers.cloudflare.com/workers/wrangler/configuration/)）
+
+   > 配置文件样例：
+   >
+   > ```toml
+   > name = "cloudflare-imgbed"
+   > compatibility_date = "2024-07-24"
+   > ```
+
+4. 在项目根目录下运行`npm run start`，至此，正常情况下项目已经成功部署。项目默认支持通过服务器**本地模拟的R2存储上传**，可通过**管理端系统设置页面**进行其他设置。
+
+   程序默认运行在`8080`端口上，使用`nginx`等服务器反代`127.0.0.1:8080`即可外网访问服务。如需修改端口，可在`package.json`中修改`start`脚本的`port`参数（如下）。
+
+   ```toml
+   "scripts": {
+       "ci-test": "concurrently --kill-others \"npm start\" \"wait-on http://localhost:8080 && mocha\"",
+       "test": "mocha",
+       "start": "npx wrangler pages dev ./ --kv \"img_url\" --r2 \"img_r2\" --port 8080 --persist-to ./data"
+     }
+   ```
+
+   正常启动，控制台输出如下：
+
+   ![202408191829163](static/readme/202408191855625.png)
+
+</details>
+
+
+
+<details>
+    <summary>v1.0 部署在服务器上的方式</summary>
+
 
 
 1. 安装服务器操作系统对应的`node.js`，经测试`v22.5.1`版本可以正常使用。（安装教程自行search）
@@ -468,7 +611,19 @@ Add Features:
 ### 3.1.3可选配置
 
 <details>
-    <summary>后台认证、自定义页面、缓存清除等设置</summary>
+    <summary>v2.0 后台认证、自定义页面、缓存清除等设置</summary>
+
+​    
+
+请前往 管理端->系统设置 界面，按照提示进行设置，如果有不清楚的设置项，可参考下方v1.0版本的设置介绍内容。
+
+</details>
+
+
+
+<details>
+    <summary>v1.0 后台认证、自定义页面、缓存清除等设置</summary>
+
 
 
 
@@ -517,18 +672,19 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 
 环境变量增加`USER_CONFIG`，JSON格式（设置时类型选`text`即可），具体字段用途及内容规范见下表。
 
-| 字段名      | 用途                 | 类型          | 内容规范                                                     |
-| ----------- | -------------------- | ------------- | ------------------------------------------------------------ |
-| loginBkImg  | 自定义登录页面背景   | 列表/字符串   | 1、当字段类型为`列表`时，列表中元素为需要添加到轮播列表中的图片链接（列表中只有一张图时即为固定背景），形如`["1.jpg","2.jpg"]`<br />2、当字段类型为`字符串`时，目前**仅支持**字符串值为`bing`，设置为该值时启用bing随机图片轮播模式。 |
-| uploadBkImg | 自定义上传页面背景   | 列表/字符串   | 同上                                                         |
-| bkInterval  | 轮播背景切换时间间隔 | 正整数        | 设置为背景图的轮播时间，默认`3000`，单位`ms`。<br />例如你希望10s切换一次，设置为`10000`即可。 |
-| bkOpacity   | 背景图透明度         | (0,1]的浮点数 | 展示的背景图透明度，默认为`1`。<br />如果你觉得显示效果不佳，可以自定义，如`0.8` |
-| ownerName   | 页内图床名称         | 字符串        | 只支持`字符串`类型，设置为你自定义的图床名称（默认为`Sanyue`） |
-| logoUrl     | 页内图床Logo         | 字符串        | 只支持`字符串`类型，设置为你自定义的图床Logo链接             |
-| siteTitle   | 网站标题             | 字符串        | 只支持`字符串`类型，设置为你自定义的网站标题                 |
-| siteIcon    | 网站图标             | 字符串        | 只支持`字符串`类型，设置为你自定义的网站图标链接             |
-| footerLink  | 页脚传送门链接       | 字符串        | 只支持`字符串`类型，设置为你自定义的传送地址（如个人博客链接） |
-| urlPrefix   | 全局默认链接前缀     | 字符串        | 只支持`字符串`类型，设置为自定义的全局默认链接前缀，该前缀会覆盖原始默认前缀，但不会覆盖用户自定义的链接前缀 |
+| 字段名        | 用途                 | 类型          | 内容规范                                                     |
+| ------------- | -------------------- | ------------- | ------------------------------------------------------------ |
+| loginBkImg    | 自定义登录页面背景   | 列表/字符串   | 1、当字段类型为`列表`时，列表中元素为需要添加到轮播列表中的图片链接（列表中只有一张图时即为固定背景），形如`["1.jpg","2.jpg"]`<br />2、当字段类型为`字符串`时，目前**仅支持**字符串值为`bing`，设置为该值时启用bing随机图片轮播模式。 |
+| uploadBkImg   | 自定义上传页面背景   | 列表/字符串   | 同上                                                         |
+| bkInterval    | 轮播背景切换时间间隔 | 正整数        | 设置为背景图的轮播时间，默认`3000`，单位`ms`。<br />例如你希望10s切换一次，设置为`10000`即可。 |
+| bkOpacity     | 背景图透明度         | (0,1]的浮点数 | 展示的背景图透明度，默认为`1`。<br />如果你觉得显示效果不佳，可以自定义，如`0.8` |
+| ownerName     | 页内图床名称         | 字符串        | 只支持`字符串`类型，设置为你自定义的图床名称（默认为`Sanyue`） |
+| logoUrl       | 页内图床Logo         | 字符串        | 只支持`字符串`类型，设置为你自定义的图床Logo链接             |
+| siteTitle     | 网站标题             | 字符串        | 只支持`字符串`类型，设置为你自定义的网站标题                 |
+| siteIcon      | 网站图标             | 字符串        | 只支持`字符串`类型，设置为你自定义的网站图标链接             |
+| footerLink    | 页脚传送门链接       | 字符串        | 只支持`字符串`类型，设置为你自定义的传送地址（如个人博客链接） |
+| disableFooter | 禁用页脚             | boolean       | 支持`boolean`类型，设为`true`时禁用页脚，默认`false`         |
+| urlPrefix     | 全局默认链接前缀     | 字符串        | 只支持`字符串`类型，设置为自定义的全局默认链接前缀，该前缀会覆盖原始默认前缀，但不会覆盖用户自定义的链接前缀 |
 
 > 整体示例：
 >
@@ -613,11 +769,15 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 
 # 4.Usage
 
-## 4.1Web端使用方式
+## 4.1Web端使用
 
 ![](static/readme/202412092301397.png)
 
-![](static/readme/202412092305405.png)
+![image-20250206155746495](static/readme/202502061557221.png)
+
+![image-20250206155901631](static/readme/202502061559473.png)
+
+![image-20250206155825926](static/readme/202502061558281.png)
 
 ## 4.2API文档
 
@@ -630,7 +790,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 | ------------ | ------------------------------------------------------------ |
 | **接口功能** | 上传图片或视频                                               |
 | **请求方法** | POST                                                         |
-| **请求参数** | **Query参数**：<br />`authCode`: string类型，即为你设置的认证码<br />`serverCompress`: boolean类型，表示是否开启服务端压缩（仅针对图片文件、Telegram上传渠道生效，默认为`true`）<br />`uploadChannel`: string类型，取值为`telegram`和`cfr2`，分别代表telegram bot渠道和Cloudflare R2渠道，默认为`telegram` 渠道<br />`autoRetry`: boolean类型，表示是否开启上传失败自动切换渠道重试，默认开启<br />`uploadNameType`: string类型，表示文件命名方式，可选值为`[default, index, origin]`，分别代表默认`前缀_原名`命名、`仅前缀`命名和`仅原名`命名法，默认为`default`<br />`returnFormat`:string类型，表示返回链接格式，可选值为`[default, full]`，分别代表默认的`/file/id`格式、完整链接格式<br />**Body参数(application/form-data)**：<br />`file`: file类型，你要上传的文件 |
+| **请求参数** | **Query参数**：<br />`authCode`: string类型，即为你设置的认证码<br />`serverCompress`: boolean类型，表示是否开启服务端压缩（仅针对图片文件、Telegram上传渠道生效，默认为`true`）<br />`uploadChannel`: string类型，取值为`telegram`和`cfr2`，分别代表telegram bot渠道和Cloudflare R2渠道，默认为`telegram` 渠道<br />`autoRetry`: boolean类型，表示是否开启上传失败自动切换渠道重试，默认开启<br />`uploadNameType`: string类型，表示文件命名方式，可选值为`[default, index, origin, short]`，分别代表默认`前缀_原名`命名、`仅前缀`命名、`仅原名`命名和`短链接`命名法，默认为`default`<br />`returnFormat`:string类型，表示返回链接格式，可选值为`[default, full]`，分别代表默认的`/file/id`格式、完整链接格式<br />**Body参数(application/form-data)**：<br />`file`: file类型，你要上传的文件 |
 | **返回响应** | `data[0].src`为获得的图片链接（注意不包含域名，需要自己添加） |
 
 > **请求示例**：
@@ -700,6 +860,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
    - ~~背景透明度支持自定义~~（2024.9.12已完成）
    - ~~页脚自定义传送门~~（2024.10.20已完成）
    - ~~全局自定义链接前缀~~（2024.12.27已完成）
+   - ~~可隐藏页脚~~（2025.2.4已完成）
 5. :white_check_mark:~~增加随机图API~~（2024.7.25已完成）
 6. :white_check_mark:~~完善多格式链接展示形式，增加ubb格式链接支持~~（2024.8.21已完成）
 7. :white_check_mark:~~完善登录逻辑，后端增加认证码校验接口~~（2024.8.21已完成）
@@ -718,20 +879,24 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 20. :white_check_mark:~~Telegram Channel渠道上传文件记录机器人和频道数据，便于迁移和备份~~（2024.12.4已完成）
 21. :white_check_mark:~~支持自定义命名方式（仅原名 or 仅随机前缀 or 默认的随机前缀\_原名）~~（2024.12.4已完成）
 22. :white_check_mark:~~支持上传失败自动切换其他渠道尝试~~（2024.12.12已完成）
-23. :hourglass_flowing_sand:后端list接口实现分页功能
+23. :white_check_mark:~~后端list接口实现分页功能~~（2024.2.5已完成）
 24. :white_check_mark:~~支持自定义链接前缀~~（2024.12.4已完成）
 25. :memo:对接alist，或实现webdav（评估中）
 26. :white_check_mark:~~文件详情增加文件大小记录~~（2024.12.10已完成）
-27. :white_check_mark:支持管理员自定义全局默认链接前缀
+27. :white_check_mark:~~支持管理员自定义全局默认链接前缀~~（2025.2.1已完成）
 28. :white_check_mark:~~开放更多文件格式~~（2024.12.9已完成）
 29. :white_check_mark:~~进行删除、加入白名单、加入黑名单等操作时，自动清除CF CDN缓存，避免延迟生效~~（2024.12.11已完成）
 30. :white_check_mark:~~管理端批量选择时，记录用户选择的顺序~~（2024.12.20已完成）
 31. :memo:上传图片支持自定义上传路径，支持相册功能（评估中）
-32. :hourglass_flowing_sand:支持多个 Telegram Bot Token 负载均衡
-33. :hourglass_flowing_sand:管理端提供详细的设置信息和设置方式引导
-34. :hourglass_flowing_sand:Logo焕新、登录页面优化、多项展示效果优化
-35. :hourglass_flowing_sand:接入S3 API渠道、CF Bed渠道
-36. :hourglass_flowing_sand:支持短链接命名方式
+32. :white_check_mark:~~支持多个 Telegram Bot Token 负载均衡~~（2025.2.4已完成）
+33. :white_check_mark:~~管理端提供详细的设置信息和设置方式引导~~（2025.2.5已完成）
+34. :white_check_mark:~~Logo焕新、登录页面优化、设置提示项等多项展示效果优化~~（2025.2.2已完成）
+35. :white_check_mark:~~接入S3 API渠道~~（2024.2.3已完成）
+36. :white_check_mark:~~支持短链接命名方式~~（2025.2.1已完成）
+37. :white_check_mark:~~支持深色模式~~（2025.1.11已完成）
+38. :hourglass_flowing_sand:支持KV备份恢复功能
+39. :white_check_mark:~~页脚可自定义隐藏~~（2025.2.4已完成）
+40. :hourglass_flowing_sand:搜索功能增强
 
 </details>
 
@@ -804,6 +969,15 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 - **赞助**：项目维护不易，喜欢本项目的话，可以作者大大一点小小的鼓励哦，您的每一份支持都是我前进的动力\~ 
 
   <a href="https://afdian.com/a/marseventh"><img width="200" src="https://pic1.afdiancdn.com/static/img/welcome/button-sponsorme.png" alt=""></a>
+  
+- **Sponsors**：感谢以下赞助者对本项目的支持！
+
+  <div style="display: flex; flex-wrap: wrap;">
+    <div style="margin-right: 20px; text-align: center;">
+      <img src="https://pic1.afdiancdn.com/user/e8af1436138e11ed945852540025c377/avatar/59db0533d82e4198f59e63df63a1917f_w640_h640_s114.jpeg?imageView2/1/w/240/h/240" width="100"/>
+      <div style="margin-top: 10px;">暔晓</div>
+    </div>
+  </div>
 
 # 8.Star History
 

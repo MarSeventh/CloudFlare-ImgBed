@@ -1,3 +1,8 @@
+import { fetchOthersConfig } from "./utils/sysConfig";
+
+let othersConfig = {};
+let allowRandom = false;
+
 export async function onRequest(context) {
     // Contents of context object
     const {
@@ -10,8 +15,12 @@ export async function onRequest(context) {
     } = context;
     const requestUrl = new URL(request.url);
 
+    // 读取其他设置
+    othersConfig = await fetchOthersConfig(env);
+    allowRandom = othersConfig.randomImageAPI.enabled;
+
     // 检查是否启用了随机图功能
-    if (env.AllowRandom != "true") {
+    if (allowRandom != true) {
         return new Response(JSON.stringify({ error: "Random is disabled" }), { status: 403 });
     }
 

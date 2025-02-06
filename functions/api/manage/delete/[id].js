@@ -1,3 +1,6 @@
+import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { purgeCFCache } from "../../../utils/purgeCache";
+
 export async function onRequest(context) {
     // Contents of context object
     const {
@@ -21,19 +24,44 @@ export async function onRequest(context) {
 
       // 如果是R2渠道的图片，删除R2中对应的图片
       if (img.metadata?.Channel === 'CloudflareR2') {
-        await env.img_r2.delete(params.id);
+          await env.img_r2.delete(params.id);
       }
 
+      // S3 渠道的图片，删除S3中对应的图片
+      if (img.metadata?.Channel === "S3") {
+          const s3Client = new S3Client({
+              region: img.metadata?.S3Region || "auto", // 默认使用 auto 区域
+              endpoint: img.metadata?.S3Endpoint,
+              credentials: {
+                  accessKeyId: img.metadata?.S3AccessKeyId,
+                  secretAccessKey: img.metadata?.S3SecretAccessKey
+              },
+              forcePathStyle: true
+          });
+
+          const bucketName = img.metadata?.S3BucketName;
+          const key = img.metadata?.S3FileKey;
+
+          try {
+              const command = new DeleteObjectCommand({
+                  Bucket: bucketName,
+                  Key: key,
+              });
+
+              await s3Client.send(command);
+              
+          } catch (error) {
+              return new Response(`Error: S3 Delete Failed - ${error.message}`, { status: 500 });
+          }
+      }
+
+      // 删除KV中的图片信息
       await env.img_url.delete(params.id);
       const info = JSON.stringify(params.id);
 
       // 清除CDN缓存
-      const options = {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json', 'X-Auth-Email': `${env.CF_EMAIL}`, 'X-Auth-Key': `${env.CF_API_KEY}`},
-        body: `{"files":["${ cdnUrl }"]}`
-      };
-      await fetch(`https://api.cloudflare.com/client/v4/zones/${ env.CF_ZONE_ID }/purge_cache`, options);
+      await purgeCFCache(env, cdnUrl);
+      
       // 清除api/randomFileList API缓存
       try {
           const cache = caches.default;
