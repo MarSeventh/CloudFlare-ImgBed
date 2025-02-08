@@ -333,8 +333,7 @@ async function uploadFileToS3(env, formdata, fullId, metadata, returnLink, origi
         credentials: {
             accessKeyId,
             secretAccessKey
-        },
-        forcePathStyle: true // 确保使用路径风格（适配 R2、MinIO）
+        }
     });
 
     // 获取文件
@@ -363,7 +362,8 @@ async function uploadFileToS3(env, formdata, fullId, metadata, returnLink, origi
         metadata.Channel = "S3";
         metadata.ChannelName = s3Channel.name;
 
-        metadata.S3Location = `${endpoint}/${bucketName}/${s3FileName}`;
+        const s3ServerDomain = endpoint.replace(/https?:\/\//, "");
+        metadata.S3Location = `https://${bucketName}.${s3ServerDomain}/${s3FileName}`; // 采用虚拟主机风格的 URL
         metadata.S3Endpoint = endpoint;
         metadata.S3AccessKeyId = accessKeyId;
         metadata.S3SecretAccessKey = secretAccessKey;

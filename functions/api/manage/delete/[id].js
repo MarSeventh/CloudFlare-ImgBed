@@ -36,7 +36,6 @@ export async function onRequest(context) {
                   accessKeyId: img.metadata?.S3AccessKeyId,
                   secretAccessKey: img.metadata?.S3SecretAccessKey
               },
-              forcePathStyle: true
           });
 
           const bucketName = img.metadata?.S3BucketName;
