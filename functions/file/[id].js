@@ -29,13 +29,13 @@ export async function onRequest(context) {  // Contents of context object
     whiteListMode = securityConfig.access.whiteListMode;
     
     const url = new URL(request.url);
-    let Referer = request.headers.get('Referer')
+    let Referer = request.headers.get('Referer');
     if (Referer) {
         try {
             let refererUrl = new URL(Referer);
             if (allowedDomains && allowedDomains.trim() !== '') {
-                let allowedDomains = allowedDomains.split(',');
-                let isAllowed = allowedDomains.some(domain => {
+                let allowedDomainsList = allowedDomains.split(',');
+                let isAllowed = allowedDomainsList.some(domain => {
                     let domainPattern = new RegExp(`(^|\\.)${domain.replace('.', '\\.')}$`); // Escape dot in domain
                     return domainPattern.test(refererUrl.hostname);
                 });
