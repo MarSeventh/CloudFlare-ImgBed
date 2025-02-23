@@ -50,6 +50,9 @@ export async function getUploadConfig(kv, env) {
 
     const telegramChannels = []
     telegram.channels = telegramChannels
+    // 添加默认压缩设置
+    telegram.defaultCompress = env.TG_DEFAULT_COMPRESS !== 'false'
+    
     if (env.TG_BOT_TOKEN) {
         telegramChannels.push({
             id: 1,

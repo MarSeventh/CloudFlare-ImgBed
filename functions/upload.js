@@ -443,8 +443,8 @@ async function uploadFileToTelegram(env, formdata, fullId, metadata, fileExt, fi
         sendFunction = {'url': 'sendAnimation', 'type': 'animation'};
     }
 
-    // 根据服务端压缩设置处理接口：从参数中获取serverCompress，如果为false，则使用sendDocument接口
-    if (url.searchParams.get('serverCompress') === 'false') {
+    // 根据服务端压缩设置处理接口：优先使用URL参数，其次使用环境变量设置，默认为true
+    if (url.searchParams.get('serverCompress') === 'false' || (!url.searchParams.has('serverCompress') && env.TG_DEFAULT_COMPRESS === 'false')) {
         sendFunction = {'url': 'sendDocument', 'type': 'document'};
     }
 
