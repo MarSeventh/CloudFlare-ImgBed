@@ -151,6 +151,14 @@ export async function onRequest(context) {  // Contents of context object
         }
     }
 
+
+
+    // 外链渠道
+    if (imgRecord.metadata?.Channel === 'External') {
+        // 直接重定向到外链
+        return Response.redirect(imgRecord.metadata?.ExternalLink, 302);
+    }
+    
     
     // Telegram及Telegraph渠道
     let TgFileID = ''; // Tg的file_id
