@@ -11,20 +11,31 @@ export async function onRequest(context) {
       next, // used for middleware or to fetch assets
       data, // arbitrary space for passing data between middlewares
     } = context;
+
     // 组装 CDN URL
     const url = new URL(request.url);
-    const cdnUrl = `https://${url.hostname}/file/${params.path}`;
+    const cdnPath = url.pathname.replace('/api/manage/delete/', '');
+    const cdnUrl = `https://${url.hostname}/file/${cdnPath}`;
 
-    // 解码params.path
-    params.path = decodeURIComponent(params.path);
+    // 从params中获取图片ID
+    let fileId = '';
+    try {
+        // 解码params.path
+        params.path = decodeURIComponent(params.path);
+        // 从path中提取文件ID
+        fileId = params.path.split(',').join('/');
+    } catch (e) {
+        return new Response('Error: Decode Image ID Failed', { status: 400 });
+    }
+
 
     try {
       // 读取图片信息
-      const img = await env.img_url.getWithMetadata(params.path);
+      const img = await env.img_url.getWithMetadata(fileId);
 
       // 如果是R2渠道的图片，删除R2中对应的图片
       if (img.metadata?.Channel === 'CloudflareR2') {
-          await env.img_r2.delete(params.path);
+          await env.img_r2.delete(fileId);
       }
 
       // S3 渠道的图片，删除S3中对应的图片
@@ -55,8 +66,8 @@ export async function onRequest(context) {
       }
 
       // 删除KV中的图片信息
-      await env.img_url.delete(params.path);
-      const info = JSON.stringify(params.path);
+      await env.img_url.delete(fileId);
+      const info = JSON.stringify(fileId);
 
       // 清除CDN缓存
       await purgeCFCache(env, cdnUrl);

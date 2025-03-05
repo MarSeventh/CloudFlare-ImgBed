@@ -117,6 +117,9 @@ export async function onRequestPost(context) {  // Contents of context object
         case 's3':
             uploadChannel = 'S3';
             break;
+        case 'external':
+            uploadChannel = 'External';
+            break;
         default:
             uploadChannel = 'TelegramNew';
             break;
@@ -217,13 +220,17 @@ export async function onRequestPost(context) {  // Contents of context object
             err = await res.text();
         }
     } else if (uploadChannel === 'S3') {
-        // -------------S3 渠道---------------
+        // ---------------------S3 渠道------------------
         const res = await uploadFileToS3(env, formdata, fullId, metadata, returnLink, url);
         if (res.status === 200 || !autoRetry) {
             return res;
         } else {
             err = await res.text();
         }
+    } else if (uploadChannel === 'External') {
+        // --------------------外链渠道----------------------
+        const res = await uploadFileToExternal(env, formdata, fullId, metadata, returnLink, url);
+        return res;
     } else {
         // ----------------Telegram New 渠道-------------------
         const res = await uploadFileToTelegram(env, formdata, fullId, metadata, fileExt, fileName, fileType, url, clonedRequest, returnLink);
@@ -527,6 +534,37 @@ async function uploadFileToTelegram(env, formdata, fullId, metadata, fileExt, fi
     } finally {
         return res;
     }
+}
+
+
+// 外链渠道
+async function uploadFileToExternal(env, formdata, fullId, metadata, returnLink, originUrl) {
+    // 直接将外链写入metadata
+    metadata.Channel = "External";
+    metadata.ChannelName = "External";
+    // 从 formdata 中获取外链
+    const extUrl = formdata.get('url');
+    if (extUrl === null || extUrl === undefined) {
+        return new Response('Error: No url provided', { status: 400 });
+    }
+    metadata.ExternalLink = extUrl;
+    // 写入KV数据库
+    try {
+        await env.img_url.put(fullId, "", {
+            metadata: metadata,
+        });
+    } catch (error) {
+        return new Response('Error: Failed to write to KV database', { status: 500 });
+    }
+
+    // 返回结果
+    return new Response(
+        JSON.stringify([{ 'src': `${returnLink}` }]), 
+        {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+        }
+    );
 }
 
 

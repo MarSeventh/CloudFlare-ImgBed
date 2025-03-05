@@ -10,6 +10,7 @@ export async function onRequest(context) {
       next, // used for middleware or to fetch assets
       data, // arbitrary space for passing data between middlewares
     } = context;
+
     // 组装 CDN URL
     const url = new URL(request.url);
     
@@ -17,6 +18,7 @@ export async function onRequest(context) {
       params.path = String(params.path).split(',').join('/');
     }
     const cdnUrl = `https://${url.hostname}/file/${params.path}`;
+    
     // 解码params.path
     params.path = decodeURIComponent(params.path);
 

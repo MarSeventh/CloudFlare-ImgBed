@@ -15,7 +15,8 @@ export async function onRequest(context) {  // Contents of context object
         next, // used for middleware or to fetch assets
         data, // arbitrary space for passing data between middlewares
     } = context;
-    let fileId;
+
+    let fileId = '';
     try {
         // 解码params.path
         params.path = decodeURIComponent(params.path);
@@ -155,6 +156,12 @@ export async function onRequest(context) {  // Contents of context object
         } catch (error) {
             return new Response(`Error: Failed to fetch from S3 - ${error.message}`, { status: 500 });
         }
+    }
+
+    // 外链渠道
+    if (imgRecord.metadata?.Channel === 'External') {
+        // 直接重定向到外链
+        return Response.redirect(imgRecord.metadata?.ExternalLink, 302);
     }
     
     // Telegram及Telegraph渠道

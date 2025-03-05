@@ -18,6 +18,7 @@ export async function onRequest(context) {
       params.path = String(params.path).split(',').join('/');
     }
     const cdnUrl = `https://${url.hostname}/file/${params.path}`;
+    
     // 解码params.path
     params.path = decodeURIComponent(params.path);
 
