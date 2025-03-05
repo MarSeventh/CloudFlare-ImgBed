@@ -14,6 +14,7 @@ export async function onRequest(context) {
     let start = parseInt(url.searchParams.get('start'), 10) || 0;
     let count = parseInt(url.searchParams.get('count'), 10) || 50;
     let sum = url.searchParams.get('sum') || false;
+    let random = url.searchParams.get('random') || false;
 
     // count 为 -1 时，返回所有数据
     if (count === -1) {
@@ -48,8 +49,19 @@ export async function onRequest(context) {
         return b.metadata.TimeStamp - a.metadata.TimeStamp;
     });
 
-    const resultRecords = allRecords.slice(start, start + count);
-
+    let resultRecords = []
+    if(random){
+        let selectedIndexes = new Set();
+        while (selectedIndexes.size < count && selectedIndexes.size < allRecords.length) {
+            let randomIndex = Math.floor(Math.random() * allRecords.length);
+            if (!selectedIndexes.has(randomIndex)) {
+                selectedIndexes.add(randomIndex);
+                resultRecords.push(allRecords[randomIndex]);
+            }
+        }
+    }else{
+        resultRecords = allRecords.slice(start, start + count);
+    }
     // 只返回 `count` 条数据
     return new Response(JSON.stringify(resultRecords), {
         headers: { "Content-Type": "application/json" }
