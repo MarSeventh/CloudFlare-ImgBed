@@ -13,18 +13,18 @@ export async function onRequest(context) {
     } = context;
     // 组装 CDN URL
     const url = new URL(request.url);
-    const cdnUrl = `https://${url.hostname}/file/${params.id}`;
+    const cdnUrl = `https://${url.hostname}/file/${params.path}`;
 
-    // 解码params.id
-    params.id = decodeURIComponent(params.id);
+    // 解码params.path
+    params.path = decodeURIComponent(params.path);
 
     try {
       // 读取图片信息
-      const img = await env.img_url.getWithMetadata(params.id);
+      const img = await env.img_url.getWithMetadata(params.path);
 
       // 如果是R2渠道的图片，删除R2中对应的图片
       if (img.metadata?.Channel === 'CloudflareR2') {
-          await env.img_r2.delete(params.id);
+          await env.img_r2.delete(params.path);
       }
 
       // S3 渠道的图片，删除S3中对应的图片
@@ -55,8 +55,8 @@ export async function onRequest(context) {
       }
 
       // 删除KV中的图片信息
-      await env.img_url.delete(params.id);
-      const info = JSON.stringify(params.id);
+      await env.img_url.delete(params.path);
+      const info = JSON.stringify(params.path);
 
       // 清除CDN缓存
       await purgeCFCache(env, cdnUrl);
