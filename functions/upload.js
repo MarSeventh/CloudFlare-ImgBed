@@ -97,6 +97,15 @@ export async function onRequestPost(context) {  // Contents of context object
 
     // 获得上传渠道
     const urlParamUploadChannel = url.searchParams.get('uploadChannel');
+    // 获取上传文件夹路径
+    const uploadFolder = url.searchParams.get('uploadFolder') || '';
+    // 处理文件夹路径格式，确保没有开头的/
+    const normalizedFolder = uploadFolder 
+        ? uploadFolder.replace(/^\/+/, '') // 移除开头的/
+            .replace(/\/{2,}/g, '/') // 替换多个连续的/为单个/
+            .replace(/\/$/, '') // 移除末尾的/
+        : '';
+
     let uploadChannel = 'TelegramNew';
     switch (urlParamUploadChannel) {
         case 'telegram':
@@ -107,9 +116,6 @@ export async function onRequestPost(context) {  // Contents of context object
             break;
         case 's3':
             uploadChannel = 'S3';
-            break;
-        case 'external':
-            uploadChannel = 'External';
             break;
         default:
             uploadChannel = 'TelegramNew';
@@ -141,6 +147,7 @@ export async function onRequestPost(context) {  // Contents of context object
         ListType: "None",
         TimeStamp: time,
         Label: "None",
+        Folder: normalizedFolder || 'root',
     }
 
 
@@ -164,24 +171,21 @@ export async function onRequestPost(context) {  // Contents of context object
     const unique_index = time + Math.floor(Math.random() * 10000);
     let fullId = '';
     if (nameType === 'index') {
-        // 仅前缀
-        fullId = unique_index + '.' + fileExt;
+        // 只在 normalizedFolder 非空时添加路径
+        fullId = normalizedFolder ? `${normalizedFolder}/${unique_index}.${fileExt}` : `${unique_index}.${fileExt}`;
     } else if (nameType === 'origin') {
-        // 仅文件名
-        fullId = fileName? fileName : unique_index + '.' + fileExt;
+        fullId = normalizedFolder ? `${normalizedFolder}/${fileName}` : fileName;
     } else if (nameType === 'short') {
-        // 短链接，8位大小写字母+数字的随机字符
         while (true) {
             const shortId = generateShortId(8);
-            const testFullId = shortId + '.' + fileExt;
+            const testFullId = normalizedFolder ? `${normalizedFolder}/${shortId}.${fileExt}` : `${shortId}.${fileExt}`;
             if (await env.img_url.get(testFullId) === null) {
-                fullId = shortId + '.' + fileExt;
+                fullId = testFullId;
                 break;
             }
         }
     } else {
-        // 默认方式：前缀+文件名
-        fullId = fileName? unique_index + '_' + fileName : unique_index + '.' + fileExt;
+        fullId = normalizedFolder ? `${normalizedFolder}/${unique_index}_${fileName}` : `${unique_index}_${fileName}`;
     }
 
     // 获得返回链接格式, default为返回/file/id, full为返回完整链接
@@ -220,10 +224,6 @@ export async function onRequestPost(context) {  // Contents of context object
         } else {
             err = await res.text();
         }
-    } else if (uploadChannel === 'External') {
-        // -------------外链渠道---------------
-        const res = await uploadFileToExternal(env, formdata, fullId, metadata, returnLink, url);
-        return res;
     } else {
         // ----------------Telegram New 渠道-------------------
         const res = await uploadFileToTelegram(env, formdata, fullId, metadata, fileExt, fileName, fileType, url, clonedRequest, returnLink);
@@ -529,36 +529,6 @@ async function uploadFileToTelegram(env, formdata, fullId, metadata, fileExt, fi
     }
 }
 
-
-// 外链渠道
-async function uploadFileToExternal(env, formdata, fullId, metadata, returnLink, originUrl) {
-    // 直接将外链写入metadata
-    metadata.Channel = "External";
-    metadata.ChannelName = "External";
-    // 从 formdata 中获取外链
-    const extUrl = formdata.get('url');
-    if (extUrl === null || extUrl === undefined) {
-        return new Response('Error: No url provided', { status: 400 });
-    }
-    metadata.ExternalLink = extUrl;
-    // 写入KV数据库
-    try {
-        await env.img_url.put(fullId, "", {
-            metadata: metadata,
-        });
-    } catch (error) {
-        return new Response('Error: Failed to write to KV database', { status: 500 });
-    }
-
-    // 返回结果
-    return new Response(
-        JSON.stringify([{ 'src': `${returnLink}` }]), 
-        {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' }
-        }
-    );
-}
 
 // 图像审查
 async function moderateContent(env, url, metadata) {
