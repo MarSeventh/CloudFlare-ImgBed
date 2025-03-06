@@ -14,10 +14,15 @@ export async function onRequest(context) {
     let start = parseInt(url.searchParams.get('start'), 10) || 0;
     let count = parseInt(url.searchParams.get('count'), 10) || 50;
     let sum = url.searchParams.get('sum') || false;
+    let allRecords = await getAllRecords(env);
 
+    // 按照 metadata 中的时间戳倒序排序
+    allRecords.sort((a, b) => {
+        return b.metadata.TimeStamp - a.metadata.TimeStamp;
+    });
     // count 为 -1 时，返回所有数据
     if (count === -1) {
-        const allRecords = await getAllRecords(env);
+        
         // sum 参数为 true 时，只返回数据总数
         if (sum === 'true') {
             return new Response(JSON.stringify(
@@ -38,16 +43,6 @@ export async function onRequest(context) {
     
     start = Math.max(0, start);  // start 不能小于 0
     count = Math.max(1, count);  // count 不能小于 1
-
-    let allRecords = [];
-    
-    allRecords = await getAllRecords(env);
-
-    // 按照 metadata 中的时间戳倒序排序
-    allRecords.sort((a, b) => {
-        return b.metadata.TimeStamp - a.metadata.TimeStamp;
-    });
-
     const resultRecords = allRecords.slice(start, start + count);
 
     // 只返回 `count` 条数据
@@ -57,7 +52,6 @@ export async function onRequest(context) {
 }
 
 async function getAllRecords(env) {
-    let recordsFetched = 0;
     let allRecords = [];
     let cursor = null;
 
@@ -69,12 +63,12 @@ async function getAllRecords(env) {
         const filteredRecords = response.keys.filter(item => !item.name.startsWith("manage@"));
 
         allRecords.push(...filteredRecords);
-        recordsFetched += filteredRecords.length;
-        cursor = response.cursor;
 
-        if (!cursor) {
+        if (response.keys.length < limit) {
             break;
         }
+
+        cursor = response.cursor;
     }
 
     return allRecords;
