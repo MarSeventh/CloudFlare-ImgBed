@@ -1,6 +1,6 @@
 # CloudFlare-ImgBed
 
-开源图片/文件托管解决方案，基于 Cloudflare Pages 和 Telegram，支持 Telegram Bot 、 Cloudflare R2 ，S3 API 等多种不同存储渠道。
+开源图片/文件托管解决方案，基于 Cloudflare Pages，支持 Telegram Bot 、 Cloudflare R2 ，S3 API 等多种不同存储渠道。
 
 **前端仓库**：[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)
 
@@ -73,6 +73,19 @@
 <details>
     <summary>更新日志</summary>
 
+
+## 2025.3.1
+
+Add Features:
+
+- 支持粘贴多个链接同时上传
+- 支持存储和管理外链
+
+Fix Bugs:
+
+- 修复管理端复制 S3 链接的有关问题
+- 修复管理端部分页面设置不生效的问题
+- 修复渠道设置某些情况下不能保存的问题
 
 ## 2025.2.6
 
@@ -476,7 +489,8 @@ Add Features:
 
 
 <details>
-    <summary>v1.0版本 部署在Cloudflare上的方式</summary>
+    <summary>（已过时）v1.0版本 部署在Cloudflare上的方式</summary>
+
 
 
 
@@ -565,7 +579,8 @@ Add Features:
 
 
 <details>
-    <summary>v1.0 部署在服务器上的方式</summary>
+    <summary>（已过时）v1.0 部署在服务器上的方式</summary>
+
 
 
 
@@ -624,7 +639,7 @@ Add Features:
 
 
 <details>
-    <summary>v1.0 后台认证、自定义页面、缓存清除等设置</summary>
+    <summary>（已过时，可参考部分设置项的具体介绍）v1.0 后台认证、自定义页面、缓存清除等设置</summary>
 
 
 
@@ -899,6 +914,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 38. :hourglass_flowing_sand:支持KV备份恢复功能
 39. :white_check_mark:~~页脚可自定义隐藏~~（2025.2.4已完成）
 40. :hourglass_flowing_sand:搜索功能增强
+41. :white_check_mark:支持粘贴多个链接，支持外链管理
 
 </details>
 
