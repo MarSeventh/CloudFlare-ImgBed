@@ -12,8 +12,52 @@ export async function onRequest(context) {
       data, // arbitrary space for passing data between middlewares
     } = context;
 
-    // 组装 CDN URL
     const url = new URL(request.url);
+
+    // 读取folder参数，判断是否为文件夹删除请求
+    const folder = url.searchParams.get('folder');
+    if (folder === 'true') {
+        try {
+            // 调用list API获取指定目录下的所有文件
+            const folderPath = params.path.join('/');
+
+            const listUrl = new URL(`${url.origin}/api/manage/list?count=-1&dir=${folderPath}`);
+            const listRequest = new Request(listUrl, request);
+
+            const listResponse = await fetch(listRequest);
+            const listData = await listResponse.json();
+
+            const files = listData.files;
+            // 调用delete API删除文件夹下的所有文件
+            for (const file of files) {
+                const encodedFileName = encodeURIComponent(file.name);
+
+                const deleteUrl = new URL(`${url.origin}/api/manage/delete/${encodedFileName}`);
+                const deleteRequest = new Request(deleteUrl, request);
+
+                await fetch(deleteRequest);
+            }
+
+            // 调用delete API删除所有子文件夹
+            const directories = listData.directories;
+            for (const dir of directories) {
+                const encodedDir = encodeURIComponent(dir);
+
+                const deleteUrl = new URL(`${url.origin}/api/manage/delete/${encodedDir}?folder=true`);
+                const deleteRequest = new Request(deleteUrl, request);
+
+                await fetch(deleteRequest);
+            }
+
+            // 返回成功信息
+            return new Response('Folder Deleted');
+
+        } catch (e) {
+            return new Response('Error: Delete Folder Failed', { status: 400 });
+        }
+    }
+
+    // 组装 CDN URL
     const cdnPath = url.pathname.replace('/api/manage/delete/', '');
     const cdnUrl = `https://${url.hostname}/file/${cdnPath}`;
 

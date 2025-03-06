@@ -168,7 +168,7 @@ export async function onRequest(context) {  // Contents of context object
     let TgFileID = ''; // Tg的file_id
     if (imgRecord.metadata?.Channel === 'Telegram') {
         // id为file_id + ext
-        TgFileID = params.id.split('.')[0];
+        TgFileID = fileId.split('.')[0];
     } else if (imgRecord.metadata?.Channel === 'TelegramNew') {
         // id为unique_id + file_name
         TgFileID = imgRecord.metadata?.TgFileId;

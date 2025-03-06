@@ -6,8 +6,19 @@ export async function onRequest(context) {
     let count = parseInt(url.searchParams.get('count'), 10) || 50;
     let sum = url.searchParams.get('sum') || false;
     let dir = url.searchParams.get('dir') || ''; // 目录名
+    // 相对路径
+    if (dir.startsWith('/')) {
+        dir = dir.substring(1);
+    }
+    if (dir !== '' && !dir.endsWith('/')) {
+        dir += '/';
+    }
 
-    let allRecords = await getAllRecords(env);
+    let allRecords = await getAllRecords(env, dir);
+
+    allRecords.sort((a, b) => {
+        return b.metadata.TimeStamp - a.metadata.TimeStamp;
+    });
 
     // 解析目录下的文件和子目录
     let filteredRecords = [];
@@ -27,15 +38,15 @@ export async function onRequest(context) {
                 filteredRecords.push(record);
             } else {
                 // 该目录下的子文件夹
-                subdirectories.add(parts[0]);
+                if (dir === '' || dir.endsWith('/')) {
+                    subdirectories.add(dir + parts[0]);
+                } else {
+                    subdirectories.add(dir + '/' + parts[0]);
+                }
             }
-        }
+            }
     }
 
-    // 按照 metadata 中的时间戳倒序排序
-    filteredRecords.sort((a, b) => {
-        return b.metadata.TimeStamp - a.metadata.TimeStamp;
-    });
 
     // sum 参数为 true 时，只返回数据总数
     if (count === -1 && sum === 'true') {
@@ -67,13 +78,18 @@ export async function onRequest(context) {
     });
 }
 
-async function getAllRecords(env) {
+async function getAllRecords(env, dir) {
+    // 按前缀列出所有文件
     let allRecords = [];
     let cursor = null;
 
     while (true) {
         const limit = 1000;
-        const response = await env.img_url.list({ limit, cursor });
+        const response = await env.img_url.list({
+            prefix: dir,
+            limit: limit,
+            cursor: cursor
+        });
         cursor = response.cursor;
 
         const filteredRecords = response.keys.filter(item => !item.name.startsWith("manage@"));
