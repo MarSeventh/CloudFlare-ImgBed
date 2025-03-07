@@ -133,14 +133,36 @@ export async function onRequestPost(context) {  // Contents of context object
     const fileType = formdata.get('file').type;
     const fileName = formdata.get('file').name;
     const fileSize = (formdata.get('file').size / 1024 / 1024).toFixed(2); // 文件大小，单位MB
-    const metadata = {
+    let metadata = {
         FileName: fileName,
         FileType: fileType,
         FileSize: fileSize,
         UploadIP: uploadIp,
         ListType: "None",
         TimeStamp: time,
-        Label: "None",
+        Label: "None"
+    }
+    try{
+        console.log(fileType)
+        if (file && fileType.startsWith("image/")) {
+            const reader = new FileReader();
+            
+            reader.onload = function (event) {
+            const img = new Image();
+            img.src = event.target.result;
+        
+            img.onload = function () {
+                metadata.width = img.width
+                metadata.height = img.height
+                console.log("图片宽度：", img.width);
+                console.log("图片高度：", img.height);
+            };
+            };
+        
+            reader.readAsDataURL(formdata.get('file'));
+        }
+    }catch(e){
+        console.log('===========',e)
     }
 
 
