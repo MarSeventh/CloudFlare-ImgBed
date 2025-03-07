@@ -109,15 +109,13 @@ export async function onRequest(context) {
         // S3 渠道的图片，需要移动S3中对应的图片
         if (img.metadata?.Channel === 'S3') {
             const { success, newKey, error } = await moveS3File(img, newFileId);
-            if (!success) {
-                return new Response(`Error: Move S3 File Failed: ${error}`, { status: 400 });
+            if (success) {
+                // 更新 metadata
+                img.metadata.S3FileKey = newFileId;
+
+                const s3ServerDomain = img.metadata.S3Endpoint.replace(/https?:\/\//, "");
+                img.metadata.S3Location = `https://${img.metadata.S3BucketName}.${s3ServerDomain}/${newKey}`;
             }
-
-            // 更新 metadata
-            img.metadata.S3FileKey = newFileId;
-
-            const s3ServerDomain = img.metadata.S3Endpoint.replace(/https?:\/\//, "");
-            img.metadata.S3Location = `https://${img.metadata.S3BucketName}.${s3ServerDomain}/${newKey}`;
         }
 
         // 旧版 Telegram 渠道和 Telegraph 渠道不支持移动
