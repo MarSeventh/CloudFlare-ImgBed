@@ -30,9 +30,7 @@ export async function onRequest(context) {
             const files = listData.files;
             // 调用delete API删除文件夹下的所有文件
             for (const file of files) {
-                const encodedFileName = encodeURIComponent(file.name);
-
-                const deleteUrl = new URL(`${url.origin}/api/manage/delete/${encodedFileName}`);
+                const deleteUrl = new URL(`${url.origin}/api/manage/delete/${file.name}`);
                 const deleteRequest = new Request(deleteUrl, request);
 
                 await fetch(deleteRequest);
@@ -41,9 +39,7 @@ export async function onRequest(context) {
             // 调用delete API删除所有子文件夹
             const directories = listData.directories;
             for (const dir of directories) {
-                const encodedDir = encodeURIComponent(dir);
-
-                const deleteUrl = new URL(`${url.origin}/api/manage/delete/${encodedDir}?folder=true`);
+                const deleteUrl = new URL(`${url.origin}/api/manage/delete/${dir}?folder=true`);
                 const deleteRequest = new Request(deleteUrl, request);
 
                 await fetch(deleteRequest);

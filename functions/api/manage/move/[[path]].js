@@ -1,4 +1,4 @@
-import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, CopyObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { purgeCFCache } from "../../../utils/purgeCache";
 
 export async function onRequest(context) {
@@ -25,6 +25,9 @@ export async function onRequest(context) {
     const folder = url.searchParams.get('folder');
     if (folder === 'true') {
         try {
+            // 获取当前文件夹名称
+            const curFolder = params.path[params.path.length - 1];
+
             // 调用list API获取指定目录下的所有文件
             const folderPath = params.path.join('/');
 
@@ -35,22 +38,21 @@ export async function onRequest(context) {
             const listData = await listResponse.json();
 
             const files = listData.files;
+
+            const folderDist = dist === '' ? curFolder : `${dist}/${curFolder}`;
             // 调用move API移动文件夹下的所有文件
             for (const file of files) {
-                const encodedFileName = encodeURIComponent(file.name);
-
-                const moveUrl = new URL(`${url.origin}/api/manage/move/${encodedFileName}?dist=${dist}`);
+                const moveUrl = new URL(`${url.origin}/api/manage/move/${file.name}?dist=${folderDist}`);
                 const moveRequest = new Request(moveUrl, request);
 
                 await fetch(moveRequest);
             }        
 
             const directories = listData.directories;
+
             // 调用move API移动所有子文件夹
             for (const dir of directories) {
-                const encodedDir = encodeURIComponent(dir);
-
-                const moveUrl = new URL(`${url.origin}/api/manage/move/${encodedDir}?dist=${dist}&folder=true`);
+                const moveUrl = new URL(`${url.origin}/api/manage/move/${dir}?dist=${folderDist}&folder=true`);
                 const moveRequest = new Request(moveUrl, request);
 
                 await fetch(moveRequest);
@@ -63,7 +65,7 @@ export async function onRequest(context) {
             return new Response('Error: Move Folder Failed', { status: 400 });
         }
     }
-
+    
     // 组装 CDN URL
     const cdnPath = url.pathname.replace('/api/manage/move/', '');
     const cdnUrl = `https://${url.hostname}/file/${cdnPath}`;
@@ -104,6 +106,16 @@ export async function onRequest(context) {
             await R2DataBase.delete(fileId);
         }
 
+        // S3 渠道的图片，需要移动S3中对应的图片
+        if (img.metadata?.Channel === 'S3') {
+            const { success, newKey, error } = await moveS3File(img, newFileId);
+            if (!success) {
+                return new Response(`Error: Move S3 File Failed: ${error}`, { status: 400 });
+            }
+
+            // 更新 metadata
+            img.metadata.S3FileKey = newFileId;
+        }
 
         // 旧版 Telegram 渠道和 Telegraph 渠道不支持移动
         if (img.metadata?.Channel === 'Telegram' || img.metadata?.Channel === undefined) {
@@ -114,6 +126,7 @@ export async function onRequest(context) {
         // 其他渠道，直接修改KV中的id为newFileId
         await env.img_url.put(newFileId, img.value, { metadata: img.metadata });
 
+        
         // 删除原有图片
         await env.img_url.delete(fileId);
 
@@ -138,4 +151,41 @@ export async function onRequest(context) {
     } catch (e) {
         return new Response('Error: Move Image Failed', { status: 400 });
     }
-  }
+ }
+
+// 移动 S3 渠道的图片
+async function moveS3File(img, newFileId) {
+    const s3Client = new S3Client({
+        region: img.metadata?.S3Region || "auto",
+        endpoint: img.metadata?.S3Endpoint,
+        credentials: {
+            accessKeyId: img.metadata?.S3AccessKeyId,
+            secretAccessKey: img.metadata?.S3SecretAccessKey
+        },
+    });
+
+    const bucketName = img.metadata?.S3BucketName;
+    const oldKey = img.metadata?.S3FileKey;
+    const newKey = newFileId;
+
+    try {
+        // 复制文件到新位置
+        await s3Client.send(new CopyObjectCommand({
+            Bucket: bucketName,
+            CopySource: `/${bucketName}/${oldKey}`,
+            Key: newKey,
+        }));
+
+        // 复制成功后，删除旧文件
+        await s3Client.send(new DeleteObjectCommand({
+            Bucket: bucketName,
+            Key: oldKey,
+        }));
+
+        // 返回新的 S3 文件信息
+        return { success: true, newKey };
+    } catch (error) {
+        console.error("S3 Move Failed:", error);
+        return { success: false, error: error.message };
+    }
+}
