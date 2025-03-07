@@ -79,8 +79,9 @@ Add Features:
 - **目录功能上线啦（感谢[fantasy-ke](https://github.com/fantasy-ke)协助）**，当前支持：
   - 上传到指定目录
   - 整目录删除
-  - 文件位置移动
+  - 文件位置移动（ Telegraph 和旧版 Telegram 渠道不支持移动）
   - 按目录读取文件
+- 随机图API支持按目录读取
 
 Fix Bugs:
 
@@ -101,6 +102,7 @@ Add Features:
   - 整目录删除
   - 文件位置移动（ Telegraph 和旧版 Telegram 渠道不支持移动）
   - 按目录读取文件
+- 随机图API支持按目录读取
 
 Fix Bugs:
 
@@ -870,7 +872,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 | **接口功能** | 从图床中随机返回一张图片的链接（注意会消耗列出次数）         |
 | **前置条件** | 设置`AllowRandom`环境变量，值为`true`                        |
 | **请求方法** | GET                                                          |
-| **请求参数** | **Query参数**：<br />`content`:返回的文件类型，可选值有`[image, video]`，多个使用`,`分隔，默认为`image`<br />`type`: 设为`img`时直接返回图片（此时form不生效）；设为`url`时返回完整url链接；默认返回随机图的文件路径。<br />`form`: 设为`text`时直接返回文本，默认返回json格式内容。 |
+| **请求参数** | **Query参数**：<br />`content`:返回的文件类型，可选值有`[image, video]`，多个使用`,`分隔，默认为`image`<br />`type`: 设为`img`时直接返回图片（此时form不生效）；设为`url`时返回完整url链接；默认返回随机图的文件路径。<br />`form`: 设为`text`时直接返回文本，默认返回json格式内容。<br />`dir`: 读取目录，使用相对路径，例如`img/test`会返回该目录以及所有子目录下的文件。 |
 | **响应格式** | 1、当`type`为`img`时：<br />返回格式为`image/jpeg`<br />2、当`type`为其他值时：<br />当`form`不是`text`时，返回JSON格式内容，`data.url`为返回的链接/文件路径。<br />否则，直接返回链接/文件路径。 |
 
 > **请求示例**：
