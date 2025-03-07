@@ -115,6 +115,9 @@ export async function onRequest(context) {
 
             // 更新 metadata
             img.metadata.S3FileKey = newFileId;
+
+            const s3ServerDomain = img.metadata.S3Endpoint.replace(/https?:\/\//, "");
+            img.metadata.S3Location = `https://${img.metadata.S3BucketName}.${s3ServerDomain}/${newKey}`;
         }
 
         // 旧版 Telegram 渠道和 Telegraph 渠道不支持移动
@@ -126,7 +129,7 @@ export async function onRequest(context) {
         // 其他渠道，直接修改KV中的id为newFileId
         await env.img_url.put(newFileId, img.value, { metadata: img.metadata });
 
-        
+
         // 删除原有图片
         await env.img_url.delete(fileId);
 
