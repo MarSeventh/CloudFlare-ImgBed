@@ -1,6 +1,6 @@
 # CloudFlare-ImgBed
 
-开源图片/文件托管解决方案，基于 Cloudflare Pages，支持 Telegram Bot 、 Cloudflare R2 ，S3 API 等多种不同存储渠道。
+开源文件托管解决方案，基于 Cloudflare Pages，支持 Telegram Bot 、 Cloudflare R2 ，S3 API 等多种不同存储渠道，支持目录功能。
 
 **前端仓库**：[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)
 
@@ -70,9 +70,41 @@
 
 </details>
 
+
+
+## 最近更新 2025.3.7
+
+Add Features:
+
+- **目录功能上线啦（感谢[fantasy-ke](https://github.com/fantasy-ke)协助）**，当前支持：
+  - 上传到指定目录
+  - 整目录删除
+  - 文件位置移动
+  - 按目录读取文件
+
+Fix Bugs:
+
+- 修复多项影响体验的bug
+
+
+
 <details>
     <summary>更新日志</summary>
 
+
+## 2025.3.7
+
+Add Features:
+
+- **目录功能上线啦**，当前支持：
+  - 上传到指定目录
+  - 整目录删除
+  - 文件位置移动（ Telegraph 和旧版 Telegram 渠道不支持移动）
+  - 按目录读取文件
+
+Fix Bugs:
+
+- 修复多项影响体验的bug
 
 ## 2025.3.1
 
@@ -807,7 +839,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 | ------------ | ------------------------------------------------------------ |
 | **接口功能** | 上传图片或视频                                               |
 | **请求方法** | POST                                                         |
-| **请求参数** | **Query参数**：<br />`authCode`: string类型，即为你设置的认证码<br />`serverCompress`: boolean类型，表示是否开启服务端压缩（仅针对图片文件、Telegram上传渠道生效，默认为`true`）<br />`uploadChannel`: string类型，取值为`telegram`和`cfr2`，分别代表telegram bot渠道和Cloudflare R2渠道，默认为`telegram` 渠道<br />`autoRetry`: boolean类型，表示是否开启上传失败自动切换渠道重试，默认开启<br />`uploadNameType`: string类型，表示文件命名方式，可选值为`[default, index, origin, short]`，分别代表默认`前缀_原名`命名、`仅前缀`命名、`仅原名`命名和`短链接`命名法，默认为`default`<br />`returnFormat`:string类型，表示返回链接格式，可选值为`[default, full]`，分别代表默认的`/file/id`格式、完整链接格式<br />**Body参数(application/form-data)**：<br />`file`: file类型，你要上传的文件 |
+| **请求参数** | **Query参数**：<br />`authCode`: string类型，即为你设置的认证码<br />`serverCompress`: boolean类型，表示是否开启服务端压缩（仅针对图片文件、Telegram上传渠道生效，默认为`true`）<br />`uploadChannel`: string类型，取值为`telegram`和`cfr2`，分别代表telegram bot渠道和Cloudflare R2渠道，默认为`telegram` 渠道<br />`autoRetry`: boolean类型，表示是否开启上传失败自动切换渠道重试，默认开启<br />`uploadNameType`: string类型，表示文件命名方式，可选值为`[default, index, origin, short]`，分别代表默认`前缀_原名`命名、`仅前缀`命名、`仅原名`命名和`短链接`命名法，默认为`default`<br />`returnFormat`:string类型，表示返回链接格式，可选值为`[default, full]`，分别代表默认的`/file/id`格式、完整链接格式<br />`uploadFolder`:string类型，指定上传目录，用相对路径表示，例如上传到img/test目录需填`img/test`<br />**Body参数(application/form-data)**：<br />`file`: file类型，你要上传的文件 |
 | **返回响应** | `data[0].src`为获得的图片链接（注意不包含域名，需要自己添加） |
 
 > **请求示例**：
@@ -904,7 +936,12 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 28. :white_check_mark:~~开放更多文件格式~~（2024.12.9已完成）
 29. :white_check_mark:~~进行删除、加入白名单、加入黑名单等操作时，自动清除CF CDN缓存，避免延迟生效~~（2024.12.11已完成）
 30. :white_check_mark:~~管理端批量选择时，记录用户选择的顺序~~（2024.12.20已完成）
-31. :memo:上传图片支持自定义上传路径，支持相册功能（评估中）
+31. :memo:上传图片支持自定义上传路径，支持相册功能
+    - ~~文件夹删除功能~~（2025.3.6已完成）
+    - ~~文件位置移动功能~~（2025.3.7已完成）
+    - ~~管理端加载更多数据时鬼打墙问题修复~~（2025.3.6已完成）
+    - ~~管理端批量操作适配文件夹~~（2025.3.6已完成）
+    - ~~管理端分页逻辑调整~~（2025.3.6已完成）
 32. :white_check_mark:~~支持多个 Telegram Bot Token 负载均衡~~（2025.2.4已完成）
 33. :white_check_mark:~~管理端提供详细的设置信息和设置方式引导~~（2025.2.5已完成）
 34. :white_check_mark:~~Logo焕新、登录页面优化、设置提示项等多项展示效果优化~~（2025.2.2已完成）
