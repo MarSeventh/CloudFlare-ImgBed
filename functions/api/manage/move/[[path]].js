@@ -143,7 +143,13 @@ export async function onRequest(context) {
             const nullResponse = new Response(null, {
                 headers: { 'Cache-Control': 'max-age=0' },
             });
-            await cache.put(`${url.origin}/api/randomFileList`, nullResponse);
+            
+            const keys = await cache.keys();
+            for (let key of keys) {
+                if (key.url.includes('/api/randomFileList')) {
+                    await cache.put(`${url.origin}/api/randomFileList`, nullResponse);
+                }
+            }
         } catch (error) {
             console.error('Failed to clear cache:', error);
         }
