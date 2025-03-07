@@ -37,8 +37,12 @@ export async function onRequest(context) {
         fileType = fileType.split(',');
     }
 
+    // 读取指定文件夹
+    const paramDir = requestUrl.searchParams.get('dir') || '';
+    const dir = paramDir.replace(/^\/+/, '').replace(/\/{2,}/g, '/').replace(/\/$/, '');
+
     // 调用randomFileList接口，读取KV数据库中的所有记录
-    let allRecords = await getRandomFileList(env, requestUrl);
+    let allRecords = await getRandomFileList(env, requestUrl, dir);
 
     // 筛选出符合fileType要求的记录
     allRecords = allRecords.filter(item => { return fileType.some(type => item.FileType.includes(type)) });
@@ -82,7 +86,7 @@ export async function onRequest(context) {
     }
 }
 
-async function getRandomFileList(env, url) {
+async function getRandomFileList(env, url, dir) {
     // 检查缓存中是否有记录，有则直接返回
     const cache = caches.default;
     const cacheRes = await cache.match(`${url.origin}/api/randomFileList`);
@@ -95,6 +99,7 @@ async function getRandomFileList(env, url) {
 
     do {
         const records = await env.img_url.list({
+            prefix: dir,
             limit: 1000,
             cursor,
         });
