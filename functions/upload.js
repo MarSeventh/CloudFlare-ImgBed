@@ -2,8 +2,6 @@ import { errorHandling, telemetryData } from "./utils/middleware";
 import { fetchUploadConfig, fetchSecurityConfig } from "./utils/sysConfig";
 import { purgeCFCache } from "./utils/purgeCache";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import sharp from 'sharp';
-
 
 let uploadConfig = {};
 let securityConfig = {};
@@ -146,11 +144,9 @@ export async function onRequestPost(context) {  // Contents of context object
     }
     try{
         if (fileType && fileType.startsWith("image/")) {
-            const buffer = await formdata.get('file').arrayBuffer(); // 转换 Blob 为 ArrayBuffer
-            const bf = await sharp(Buffer.from(buffer)).metadata();
-            metadata.width = bf.width
-            metadata.height = bf.height
-            console.log(`宽: ${bf.width}, 高: ${bf.height}`);
+            metadata.width = formdata.get('width')
+            metadata.height = formdata.get('height')
+            console.log(`宽: ${formdata.get('width')}, 高: ${formdata.get('height')}`);
         }
     }catch(e){
         console.log('===========',e)
