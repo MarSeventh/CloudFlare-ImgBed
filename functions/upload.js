@@ -2,6 +2,8 @@ import { errorHandling, telemetryData } from "./utils/middleware";
 import { fetchUploadConfig, fetchSecurityConfig } from "./utils/sysConfig";
 import { purgeCFCache } from "./utils/purgeCache";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import sharp from 'sharp';
+
 
 let uploadConfig = {};
 let securityConfig = {};
@@ -143,23 +145,12 @@ export async function onRequestPost(context) {  // Contents of context object
         Label: "None"
     }
     try{
-        console.log(fileType)
         if (fileType && fileType.startsWith("image/")) {
-            const reader = new FileReader();
-            
-            reader.onload = function (event) {
-            const img = new Image();
-            img.src = event.target.result;
-        
-            img.onload = function () {
-                metadata.width = img.width
-                metadata.height = img.height
-                console.log("图片宽度：", img.width);
-                console.log("图片高度：", img.height);
-            };
-            };
-        
-            reader.readAsDataURL(formdata.get('file'));
+            const buffer = await formdata.get('file').arrayBuffer(); // 转换 Blob 为 ArrayBuffer
+            const bf = await sharp(Buffer.from(buffer)).metadata();
+            metadata.width = bf.width
+            metadata.height = bf.height
+            console.log(`宽: ${bf.width}, 高: ${bf.height}`);
         }
     }catch(e){
         console.log('===========',e)
