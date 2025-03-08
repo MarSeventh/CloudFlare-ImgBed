@@ -72,7 +72,7 @@
 
 
 
-## 最近更新 2025.3.7
+## 最近更新 2025.3.8
 
 Add Features:
 
@@ -81,7 +81,7 @@ Add Features:
   - 整目录删除
   - 文件位置移动（ Telegraph 和旧版 Telegram 渠道不支持移动）
   - 按目录读取文件
-- 随机图API支持按目录读取
+- 随机图API支持按目录读取，支持按目录进行权限控制
 
 Fix Bugs:
 
@@ -92,6 +92,16 @@ Fix Bugs:
 <details>
     <summary>更新日志</summary>
 
+
+## 2025.3.8
+
+Add Features:
+
+- 随机图API支持按目录读取，支持按目录进行权限控制
+
+Fix Bugs:
+
+- 修复随机图API的缓存问题
 
 ## 2025.3.7
 

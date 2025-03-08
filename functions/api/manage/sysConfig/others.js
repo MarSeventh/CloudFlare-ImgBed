@@ -54,6 +54,7 @@ export async function getOthersConfig(kv, env) {
     // 随机图API
     settings.randomImageAPI = {
         enabled: env.AllowRandom === 'true',
+        allowedDir: '',
         fixed: false,
     }
 
@@ -66,7 +67,9 @@ export async function getOthersConfig(kv, env) {
     }
 
     // 用KV存储的设置覆盖默认设置
-    Object.assign(settings, settingsKV)
+    for (const key in settings) {
+        Object.assign(settings[key], settingsKV[key])
+    }
 
     return settings;
 }
