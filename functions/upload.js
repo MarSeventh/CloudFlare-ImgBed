@@ -144,7 +144,7 @@ export async function onRequestPost(context) {  // Contents of context object
     }
     try{
         console.log(fileType)
-        if (file && fileType.startsWith("image/")) {
+        if (fileType && fileType.startsWith("image/")) {
             const reader = new FileReader();
             
             reader.onload = function (event) {
