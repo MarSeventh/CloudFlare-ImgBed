@@ -18,6 +18,7 @@ export async function onRequest(context) {
     // 读取其他设置
     othersConfig = await fetchOthersConfig(env);
     allowRandom = othersConfig.randomImageAPI.enabled;
+    const allowedDir = othersConfig.randomImageAPI.allowedDir;
 
     // 检查是否启用了随机图功能
     if (allowRandom != true) {
@@ -28,6 +29,12 @@ export async function onRequest(context) {
     if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") {
         return new Response('Error: Please configure KV database', { status: 500 });
     }
+
+    // 处理允许的目录，每个目录调整为标准格式，去掉首尾空格和
+    const allowedDirList = allowedDir.split(',');
+    const allowedDirListFormatted = allowedDirList.map(item => {
+        return item.trim().replace(/^\/+/, '').replace(/\/{2,}/g, '/').replace(/\/$/, '');
+    });
 
     // 从params中读取返回的文件类型
     let fileType = requestUrl.searchParams.get('content');
@@ -40,6 +47,11 @@ export async function onRequest(context) {
     // 读取指定文件夹
     const paramDir = requestUrl.searchParams.get('dir') || '';
     const dir = paramDir.replace(/^\/+/, '').replace(/\/{2,}/g, '/').replace(/\/$/, '');
+
+    // 检查是否在允许的目录中
+    if (!allowedDirListFormatted.includes(dir)) {
+        return new Response(JSON.stringify({ error: "Directory not allowed" }), { status: 403 });
+    }
 
     // 调用randomFileList接口，读取KV数据库中的所有记录
     let allRecords = await getRandomFileList(env, requestUrl, dir);
