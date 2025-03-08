@@ -48,8 +48,15 @@ export async function onRequest(context) {
     const paramDir = requestUrl.searchParams.get('dir') || '';
     const dir = paramDir.replace(/^\/+/, '').replace(/\/{2,}/g, '/').replace(/\/$/, '');
 
-    // 检查是否在允许的目录中
-    if (!allowedDirListFormatted.includes(dir)) {
+    // 检查是否在允许的目录中，或是允许目录的子目录
+    let dirAllowed = false;
+    for (let i = 0; i < allowedDirListFormatted.length; i++) {
+        if (allowedDirListFormatted[i] === '' || dir === allowedDirListFormatted[i] || dir.startsWith(allowedDirListFormatted[i] + '/')) {
+            dirAllowed = true;
+            break;
+        }
+    }
+    if (!dirAllowed) {
         return new Response(JSON.stringify({ error: "Directory not allowed" }), { status: 403 });
     }
 
