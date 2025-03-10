@@ -964,6 +964,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 39. :white_check_mark:~~页脚可自定义隐藏~~（2025.2.4已完成）
 40. :hourglass_flowing_sand:搜索功能增强
 41. :white_check_mark:支持粘贴多个链接，支持外链管理
+42. :hourglass_flowing_sand:上传文件记录MD5，支持文件硬链接
 
 </details>
 
