@@ -125,6 +125,7 @@ export async function onRequest(context) {
 
 
         // 其他渠道，直接修改KV中的id为newFileId
+        img.metadata.Folder = dist;
         await env.img_url.put(newFileId, img.value, { metadata: img.metadata });
 
 
