@@ -73,22 +73,14 @@ async function dealByIP(data) {
         }
     });
 
-    const ipArray = Array.from(ipSet);
-    const batchSize = 15; // 每批处理20个IP（每个IP发起2个请求，总共40个请求）
-    
-    for (let i = 0; i < ipArray.length; i += batchSize) {
-        const batch = ipArray.slice(i, i + batchSize);
-        const promises = batch.map(async ip => {
-            let ipData = data.filter(item => item.metadata?.UploadIP === ip);
-            let count = ipData.length;
-            let address = await getIPAddress(ip);
-            return {ip, address, count, data: ipData};
-        });
-        
-        const batchResults = await Promise.all(promises);
-        dealedData.push(...batchResults);
-    }
+    const promises = Array.from(ipSet).map(async ip => {
+        let ipData = data.filter(item => item.metadata?.UploadIP === ip);
+        let count = ipData.length;
+        let address = await getIPAddress(ip);
+        return {ip, address, count, data: ipData};
+    });
 
+    dealedData = await Promise.all(promises);
     return dealedData;
 }
 
