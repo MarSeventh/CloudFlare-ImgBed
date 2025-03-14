@@ -108,7 +108,13 @@ async function getIPAddress(ip) {
             const addressData = await addressInfo.json();
 
             if (addressInfo.ok && addressData.data) {
-                address = addressData.data.detail + ', ' + addressData.data.city + ', ' + addressData.data.province + ', ' + addressData.data.country;
+                // 根据各字段是否存在，拼接地址
+                address = [
+                    addressData.data.detail,
+                    addressData.data.city,
+                    addressData.data.province,
+                    addressData.data.country
+                ].filter(Boolean).join(', ');
             }
         }
     } catch (error) {
