@@ -73,44 +73,13 @@ async function dealByIP(data) {
         }
     });
 
-    const promises = Array.from(ipSet).map(async ip => {
+    ipSet.forEach(async ip => {
         let ipData = data.filter(item => item.metadata?.UploadIP === ip);
         let count = ipData.length;
-        let address = await getIPAddress(ip);
-        return {ip, address, count, data: ipData};
+        let address = ipData[0].metadata?.UploadAddress || '未知';
+        dealedData.push({ip, address, count, data: ipData});
     });
 
-    dealedData = await Promise.all(promises);
     return dealedData;
 }
 
-// 获取IP地址
-async function getIPAddress(ip) {
-    let address = '未知';
-    try {
-        const ipInfo = await fetch(`https://apimobile.meituan.com/locate/v2/ip/loc?rgeo=true&ip=${ip}`);
-        const ipData = await ipInfo.json();
-        
-        if (ipInfo.ok && ipData.data) {
-            const lng = ipData.data?.lng || 0;
-            const lat = ipData.data?.lat || 0;
-            
-            // 读取具体地址
-            const addressInfo = await fetch(`https://apimobile.meituan.com/group/v1/city/latlng/${lat},${lng}?tag=0`);
-            const addressData = await addressInfo.json();
-
-            if (addressInfo.ok && addressData.data) {
-                // 根据各字段是否存在，拼接地址
-                address = [
-                    addressData.data.detail,
-                    addressData.data.city,
-                    addressData.data.province,
-                    addressData.data.country
-                ].filter(Boolean).join(', ');
-            }
-        }
-    } catch (error) {
-        console.error('Error fetching IP address:', error);
-    }
-    return address;
-}

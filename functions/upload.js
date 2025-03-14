@@ -91,6 +91,8 @@ export async function onRequestPost(context) {  // Contents of context object
     if (isBlockedIp) {
         return new Response('Error: Your IP is blocked', { status: 403 });
     }
+    // 获取IP地址
+    const ipAddress = await getIPAddress(uploadIp);
 
     // 读取上传配置
     uploadConfig = await fetchUploadConfig(env);
@@ -147,6 +149,7 @@ export async function onRequestPost(context) {  // Contents of context object
         FileType: fileType,
         FileSize: fileSize,
         UploadIP: uploadIp,
+        UploadAddress: ipAddress,
         ListType: "None",
         TimeStamp: time,
         Label: "None",
@@ -719,4 +722,36 @@ function generateShortId(length = 8) {
         result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return result;
+}
+
+
+// 获取IP地址
+async function getIPAddress(ip) {
+    let address = '未知';
+    try {
+        const ipInfo = await fetch(`https://apimobile.meituan.com/locate/v2/ip/loc?rgeo=true&ip=${ip}`);
+        const ipData = await ipInfo.json();
+        
+        if (ipInfo.ok && ipData.data) {
+            const lng = ipData.data?.lng || 0;
+            const lat = ipData.data?.lat || 0;
+            
+            // 读取具体地址
+            const addressInfo = await fetch(`https://apimobile.meituan.com/group/v1/city/latlng/${lat},${lng}?tag=0`);
+            const addressData = await addressInfo.json();
+
+            if (addressInfo.ok && addressData.data) {
+                // 根据各字段是否存在，拼接地址
+                address = [
+                    addressData.data.detail,
+                    addressData.data.city,
+                    addressData.data.province,
+                    addressData.data.country
+                ].filter(Boolean).join(', ');
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching IP address:', error);
+    }
+    return address;
 }
