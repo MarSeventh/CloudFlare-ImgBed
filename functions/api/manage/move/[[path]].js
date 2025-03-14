@@ -51,7 +51,7 @@ export async function onRequest(context) {
                     const newFileId = `${folderDist}/${fileName}`;
                     const cdnUrl = `https://${url.hostname}/file/${fileId}`;
 
-                    const success = await moveFile(env, fileId, newFileId, cdnUrl);
+                    const success = await moveFile(env, fileId, newFileId, cdnUrl, url);
                     if (success) {
                         processedFiles.push(fileId);
                     } else {
@@ -93,7 +93,7 @@ export async function onRequest(context) {
         const newFileId = dist === '' ? fileKey : `${dist}/${fileKey}`;
         const cdnUrl = `https://${url.hostname}/file/${fileId}`;
 
-        const success = await moveFile(env, fileId, newFileId, cdnUrl);
+        const success = await moveFile(env, fileId, newFileId, cdnUrl, url);
         if (!success) {
             throw new Error('Move file failed');
         }
@@ -112,7 +112,7 @@ export async function onRequest(context) {
 }
 
 // 移动单个文件的核心函数
-async function moveFile(env, fileId, newFileId, cdnUrl) {
+async function moveFile(env, fileId, newFileId, cdnUrl, url) {
     try {
         // 读取图片信息
         const img = await env.img_url.getWithMetadata(fileId);
@@ -171,12 +171,10 @@ async function moveFile(env, fileId, newFileId, cdnUrl) {
                 headers: { 'Cache-Control': 'max-age=0' },
             });
             
-            const keys = await cache.keys();
-            for (let key of keys) {
-                if (key.url.includes('/api/randomFileList')) {
-                    await cache.put(`${url.origin}/api/randomFileList`, nullResponse);
-                }
-            }
+            const normalizedFolder = fileId.split('/').slice(0, -1).join('/');
+            const normalizedDist = newFileId.split('/').slice(0, -1).join('/');
+            await cache.put(`${url.origin}/api/randomFileList?dir=${normalizedFolder}`, nullResponse);
+            await cache.put(`${url.origin}/api/randomFileList?dir=${normalizedDist}`, nullResponse);
         } catch (error) {
             console.error('Failed to clear cache:', error);
         }

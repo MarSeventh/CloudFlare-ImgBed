@@ -117,8 +117,9 @@ async function getRandomFileList(env, url, dir) {
     let cursor = null;
 
     do {
+        const prefix = dir === ''? '' : dir + '/';
         const records = await env.img_url.list({
-            prefix: dir,
+            prefix: prefix,
             limit: 1000,
             cursor,
         });

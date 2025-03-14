@@ -39,7 +39,7 @@ export async function onRequest(context) {
                     const fileId = file.name;
                     const cdnUrl = `https://${url.hostname}/file/${fileId}`;
 
-                    const success = await deleteFile(env, fileId, cdnUrl);
+                    const success = await deleteFile(env, fileId, cdnUrl, url);
                     if (success) {
                         deletedFiles.push(fileId);
                     } else {
@@ -79,7 +79,7 @@ export async function onRequest(context) {
         const fileId = params.path.split(',').join('/');
         const cdnUrl = `https://${url.hostname}/file/${fileId}`;
 
-        const success = await deleteFile(env, fileId, cdnUrl);
+        const success = await deleteFile(env, fileId, cdnUrl, url);
         if (!success) {
             throw new Error('Delete file failed');
         }
@@ -97,7 +97,7 @@ export async function onRequest(context) {
 }
 
 // 删除单个文件的核心函数
-async function deleteFile(env, fileId, cdnUrl) {
+async function deleteFile(env, fileId, cdnUrl, url) {
     try {
         // 读取图片信息
         const img = await env.img_url.getWithMetadata(fileId);
@@ -129,12 +129,8 @@ async function deleteFile(env, fileId, cdnUrl) {
                 headers: { 'Cache-Control': 'max-age=0' },
             });
             
-            const keys = await cache.keys();
-            for (let key of keys) {
-                if (key.url.includes('/api/randomFileList')) {
-                    await cache.put(`${url.origin}/api/randomFileList`, nullResponse);
-                }
-            }
+            const normalizedFolder = fileId.split('/').slice(0, -1).join('/');
+            await cache.put(`${url.origin}/api/randomFileList?dir=${normalizedFolder}`, nullResponse);
         } catch (error) {
             console.error('Failed to clear cache:', error);
         }

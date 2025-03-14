@@ -205,7 +205,7 @@ export async function onRequestPost(context) {  // Contents of context object
 
     // 清除CDN缓存
     const cdnUrl = `https://${url.hostname}/file/${fullId}`;
-    await purgeCDNCache(env, cdnUrl, url);
+    await purgeCDNCache(env, cdnUrl, url, normalizedFolder);
    
 
     // ====================================不同渠道上传=======================================
@@ -657,7 +657,7 @@ async function getFilePath(bot_token, file_id) {
       }
 }
 
-async function purgeCDNCache(env, cdnUrl, url) {
+async function purgeCDNCache(env, cdnUrl, url, normalizedFolder) {
     if (env.dev_mode === 'true') {
         return;
     }
@@ -677,12 +677,7 @@ async function purgeCDNCache(env, cdnUrl, url) {
             headers: { 'Cache-Control': 'max-age=0' },
         });
 
-        const keys = await cache.keys();
-        for (let key of keys) {
-            if (key.url.includes('/api/randomFileList')) {
-                await cache.put(`${url.origin}/api/randomFileList`, nullResponse);
-            }
-        }
+        await cache.put(`${url.origin}/api/randomFileList?dir=${normalizedFolder}`, nullResponse);
     } catch (error) {
         console.error('Failed to clear cache:', error);
     }
