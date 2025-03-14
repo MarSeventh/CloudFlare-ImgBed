@@ -2,89 +2,117 @@ import { S3Client, CopyObjectCommand, DeleteObjectCommand } from "@aws-sdk/clien
 import { purgeCFCache } from "../../../utils/purgeCache";
 
 export async function onRequest(context) {
-    // Contents of context object
     const {
-      request, // same as existing Worker API
-      env, // same as existing Worker API
-      params, // if filename includes [id] or [[path]]
-      waitUntil, // same as ctx.waitUntil in existing Worker API
-      next, // used for middleware or to fetch assets
-      data, // arbitrary space for passing data between middlewares
+        request,
+        env,
+        params,
     } = context;
 
     const url = new URL(request.url);
 
     // 读取目标文件夹
     const dist = url.searchParams.get('dist')
-        ? url.searchParams.get('dist').replace(/^\/+/, '') // 移除开头的/
-            .replace(/\/{2,}/g, '/') // 替换多个连续的/为单个/
-            .replace(/\/$/, '') // 移除末尾的/
+        ? url.searchParams.get('dist').replace(/^\/+/, '')
+            .replace(/\/{2,}/g, '/')
+            .replace(/\/$/, '')
         : '';
 
-    // 读取folder参数，判断是否为文件夹删除请求
+    // 读取folder参数，判断是否为文件夹移动请求
     const folder = url.searchParams.get('folder');
     if (folder === 'true') {
         try {
-            // 获取当前文件夹名称
-            const curFolder = params.path[params.path.length - 1];
+            params.path = decodeURIComponent(params.path);
+            // 使用队列存储需要处理的文件夹
+            const folderQueue = [{
+                path: params.path.split(',').join('/'),
+                dist: dist
+            }];
 
-            // 调用list API获取指定目录下的所有文件
-            const folderPath = params.path.join('/');
+            const processedFiles = [];
+            const failedFiles = [];
 
-            const listUrl = new URL(`${url.origin}/api/manage/list?count=-1&dir=${folderPath}`);
-            const listRequest = new Request(listUrl, request);
+            while (folderQueue.length > 0) {
+                const currentFolder = folderQueue.shift();
+                const curFolderName = currentFolder.path.split('/').pop();
+                
+                // 获取指定目录下的所有文件
+                const listUrl = new URL(`${url.origin}/api/manage/list?count=-1&dir=${currentFolder.path}`);
+                const listRequest = new Request(listUrl, request);
+                const listResponse = await fetch(listRequest);
+                const listData = await listResponse.json();
 
-            const listResponse = await fetch(listRequest);
-            const listData = await listResponse.json();
+                const files = listData.files;
+                const folderDist = currentFolder.dist === '' ? curFolderName : `${currentFolder.dist}/${curFolderName}`;
 
-            const files = listData.files;
+                // 处理当前文件夹下的所有文件
+                for (const file of files) {
+                    const fileId = file.name;
+                    const fileName = file.name.split('/').pop();
+                    const newFileId = `${folderDist}/${fileName}`;
+                    const cdnUrl = `https://${url.hostname}/file/${fileId}`;
 
-            const folderDist = dist === '' ? curFolder : `${dist}/${curFolder}`;
-            // 调用move API移动文件夹下的所有文件
-            for (const file of files) {
-                const moveUrl = new URL(`${url.origin}/api/manage/move/${file.name}?dist=${folderDist}`);
-                const moveRequest = new Request(moveUrl, request);
+                    const success = await moveFile(env, fileId, newFileId, cdnUrl);
+                    if (success) {
+                        processedFiles.push(fileId);
+                    } else {
+                        failedFiles.push(fileId);
+                    }
+                }
 
-                await fetch(moveRequest);
-            }        
-
-            const directories = listData.directories;
-
-            // 调用move API移动所有子文件夹
-            for (const dir of directories) {
-                const moveUrl = new URL(`${url.origin}/api/manage/move/${dir}?dist=${folderDist}&folder=true`);
-                const moveRequest = new Request(moveUrl, request);
-
-                await fetch(moveRequest);
+                // 将子文件夹添加到队列
+                const directories = listData.directories;
+                for (const dir of directories) {
+                    folderQueue.push({
+                        path: dir,
+                        dist: folderDist
+                    });
+                }
             }
 
-            // 返回成功信息
-            return new Response('Folder Moved');
+            // 返回处理结果
+            return new Response(JSON.stringify({
+                success: true,
+                processed: processedFiles,
+                failed: failedFiles
+            }));
 
         } catch (e) {
-            return new Response('Error: Move Folder Failed', { status: 400 });
+            return new Response(JSON.stringify({
+                success: false,
+                error: e.message
+            }), { status: 400 });
         }
     }
-    
-    // 组装 CDN URL
-    const cdnPath = url.pathname.replace('/api/manage/move/', '');
-    const cdnUrl = `https://${url.hostname}/file/${cdnPath}`;
 
-    // 从params中获取图片ID
-    let fileId = '';
+    // 单个文件移动处理
     try {
         // 解码params.path
         params.path = decodeURIComponent(params.path);
-        // 从path中提取文件ID
-        fileId = params.path.split(',').join('/');
+        const fileId = params.path.split(',').join('/');
+        const fileKey = fileId.split('/').pop();
+        const newFileId = dist === '' ? fileKey : `${dist}/${fileKey}`;
+        const cdnUrl = `https://${url.hostname}/file/${fileId}`;
+
+        const success = await moveFile(env, fileId, newFileId, cdnUrl);
+        if (!success) {
+            throw new Error('Move file failed');
+        }
+
+        return new Response(JSON.stringify({
+            success: true,
+            fileId: fileId,
+            newFileId: newFileId
+        }));
     } catch (e) {
-        return new Response('Error: Decode Image ID Failed', { status: 400 });
+        return new Response(JSON.stringify({
+            success: false,
+            error: e.message
+        }), { status: 400 });
     }
+}
 
-    // 读取文件名
-    const fileKey = fileId.split('/').pop();
-    const newFileId = dist === '' ? fileKey : `${dist}/${fileKey}`;
-
+// 移动单个文件的核心函数
+async function moveFile(env, fileId, newFileId, cdnUrl) {
     try {
         // 读取图片信息
         const img = await env.img_url.getWithMetadata(fileId);
@@ -96,7 +124,7 @@ export async function onRequest(context) {
             // 获取原文件内容
             const object = await R2DataBase.get(fileId);
             if (!object) {
-                return new Response('Error: R2 Object Not Found', { status: 404 });
+                throw new Error('R2 Object Not Found');
             }
 
             // 复制到新位置
@@ -115,32 +143,30 @@ export async function onRequest(context) {
 
                 const s3ServerDomain = img.metadata.S3Endpoint.replace(/https?:\/\//, "");
                 img.metadata.S3Location = `https://${img.metadata.S3BucketName}.${s3ServerDomain}/${newKey}`;
+            } else {
+                // do nothing
             }
         }
 
         // 旧版 Telegram 渠道和 Telegraph 渠道不支持移动
         if (img.metadata?.Channel === 'Telegram' || img.metadata?.Channel === undefined) {
-            return new Response('Error: Move Image Failed', { status: 400 });
+            throw new Error('Unsupported Channel');
         }
 
-
-        // 其他渠道，直接修改KV中的id为newFileId
-        img.metadata.Folder = dist;
+        // 更新文件夹信息
+        const folderPath = newFileId.split('/').slice(0, -1).join('/');
+        img.metadata.Folder = folderPath;
+        
+        // 更新KV存储
         await env.img_url.put(newFileId, img.value, { metadata: img.metadata });
-
-
-        // 删除原有图片
         await env.img_url.delete(fileId);
-
-        const info = JSON.stringify(fileId);
 
         // 清除CDN缓存
         await purgeCFCache(env, cdnUrl);
-        
-        // 清除api/randomFileList API缓存
+
+        // 清除randomFileList API缓存
         try {
             const cache = caches.default;
-            // 通过写入一个max-age=0的response来清除缓存
             const nullResponse = new Response(null, {
                 headers: { 'Cache-Control': 'max-age=0' },
             });
@@ -154,12 +180,13 @@ export async function onRequest(context) {
         } catch (error) {
             console.error('Failed to clear cache:', error);
         }
-        
-        return new Response(info);
+
+        return true;
     } catch (e) {
-        return new Response('Error: Move Image Failed', { status: 400 });
+        console.error('Move file failed:', e);
+        return false;
     }
- }
+}
 
 // 移动 S3 渠道的图片
 async function moveS3File(img, newFileId) {

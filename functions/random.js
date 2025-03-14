@@ -30,7 +30,7 @@ export async function onRequest(context) {
         return new Response('Error: Please configure KV database', { status: 500 });
     }
 
-    // 处理允许的目录，每个目录调整为标准格式，去掉首尾空格和
+    // 处理允许的目录，每个目录调整为标准格式，去掉首尾空格，去掉开头的/，替换多个连续的/为单个/，去掉末尾的/
     const allowedDirList = allowedDir.split(',');
     const allowedDirListFormatted = allowedDirList.map(item => {
         return item.trim().replace(/^\/+/, '').replace(/\/{2,}/g, '/').replace(/\/$/, '');
