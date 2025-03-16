@@ -26,8 +26,6 @@
 ----
 # CloudFlare-ImgBed
 
-**前端仓库**：[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)
-
 > [!IMPORTANT]
 >
 > **v2.0 版本升级注意事项请查看公告！**
@@ -39,8 +37,11 @@
 
 ## 置顶
 
-部署使用出现问题，请先仔细查阅文档、常见问题解答以及已有issues。
-**注意**：本仓库为[Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，如果你觉得本项目不错，在支持本项目的同时，也请支持原项目。
+1. 部署使用出现问题，请先仔细查阅文档、常见问题解答以及已有issues。
+
+2. **前端仓库**：[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)
+
+3. **注意**：本仓库为[Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，如果你觉得本项目不错，在支持本项目的同时，也请支持原项目。
 
 ## 2025.2.6  V2.0 版本升级注意事项
 
@@ -66,6 +67,19 @@
 > 此外，目前**KV数据库为必须配置**，如果以前未配置请按照文档说明配置。
 >
 > 出现问题，请先查看第5节常见问题Q&A部分。
+
+</details>
+
+<details>
+    <summary>生态建设</summary>
+
+
+
+## 1. 插件
+
+- **编辑器内自动上传（油猴脚本）**：https://greasyfork.org/zh-CN/scripts/529816-image-uploader-to-markdown-to-cloudflare-imgbed
+
+
 
 </details>
 
