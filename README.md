@@ -77,7 +77,7 @@
 
 ## 1. 插件
 
-- **编辑器内自动上传（油猴脚本）**：https://greasyfork.org/zh-CN/scripts/529816-image-uploader-to-markdown-to-cloudflare-imgbed
+- **编辑器内自动上传（油猴脚本）**：https://greasyfork.org/zh-CN/scripts/529816-image-uploader-to-markdown-to-cloudflare-imgbed （_作者：Linux.do: [calg_c](https://linux.do/u/calg_c/summary)_）
 
 
 
