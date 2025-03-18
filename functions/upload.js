@@ -100,13 +100,7 @@ export async function onRequestPost(context) {  // Contents of context object
     // 获得上传渠道
     const urlParamUploadChannel = url.searchParams.get('uploadChannel');
     // 获取上传文件夹路径
-    const uploadFolder = url.searchParams.get('uploadFolder') || '';
-    // 处理文件夹路径格式，确保没有开头的/
-    const normalizedFolder = uploadFolder 
-        ? uploadFolder.replace(/^\/+/, '') // 移除开头的/
-            .replace(/\/{2,}/g, '/') // 替换多个连续的/为单个/
-            .replace(/\/$/, '') // 移除末尾的/
-        : '';
+    let uploadFolder = url.searchParams.get('uploadFolder') || '';
 
     let uploadChannel = 'TelegramNew';
     switch (urlParamUploadChannel) {
@@ -142,8 +136,25 @@ export async function onRequestPost(context) {  // Contents of context object
     const time = new Date().getTime();
     const formdata = await clonedRequest.formData();
     const fileType = formdata.get('file').type;
-    const fileName = formdata.get('file').name;
+    let fileName = formdata.get('file').name;
     const fileSize = (formdata.get('file').size / 1024 / 1024).toFixed(2); // 文件大小，单位MB
+    // 检查fileType和fileName是否存在
+    if (fileType === null || fileType === undefined || fileName === null || fileName === undefined) {
+        return new Response('Error: fileType or fileName is wrong, check the integrity of this file!', { status: 400 });
+    }
+
+    fileName = fileName.split('/').pop();
+    // 如果上传文件夹路径为空，尝试从文件名中获取
+    if (uploadFolder === '' || uploadFolder === null || uploadFolder === undefined) {
+        uploadFolder = fileName.split('/').slice(0, -1).join('/');
+    }
+    // 处理文件夹路径格式，确保没有开头的/
+    const normalizedFolder = uploadFolder 
+        ? uploadFolder.replace(/^\/+/, '') // 移除开头的/
+            .replace(/\/{2,}/g, '/') // 替换多个连续的/为单个/
+            .replace(/\/$/, '') // 移除末尾的/
+        : '';
+
     const metadata = {
         FileName: fileName,
         FileType: fileType,
@@ -156,11 +167,6 @@ export async function onRequestPost(context) {  // Contents of context object
         Folder: normalizedFolder || 'root',
     }
 
-
-    // 检查fileType和fileName是否存在
-    if (fileType === null || fileType === undefined || fileName === null || fileName === undefined) {
-        return new Response('Error: fileType or fileName is wrong, check the integrity of this file!', { status: 400 });
-    }
 
     let fileExt = fileName.split('.').pop(); // 文件扩展名
     if (!isExtValid(fileExt)) {
