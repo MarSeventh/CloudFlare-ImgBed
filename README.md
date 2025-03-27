@@ -1,8 +1,29 @@
-# CloudFlare-ImgBed
+<div align="center">
+    <a href="https://github.com/MarSeventh/CloudFlare-ImgBed"><img width="80%" alt="logo" src="static/readme/banner.png"/></a>
+    <p><em>🗂️开源文件托管解决方案，基于 Cloudflare Pages，支持 Telegram Bot 、 Cloudflare R2 ，S3 等多种存储渠道</em></p>
+    <div>
+        <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/LICENSE">
+        <img src="https://img.shields.io/github/license/MarSeventh/CloudFlare-ImgBed" alt="License" />
+        </a>
+        <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/releases">
+        <img src="https://img.shields.io/github/release/MarSeventh/CloudFlare-ImgBed" alt="latest version" />
+        </a>
+        <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/releases">
+        <img src="https://img.shields.io/github/downloads/MarSeventh/CloudFlare-ImgBed/total?color=%239F7AEA&logo=github" alt="Downloads" />
+        </a>
+        <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/issues">
+          <img src="https://img.shields.io/github/issues/MarSeventh/CloudFlare-ImgBed" alt="Issues" />
+        </a>
+        <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/stargazers">
+          <img src="https://img.shields.io/github/stars/MarSeventh/CloudFlare-ImgBed" alt="Stars" />
+        </a>
+        <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/network/members">
+          <img src="https://img.shields.io/github/forks/MarSeventh/CloudFlare-ImgBed" alt="Forks" />
+        </a>
+    </div>
+</div>
 
-开源图片/文件托管解决方案，基于 Cloudflare Pages 和 Telegram，支持 Telegram Bot 、 Cloudflare R2 ，S3 API 等多种不同存储渠道。
-
-**前端仓库**：[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)
+---
 
 > [!IMPORTANT]
 >
@@ -15,8 +36,11 @@
 
 ## 置顶
 
-部署使用出现问题，请先仔细查阅文档、常见问题解答以及已有issues。
-**注意**：本仓库为[Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，如果你觉得本项目不错，在支持本项目的同时，也请支持原项目。
+1. 部署使用出现问题，请先仔细查阅文档、常见问题解答以及已有issues。
+
+2. **前端仓库**：[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)
+
+3. **注意**：本仓库为[Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，如果你觉得本项目不错，在支持本项目的同时，也请支持原项目。
 
 ## 2025.2.6  V2.0 版本升级注意事项
 
@@ -46,6 +70,19 @@
 </details>
 
 <details>
+    <summary>生态建设</summary>
+
+
+
+## 1. 插件
+
+- **编辑器内自动上传（油猴脚本）**：https://greasyfork.org/zh-CN/scripts/529816-image-uploader-to-markdown-to-cloudflare-imgbed （_作者：Linux.do: [calg_c](https://linux.do/u/calg_c/summary)_）
+
+
+
+</details>
+
+<details>
     <summary>体验地址及优质博文、视频（搭建或使用有问题可以先去里面学习哦~）</summary>
 
 
@@ -70,9 +107,73 @@
 
 </details>
 
+
+
+## 最近更新
+
+Add Features:
+
+- **目录功能上线啦（感谢[fantasy-ke](https://github.com/fantasy-ke)协助）**，当前支持：
+  - 上传到指定目录
+  - 整目录删除
+  - 文件位置移动（ Telegraph 和旧版 Telegram 渠道不支持移动）
+  - 按目录读取文件
+- 随机图API支持按目录读取，支持按目录进行权限控制
+- 上传用户管理支持显示IP具体位置
+
+Fix Bugs:
+
+- 修复多项影响体验的bug
+
+
+
 <details>
     <summary>更新日志</summary>
 
+
+## 2025.3.14
+
+Add Features:
+
+- 上传用户管理支持显示IP具体位置
+
+## 2025.3.8
+
+Add Features:
+
+- 随机图API支持按目录读取，支持按目录进行权限控制
+
+Fix Bugs:
+
+- 修复随机图API的缓存问题
+
+## 2025.3.7
+
+Add Features:
+
+- **目录功能上线啦**，当前支持：
+  - 上传到指定目录
+  - 整目录删除
+  - 文件位置移动（ Telegraph 和旧版 Telegram 渠道不支持移动）
+  - 按目录读取文件
+- 随机图API支持按目录读取
+
+Fix Bugs:
+
+- 修复多项影响体验的bug
+
+## 2025.3.1
+
+Add Features:
+
+- 支持粘贴多个链接同时上传
+- 支持存储和管理外链
+
+Fix Bugs:
+
+- 修复管理端复制 S3 链接的有关问题
+- 修复管理端部分页面设置不生效的问题
+- 修复渠道设置某些情况下不能保存的问题
 
 ## 2025.2.6
 
@@ -271,9 +372,7 @@ Add Features:
 
 # 1.Introduction
 
-免费图片托管解决方案（支持存储绝大多数常见格式的**图片、视频、动图**等），具有**后台管理、图片审查**、**登录鉴权**、**页面自定义**、**多种方式及多文件上传**、**多文件及多格式链接复制**等功能（详见[第2章](#2.Features))。
-
-此外，上传**并没有严格限制文件类型**，理论上你可以上传**任何**文件，但是暂时不会针对图片和视频外的文件进行特殊优化和适配。
+免费文件托管解决方案，具有**上传**、**管理**、**读取**、**删除**等全链路功能，覆盖文件全生命周期，支持**鉴权**、**目录**、**图片审查**、**随机图**等各项特性。
 
 ![CloudFlare](static/readme/海报.png)
 
@@ -311,6 +410,8 @@ Add Features:
     > 3. 上传显示实时上传进度
     > 4. Web和API端上传图片，均可直接展示在管理页面中
     > 5. 过大图片在前端进行压缩，提升上传稳定性和加载性能;支持自定义压缩质量，自定义开启前后端压缩功能
+    
+  - **支持指定上传目录**
   
 - **多样化复制**
 
@@ -420,6 +521,8 @@ Add Features:
 
 </details>
 
+---
+
 ### 3.1.2部署教程
 
 <details>
@@ -476,7 +579,8 @@ Add Features:
 
 
 <details>
-    <summary>v1.0版本 部署在Cloudflare上的方式</summary>
+    <summary>（已过时）v1.0版本 部署在Cloudflare上的方式</summary>
+
 
 
 
@@ -565,7 +669,8 @@ Add Features:
 
 
 <details>
-    <summary>v1.0 部署在服务器上的方式</summary>
+    <summary>（已过时）v1.0 部署在服务器上的方式</summary>
+
 
 
 
@@ -610,6 +715,8 @@ Add Features:
 
 </details>
 
+---
+
 ### 3.1.3可选配置
 
 <details>
@@ -624,7 +731,7 @@ Add Features:
 
 
 <details>
-    <summary>v1.0 后台认证、自定义页面、缓存清除等设置</summary>
+    <summary>（已过时，可参考部分设置项的具体介绍）v1.0 后台认证、自定义页面、缓存清除等设置</summary>
 
 
 
@@ -738,6 +845,8 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 
 ##### </details>
 
+---
+
 ### 3.1.4其他操作指南
 
 <details>
@@ -773,13 +882,15 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 
 ## 4.1Web端使用
 
-![](static/readme/202412092301397.png)
+![image-20250313204101984](static/readme/202503132041511.png)
 
-![image-20250206155746495](static/readme/202502061557221.png)
+![image-20250313204138886](static/readme/202503132041072.png)
 
-![image-20250206155901631](static/readme/202502061559473.png)
+![image-20250313204308225](static/readme/202503132043466.png)
 
-![image-20250206155825926](static/readme/202502061558281.png)
+![image-20250314152355339](static/readme/202503141524797.png)
+
+![image-20250313204325002](static/readme/202503132043265.png)
 
 ## 4.2API文档
 
@@ -792,7 +903,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 | ------------ | ------------------------------------------------------------ |
 | **接口功能** | 上传图片或视频                                               |
 | **请求方法** | POST                                                         |
-| **请求参数** | **Query参数**：<br />`authCode`: string类型，即为你设置的认证码<br />`serverCompress`: boolean类型，表示是否开启服务端压缩（仅针对图片文件、Telegram上传渠道生效，默认为`true`）<br />`uploadChannel`: string类型，取值为`telegram`和`cfr2`，分别代表telegram bot渠道和Cloudflare R2渠道，默认为`telegram` 渠道<br />`autoRetry`: boolean类型，表示是否开启上传失败自动切换渠道重试，默认开启<br />`uploadNameType`: string类型，表示文件命名方式，可选值为`[default, index, origin, short]`，分别代表默认`前缀_原名`命名、`仅前缀`命名、`仅原名`命名和`短链接`命名法，默认为`default`<br />`returnFormat`:string类型，表示返回链接格式，可选值为`[default, full]`，分别代表默认的`/file/id`格式、完整链接格式<br />**Body参数(application/form-data)**：<br />`file`: file类型，你要上传的文件 |
+| **请求参数** | **Query参数**：<br />`authCode`: string类型，即为你设置的认证码<br />`serverCompress`: boolean类型，表示是否开启服务端压缩（仅针对图片文件、Telegram上传渠道生效，默认为`true`）<br />`uploadChannel`: string类型，取值为`telegram`和`cfr2`，分别代表telegram bot渠道和Cloudflare R2渠道，默认为`telegram` 渠道<br />`autoRetry`: boolean类型，表示是否开启上传失败自动切换渠道重试，默认开启<br />`uploadNameType`: string类型，表示文件命名方式，可选值为`[default, index, origin, short]`，分别代表默认`前缀_原名`命名、`仅前缀`命名、`仅原名`命名和`短链接`命名法，默认为`default`<br />`returnFormat`:string类型，表示返回链接格式，可选值为`[default, full]`，分别代表默认的`/file/id`格式、完整链接格式<br />`uploadFolder`:string类型，指定上传目录，用相对路径表示，例如上传到img/test目录需填`img/test`<br />**Body参数(application/form-data)**：<br />`file`: file类型，你要上传的文件 |
 | **返回响应** | `data[0].src`为获得的图片链接（注意不包含域名，需要自己添加） |
 
 > **请求示例**：
@@ -823,7 +934,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 | **接口功能** | 从图床中随机返回一张图片的链接（注意会消耗列出次数）         |
 | **前置条件** | 设置`AllowRandom`环境变量，值为`true`                        |
 | **请求方法** | GET                                                          |
-| **请求参数** | **Query参数**：<br />`content`:返回的文件类型，可选值有`[image, video]`，多个使用`,`分隔，默认为`image`<br />`type`: 设为`img`时直接返回图片（此时form不生效）；设为`url`时返回完整url链接；默认返回随机图的文件路径。<br />`form`: 设为`text`时直接返回文本，默认返回json格式内容。 |
+| **请求参数** | **Query参数**：<br />`content`:返回的文件类型，可选值有`[image, video]`，多个使用`,`分隔，默认为`image`<br />`type`: 设为`img`时直接返回图片（此时form不生效）；设为`url`时返回完整url链接；默认返回随机图的文件路径。<br />`form`: 设为`text`时直接返回文本，默认返回json格式内容。<br />`dir`: 读取目录，使用相对路径，例如`img/test`会返回该目录以及所有子目录下的文件。 |
 | **响应格式** | 1、当`type`为`img`时：<br />返回格式为`image/jpeg`<br />2、当`type`为其他值时：<br />当`form`不是`text`时，返回JSON格式内容，`data.url`为返回的链接/文件路径。<br />否则，直接返回链接/文件路径。 |
 
 > **请求示例**：
@@ -889,7 +1000,12 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 28. :white_check_mark:~~开放更多文件格式~~（2024.12.9已完成）
 29. :white_check_mark:~~进行删除、加入白名单、加入黑名单等操作时，自动清除CF CDN缓存，避免延迟生效~~（2024.12.11已完成）
 30. :white_check_mark:~~管理端批量选择时，记录用户选择的顺序~~（2024.12.20已完成）
-31. :memo:上传图片支持自定义上传路径，支持相册功能（评估中）
+31. :memo:上传图片支持自定义上传路径，支持相册功能
+    - ~~文件夹删除功能~~（2025.3.6已完成）
+    - ~~文件位置移动功能~~（2025.3.7已完成）
+    - ~~管理端加载更多数据时鬼打墙问题修复~~（2025.3.6已完成）
+    - ~~管理端批量操作适配文件夹~~（2025.3.6已完成）
+    - ~~管理端分页逻辑调整~~（2025.3.6已完成）
 32. :white_check_mark:~~支持多个 Telegram Bot Token 负载均衡~~（2025.2.4已完成）
 33. :white_check_mark:~~管理端提供详细的设置信息和设置方式引导~~（2025.2.5已完成）
 34. :white_check_mark:~~Logo焕新、登录页面优化、设置提示项等多项展示效果优化~~（2025.2.2已完成）
@@ -899,6 +1015,9 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 38. :hourglass_flowing_sand:支持KV备份恢复功能
 39. :white_check_mark:~~页脚可自定义隐藏~~（2025.2.4已完成）
 40. :hourglass_flowing_sand:搜索功能增强
+41. :white_check_mark:支持粘贴多个链接，支持外链管理
+42. :hourglass_flowing_sand:上传文件记录MD5，支持文件硬链接
+43. :hourglass_flowing_sand:上传页面增加最近上传展示
 
 </details>
 

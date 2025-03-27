@@ -91,12 +91,17 @@ export async function onRequestPost(context) {  // Contents of context object
     if (isBlockedIp) {
         return new Response('Error: Your IP is blocked', { status: 403 });
     }
+    // 获取IP地址
+    const ipAddress = await getIPAddress(uploadIp);
 
     // 读取上传配置
     uploadConfig = await fetchUploadConfig(env);
 
     // 获得上传渠道
     const urlParamUploadChannel = url.searchParams.get('uploadChannel');
+    // 获取上传文件夹路径
+    let uploadFolder = url.searchParams.get('uploadFolder') || '';
+
     let uploadChannel = 'TelegramNew';
     switch (urlParamUploadChannel) {
         case 'telegram':
@@ -107,6 +112,9 @@ export async function onRequestPost(context) {  // Contents of context object
             break;
         case 's3':
             uploadChannel = 'S3';
+            break;
+        case 'external':
+            uploadChannel = 'External';
             break;
         default:
             uploadChannel = 'TelegramNew';
@@ -128,23 +136,37 @@ export async function onRequestPost(context) {  // Contents of context object
     const time = new Date().getTime();
     const formdata = await clonedRequest.formData();
     const fileType = formdata.get('file').type;
-    const fileName = formdata.get('file').name;
+    let fileName = formdata.get('file').name;
     const fileSize = (formdata.get('file').size / 1024 / 1024).toFixed(2); // 文件大小，单位MB
+    // 检查fileType和fileName是否存在
+    if (fileType === null || fileType === undefined || fileName === null || fileName === undefined) {
+        return new Response('Error: fileType or fileName is wrong, check the integrity of this file!', { status: 400 });
+    }
+
+    fileName = fileName.split('/').pop();
+    // 如果上传文件夹路径为空，尝试从文件名中获取
+    if (uploadFolder === '' || uploadFolder === null || uploadFolder === undefined) {
+        uploadFolder = fileName.split('/').slice(0, -1).join('/');
+    }
+    // 处理文件夹路径格式，确保没有开头的/
+    const normalizedFolder = uploadFolder 
+        ? uploadFolder.replace(/^\/+/, '') // 移除开头的/
+            .replace(/\/{2,}/g, '/') // 替换多个连续的/为单个/
+            .replace(/\/$/, '') // 移除末尾的/
+        : '';
+
     const metadata = {
         FileName: fileName,
         FileType: fileType,
         FileSize: fileSize,
         UploadIP: uploadIp,
+        UploadAddress: ipAddress,
         ListType: "None",
         TimeStamp: time,
         Label: "None",
+        Folder: normalizedFolder || 'root',
     }
 
-
-    // 检查fileType和fileName是否存在
-    if (fileType === null || fileType === undefined || fileName === null || fileName === undefined) {
-        return new Response('Error: fileType or fileName is wrong, check the integrity of this file!', { status: 400 });
-    }
 
     let fileExt = fileName.split('.').pop(); // 文件扩展名
     if (!isExtValid(fileExt)) {
@@ -161,24 +183,21 @@ export async function onRequestPost(context) {  // Contents of context object
     const unique_index = time + Math.floor(Math.random() * 10000);
     let fullId = '';
     if (nameType === 'index') {
-        // 仅前缀
-        fullId = unique_index + '.' + fileExt;
+        // 只在 normalizedFolder 非空时添加路径
+        fullId = normalizedFolder ? `${normalizedFolder}/${unique_index}.${fileExt}` : `${unique_index}.${fileExt}`;
     } else if (nameType === 'origin') {
-        // 仅文件名
-        fullId = fileName? fileName : unique_index + '.' + fileExt;
+        fullId = normalizedFolder ? `${normalizedFolder}/${fileName}` : fileName;
     } else if (nameType === 'short') {
-        // 短链接，8位大小写字母+数字的随机字符
         while (true) {
             const shortId = generateShortId(8);
-            const testFullId = shortId + '.' + fileExt;
+            const testFullId = normalizedFolder ? `${normalizedFolder}/${shortId}.${fileExt}` : `${shortId}.${fileExt}`;
             if (await env.img_url.get(testFullId) === null) {
-                fullId = shortId + '.' + fileExt;
+                fullId = testFullId;
                 break;
             }
         }
     } else {
-        // 默认方式：前缀+文件名
-        fullId = fileName? unique_index + '_' + fileName : unique_index + '.' + fileExt;
+        fullId = normalizedFolder ? `${normalizedFolder}/${unique_index}_${fileName}` : `${unique_index}_${fileName}`;
     }
 
     // 获得返回链接格式, default为返回/file/id, full为返回完整链接
@@ -192,7 +211,7 @@ export async function onRequestPost(context) {  // Contents of context object
 
     // 清除CDN缓存
     const cdnUrl = `https://${url.hostname}/file/${fullId}`;
-    await purgeCDNCache(env, cdnUrl, url);
+    await purgeCDNCache(env, cdnUrl, url, normalizedFolder);
    
 
     // ====================================不同渠道上传=======================================
@@ -210,13 +229,17 @@ export async function onRequestPost(context) {  // Contents of context object
             err = await res.text();
         }
     } else if (uploadChannel === 'S3') {
-        // -------------S3 渠道---------------
+        // ---------------------S3 渠道------------------
         const res = await uploadFileToS3(env, formdata, fullId, metadata, returnLink, url);
         if (res.status === 200 || !autoRetry) {
             return res;
         } else {
             err = await res.text();
         }
+    } else if (uploadChannel === 'External') {
+        // --------------------外链渠道----------------------
+        const res = await uploadFileToExternal(env, formdata, fullId, metadata, returnLink, url);
+        return res;
     } else {
         // ----------------Telegram New 渠道-------------------
         const res = await uploadFileToTelegram(env, formdata, fullId, metadata, fileExt, fileName, fileType, url, clonedRequest, returnLink);
@@ -523,6 +546,37 @@ async function uploadFileToTelegram(env, formdata, fullId, metadata, fileExt, fi
 }
 
 
+// 外链渠道
+async function uploadFileToExternal(env, formdata, fullId, metadata, returnLink, originUrl) {
+    // 直接将外链写入metadata
+    metadata.Channel = "External";
+    metadata.ChannelName = "External";
+    // 从 formdata 中获取外链
+    const extUrl = formdata.get('url');
+    if (extUrl === null || extUrl === undefined) {
+        return new Response('Error: No url provided', { status: 400 });
+    }
+    metadata.ExternalLink = extUrl;
+    // 写入KV数据库
+    try {
+        await env.img_url.put(fullId, "", {
+            metadata: metadata,
+        });
+    } catch (error) {
+        return new Response('Error: Failed to write to KV database', { status: 500 });
+    }
+
+    // 返回结果
+    return new Response(
+        JSON.stringify([{ 'src': `${returnLink}` }]), 
+        {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+        }
+    );
+}
+
+
 // 图像审查
 async function moderateContent(env, url, metadata) {
     const apikey = moderateContentApiKey;
@@ -609,7 +663,7 @@ async function getFilePath(bot_token, file_id) {
       }
 }
 
-async function purgeCDNCache(env, cdnUrl, url) {
+async function purgeCDNCache(env, cdnUrl, url, normalizedFolder) {
     if (env.dev_mode === 'true') {
         return;
     }
@@ -628,7 +682,8 @@ async function purgeCDNCache(env, cdnUrl, url) {
         const nullResponse = new Response(null, {
             headers: { 'Cache-Control': 'max-age=0' },
         });
-        await cache.put(`${url.origin}/api/randomFileList`, nullResponse);
+
+        await cache.put(`${url.origin}/api/randomFileList?dir=${normalizedFolder}`, nullResponse);
     } catch (error) {
         console.error('Failed to clear cache:', error);
     }
@@ -668,4 +723,36 @@ function generateShortId(length = 8) {
         result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return result;
+}
+
+
+// 获取IP地址
+async function getIPAddress(ip) {
+    let address = '未知';
+    try {
+        const ipInfo = await fetch(`https://apimobile.meituan.com/locate/v2/ip/loc?rgeo=true&ip=${ip}`);
+        const ipData = await ipInfo.json();
+        
+        if (ipInfo.ok && ipData.data) {
+            const lng = ipData.data?.lng || 0;
+            const lat = ipData.data?.lat || 0;
+            
+            // 读取具体地址
+            const addressInfo = await fetch(`https://apimobile.meituan.com/group/v1/city/latlng/${lat},${lng}?tag=0`);
+            const addressData = await addressInfo.json();
+
+            if (addressInfo.ok && addressData.data) {
+                // 根据各字段是否存在，拼接地址
+                address = [
+                    addressData.data.detail,
+                    addressData.data.city,
+                    addressData.data.province,
+                    addressData.data.country
+                ].filter(Boolean).join(', ');
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching IP address:', error);
+    }
+    return address;
 }

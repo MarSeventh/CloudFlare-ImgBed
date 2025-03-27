@@ -1,78 +1,101 @@
 export async function onRequest(context) {
-    // Contents of context object
-    const {
-      request, // same as existing Worker API
-      env, // same as existing Worker API
-      params, // if filename includes [id] or [[path]]
-      waitUntil, // same as ctx.waitUntil in existing Worker API
-      next, // used for middleware or to fetch assets
-      data, // arbitrary space for passing data between middlewares
-    } = context;
+    const { request, env } = context;
     const url = new URL(request.url);
 
-    // 解析 URL 中的参数
     let start = parseInt(url.searchParams.get('start'), 10) || 0;
     let count = parseInt(url.searchParams.get('count'), 10) || 50;
     let sum = url.searchParams.get('sum') || false;
-
-    // count 为 -1 时，返回所有数据
-    if (count === -1) {
-        const allRecords = await getAllRecords(env);
-        // sum 参数为 true 时，只返回数据总数
-        if (sum === 'true') {
-            return new Response(JSON.stringify(
-                {
-                    sum: allRecords.length
-                }
-            ), {
-                headers: { "Content-Type": "application/json" }
-            });
-        } else {
-            return new Response(JSON.stringify(allRecords), {
-                headers: { "Content-Type": "application/json" }
-            });
-        }
+    let dir = url.searchParams.get('dir') || ''; // 目录名
+    // 相对路径
+    if (dir.startsWith('/')) {
+        dir = dir.substring(1);
+    }
+    if (dir !== '' && !dir.endsWith('/')) {
+        dir += '/';
     }
 
-    // 倒序返回指定数量的数据
-    
-    start = Math.max(0, start);  // start 不能小于 0
-    count = Math.max(1, count);  // count 不能小于 1
+    let allRecords = await getAllRecords(env, dir);
 
-    let allRecords = [];
-    
-    allRecords = await getAllRecords(env);
-
-    // 按照 metadata 中的时间戳倒序排序
     allRecords.sort((a, b) => {
         return b.metadata.TimeStamp - a.metadata.TimeStamp;
     });
 
-    const resultRecords = allRecords.slice(start, start + count);
+    // 解析目录下的文件和子目录
+    let filteredRecords = [];
+    let subdirectories = new Set();
 
-    // 只返回 `count` 条数据
-    return new Response(JSON.stringify(resultRecords), {
+    for (let record of allRecords) {
+        let key = record.name;
+        if (key.startsWith(dir)) {
+            let relativePath = key.substring(dir.length);
+            if (relativePath.startsWith('/')) {
+                relativePath = relativePath.substring(1);
+            }
+
+            let parts = relativePath.split('/');
+            if (parts.length === 1) {
+                // 直接位于该目录的文件
+                filteredRecords.push(record);
+            } else {
+                // 该目录下的子文件夹
+                if (dir === '' || dir.endsWith('/')) {
+                    subdirectories.add(dir + parts[0]);
+                } else {
+                    subdirectories.add(dir + '/' + parts[0]);
+                }
+            }
+            }
+    }
+
+
+    // sum 参数为 true 时，只返回数据总数
+    if (count === -1 && sum === 'true') {
+        return new Response(JSON.stringify({ sum: filteredRecords.length }), {
+            headers: { "Content-Type": "application/json" }
+        });
+    }
+
+    // count 为 -1 时返回所有数据
+    if (count === -1) {
+        return new Response(JSON.stringify({
+            files: filteredRecords,
+            directories: Array.from(subdirectories)
+        }), {
+            headers: { "Content-Type": "application/json" }
+        });
+    }
+
+    // 进行分页
+    start = Math.max(0, start);
+    count = Math.max(1, count);
+    const resultRecords = filteredRecords.slice(start, start + count);
+
+    return new Response(JSON.stringify({
+        files: resultRecords,
+        directories: Array.from(subdirectories)
+    }), {
         headers: { "Content-Type": "application/json" }
     });
 }
 
-async function getAllRecords(env) {
-    let recordsFetched = 0;
+async function getAllRecords(env, dir) {
+    // 按前缀列出所有文件
     let allRecords = [];
     let cursor = null;
 
     while (true) {
-        const limit = 1000; // 读取所需的最少数量
-        const response = await env.img_url.list({ limit, cursor });
-
-        // 过滤掉以 "manage@" 开头的 key
-        const filteredRecords = response.keys.filter(item => !item.name.startsWith("manage@"));
-
-        allRecords.push(...filteredRecords);
-        recordsFetched += filteredRecords.length;
+        const limit = 1000;
+        const response = await env.img_url.list({
+            prefix: dir,
+            limit: limit,
+            cursor: cursor
+        });
         cursor = response.cursor;
 
-        if (!cursor) {
+        const filteredRecords = response.keys.filter(item => !item.name.startsWith("manage@"));
+        allRecords.push(...filteredRecords);
+
+        if (!cursor || filteredRecords.length < limit) {
             break;
         }
     }

@@ -72,10 +72,14 @@ async function dealByIP(data) {
             ipSet.add(item.metadata.UploadIP);
         }
     });
-    ipSet.forEach(ip => {
+
+    ipSet.forEach(async ip => {
         let ipData = data.filter(item => item.metadata?.UploadIP === ip);
         let count = ipData.length;
-        dealedData.push({ip, count, data: ipData});
+        let address = ipData[0].metadata?.UploadAddress || '未知';
+        dealedData.push({ip, address, count, data: ipData});
     });
+
     return dealedData;
 }
+
