@@ -1097,7 +1097,9 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
         <img src="https://pic1.afdiancdn.com/user/e8af1436138e11ed945852540025c377/avatar/59db0533d82e4198f59e63df63a1917f_w640_h640_s114.jpeg?imageView2/1/w/240/h/240" width="100"/>
       </a> <a href="https://afdian.com/u/1acef0be02d911ee90695254001e7c00">
         <img src="https://pic1.afdiancdn.com/default/avatar/avatar-orange.png?imageView2/1/w/240/h/240" width="100"/></a><a href="https://afdian.com/u/412189a0284911eca59f52540025c377">
-        <img src="https://pic1.afdiancdn.com/default/avatar/avatar-orange.png?imageView2/1/w/120/h/120" width="100"/></a>
+        <img src="https://pic1.afdiancdn.com/default/avatar/avatar-orange.png?imageView2/1/w/120/h/120" width="100"/></a><a href="https://afdian.com/u/5e52ece217bc11f0ae3352540025c377">
+        <img src="https://pic1.afdiancdn.com/default/avatar/avatar-purple.png?imageView2/1/" width="100"/></a><a href="https://afdian.com/u/42e1c47e16a411f0baff52540025c377">
+        <img src="https://pic1.afdiancdn.com/default/avatar/avatar-purple.png?imageView2/1/" width="100"/></a>
 
 # 8.Star History
 
