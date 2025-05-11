@@ -1,0 +1,45 @@
+name: NodeJS Build Check on PR
+
+# 仅在有PR请求到master分支时触发
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [22.x]  # 可以根据项目需要设置Node版本
+
+    steps:
+    # 检出仓库代码
+    - uses: actions/checkout@v4
+
+    # 设置Node.js版本
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+
+    # 安装依赖
+    - name: Install dependencies
+      run: |
+        npm install
+
+    # 运行构建
+    - name: Build project
+      run: |
+        npm run build
+
+    # 验证构建是否成功
+    - name: Verify build
+      run: |
+        if [ ! -d "dist" ]; then
+          echo "Build failed: dist folder not found."
+          exit 1
+        else
+          echo "Build succeeded."
+        fi
