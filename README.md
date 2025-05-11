@@ -78,6 +78,10 @@
 
 - **编辑器内自动上传（油猴脚本）**：https://greasyfork.org/zh-CN/scripts/529816-image-uploader-to-markdown-to-cloudflare-imgbed （_作者：Linux.do: [calg_c](https://linux.do/u/calg_c/summary)_）
 
+## 2.仓库
+
+- **向TG BOT发送文件上传图床**：https://github.com/zxsos/tg-image-bot （_作者：[zxsos](https://github.com/zxsos)_)
+
 
 
 </details>
@@ -113,23 +117,19 @@
 
 Add Features:
 
-- **目录功能上线啦（感谢[fantasy-ke](https://github.com/fantasy-ke)协助）**，当前支持：
-  - 上传到指定目录
-  - 整目录删除
-  - 文件位置移动（ Telegraph 和旧版 Telegram 渠道不支持移动）
-  - 按目录读取文件
-- 随机图API支持按目录读取，支持按目录进行权限控制
-- 上传用户管理支持显示IP具体位置
-
-Fix Bugs:
-
-- 修复多项影响体验的bug
+- **支持通过Docker在服务器上部署**
 
 
 
 <details>
     <summary>更新日志</summary>
 
+
+## 2025.5.11
+
+Add Features:
+
+- 支持通过Docker在服务器上部署
 
 ## 2025.3.14
 
@@ -534,7 +534,8 @@ Add Features:
 需准备一个**Cloudflare账户**，然后按照以下步骤即可完成部署。
 
 <details>
-    <summary>v2.0版本 部署在Cloudflare上的方式</summary>
+    <summary>部署在Cloudflare上的方式</summary>
+
 
 ​    按照以下步骤部署图床在 CloudFlare Pages 上。
 
@@ -578,52 +579,6 @@ Add Features:
 
 
 
-<details>
-    <summary>（已过时）v1.0版本 部署在Cloudflare上的方式</summary>
-
-
-
-
-依托于CF的强大能力，只需简单几步，即可部署本项目，拥有自己的图床。
-
-1. Fork 本仓库
-
-2. 打开 Cloudflare Dashboard，进入 Pages 管理页面，选择创建项目，选择`连接到 Git 提供程序`
-
-   > ![](static/readme/202407201047300.png)
-
-3. 按照页面提示输入项目名称，选择需要连接的 git 仓库，点击`部署站点`
-
-4. 根据**所需存储渠道**进行相关设置：
-
-   - `Telegram 渠道`：将3.1.1中获取的`TG_BOT_TOKEN`和`TG_CHAT_ID`分别添加到环境变量中，对应**环境变量名为`TG_BOT_TOKEN`和`TG_CHAT_ID`**
-
-   - `Cloudflare R2 渠道`：
-
-     - 将前面新建的存储桶绑定到项目，名称为`img_r2`
-     
-       > ![](static/readme/202411052323183.png)
-     
-     - 如果后续要开启**图像审查**，需要设置`R2PublicUrl`环境变量，值为前面记下的**R2存储桶公网访问链接**：
-     
-       > ![](static/readme/202411052330663.png)
-     
-   - `S3 渠道`：将前面准备好的`S3_ACCESS_KEY_ID`、`S3_SECRET_ACCESS_KEY`、`S3_BUCKET_NAME`、`S3_ENDPOINT`及其对应值填入环境变量。
-
-3. **绑定KV数据库**：
-
-   - 创建一个新的KV数据库
-
-     > ![](static/readme/202408261035367.png)
-     >
-     > ![](static/readme/202408261037971.png)
-
-   - 进入项目对应`设置`->`函数`->`KV 命名空间绑定`->`编辑绑定`->`变量名称`，填写`img_url`，KV命名空间选择刚才创建好的KV数据库
-
-3. `重试部署`，此时项目即可正常使用
-
-</details>
-
 #### 3.1.2.2部署于服务器
 
 如果Cloudflare的**有限访问次数**不能满足你的需求，并且你拥有自己的服务器，可以参照[3.1.2.2节](#3.1.2.2部署于服务器)的教程在服务器上模拟Cloudflare的环境，并开放对应的端口访问服务。
@@ -631,7 +586,30 @@ Add Features:
 注意由于服务器操作系统、硬件版本复杂多样，相关教程**无法确保适合每一位用户**，遇到报错请尽量利用搜索引擎解决，无法解决也可以提issue寻求帮助。
 
 <details>
-    <summary>v2.0 部署在服务器上的方式</summary>
+    <summary>Docker Compose部署（推荐）</summary>
+
+1. 新建`docker-compose.yml`文件，复制项目根目录下[docker-compose.yml](https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/docker-compose.yml)的内容。
+
+2. 在`docker-compose.yml`同级目录下新建`wrangler.toml`配置文件，其内容为项目名称，环境变量等。（详情参见官方文档[Configuration - Wrangler (cloudflare.com)](https://developers.cloudflare.com/workers/wrangler/configuration/)）
+
+   > 配置文件样例：
+   >
+   > ```toml
+   > name = "cloudflare-imgbed"
+   > compatibility_date = "2024-07-24"
+   > ```
+
+3. 运行`docker compose up -d`启动容器，通过`http://127.0.0.1:7658`访问服务。
+
+
+
+</details>
+
+
+
+<details>
+    <summary>手动部署</summary>
+
 
 
 
@@ -667,51 +645,6 @@ Add Features:
 </details>
 
 
-
-<details>
-    <summary>（已过时）v1.0 部署在服务器上的方式</summary>
-
-
-
-
-1. 安装服务器操作系统对应的`node.js`，经测试`v22.5.1`版本可以正常使用。（安装教程自行search）
-
-2. 切换到项目根目录，运行`npm install`，安装所需依赖。
-
-3. 在项目根目录下新建`wrangler.toml`配置文件，其内容为项目名称，环境变量（**包括`TG_BOT_TOKEN`和`TG_CHAT_ID`等参数**）等，可根据后文环境变量配置进行个性化修改。（详情参见官方文档[Configuration - Wrangler (cloudflare.com)](https://developers.cloudflare.com/workers/wrangler/configuration/)）
-
-   > 配置文件样例：
-   >
-   > ```toml
-   > name = "cloudflare-imgbed"
-   > compatibility_date = "2024-07-24"
-   > 
-   > [vars]
-   > ModerateContentApiKey = "your_key"
-   > AllowRandom = "true"
-   > BASIC_USER = "user"
-   > BASIC_PASS = "pass"
-   > TG_BOT_TOKEN = "your_bot_token"
-   > TG_CHAT_ID = "your_bot_id"
-   > ```
-
-4. 在项目根目录下运行`npm run start`，至此，正常情况下项目已经成功部署。项目默认支持通过服务器**本地模拟的R2存储上传**。
-
-   程序默认运行在`8080`端口上，使用`nginx`等服务器反代`127.0.0.1:8080`即可外网访问服务。如需修改端口，可在`package.json`中修改`start`脚本的`port`参数（如下）。
-
-   ```toml
-   "scripts": {
-       "ci-test": "concurrently --kill-others \"npm start\" \"wait-on http://localhost:8080 && mocha\"",
-       "test": "mocha",
-       "start": "npx wrangler pages dev ./ --kv \"img_url\" --r2 \"img_r2\" --port 8080 --persist-to ./data"
-     }
-   ```
-
-   正常启动，控制台输出如下：
-
-   ![202408191829163](static/readme/202408191855625.png)
-   
-   </details>
 
 </details>
 
@@ -1099,7 +1032,8 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
         <img src="https://pic1.afdiancdn.com/default/avatar/avatar-orange.png?imageView2/1/w/240/h/240" width="100"/></a><a href="https://afdian.com/u/412189a0284911eca59f52540025c377">
         <img src="https://pic1.afdiancdn.com/default/avatar/avatar-orange.png?imageView2/1/w/120/h/120" width="100"/></a><a href="https://afdian.com/u/5e52ece217bc11f0ae3352540025c377">
         <img src="https://pic1.afdiancdn.com/default/avatar/avatar-purple.png?imageView2/1/" width="100"/></a><a href="https://afdian.com/u/42e1c47e16a411f0baff52540025c377">
-        <img src="https://pic1.afdiancdn.com/default/avatar/avatar-purple.png?imageView2/1/" width="100"/></a>
+        <img src="https://pic1.afdiancdn.com/default/avatar/avatar-purple.png?imageView2/1/" width="100"/></a><a href="https://afdian.com/a/yono233">
+        <img src="https://pic1.afdiancdn.com/user/73b45190c98711eeaa425254001e7c00/avatar/26afa95554d4bbcd748e6432ab56f824_w580_h580_s145.jpeg?imageView2/1/w/240/h/240" width="100"/></a>
 
 # 8.Star History
 
