@@ -80,7 +80,7 @@
 
 ## 2.仓库
 
-- **向TG BOT发送文件上传图床**：https://github.com/zxsos/tg-image-bot （_作者：[zxsos](https://github.com/zxsos)_)
+- **向TG BOT发送文件上传图床**：[uki0xc/img-up-bot: 使用telegram机器人链接图床进行上传](https://github.com/uki0xc/img-up-bot?tab=readme-ov-file) （_作者：[uki0xc](https://github.com/uki0xc)_)
 
 
 
