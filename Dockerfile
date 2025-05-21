@@ -1,11 +1,9 @@
-FROM node:22-slim
+FROM node:22
 
 WORKDIR /app
 
 COPY . .
-
 RUN npm install
-
 EXPOSE 8080
 
 # 启动应用
