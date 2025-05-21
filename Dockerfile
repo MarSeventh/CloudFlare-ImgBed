@@ -1,5 +1,11 @@
 FROM node:22
-RUN apt update && apt install -y ca-certificates
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates curl && \
+    update-ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
 
 WORKDIR /app
 COPY . .
@@ -7,5 +13,4 @@ COPY . .
 RUN npm install
 
 EXPOSE 8080
-# 启动应用
 CMD ["npm", "run", "start"]
