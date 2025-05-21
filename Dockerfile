@@ -1,5 +1,6 @@
 FROM node:22
-RUN apt update && apt install -y ca-certificates
+RUN apt update 
+RUN apt install -y ca-certificates
 
 WORKDIR /app
 COPY . .
