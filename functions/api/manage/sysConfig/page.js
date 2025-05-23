@@ -66,6 +66,11 @@ export async function getPageConfig(kv, env) {
             label: '图床Logo',
         },
         {
+            id: 'announcement',
+            label: '公告',
+            tooltip: '支持HTML标签',
+        },
+        {
             id: 'loginBkImg',
             label: '登录页背景图',
             tooltip: '1.填写 bing 使用必应壁纸轮播 <br/> 2.填写 ["url1","url2"] 使用多张图片轮播 <br/> 3.填写 ["url"] 使用单张图片',

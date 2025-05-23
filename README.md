@@ -11,6 +11,9 @@
         <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/releases">
         <img src="https://img.shields.io/github/downloads/MarSeventh/CloudFlare-ImgBed/total?color=%239F7AEA&logo=github" alt="Downloads" />
         </a>
+        <a href="https://hub.docker.com/r/marseventh/cloudflare-imgbed">
+  		  <img src="https://img.shields.io/docker/pulls/marseventh/cloudflare-imgbed?style=flat-square" alt="Docker Pulls" />
+		</a>
         <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/issues">
           <img src="https://img.shields.io/github/issues/MarSeventh/CloudFlare-ImgBed" alt="Issues" />
         </a>
@@ -22,6 +25,7 @@
         </a>
     </div>
 </div>
+
 
 ---
 
@@ -117,7 +121,13 @@
 
 Add Features:
 
-- **支持通过Docker在服务器上部署**
+- 增加公告功能
+
+Fix Bugs:
+
+- 修复后台图片名过长遮盖图片的问题
+- 优化部分页面显示效果
+- 修复 Docker 镜像无法访问 https 外链的问题
 
 
 
@@ -126,6 +136,18 @@ Add Features:
 <details>
     <summary>更新日志</summary>
 
+
+## 2025.5.23
+
+Add Features:
+
+- 增加公告功能
+
+Fix Bugs:
+
+- 修复后台图片名过长遮盖图片的问题
+- 优化部分页面显示效果
+- 修复 Docker 镜像无法访问 https 外链的问题
 
 ## 2025.5.11
 
@@ -953,6 +975,10 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 41. :white_check_mark:支持粘贴多个链接，支持外链管理
 42. :hourglass_flowing_sand:上传文件记录MD5，支持文件硬链接
 43. :hourglass_flowing_sand:上传页面增加最近上传展示
+44. :hourglass_flowing_sand:支持从后台管理处配置上传页默认设置
+45. :white_check_mark:增加公告功能
+46. :hourglass_flowing_sand:支持访问图片时设置宽高参数
+47. :hourglass_flowing_sand:支持上传时转换图片格式
 
 </details>
 
@@ -970,6 +996,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 1. :white_check_mark:~~R2渠道在管理端删除时，存储桶同步删除~~（2024.12.4已修复）
 1. :white_check_mark:~~读取文件响应头增加允许跨域头`access-control-allow-origin: *`~~（2024.12.9已修复）
 1. :white_check_mark:~~上传界面加入访问限制白名单~~（2024.12.11已修复）
+1. :white_check_mark:修复文件名过长挡住操作按钮的问题
 
 </details>
 
