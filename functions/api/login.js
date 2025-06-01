@@ -1,3 +1,5 @@
+import { fetchSecurityConfig } from "../utils/sysConfig";
+
 export async function onRequestPost(context) {
     // Contents of context object
     const {
@@ -11,8 +13,13 @@ export async function onRequestPost(context) {
     //从POST请求中获取authCode
     const jsonRequest = await request.json();
     const authCode = jsonRequest.authCode;
+
+    // 读取安全设置
+    const securityConfig = await fetchSecurityConfig(env);
+    const rightAuthCode = securityConfig.auth.user.authCode;
+
     //验证authCode
-    if (env.AUTH_CODE !== undefined && authCode !== env.AUTH_CODE) {
+    if (rightAuthCode !== undefined && rightAuthCode !== '' && authCode !== rightAuthCode) {
       return new Response('Unauthorized', { status: 401 })
     }
     //返回登录成功
