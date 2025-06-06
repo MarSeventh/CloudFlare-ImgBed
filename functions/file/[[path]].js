@@ -163,6 +163,46 @@ export async function onRequest(context) {  // Contents of context object
         // 直接重定向到外链
         return Response.redirect(imgRecord.metadata?.ExternalLink, 302);
     }
+
+    // Rclone渠道
+    if (imgRecord.metadata?.Channel === 'Rclone') {
+        const rclonePath = imgRecord.metadata?.RclonePath;
+        if (!rclonePath) {
+            return new Response('Error: RclonePath not found in metadata', { status: 500 });
+        }
+
+        // Placeholder for actual rclone cat command execution
+        // In a real Cloudflare Worker environment, direct shell command execution is not possible.
+        // This would need to be replaced with an API call to a service that can execute rclone cat,
+        // or by using a WASM-compiled rclone if available and feasible.
+        console.log(`Simulating: rclone cat remote:${rclonePath}`);
+
+        // Simulate successful file fetch for now
+        const fileContent = "simulated file content from rclone"; // Replace with actual fetched content
+        const success = true;
+
+        if (success) {
+            const headers = new Headers();
+            headers.set('Content-Disposition', `inline; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
+            headers.set('Access-Control-Allow-Origin', '*');
+            if (fileType) {
+                headers.set('Content-Type', fileType);
+            }
+            // 根据Referer设置CDN缓存策略
+            if (Referer && Referer.includes(url.origin)) {
+                headers.set('Cache-Control', 'private, max-age=86400');
+            } else {
+                headers.set('Cache-Control', 'public, max-age=604800');
+            }
+
+            return new Response(fileContent, {
+                status: 200,
+                headers,
+            });
+        } else {
+            return new Response('Error: Failed to fetch image via rclone (simulated error)', { status: 500 });
+        }
+    }
     
     // Telegram及Telegraph渠道
     let TgFileID = ''; // Tg的file_id

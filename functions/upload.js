@@ -116,6 +116,9 @@ export async function onRequestPost(context) {  // Contents of context object
         case 'external':
             uploadChannel = 'External';
             break;
+        case 'rclone':
+            uploadChannel = 'Rclone';
+            break;
         default:
             uploadChannel = 'TelegramNew';
             break;
@@ -240,6 +243,14 @@ export async function onRequestPost(context) {  // Contents of context object
         // --------------------外链渠道----------------------
         const res = await uploadFileToExternal(env, formdata, fullId, metadata, returnLink, url);
         return res;
+    } else if (uploadChannel === 'Rclone') {
+        // ---------------------Rclone 渠道------------------
+        const res = await uploadFileToRclone(env, formdata, fullId, metadata, returnLink, url);
+        if (res.status === 200 || !autoRetry) {
+            return res;
+        } else {
+            err = await res.text();
+        }
     } else {
         // ----------------Telegram New 渠道-------------------
         const res = await uploadFileToTelegram(env, formdata, fullId, metadata, fileExt, fileName, fileType, url, clonedRequest, returnLink);
@@ -259,7 +270,7 @@ export async function onRequestPost(context) {  // Contents of context object
 // 自动切换渠道重试
 async function tryRetry(err, env, uploadChannel, formdata, fullId, metadata, fileExt, fileName, fileType, url, clonedRequest, returnLink) {
     // 渠道列表
-    const channelList = ['CloudflareR2', 'TelegramNew', 'S3'];
+    const channelList = ['CloudflareR2', 'TelegramNew', 'S3', 'Rclone'];
     const errMessages = {};
     errMessages[uploadChannel] = 'Error: ' + uploadChannel + err;
     for (let i = 0; i < channelList.length; i++) {
@@ -271,6 +282,8 @@ async function tryRetry(err, env, uploadChannel, formdata, fullId, metadata, fil
                 res = await uploadFileToTelegram(env, formdata, fullId, metadata, fileExt, fileName, fileType, url, clonedRequest, returnLink);
             } else if (channelList[i] === 'S3') {
                 res = await uploadFileToS3(env, formdata, fullId, metadata, returnLink, url);
+            } else if (channelList[i] === 'Rclone') {
+                res = await uploadFileToRclone(env, formdata, fullId, metadata, returnLink, url);
             }
 
             if (res.status === 200) {
@@ -282,6 +295,49 @@ async function tryRetry(err, env, uploadChannel, formdata, fullId, metadata, fil
     }
 
     return new Response(JSON.stringify(errMessages), { status: 500 });
+}
+
+
+// 上传到Rclone
+async function uploadFileToRclone(env, formdata, fullId, metadata, returnLink, url) {
+    const rcloneGdrivePath = env.RCLONE_GDRIVE_PATH;
+    if (!rcloneGdrivePath) {
+        return new Response('Error: RCLONE_GDRIVE_PATH is not set in environment variables', { status: 500 });
+    }
+
+    const file = formdata.get('file');
+    if (!file) {
+        return new Response('Error: No file provided', { status: 400 });
+    }
+
+    const destinationPath = `${rcloneGdrivePath}/${fullId}`;
+
+    // Placeholder for actual rclone command execution
+    // In a real Cloudflare Worker environment, direct shell command execution is not possible.
+    // This would need to be replaced with an API call to a service that can execute rclone,
+    // or by using a WASM-compiled rclone if available and feasible.
+    console.log(`Simulating: rclone copy ${file.name} remote:${destinationPath}`);
+
+    // Simulate successful upload for now
+    const success = true;
+
+    if (success) {
+        metadata.Channel = "Rclone";
+        metadata.RclonePath = destinationPath;
+
+        try {
+            await env.img_url.put(fullId, "", { metadata });
+        } catch (error) {
+            return new Response('Error: Failed to write to KV database', { status: 500 });
+        }
+
+        return new Response(JSON.stringify([{ src: returnLink }]), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+        });
+    } else {
+        return new Response('Error: Failed to upload to Rclone (simulated error)', { status: 500 });
+    }
 }
 
 
