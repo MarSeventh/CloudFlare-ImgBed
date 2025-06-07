@@ -1068,7 +1068,10 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
   
 - **鸣谢**：
 
-  [<img src="https://dartnode.com/branding/DN-Open-Source-sm.png" alt="Powered by DartNode" style="zoom: 25%;" />](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")
+  <a href="https://dartnode.com">
+        <img src="https://dartnode.com/branding/DN-Open-Source-sm.png" width="200"/></a>
+
+  
 
 # 8.Star History
 
