@@ -1066,11 +1066,6 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
         <img src="https://pic1.afdiancdn.com/user/a1c1cb08695c11edb9e352540025c377/avatar/83d5cc8895f5357e627e86aabd9f848e_w1080_h1028_s317.jpg?imageView2/1/w/240/h/240" width="100"/></a><a href="https://www.yunsen2025.top">
         <img src="https://pic1.afdiancdn.com/user/b9aa4780aa1c11edab6c52540025c377/avatar/0c75630cfa3ac6a921acd8cc2a55505a_w1024_h1024_s42.jpeg?imageView2/1/w/120/h/120" width="100"/></a>
   
-- **鸣谢**：
-
-  <a href="https://dartnode.com">
-        <img src="https://dartnode.com/branding/DN-Open-Source-sm.png" width="200"/></a>
-
   
 
 # 8.Star History
@@ -1078,3 +1073,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 [![Star History Chart](https://api.star-history.com/svg?repos=MarSeventh/CloudFlare-ImgBed,MarSeventh/Sanyue-ImgHub&type=Date)](https://star-history.com/#MarSeventh/CloudFlare-ImgBed&MarSeventh/Sanyue-ImgHub&Date)
 
 **如果觉得项目不错希望您能给个免费的star✨✨✨，非常感谢！**
+
+---
+
+[![Powered by DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")
