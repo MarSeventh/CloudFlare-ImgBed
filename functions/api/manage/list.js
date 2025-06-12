@@ -95,7 +95,7 @@ async function getAllRecords(env, dir) {
         const filteredRecords = response.keys.filter(item => !item.name.startsWith("manage@"));
         allRecords.push(...filteredRecords);
 
-        if (!cursor || filteredRecords.length < limit) {
+        if (!cursor) {
             break;
         }
     }
