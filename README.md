@@ -119,11 +119,13 @@
 
 ## 最近更新
 
+Add Features:
+
+- `upload`接口支持跨域访问和调用
+
 Fix Bugs:
 
 - 修复`list`接口返回数据完整性的问题
-
-
 
 
 
@@ -132,6 +134,10 @@ Fix Bugs:
 
 
 ## 2025.6.12
+
+Add Features:
+
+- `upload`接口支持跨域访问和调用
 
 Fix Bugs:
 
@@ -1070,10 +1076,14 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 
 # 8.Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=MarSeventh/CloudFlare-ImgBed,MarSeventh/Sanyue-ImgHub&type=Date)](https://star-history.com/#MarSeventh/CloudFlare-ImgBed&MarSeventh/Sanyue-ImgHub&Date)
-
 **如果觉得项目不错希望您能给个免费的star✨✨✨，非常感谢！**
 
----
+[![Star History Chart](https://api.star-history.com/svg?repos=MarSeventh/CloudFlare-ImgBed,MarSeventh/Sanyue-ImgHub&type=Date)](https://star-history.com/#MarSeventh/CloudFlare-ImgBed&MarSeventh/Sanyue-ImgHub&Date)
+
+# 9.Special Sponsors
+
+- **[亚洲云](https://www.asiayun.com/)**：提供云计算服务资源支持（高防服务器|服务器租用|福州高防|广东电信|香港服务器|美国服务器|海外服务器）
+
+- **DartNode**：提供云计算服务资源支持
 
 [![Powered by DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")
