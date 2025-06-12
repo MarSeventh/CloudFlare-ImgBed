@@ -1003,6 +1003,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 1. :white_check_mark:~~读取文件响应头增加允许跨域头`access-control-allow-origin: *`~~（2024.12.9已修复）
 1. :white_check_mark:~~上传界面加入访问限制白名单~~（2024.12.11已修复）
 1. :white_check_mark:修复文件名过长挡住操作按钮的问题
+1. :white_check_mark:修复`list`接口返回数据完整性问题
 
 </details>
 
@@ -1062,17 +1063,19 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 - **Sponsors**：感谢以下赞助者对本项目的支持！
 
   <a href="https://afdian.com/a/nothin">
-        <img src="https://pic1.afdiancdn.com/user/e8af1436138e11ed945852540025c377/avatar/59db0533d82e4198f59e63df63a1917f_w640_h640_s114.jpeg?imageView2/1/w/240/h/240" width="100"/>
+        <img src="https://pic1.afdiancdn.com/user/e8af1436138e11ed945852540025c377/avatar/59db0533d82e4198f59e63df63a1917f_w640_h640_s114.jpeg?imageView2/1/w/240/h/240" width="80"/>
       </a> <a href="https://afdian.com/u/1acef0be02d911ee90695254001e7c00">
-        <img src="https://pic1.afdiancdn.com/default/avatar/avatar-orange.png?imageView2/1/w/240/h/240" width="100"/></a><a href="https://afdian.com/u/412189a0284911eca59f52540025c377">
-        <img src="https://pic1.afdiancdn.com/default/avatar/avatar-orange.png?imageView2/1/w/120/h/120" width="100"/></a><a href="https://afdian.com/u/5e52ece217bc11f0ae3352540025c377">
-        <img src="https://pic1.afdiancdn.com/default/avatar/avatar-purple.png?imageView2/1/" width="100"/></a><a href="https://afdian.com/u/42e1c47e16a411f0baff52540025c377">
-        <img src="https://pic1.afdiancdn.com/default/avatar/avatar-purple.png?imageView2/1/" width="100"/></a><a href="https://afdian.com/a/yono233">
-        <img src="https://pic1.afdiancdn.com/user/73b45190c98711eeaa425254001e7c00/avatar/26afa95554d4bbcd748e6432ab56f824_w580_h580_s145.jpeg?imageView2/1/w/240/h/240" width="100"/></a><a href="https://afdian.com/a/XinToolKit">
-        <img src="https://pic1.afdiancdn.com/user/a1c1cb08695c11edb9e352540025c377/avatar/83d5cc8895f5357e627e86aabd9f848e_w1080_h1028_s317.jpg?imageView2/1/w/240/h/240" width="100"/></a><a href="https://www.yunsen2025.top">
-        <img src="https://pic1.afdiancdn.com/user/b9aa4780aa1c11edab6c52540025c377/avatar/0c75630cfa3ac6a921acd8cc2a55505a_w1024_h1024_s42.jpeg?imageView2/1/w/120/h/120" width="100"/></a>
+        <img src="https://pic1.afdiancdn.com/default/avatar/avatar-orange.png?imageView2/1/w/240/h/240" width="80"/></a><a href="https://afdian.com/u/412189a0284911eca59f52540025c377">
+        <img src="https://pic1.afdiancdn.com/default/avatar/avatar-orange.png?imageView2/1/w/120/h/120" width="80"/></a><a href="https://afdian.com/u/5e52ece217bc11f0ae3352540025c377">
+        <img src="https://pic1.afdiancdn.com/default/avatar/avatar-purple.png?imageView2/1/" width="80"/></a><a href="https://afdian.com/u/42e1c47e16a411f0baff52540025c377">
+        <img src="https://pic1.afdiancdn.com/default/avatar/avatar-purple.png?imageView2/1/" width="80"/></a><a href="https://afdian.com/a/yono233">
+        <img src="https://pic1.afdiancdn.com/user/73b45190c98711eeaa425254001e7c00/avatar/26afa95554d4bbcd748e6432ab56f824_w580_h580_s145.jpeg?imageView2/1/w/240/h/240" width="80"/></a><a href="https://afdian.com/a/XinToolKit">
+        <img src="https://pic1.afdiancdn.com/user/a1c1cb08695c11edb9e352540025c377/avatar/83d5cc8895f5357e627e86aabd9f848e_w1080_h1028_s317.jpg?imageView2/1/w/240/h/240" width="80"/></a><a href="https://www.yunsen2025.top">
+        <img src="https://pic1.afdiancdn.com/user/b9aa4780aa1c11edab6c52540025c377/avatar/0c75630cfa3ac6a921acd8cc2a55505a_w1024_h1024_s42.jpeg?imageView2/1/w/120/h/120" width="80"/></a>
   
-  
+- **Contributors**：感谢以下贡献者对本项目的无私贡献！
+
+  [![Contributors](https://contrib.rocks/image?repo=Marseventh/Cloudflare-ImgBed)](https://github.com/MarSeventh/CloudFlare-ImgBed/graphs/contributors)
 
 # 8.Star History
 
@@ -1082,7 +1085,7 @@ Web端在登录页面输入你的**认证码**即可登录使用；API端需要�
 
 # 9.Special Sponsors
 
-- **[亚洲云](https://www.asiayun.com/)**：提供云计算服务资源支持（高防服务器|服务器租用|福州高防|广东电信|香港服务器|美国服务器|海外服务器）
+- **[亚洲云](https://www.asiayun.com/)**：提供云计算服务资源支持（高防服务器|福州高防|广东电信|香港服务器|美国服务器|海外服务器）
 
 - **DartNode**：提供云计算服务资源支持
 
