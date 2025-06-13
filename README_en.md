@@ -114,7 +114,15 @@
 Add Features:
 
 - Beautify error images
-- Upload page supports preview of ico and more formats... ## 2025.6.13
+- Upload page supports preview of ico and more formats
+
+<details>
+    <summary>Update Logs</summary>
+
+
+
+
+## 2025.6.13
 
 Add Features:
 
@@ -386,7 +394,9 @@ Add Features:
 - Add Markdown, HTML, etc. format link copy feature
 - Add admin panel entry on upload page
 
----
+</details>
+
+
 
 # 1. Introduction
 
