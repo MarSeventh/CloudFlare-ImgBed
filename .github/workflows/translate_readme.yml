@@ -1,0 +1,23 @@
+# .github/workflows/translate.yml
+name: Translate Readme
+
+on:
+    push:
+        branches: ['**']
+
+jobs:
+    translate:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v3
+              with:
+                fetch-depth: 3
+
+            - name: Auto Translate
+              uses: Lin-jun-xiang/action-translate-readme@v2 # 基于标签
+              with:
+                token: ${{ secrets.TRANSLATE_GITHUB_TOKEN }} # 基于第二步的命名
+                zhipuai: ${{ secrets.zhipuai_api_key }} # 可选：基于第三步
+                openai: ${{ secrets.openai_api_key }}  # 可选：基于第三步
+                langs: "en,zh-TW,zh-CN,French,Arabic" # 您可以定义任何语言
