@@ -121,17 +121,21 @@
 
 Add Features:
 
-- `upload`接口支持跨域访问和调用
-
-Fix Bugs:
-
-- 修复`list`接口返回数据完整性的问题
+- 美化报错图片
+- 上传页面支持预览ico等更多格式文件
 
 
 
 <details>
     <summary>更新日志</summary>
 
+
+## 2025.6.13
+
+Add Features:
+
+- 美化报错图片
+- 上传页面支持预览ico等更多格式文件
 
 ## 2025.6.12
 
