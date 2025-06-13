@@ -20,4 +20,4 @@ jobs:
                 token: ${{ secrets.TRANSLATE_GITHUB_TOKEN }} # 基于第二步的命名
                 zhipuai: ${{ secrets.zhipuai_api_key }} # 可选：基于第三步
                 openai: ${{ secrets.openai_api_key }}  # 可选：基于第三步
-                langs: "en,zh-TW,zh-CN,French,Arabic" # 您可以定义任何语言
+                langs: "en" # 您可以定义任何语言
