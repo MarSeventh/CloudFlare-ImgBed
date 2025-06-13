@@ -668,7 +668,7 @@ Add Features:
 
    程序默认运行在`8080`端口上，使用`nginx`等服务器反代`127.0.0.1:8080`即可外网访问服务。如需修改端口，可在`package.json`中修改`start`脚本的`port`参数（如下）。
 
-   ```toml
+   ```json
    "scripts": {
        "ci-test": "concurrently --kill-others \"npm start\" \"wait-on http://localhost:8080 && mocha\"",
        "test": "mocha",
