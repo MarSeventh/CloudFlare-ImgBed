@@ -48,9 +48,7 @@
 
 1. 部署使用出现问题，请先仔细查阅文档、常见问题解答以及已有issues。
 
-2. **前端仓库**：[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)
-
-3. **注意**：本仓库为[Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，如果你觉得本项目不错，在支持本项目的同时，也请支持原项目。
+2. **注意**：本仓库为[Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，如果你觉得本项目不错，在支持本项目的同时，也请支持原项目。
 
 ## 2025.2.6  V2.0 版本升级注意事项
 

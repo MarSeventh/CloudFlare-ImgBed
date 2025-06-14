@@ -43,8 +43,7 @@
 ## Pinned
 
 1. If you encounter issues during deployment or usage, please carefully read the documentation, FAQ, and existing issues first.
-2. **Frontend repository**: [MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)
-3. **Note**: This repository is a remake of the [Telegraph-Image](https://github.com/cf-pages/Telegraph-Image) project. If you like this project, please support the original one as well.
+2. **Note**: This repository is a remake of the [Telegraph-Image](https://github.com/cf-pages/Telegraph-Image) project. If you like this project, please support the original one as well.
 
 ## 2025.2.6 Version 2.0 Upgrade Notes
 
