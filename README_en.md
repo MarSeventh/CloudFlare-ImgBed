@@ -68,25 +68,7 @@
 
 </details>
 
-<details>
-    <summary>Quality Blogs & Videos</summary>
-
-**Experience video**: [CloudFlare Free Image Hosting, easily protect your every wonderful moment! _ Bilibili](https://www.bilibili.com/video/BV1y3WGe4EGh/?vd_source=da5ecbe595e41089cd1bed95932b8bfd)
-
-**Related tutorial videos**:
-
-- [Build an online image hosting system using Cloudflare R2 + Pages, unlimited space, no blocking, super simple, completely free (youtube.com)](https://www.youtube.com/watch?v=T8VayuUMOzM)
-
-**Related quality blogs (Thanks to every supportive contributor):**
-
-- [CloudFlare-ImgBed project – yunsen2025's blog](https://www.yunsen2025.top/category/cloudflare-imgbed/)
-  - [Completely free, step-by-step tutorial to build an unlimited space private image hosting with Cloudflare, supports authentication and adult content detection! - yunsen2025's blog](https://www.yunsen2025.top/blog-cfpages-syq-imgbed)
-  - [Configure domestic CDN and split-line resolution for CloudFlare-ImgBed to enjoy ultimate speed at lowest cost! – yunsen2025's blog](https://www.yunsen2025.top/cloudflare-imgbed-fen-xian-pei-zhi-guo-nei-cdn/)
-- [Build Telegram channel image hosting with Cloudflare Pages (lepidus.me)](https://blogstr.lepidus.me/post/1725801323700/)
-- [Tutorial for free image hosting based on CloudFlare and Telegram - Liu Xueguan | Blog (sexy0769.com)](https://blog.sexy0769.com/skill/735.html)
-- [CloudFlare + Github, build your own free image hosting - Datouding's small blog (luckyting.top)](https://luckyting.top/index.php/archives/20/)
-
-</details>
+**Ecosystem**: We welcome community participation in the ecosystem construction. Feel free to submit PRs or Issues, and high-quality content can be found on the [official ecosystem page](https://cfbed.sanyue.de/about/ecosystem.html).
 
 ## Recent Updates ([Update Log](https://cfbed.sanyue.de/guide/update-log.html)):
 
