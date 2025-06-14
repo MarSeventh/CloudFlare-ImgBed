@@ -68,24 +68,7 @@
 </details>
 
 <details>
-    <summary>Ecosystem</summary>
-
-## 1. Plugins
-
-- **Auto upload inside editor (Tampermonkey script)**: https://greasyfork.org/zh-CN/scripts/529816-image-uploader-to-markdown-to-cloudflare-imgbed (Author: Linux.do: [calg_c](https://linux.do/u/calg_c/summary))
-
-## 2. Repositories
-
-- **Upload files to image hosting via TG BOT**: [uki0xc/img-up-bot: Upload using Telegram bot linked image hosting](https://github.com/uki0xc/img-up-bot?tab=readme-ov-file) (Author: [uki0xc](https://github.com/uki0xc))
-
-</details>
-
-<details>
-    <summary>Experience Links and Quality Blogs/Videos</summary>
-
-**Experience site**: [CloudFlare ImgBed](https://cfbed.1314883.xyz/)
-
-> Access code: cfbed
+    <summary>Quality Blogs & Videos</summary>
 
 **Experience video**: [CloudFlare Free Image Hosting, easily protect your every wonderful moment! _ Bilibili](https://www.bilibili.com/video/BV1y3WGe4EGh/?vd_source=da5ecbe595e41089cd1bed95932b8bfd)
 
@@ -104,14 +87,12 @@
 
 </details>
 
-## Recent Updates
+## Recent Updates ([Update Log](https://cfbed.sanyue.de/guide/update-log.html)):
 
 Add Features:
 
 - Beautify error images
 - Upload page supports preview of ico and more formats
-
-Update log: https://cfbed.sanyue.de/guide/update-log.html
 
 # 1. Introduction
 
@@ -119,7 +100,9 @@ Free file hosting solution with full lifecycle features including **upload**, **
 
 ![CloudFlare](static/readme/海报.png)
 
-# 2. [Deployment and Q&A](https://cfbed.sanyue.de/guide/quick-start.html)
+# 2. [Document](https://cfbed.sanyue.de)
+
+Provides detailed deployment documentation, feature docs, development plans, FAQ, and more to help you get started quickly.
 
 # 3. Show
 
@@ -138,95 +121,7 @@ Free file hosting solution with full lifecycle features including **upload**, **
 
 </details>
 
-# 4. TODO
-
-## 4.1 Add Features 💕
-
-<details>
-    <summary>Feature update list</summary>
-
-1. :white_check_mark: ~~Add paste image upload feature~~ (completed 2024.7.22)
-2. :white_check_mark: ~~Add markdown, html format link copy~~ (completed 2024.7.21)
-3. :white_check_mark: ~~Add admin panel entry on upload page~~ (completed 2024.7.21)
-4. :memo: Add user customization interface
-   - ~~Custom login and upload page backgrounds~~ (completed 2024.8.25)
-   - ~~Custom image hosting name and logo~~ (completed 2024.8.26)
-   - ~~Custom website title and icon~~ (completed 2024.8.26)
-   - ~~Custom background switch interval~~ (completed 2024.9.11)
-   - ~~Custom background opacity~~ (completed 2024.9.12)
-   - ~~Custom footer portal~~ (completed 2024.10.20)
-   - ~~Global custom link prefix~~ (completed 2024.12.27)
-   - ~~Footer hide option~~ (completed 2025.2.4)
-5. :white_check_mark: ~~Add random image API~~ (completed 2024.7.25)
-6. :white_check_mark: ~~Improve multi-format link display, add UBB support~~ (completed 2024.8.21)
-7. :white_check_mark: ~~Improve login logic, add backend auth code verification~~ (completed 2024.8.21)
-8. :white_check_mark: ~~Support URL paste upload~~ (completed 2024.8.23)
-9. :white_check_mark: ~~Auto compress images >5MB before upload~~ (completed 2024.8.26)
-10. :white_check_mark: ~~Restyle upload page toolbar, support custom compression~~ (completed 2024.9.28)
-11. :white_check_mark: ~~Refactor admin, add authentication and display optimization, add image detail page~~ (completed 2024.12.20)
-12. :white_check_mark: ~~Add visit statistics, IP record, IP blacklist, upload IP blacklist in admin~~ (upload IP blacklist done, visit record postponed)
-13. :white_check_mark: ~~Auto copy link on upload page click~~ (completed 2024.9.27)
-14. :white_check_mark: ~~Upload settings memory (method, link format)~~ (completed 2024.9.27, merged upload methods)
-15. :white_check_mark: ~~No password set, no redirect to login~~ (completed 2024.9.27)
-16. :white_check_mark: ~~Add delete only successful uploads, retry failed uploads~~ (completed 2024.9.28)
-17. :white_check_mark: ~~Optimize file naming on paste upload~~ (completed 2024.9.26)
-18. :white_check_mark: ~~Add R2 bucket support~~ (completed 2024.11.5)
-19. :white_check_mark: ~~Add batch blacklist and whitelist in admin~~ (completed 2024.12.14)
-20. :white_check_mark: ~~Telegram Channel upload records bot and channel data for migration/backup~~ (completed 2024.12.4)
-21. :white_check_mark: ~~Support custom naming methods~~ (completed 2024.12.4)
-22. :white_check_mark: ~~Support auto retry with other channels on upload failure~~ (completed 2024.12.12)
-23. :white_check_mark: ~~Backend list API pagination~~ (completed 2024.2.5)
-24. :white_check_mark: ~~Support custom link prefix~~ (completed 2024.12.4)
-25. :memo: Integrate alist or implement webdav (under evaluation)
-26. :white_check_mark: ~~Add file size record in details~~ (completed 2024.12.10)
-27. :white_check_mark: ~~Support admin custom global default link prefix~~ (completed 2025.2.1)
-28. :white_check_mark: ~~Open more file formats~~ (completed 2024.12.9)
-29. :white_check_mark: ~~Auto clear CF CDN cache on delete, whitelist, blacklist~~ (completed 2024.12.11)
-30. :white_check_mark: ~~Admin batch selection remembers user order~~ (completed 2024.12.20)
-31. :memo: Support custom upload path and album feature
-    - ~~Folder delete~~ (completed 2025.3.6)
-    - ~~File move~~ (completed 2025.3.7)
-    - ~~Fix ghost click bug on admin load more~~ (completed 2025.3.6)
-    - ~~Batch operations support folders~~ (completed 2025.3.6)
-    - ~~Admin pagination logic adjustment~~ (completed 2025.3.6)
-32. :white_check_mark: ~~Support multiple Telegram Bot Token load balancing~~ (completed 2025.2.4)
-33. :white_check_mark: ~~Admin provides detailed setting info and guidance~~ (completed 2025.2.5)
-34. :white_check_mark: ~~Logo redesign, login page optimization, setting tooltips~~ (completed 2025.2.2)
-35. :white_check_mark: ~~Add S3 API channel~~ (completed 2024.2.3)
-36. :white_check_mark: ~~Support short link naming~~ (completed 2025.2.1)
-37. :white_check_mark: ~~Support dark mode~~ (completed 2025.1.11)
-38. :hourglass_flowing_sand: Support KV backup and restore
-39. :white_check_mark: ~~Footer can be hidden~~ (completed 2025.2.4)
-40. :hourglass_flowing_sand: Search function enhancement
-41. :white_check_mark: Support pasting multiple links and external link management
-42. :hourglass_flowing_sand: Upload file MD5 record and hard link support
-43. :hourglass_flowing_sand: Upload page recent uploads display
-44. :hourglass_flowing_sand: Configure upload page default settings from admin
-45. :white_check_mark: Add announcement feature
-46. :hourglass_flowing_sand: Support width/height params on image access
-47. :hourglass_flowing_sand: Support image format conversion on upload
-
-</details>
-
-## 4.2 Fix Bugs 👻
-
-<details>
-    <summary>Bug fix list</summary>
-
-1. :white_check_mark: ~~Fix API upload not showing in backend~~ (fixed 2024.7.25)
-2. :white_check_mark: ~~Migrate upload to TG channel due to telegra.ph closure~~ (fixed 2024.9.7)
-3. :white_check_mark: ~~Fix infinite refresh when no admin auth set~~ (fixed 2024.9.9)
-4. :white_check_mark: ~~Fix some videos not previewing (likely file issue)~~
-5. :hourglass_flowing_sand: Add new image moderation channel
-6. :white_check_mark: ~~R2 channel deletes bucket synchronously in admin~~ (fixed 2024.12.4)
-7. :white_check_mark: ~~Add CORS header `access-control-allow-origin: *` in file response~~ (fixed 2024.12.9)
-8. :white_check_mark: ~~Add upload page access restriction whitelist~~ (fixed 2024.12.11)
-9. :white_check_mark: Fix long file names covering buttons
-10. :white_check_mark: Fix `list` API data completeness
-
-</details>
-
-# 5. Tips
+# 4. Tips
 
 - Frontend is open source, see [MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub).
 
@@ -251,13 +146,13 @@ Free file hosting solution with full lifecycle features including **upload**, **
 
   [![Contributors](https://contrib.rocks/image?repo=Marseventh/Cloudflare-ImgBed)](https://github.com/MarSeventh/CloudFlare-ImgBed/graphs/contributors)
 
-# 6. Star History
+# 5. Star History
 
 **If you like the project, please give a free star✨✨✨, thank you very much!**
 
 [![Star History Chart](https://api.star-history.com/svg?repos=MarSeventh/CloudFlare-ImgBed,MarSeventh/Sanyue-ImgHub&type=Date)](https://star-history.com/#MarSeventh/CloudFlare-ImgBed&MarSeventh/Sanyue-ImgHub&Date)
 
-# 7. Special Sponsors
+# 6. Special Sponsors
 
 - **[AsiaYun](https://www.asiayun.com/)**: Provides cloud computing resources support (high defense servers | Fuzhou high defense | Guangdong Telecom | Hong Kong servers | US servers | Overseas servers)
 
