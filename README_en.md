@@ -68,8 +68,6 @@
 
 </details>
 
-**Ecosystem**: We welcome community participation in the ecosystem construction. Feel free to submit PRs or Issues, and high-quality content can be found on the [official ecosystem page](https://cfbed.sanyue.de/about/ecosystem.html).
-
 ## Recent Updates ([Update Log](https://cfbed.sanyue.de/guide/update-log.html)):
 
 Add Features:
@@ -107,6 +105,8 @@ Provides detailed deployment documentation, feature docs, development plans, FAQ
 # 4. Tips
 
 - Frontend is open source, see [MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub).
+
+- **Ecosystem**: We welcome community participation in the ecosystem construction. Feel free to submit PRs or Issues, and high-quality content can be found on the [official ecosystem page](https://cfbed.sanyue.de/about/ecosystem.html).
 
 - **Sponsor**: Maintaining the project is not easy. If you like it, please support the author. Your support is the motivation to keep going~
 

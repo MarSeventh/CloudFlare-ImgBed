@@ -79,8 +79,6 @@
 
 </details>
 
-**生态建设**：欢迎社区参与生态建设，欢迎提交 PR 或者 Issue，优质内容参见[官网生态建设页面](https://cfbed.sanyue.de/about/ecosystem.html)。
-
 ## 最近更新（[更新日志](https://cfbed.sanyue.de/guide/update-log.html)）：
 
 Add Features:
@@ -122,6 +120,8 @@ Add Features:
 # 4.Tips
 
 - 前端开源，参见[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)项目。
+
+- **生态建设**：欢迎社区参与生态建设，欢迎提交 PR 或者 Issue，优质内容参见[官网生态建设页面](https://cfbed.sanyue.de/about/ecosystem.html)。
 
 - **赞助**：项目维护不易，喜欢本项目的话，可以作者大大一点小小的鼓励哦，您的每一份支持都是我前进的动力\~ 
 
