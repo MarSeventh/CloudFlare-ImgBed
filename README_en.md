@@ -35,7 +35,6 @@
 >
 > **Please check the announcement for upgrade notes on version 2.0!**
 
-**🚀Project Website**: [CloudFlare ImgBed](https://cfbed.sanyue.de/)
 
 <details>
     <summary>Announcement</summary>
