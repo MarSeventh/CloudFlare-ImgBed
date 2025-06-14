@@ -54,7 +54,6 @@
 >
 > - Sync your forked repository to the latest version (ignore if already synced automatically)
 > - Go to the Pages management page, enter `Settings` -> `Build`, edit the `Build configuration`, and set the `Build command` to `npm install`
->   ![image-20250212190315179](static/readme/202502121903327.png)
 > - All new version settings have been **migrated to the Admin Panel -> System Settings** interface, so generally no need to configure environment variables anymore. Settings made in the system settings interface will **override** environment variable settings. However, to ensure compatibility of images uploaded via the Telegram channel with the old version, **please keep any previously set Telegram-related environment variables!**
 > - After confirming the above settings are correct, go to the Pages management page, enter `Deployments`, and `Retry` the last failed deployment.
 
@@ -82,7 +81,7 @@
 </details>
 
 <details>
-    <summary>Experience Links and Quality Blogs/Videos (Good for learning deployment or usage issues)</summary>
+    <summary>Experience Links and Quality Blogs/Videos</summary>
 
 **Experience site**: [CloudFlare ImgBed](https://cfbed.1314883.xyz/)
 
@@ -116,15 +115,13 @@ Update log: https://cfbed.sanyue.de/guide/update-log.html
 
 # 1. Introduction
 
-Free file hosting solution with full lifecycle features including **upload**, **management**, **read**, and **delete**, supporting **authentication**, **directories**, **image moderation**, **random images**, and other features.
+Free file hosting solution with full lifecycle features including **upload**, **management**, **read**, and **delete**, supporting **authentication**, **directories**, **image moderation**, **random images**, and other features (see [Feature Docs](https://cfbed.sanyue.de/guide/features.html) for details).
 
 ![CloudFlare](static/readme/海报.png)
 
-# 2. [Features](https://cfbed.sanyue.de/guide/features.html)
+# 2. [Deployment and Q&A](https://cfbed.sanyue.de/guide/quick-start.html)
 
-# 3. [Deployment](https://cfbed.sanyue.de/guide/quick-start.html)
-
-# 4. Show
+# 3. Show
 
 ![image-20250313204101984](static/readme/202503132041511.png)
 
@@ -141,9 +138,9 @@ Free file hosting solution with full lifecycle features including **upload**, **
 
 </details>
 
-# 5. TODO
+# 4. TODO
 
-## 5.1 Add Features 💕
+## 4.1 Add Features 💕
 
 <details>
     <summary>Feature update list</summary>
@@ -211,7 +208,7 @@ Free file hosting solution with full lifecycle features including **upload**, **
 
 </details>
 
-## 5.2 Fix Bugs 👻
+## 4.2 Fix Bugs 👻
 
 <details>
     <summary>Bug fix list</summary>
@@ -229,9 +226,7 @@ Free file hosting solution with full lifecycle features including **upload**, **
 
 </details>
 
-# 6. [Q&A](https://cfbed.sanyue.de/qa/)
-
-# 7. Tips
+# 5. Tips
 
 - Frontend is open source, see [MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub).
 
@@ -256,13 +251,13 @@ Free file hosting solution with full lifecycle features including **upload**, **
 
   [![Contributors](https://contrib.rocks/image?repo=Marseventh/Cloudflare-ImgBed)](https://github.com/MarSeventh/CloudFlare-ImgBed/graphs/contributors)
 
-# 8. Star History
+# 6. Star History
 
 **If you like the project, please give a free star✨✨✨, thank you very much!**
 
 [![Star History Chart](https://api.star-history.com/svg?repos=MarSeventh/CloudFlare-ImgBed,MarSeventh/Sanyue-ImgHub&type=Date)](https://star-history.com/#MarSeventh/CloudFlare-ImgBed&MarSeventh/Sanyue-ImgHub&Date)
 
-# 9. Special Sponsors
+# 7. Special Sponsors
 
 - **[AsiaYun](https://www.asiayun.com/)**: Provides cloud computing resources support (high defense servers | Fuzhou high defense | Guangdong Telecom | Hong Kong servers | US servers | Overseas servers)
 

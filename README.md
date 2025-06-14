@@ -64,8 +64,6 @@
 >
 > - 前往 pages 管理页面，进入`设置`->`构建`，编辑`构建配置`，在`构建命令`处填写`npm install`
 >
->   ![image-20250212190315179](static/readme/202502121903327.png)
->
 > - 新版本所有设置项已**迁移至 管理端->系统设置 界面**，原则上无需再通过环境变量的方式进行设置，通过系统设置界面进行的设置将**覆盖掉**环境变量中的设置，但为了保证 **Telegram渠道的图片** 能够与旧版本相兼容，**若您之前设置了 Telegram 渠道相关的环境变量，请将其保留！**
 >
 > - 确保上述设置完成无误后，前往 pages 管理页面，进入`部署`，对最后一次不成功的部署进行`重试操作`
@@ -99,7 +97,7 @@
 </details>
 
 <details>
-    <summary>体验地址及优质博文、视频（搭建或使用有问题可以先去里面学习哦~）</summary>
+    <summary>体验地址及优质博文、视频</summary>
 
 
 **体验地址**：[CloudFlare ImgBed](https://cfbed.1314883.xyz/)
@@ -136,17 +134,14 @@ Add Features:
 
 # 1.Introduction
 
-免费文件托管解决方案，具有**上传**、**管理**、**读取**、**删除**等全链路功能，覆盖文件全生命周期，支持**鉴权**、**目录**、**图片审查**、**随机图**等各项特性。
+免费文件托管解决方案，具有**上传**、**管理**、**读取**、**删除**等全链路功能，覆盖文件全生命周期，支持**鉴权**、**目录**、**图片审查**、**随机图**等各项特性（详见[功能文档](https://cfbed.sanyue.de/guide/features.html)）。
 
 ![CloudFlare](static/readme/海报.png)
 
-# 2.[Features](https://cfbed.sanyue.de/guide/features.html)
+# 2.[Deployment and Q&A](https://cfbed.sanyue.de/guide/quick-start.html)
 
 
-# 3.[Deployment](https://cfbed.sanyue.de/guide/quick-start.html)
-
-
-# 4.Show
+# 3.Show
 
 ![image-20250313204101984](static/readme/202503132041511.png)
 
@@ -165,9 +160,9 @@ Add Features:
 
 </details>
 
-# 5.TODO
+# 4.TODO
 
-## 5.1Add Features💕
+## 4.1Add Features💕
 
 <details>
     <summary>功能更新列表</summary>
@@ -236,7 +231,7 @@ Add Features:
 
 </details>
 
-## 5.2Fix Bugs👻
+## 4.2Fix Bugs👻
 
 <details>
     <summary>Bug修复列表</summary>
@@ -255,10 +250,7 @@ Add Features:
 
 </details>
 
-# 6.[Q&A](https://cfbed.sanyue.de/qa/)
-
-
-# 7.Tips
+# 5.Tips
 
 - 前端开源，参见[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)项目。
 
@@ -283,13 +275,13 @@ Add Features:
 
   [![Contributors](https://contrib.rocks/image?repo=Marseventh/Cloudflare-ImgBed)](https://github.com/MarSeventh/CloudFlare-ImgBed/graphs/contributors)
 
-# 8.Star History
+# 6.Star History
 
 **如果觉得项目不错希望您能给个免费的star✨✨✨，非常感谢！**
 
 [![Star History Chart](https://api.star-history.com/svg?repos=MarSeventh/CloudFlare-ImgBed,MarSeventh/Sanyue-ImgHub&type=Date)](https://star-history.com/#MarSeventh/CloudFlare-ImgBed&MarSeventh/Sanyue-ImgHub&Date)
 
-# 9.Special Sponsors
+# 7.Special Sponsors
 
 - **[亚洲云](https://www.asiayun.com/)**：提供云计算服务资源支持（高防服务器|福州高防|广东电信|香港服务器|美国服务器|海外服务器）
 
