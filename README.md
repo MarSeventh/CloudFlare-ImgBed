@@ -48,11 +48,9 @@
 
 1. 部署使用出现问题，请先仔细查阅文档、常见问题解答以及已有issues。
 
-2. **体验地址**：[CloudFlare ImgBed](https://cfbed.1314883.xyz/) 访问密码：`cfbed`
+2. **前端仓库**：[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)
 
-3. **前端仓库**：[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)
-
-4. **注意**：本仓库为[Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，如果你觉得本项目不错，在支持本项目的同时，也请支持原项目。
+3. **注意**：本仓库为[Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，如果你觉得本项目不错，在支持本项目的同时，也请支持原项目。
 
 ## 2025.2.6  V2.0 版本升级注意事项
 
@@ -97,7 +95,9 @@ Add Features:
 
 提供详细的部署文档、功能文档、开发计划、常见问题解答等，帮助您快速上手。
 
-# 3.Show
+# 3.Demo
+
+**演示站点**：[CloudFlare ImgBed](https://cfbed.1314883.xyz/) 访问密码：`cfbed`
 
 ![image-20250313204101984](static/readme/202503132041511.png)
 

@@ -43,9 +43,8 @@
 ## Pinned
 
 1. If you encounter issues during deployment or usage, please carefully read the documentation, FAQ, and existing issues first.
-2. **Demo Address**: [CloudFlare ImgBed](https://cfbed.1314883.xyz/) Access Password: `cfbed`
-3. **Frontend repository**: [MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)
-4. **Note**: This repository is a remake of the [Telegraph-Image](https://github.com/cf-pages/Telegraph-Image) project. If you like this project, please support the original one as well.
+2. **Frontend repository**: [MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)
+3. **Note**: This repository is a remake of the [Telegraph-Image](https://github.com/cf-pages/Telegraph-Image) project. If you like this project, please support the original one as well.
 
 ## 2025.2.6 Version 2.0 Upgrade Notes
 
@@ -85,7 +84,9 @@ Free file hosting solution with full lifecycle features including **upload**, **
 
 Provides detailed deployment documentation, feature docs, development plans, FAQ, and more to help you get started quickly.
 
-# 3. Show
+# 3. Demo
+
+**Demo Address**: [CloudFlare ImgBed](https://cfbed.1314883.xyz/) Access Password: `cfbed`
 
 ![image-20250313204101984](static/readme/202503132041511.png)
 
