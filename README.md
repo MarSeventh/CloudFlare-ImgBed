@@ -48,9 +48,7 @@
 
 1. 部署使用出现问题，请先仔细查阅文档、常见问题解答以及已有issues。
 
-2. **体验地址**：[CloudFlare ImgBed](https://cfbed.1314883.xyz/)
-
-> 访问码：cfbed
+2. **体验地址**：[CloudFlare ImgBed](https://cfbed.1314883.xyz/) 访问密码：`cfbed`
 
 3. **前端仓库**：[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)
 
