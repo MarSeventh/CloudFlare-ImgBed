@@ -5,7 +5,7 @@ const { ElementPlusResolver } = require('unplugin-vue-components/resolvers');
 const CompressionPlugin = require("compression-webpack-plugin")
 
 module.exports = defineConfig({
-  outputDir: '../dist', // 构建输出到父目录，与后端项目合并
+  outputDir: 'dist',
   assetsDir: 'assets', // 静态资源目录
   configureWebpack: {
     plugins: [

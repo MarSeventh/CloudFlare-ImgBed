@@ -1,4 +1,5 @@
 .wrangler/*
 data/*
 node_modules
-dist
+_worker.js
+wrangler.toml

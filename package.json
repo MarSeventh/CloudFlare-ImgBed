@@ -1,29 +1,30 @@
 {
   "name": "cloudflare-imgbed",
   "version": "2.0",
-  "description": "开源文件托管解决方案",
+  "description": "开源文件托管解决方案",  
   "scripts": {
+    "install:all": "npm install && cd frontend && npm install",
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
     "dev:frontend": "cd frontend && npm run serve",
-    "dev:backend": "npx wrangler pages dev ./ --kv \"img_url\" --r2 \"img_r2\" --ip 0.0.0.0 --port 8080 --persist-to ./data",
-    "build": "npm run build:frontend",
+    "dev:backend": "npx wrangler dev --ip 0.0.0.0 --port 8080 --persist-to ./data",
+    "build": "npm run build:frontend && npm run build:functions",
     "build:frontend": "cd frontend && npm run build",
-    "install:all": "npm install && cd frontend && npm install",
+    "build:functions": "npx wrangler pages functions build --outdir=./_worker.js/",
     "test": "mocha",
     "ci-test": "concurrently --kill-others \"npm run dev:backend\" \"wait-on http://localhost:8080 && mocha\"",
-    "deploy": "npm run build && npx wrangler pages deploy"
+    "deploy": "npx wrangler deploy _worker.js --assets=./frontend/dist --compatibility-date 2025-06-16"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.726.1",
     "@cloudflare/pages-plugin-sentry": "^1.1.3",
     "@sentry/tracing": "^7.114.0",
     "miniflare": "^3.20240718.0"
-  },
+  },  
   "devDependencies": {
     "concurrently": "^8.2.2",
     "mocha": "^10.6.0",
     "wait-on": "^7.2.0",
-    "wrangler": "^3.66.0"
+    "wrangler": "^4.0.0"
   },
   "keywords": ["cloudflare", "image-hosting", "vue", "workers"],
   "author": "MarSeventh",
