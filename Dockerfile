@@ -8,7 +8,8 @@ RUN apt-get update && \
 WORKDIR /app
 COPY . .
 
-RUN npm install
+RUN npm run install:all && npm run build && \
+    rm -rf frontend/node_modules
 
 EXPOSE 8080
-CMD ["npm", "run", "start"]
+CMD ["npm", "run", "dev:backend"]

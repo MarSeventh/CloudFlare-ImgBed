@@ -1,8 +1,17 @@
 {
+  "name": "cloudflare-imgbed",
+  "version": "2.0",
+  "description": "开源文件托管解决方案",
   "scripts": {
-    "ci-test": "concurrently --kill-others \"npm start\" \"wait-on http://localhost:8080 && mocha\"",
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "cd frontend && npm run serve",
+    "dev:backend": "npx wrangler pages dev ./ --kv \"img_url\" --r2 \"img_r2\" --ip 0.0.0.0 --port 8080 --persist-to ./data",
+    "build": "npm run build:frontend",
+    "build:frontend": "cd frontend && npm run build",
+    "install:all": "npm install && cd frontend && npm install",
     "test": "mocha",
-    "start": "npx wrangler pages dev ./ --kv \"img_url\" --r2 \"img_r2\" --ip 0.0.0.0 --port 8080 --persist-to ./data"
+    "ci-test": "concurrently --kill-others \"npm run dev:backend\" \"wait-on http://localhost:8080 && mocha\"",
+    "deploy": "npm run build && npx wrangler pages deploy"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.726.1",
@@ -15,5 +24,8 @@
     "mocha": "^10.6.0",
     "wait-on": "^7.2.0",
     "wrangler": "^3.66.0"
-  }
+  },
+  "keywords": ["cloudflare", "image-hosting", "vue", "workers"],
+  "author": "MarSeventh",
+  "license": "MIT"
 }

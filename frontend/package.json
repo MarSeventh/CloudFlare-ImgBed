@@ -1,0 +1,44 @@
+{
+  "name": "sanyue_imghub",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "serve": "vue-cli-service serve",
+    "build": "vue-cli-service build"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.1",
+    "@fortawesome/fontawesome-svg-core": "^6.6.0",
+    "@fortawesome/free-regular-svg-icons": "^6.6.0",
+    "@fortawesome/free-solid-svg-icons": "^6.6.0",
+    "@fortawesome/vue-fontawesome": "^3.0.8",
+    "@vueuse/core": "^12.3.0",
+    "@vueuse/head": "^2.0.0",
+    "axios": "^1.7.7",
+    "core-js": "^3.38.1",
+    "element-plus": "^2.8.2",
+    "http-proxy-middleware": "^3.0.2",
+    "image-conversion": "^2.1.1",
+    "jszip": "^3.10.1",
+    "vue": "^3.2.13",
+    "vue-cookies": "^1.8.4",
+    "vue-router": "^4.4.3",
+    "vuex": "^4.1.0",
+    "vuex-persistedstate": "^4.1.0"
+  },
+  "devDependencies": {
+    "@vue/cli-plugin-babel": "~5.0.0",
+    "@vue/cli-plugin-router": "~5.0.0",
+    "@vue/cli-plugin-vuex": "~5.0.0",
+    "@vue/cli-service": "~5.0.0",
+    "compression-webpack-plugin": "^11.1.0",
+    "unplugin-auto-import": "^0.18.2",
+    "unplugin-vue-components": "^0.27.4"
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead",
+    "not ie 11"
+  ]
+}
