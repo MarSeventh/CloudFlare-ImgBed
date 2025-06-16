@@ -1,0 +1,5 @@
+name = "cloudflare-imgbed"
+compatibility_date = "2024-07-24"
+
+[build]
+command = "npm run install:all && npm run build"
