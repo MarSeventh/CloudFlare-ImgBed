@@ -1,0 +1,17 @@
+name = "cloudflare-imgbed"
+compatibility_date = "2025-06-16"
+main = "_worker.js"
+
+# 静态资源配置
+[assets]
+directory = "./frontend/dist"
+binding = "ASSETS"
+
+# 构建配置
+[build]
+command = "npm run install:all && npm run build"
+
+
+# 环境变量
+[vars]
+
