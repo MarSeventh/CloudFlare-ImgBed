@@ -75,9 +75,9 @@
 
 </details>
 
-## 最近更新（[更新日志](https://cfbed.sanyue.de/guide/update-log.html)）：
 
-[![更新日志](https://recent-update.cfbed.sanyue.de/cn)](https://cfbed.sanyue.de/guide/update-log.html#最近更新)
+
+[![更新日志](https://recent-update.cfbed.sanyue.de/cn)](https://cfbed.sanyue.de/guide/update-log.html)
 
 
 # 1.Introduction

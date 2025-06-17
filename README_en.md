@@ -66,7 +66,7 @@
 
 </details>
 
-## Recent Updates ([Update Log](https://cfbed.sanyue.de/guide/update-log.html)):
+## 
 
 [![recent update](https://recent-update.cfbed.sanyue.de/en)](https://cfbed.sanyue.de/en/guide/update-log.html#recent-updates)
 
