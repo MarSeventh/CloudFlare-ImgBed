@@ -77,10 +77,7 @@
 
 ## 最近更新（[更新日志](https://cfbed.sanyue.de/guide/update-log.html)）：
 
-Add Features:
-
-- 美化报错图片
-- 上传页面支持预览ico等更多格式文件
+[![更新日志](https://recent-update.cfbed.sanyue.de/cn)](https://cfbed.sanyue.de/guide/update-log.html#最近更新)
 
 
 # 1.Introduction

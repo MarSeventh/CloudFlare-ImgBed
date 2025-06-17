@@ -68,10 +68,7 @@
 
 ## Recent Updates ([Update Log](https://cfbed.sanyue.de/guide/update-log.html)):
 
-Add Features:
-
-- Beautify error images
-- Upload page supports preview of ico and more formats
+[![recent update](https://recent-update.cfbed.sanyue.de/en)](https://cfbed.sanyue.de/en/guide/update-log.html#recent-updates)
 
 # 1. Introduction
 
