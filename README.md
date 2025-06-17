@@ -78,8 +78,6 @@
 
 
 
-[![更新日志](https://recent-update.cfbed.sanyue.de/cn)](https://cfbed.sanyue.de/guide/update-log.html)
-
 
 # 1.Introduction
 
@@ -89,7 +87,9 @@
 
 # 2.[Document](https://cfbed.sanyue.de)
 
-提供详细的部署文档、功能文档、开发计划、常见问题解答等，帮助您快速上手。
+提供详细的部署文档、功能文档、开发计划、更新日志、常见问题解答等，帮助您快速上手。
+
+[![更新日志](https://recent-update.cfbed.sanyue.de/cn)](https://cfbed.sanyue.de/guide/update-log.html)
 
 # 3.Demo
 
@@ -115,7 +115,7 @@
 
 # 4.Tips
 
-- 前端开源，参见[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)项目。
+- **前端开源**：参见[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)项目。
 
 - **生态建设**：欢迎社区参与生态建设，欢迎提交 PR 或者 Issue，优质内容参见[官网生态建设页面](https://cfbed.sanyue.de/about/ecosystem.html)。
 

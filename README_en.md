@@ -66,9 +66,7 @@
 
 </details>
 
-## 
 
-[![recent update](https://recent-update.cfbed.sanyue.de/en)](https://cfbed.sanyue.de/en/guide/update-log.html)
 
 # 1. Introduction
 
@@ -78,7 +76,9 @@ Free file hosting solution with full lifecycle features including **upload**, **
 
 # 2. [Document](https://cfbed.sanyue.de)
 
-Provides detailed deployment documentation, feature docs, development plans, FAQ, and more to help you get started quickly.
+Provides detailed deployment documentation, feature docs, development plans, update logs, FAQ, and more to help you get started quickly.
+
+[![recent update](https://recent-update.cfbed.sanyue.de/en)](https://cfbed.sanyue.de/en/guide/update-log.html)
 
 # 3. Demo
 
