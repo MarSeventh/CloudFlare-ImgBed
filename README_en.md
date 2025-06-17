@@ -68,7 +68,7 @@
 
 ## 
 
-[![recent update](https://recent-update.cfbed.sanyue.de/en)](https://cfbed.sanyue.de/en/guide/update-log.html#recent-updates)
+[![recent update](https://recent-update.cfbed.sanyue.de/en)](https://cfbed.sanyue.de/en/guide/update-log.html)
 
 # 1. Introduction
 
