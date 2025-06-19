@@ -195,7 +195,7 @@ async function moveS3File(img, newFileId) {
             accessKeyId: img.metadata?.S3AccessKeyId,
             secretAccessKey: img.metadata?.S3SecretAccessKey
         },
-        forcePathStyle: img.metadata?.S3PathStyle === 'true' // 是否启用路径风格
+        forcePathStyle: img.metadata?.S3PathStyle || false // 是否启用路径风格
     });
 
     const bucketName = img.metadata?.S3BucketName;
