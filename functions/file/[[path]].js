@@ -119,7 +119,8 @@ export async function onRequest(context) {  // Contents of context object
             credentials: {
                 accessKeyId: imgRecord.metadata?.S3AccessKeyId,
                 secretAccessKey: imgRecord.metadata?.S3SecretAccessKey
-            }
+            },
+            forcePathStyle: imgRecord.metadata?.S3PathStyle === 'true' // 是否启用路径风格
         });
 
         const bucketName = imgRecord.metadata?.S3BucketName;

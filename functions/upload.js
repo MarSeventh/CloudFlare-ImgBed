@@ -8,7 +8,7 @@ let securityConfig = {};
 let rightAuthCode = null;
 let moderateContentApiKey = null;
 
-// 统一的跨域响应创建函数
+// 统一的响应创建函数
 function createResponse(body, options = {}) {
     const defaultHeaders = {
         'Access-Control-Allow-Origin': '*',
@@ -364,7 +364,7 @@ async function uploadFileToS3(env, formdata, fullId, metadata, returnLink, origi
         return createResponse('Error: No S3 channel provided', { status: 400 });
     }
 
-    const { endpoint, accessKeyId, secretAccessKey, bucketName, region } = s3Channel;
+    const { endpoint, pathStyle, accessKeyId, secretAccessKey, bucketName, region } = s3Channel;
 
     // 创建 S3 客户端
     const s3Client = new S3Client({
@@ -373,7 +373,8 @@ async function uploadFileToS3(env, formdata, fullId, metadata, returnLink, origi
         credentials: {
             accessKeyId,
             secretAccessKey
-        }
+        },
+        forcePathStyle: pathStyle // 是否启用路径风格
     });
 
     // 获取文件
@@ -403,8 +404,13 @@ async function uploadFileToS3(env, formdata, fullId, metadata, returnLink, origi
         metadata.ChannelName = s3Channel.name;
 
         const s3ServerDomain = endpoint.replace(/https?:\/\//, "");
-        metadata.S3Location = `https://${bucketName}.${s3ServerDomain}/${s3FileName}`; // 采用虚拟主机风格的 URL
+        if (pathStyle) {
+            metadata.S3Location = `https://${s3ServerDomain}/${bucketName}/${s3FileName}`; // 采用路径风格的 URL
+        } else {
+            metadata.S3Location = `https://${bucketName}.${s3ServerDomain}/${s3FileName}`; // 采用虚拟主机风格的 URL
+        }
         metadata.S3Endpoint = endpoint;
+        metadata.S3PathStyle = pathStyle;
         metadata.S3AccessKeyId = accessKeyId;
         metadata.S3SecretAccessKey = secretAccessKey;
         metadata.S3Region = region || "auto";
