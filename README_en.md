@@ -127,6 +127,8 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 
 - **[AsiaYun](https://www.asiayun.com/)**: Provides cloud computing resources support (high defense servers | Fuzhou high defense | Guangdong Telecom | Hong Kong servers | US servers | Overseas servers)
 
+- **[ShuangyiNiao Data](https://www.synidc.cn/)**：Provides cloud computing resources support (High-Security CDN in China and Overseas | Cloud Servers Worldwide | Domestic Dedicated Servers)
+
 - **DartNode**: Provides cloud computing resources support
 
 [![Powered by DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")
