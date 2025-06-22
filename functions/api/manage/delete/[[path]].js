@@ -110,10 +110,7 @@ async function deleteFile(env, fileId, cdnUrl, url) {
 
         // S3 渠道的图片，需要删除S3中对应的图片
         if (img.metadata?.Channel === 'S3') {
-            const success = await deleteS3File(img);
-            if (!success) {
-                throw new Error('S3 Delete Failed');
-            }
+            await deleteS3File(img);
         }
 
         // 删除KV存储中的记录

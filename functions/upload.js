@@ -6,7 +6,7 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 let uploadConfig = {};
 let securityConfig = {};
 let rightAuthCode = null;
-let moderateContentApiKey = null;
+let uploadModerate = null;
 
 // 统一的响应创建函数
 function createResponse(body, options = {}) {
@@ -92,7 +92,7 @@ export async function onRequestPost(context) {  // Contents of context object
     // 读取安全配置
     securityConfig = await fetchSecurityConfig(env);
     rightAuthCode = securityConfig.auth.user.authCode;
-    moderateContentApiKey = securityConfig.upload.moderate.apiKey;
+    uploadModerate = securityConfig.upload.moderate;
     
     // 鉴权
     if (!authCheck(env, url, request)) {
@@ -418,7 +418,7 @@ async function uploadFileToS3(env, formdata, fullId, metadata, returnLink, origi
         metadata.S3FileKey = s3FileName;
 
         // 图像审查
-        if (moderateContentApiKey) {
+        if (uploadModerate && uploadModerate.enabled) {
             try {
                 await env.img_url.put(fullId, "", { metadata });
             } catch {
@@ -608,28 +608,69 @@ async function uploadFileToExternal(env, formdata, fullId, metadata, returnLink,
 
 // 图像审查
 async function moderateContent(env, url, metadata) {
-    const apikey = moderateContentApiKey;
-    if (apikey == undefined || apikey == null || apikey == "") {
+    const enableModerate = uploadModerate && uploadModerate.enabled;
+
+    // 如果未启用审查，直接返回metadata
+    if (!enableModerate) {
         metadata.Label = "None";
-    } else {
+        return metadata;
+    }
+
+    // moderatecontent.com 渠道
+    if (uploadModerate.channel === 'moderatecontent.com') {
+        const apikey = securityConfig.upload.moderate.moderateContentApiKey;
+        if (apikey == undefined || apikey == null || apikey == "") {
+            metadata.Label = "None";
+        } else {
+            try {
+                const fetchResponse = await fetch(`https://api.moderatecontent.com/moderate/?key=${apikey}&url=${url}`);
+                if (!fetchResponse.ok) {
+                    throw new Error(`HTTP error! status: ${fetchResponse.status}`);
+                }
+                const moderate_data = await fetchResponse.json();
+                if (moderate_data.rating_label) {
+                    metadata.Label = moderate_data.rating_label;
+                }
+            } catch (error) {
+                console.error('Moderate Error:', error);
+                // 将不带审查的图片写入数据库
+                metadata.Label = "None";
+            }
+        }
+        return metadata;
+    }
+
+    // nsfw 渠道 和 默认渠道
+    if (uploadModerate.channel === 'nsfwjs' || uploadModerate.channel === 'default') {
+        const defaultApiPath = 'https://nsfwjs.1314883.xyz';
+        const nsfwApiPath = uploadModerate.channel === 'default' ? defaultApiPath : securityConfig.upload.moderate.nsfwApiPath;
+
         try {
-            const fetchResponse = await fetch(`https://api.moderatecontent.com/moderate/?key=${apikey}&url=${url}`);
+            const fetchResponse = await fetch(`${nsfwApiPath}?url=${encodeURIComponent(url)}`);
             if (!fetchResponse.ok) {
                 throw new Error(`HTTP error! status: ${fetchResponse.status}`);
             }
             const moderate_data = await fetchResponse.json();
-            if (moderate_data.rating_label) {
-                metadata.Label = moderate_data.rating_label;
+
+            const score = moderate_data.score || 0;
+            if (score >= 0.9) {
+                metadata.Label = "adult";
+            } else if (score >= 0.7) {
+                metadata.Label = "teen";
+            } else {
+                metadata.Label = "everyone";
             }
         } catch (error) {
             console.error('Moderate Error:', error);
             // 将不带审查的图片写入数据库
             metadata.Label = "None";
-        } finally {
-            console.log('Moderate Done');
-        }
+        } 
+
+        return metadata;
     }
-    return metadata;
+
+    metadata.Label = "None";
+    return metadata; // 如果没有匹配到任何渠道，直接返回metadata
 }
 
 function getFile(response) {

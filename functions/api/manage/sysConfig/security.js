@@ -46,35 +46,37 @@ export async function getSecurityConfig(kv, env) {
     const settingsKV = settingsStr ? JSON.parse(settingsStr) : {}
 
     // 认证管理
+    const kvAuth = settingsKV.auth || {}
     const auth = {
         user: {
-            authCode: env.AUTH_CODE
+            authCode: kvAuth.user?.authCode || env.AUTH_CODE
         },
         admin: {
-            adminUsername: env.BASIC_USER,
-            adminPassword: env.BASIC_PASS,
+            adminUsername: kvAuth.admin?.adminUsername || env.BASIC_USER,
+            adminPassword: kvAuth.admin?.adminPassword || env.BASIC_PASS,
         }
     }
     settings.auth = auth
 
     // 上传管理
+    const kvUpload = settingsKV.upload || {}
     const upload = {
         moderate: {
-            channel: 'moderatecontent.com',
-            apiKey: env.ModerateContentApiKey,
+            enabled: kvUpload.moderate?.enabled ?? true,
+            channel: kvUpload.moderate?.channel || 'default', // [default, moderatecontent.com, nsfwjs]
+            moderateContentApiKey: kvUpload.moderate?.moderateContentApiKey || kvUpload.moderate?.apiKey || env.ModerateContentApiKey,
+            nsfwApiPath: kvUpload.moderate?.nsfwApiPath || '',
         }
     }
     settings.upload = upload
 
     // 访问管理
+    const kvAccess = settingsKV.access || {}
     const access = {
-        allowedDomains: env.ALLOWED_DOMAINS,
-        whiteListMode: env.WhiteList_Mode === 'true',
+        allowedDomains: kvAccess.allowedDomains || env.ALLOWED_DOMAINS,
+        whiteListMode: kvUpload.moderate?.whiteListMode ?? env.WhiteList_Mode === 'true',
     }
     settings.access = access
-
-    // 用 KV 中的设置覆盖默认设置
-    Object.assign(settings, settingsKV)
 
     return settings;
 }
