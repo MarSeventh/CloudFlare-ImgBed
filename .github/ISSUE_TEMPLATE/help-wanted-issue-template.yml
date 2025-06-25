@@ -2,7 +2,6 @@ name: Help wanted issue template
 about: Help wanted template.
 title: '[Help Wanted]'
 labels: ['help wanted']
-assignees: ''
 body:
   - type: checkboxes
     id: self_check
