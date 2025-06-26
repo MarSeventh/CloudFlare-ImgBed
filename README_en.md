@@ -3,7 +3,7 @@
     <p><em>🗂️Open-source file hosting solution based on Cloudflare Pages, supporting multiple storage channels such as Telegram Bot, Cloudflare R2, S3, etc.</em></p>
     <p>
         <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README.md">简体中文</a> | <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README_en.md">English</a> | <a
-        href="https://cfbed.sanyue.de">Official Website</a>
+        href="https://cfbed.sanyue.de/en">Official Website</a>
     </p>
     <div>
         <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/LICENSE">
@@ -70,11 +70,11 @@
 
 # 1. Introduction
 
-Free file hosting solution with full lifecycle features including **upload**, **management**, **read**, and **delete**, supporting **authentication**, **directories**, **image moderation**, **random images**, and other features (see [Feature Docs](https://cfbed.sanyue.de/guide/features.html) for details).
+Free file hosting solution with full lifecycle features including **upload**, **management**, **read**, and **delete**, supporting **authentication**, **directories**, **image moderation**, **random images**, and other features (see [Feature Docs](https://cfbed.sanyue.de/en/guide/features.html) for details).
 
 ![CloudFlare](static/readme/海报.png)
 
-# 2. [Document](https://cfbed.sanyue.de)
+# 2. [Document](https://cfbed.sanyue.de/en)
 
 Provides detailed deployment documentation, feature docs, development plans, update logs, FAQ, and more to help you get started quickly.
 
@@ -103,7 +103,7 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 
 - Frontend is open source, see [MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub).
 
-- **Ecosystem**: We welcome community participation in the ecosystem construction. Feel free to submit PRs or Issues, and high-quality content can be found on the [official ecosystem page](https://cfbed.sanyue.de/about/ecosystem.html).
+- **Ecosystem**: We welcome community participation in the ecosystem construction. Feel free to submit PRs or Issues, and high-quality content can be found on the [official ecosystem page](https://cfbed.sanyue.de/en/about/ecosystem.html).
 
 - **Sponsor**: Maintaining the project is not easy. If you like it, please support the author. Your support is the motivation to keep going~
 
