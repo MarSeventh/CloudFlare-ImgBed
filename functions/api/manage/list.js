@@ -6,7 +6,14 @@ export async function onRequest(context) {
     let count = parseInt(url.searchParams.get('count'), 10) || 50;
     let sum = url.searchParams.get('sum') || false;
     let dir = url.searchParams.get('dir') || ''; // 目录名
-    // 相对路径
+    let search = url.searchParams.get('search') || ''; // 搜索关键字
+
+    // 处理搜索关键字
+    if (search) {
+        search = decodeURIComponent(search).trim();
+    }
+
+    // 处理为相对路径
     if (dir.startsWith('/')) {
         dir = dir.substring(1);
     }
@@ -14,7 +21,15 @@ export async function onRequest(context) {
         dir += '/';
     }
 
+
     let allRecords = await getAllRecords(env, dir);
+
+    // 如果有搜索关键字，过滤记录
+    if (search) {
+        allRecords = allRecords.filter(record => {
+            return record.name.toLowerCase().includes(search) || record.metadata?.FileName?.toLowerCase().includes(search);
+        });
+    }
 
     allRecords.sort((a, b) => {
         return b.metadata.TimeStamp - a.metadata.TimeStamp;
@@ -50,7 +65,7 @@ export async function onRequest(context) {
 
     // sum 参数为 true 时，只返回数据总数
     if (count === -1 && sum === 'true') {
-        return new Response(JSON.stringify({ sum: filteredRecords.length }), {
+        return new Response(JSON.stringify({ sum: allRecords.length }), {
             headers: { "Content-Type": "application/json" }
         });
     }
