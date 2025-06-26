@@ -46,30 +46,29 @@ export async function getOthersConfig(kv, env) {
     const settingsKV = settingsStr ? JSON.parse(settingsStr) : {}
 
     // 远端遥测
+    const kvTelemetry = settingsKV.telemetry || {}
     settings.telemetry = {
-        enabled: !env.disable_telemetry === 'true',
+        enabled: kvTelemetry.enabled ?? !env.disable_telemetry === 'true',
         fixed: false,
     }
 
     // 随机图API
+    const kvRandomImageAPI = settingsKV.randomImageAPI || {}
     settings.randomImageAPI = {
-        enabled: env.AllowRandom === 'true',
-        allowedDir: '',
+        enabled: kvRandomImageAPI.enabled ?? env.AllowRandom === 'true',
+        allowedDir: kvRandomImageAPI.allowedDir ?? '',
         fixed: false,
     }
 
     // CloudFlare API Token
+    const kvCloudflareApiToken = settingsKV.cloudflareApiToken || {}
     settings.cloudflareApiToken = {
-        CF_ZONE_ID: env.CF_ZONE_ID,
-        CF_EMAIL: env.CF_EMAIL,
-        CF_API_KEY: env.CF_API_KEY,
+        CF_ZONE_ID: kvCloudflareApiToken.CF_ZONE_ID || env.CF_ZONE_ID,
+        CF_EMAIL: kvCloudflareApiToken.CF_EMAIL || env.CF_EMAIL,
+        CF_API_KEY: kvCloudflareApiToken.CF_API_KEY || env.CF_API_KEY,
         fixed: false,
     }
 
-    // 用KV存储的设置覆盖默认设置
-    for (const key in settings) {
-        Object.assign(settings[key], settingsKV[key])
-    }
 
     return settings;
 }
