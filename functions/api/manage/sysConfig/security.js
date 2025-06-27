@@ -49,11 +49,11 @@ export async function getSecurityConfig(kv, env) {
     const kvAuth = settingsKV.auth || {}
     const auth = {
         user: {
-            authCode: kvAuth.user?.authCode || env.AUTH_CODE
+            authCode: kvAuth.user?.authCode || env.AUTH_CODE || '',
         },
         admin: {
-            adminUsername: kvAuth.admin?.adminUsername || env.BASIC_USER,
-            adminPassword: kvAuth.admin?.adminPassword || env.BASIC_PASS,
+            adminUsername: kvAuth.admin?.adminUsername || env.BASIC_USER || '',
+            adminPassword: kvAuth.admin?.adminPassword || env.BASIC_PASS || '',
         }
     }
     settings.auth = auth
@@ -64,7 +64,7 @@ export async function getSecurityConfig(kv, env) {
         moderate: {
             enabled: kvUpload.moderate?.enabled ?? true,
             channel: kvUpload.moderate?.channel || 'default', // [default, moderatecontent.com, nsfwjs]
-            moderateContentApiKey: kvUpload.moderate?.moderateContentApiKey || kvUpload.moderate?.apiKey || env.ModerateContentApiKey,
+            moderateContentApiKey: kvUpload.moderate?.moderateContentApiKey || kvUpload.moderate?.apiKey || env.ModerateContentApiKey || '',
             nsfwApiPath: kvUpload.moderate?.nsfwApiPath || '',
         }
     }
@@ -73,7 +73,7 @@ export async function getSecurityConfig(kv, env) {
     // 访问管理
     const kvAccess = settingsKV.access || {}
     const access = {
-        allowedDomains: kvAccess.allowedDomains || env.ALLOWED_DOMAINS,
+        allowedDomains: kvAccess.allowedDomains || env.ALLOWED_DOMAINS || '',
         whiteListMode: kvAccess.whiteListMode ?? env.WhiteList_Mode === 'true',
     }
     settings.access = access
