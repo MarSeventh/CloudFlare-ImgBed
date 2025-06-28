@@ -10,7 +10,7 @@ export async function onRequest(context) {
 
     // 处理搜索关键字
     if (search) {
-        search = decodeURIComponent(search).trim();
+        search = decodeURIComponent(search).trim().toLowerCase();
     }
 
     // 处理为相对路径
