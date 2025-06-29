@@ -774,7 +774,7 @@ function isExtValid(fileExt) {
 function sanitizeFileName(fileName) {
     fileName = decodeURIComponent(fileName);
 
-    const unsafeCharsRe = /[\\\/:\*\?"'<>\| \(\)&#\+%=~`@\[\],，。]/g;
+    const unsafeCharsRe = /[\\\/:\*\?"'<>\| \(\)\[\]\{\}#%\^`~;@&=\+\$,]/g;
     return fileName.replace(unsafeCharsRe, '_');
 }
 
