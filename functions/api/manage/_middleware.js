@@ -19,7 +19,7 @@ function basicAuthentication(request) {
 
   // The Authorization header must start with Basic, followed by a space.
   if (!encoded || scheme !== 'Basic') {
-    throw new BadRequestException('Malformed authorization header.');
+    return BadRequestException('Malformed authorization header.');
   }
 
   // Decodes the base64 value and performs unicode normalization.
@@ -35,7 +35,7 @@ function basicAuthentication(request) {
   // The user & password are split by the first colon and MUST NOT contain control characters.
   // @see https://tools.ietf.org/html/rfc5234#appendix-B.1 (=> "CTL = %x00-1F / %x7F")
   if (index === -1 || /[\0-\x1F\x7F]/.test(decoded)) {
-    throw new BadRequestException('Invalid authorization value.');
+    return BadRequestException('Invalid authorization value.');
   }
 
   return {
