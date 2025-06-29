@@ -158,7 +158,9 @@ export async function onRequestPost(context) {  // Contents of context object
         return createResponse('Error: fileType or fileName is wrong, check the integrity of this file!', { status: 400 });
     }
 
-    fileName = fileName.split('/').pop();
+    // 处理文件名，移除特殊字符
+    fileName = sanitizeFileName(fileName);
+    
     // 如果上传文件夹路径为空，尝试从文件名中获取
     if (uploadFolder === '' || uploadFolder === null || uploadFolder === undefined) {
         uploadFolder = fileName.split('/').slice(0, -1).join('/');
@@ -768,6 +770,15 @@ function isExtValid(fileExt) {
     ].includes(fileExt);
 }
 
+// 处理文件名中的特殊字符
+function sanitizeFileName(fileName) {
+    fileName = decodeURIComponent(fileName);
+
+    const unsafeCharsRe = /[\\\/:\*\?"'<>\| \(\)&#\+%=~`@\[\],，。]/g;
+    return fileName.replace(unsafeCharsRe, '_');
+}
+
+// 检查上传IP是否被封禁
 async function isBlockedUploadIp(env, uploadIp) {
     // 检查是否配置了KV数据库
     if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") {
