@@ -773,6 +773,7 @@ function isExtValid(fileExt) {
 // 处理文件名中的特殊字符
 function sanitizeFileName(fileName) {
     fileName = decodeURIComponent(fileName);
+    fileName = fileName.split('/').pop();
 
     const unsafeCharsRe = /[\\\/:\*\?"'<>\| \(\)\[\]\{\}#%\^`~;@&=\+\$,]/g;
     return fileName.replace(unsafeCharsRe, '_');
