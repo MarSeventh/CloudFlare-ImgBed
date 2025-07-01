@@ -128,6 +128,9 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 - **[AsiaYun](https://www.asiayun.com/)**: Provides cloud computing resources support (high defense servers | Fuzhou high defense | Guangdong Telecom | Hong Kong servers | US servers | Overseas servers)
 
 - **[ShuangyiNiao Data](https://www.synidc.cn/)**：Provides cloud computing resources support (High-Security CDN in China and Overseas | Cloud Servers Worldwide | Domestic Dedicated Servers)
+- [Tencent EdgeOne](https://edgeone.ai/?from=github): Provides CDN acceleration and security protection
+
+![tencent logo](https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png)
 
 - **DartNode**: Provides cloud computing resources support
 

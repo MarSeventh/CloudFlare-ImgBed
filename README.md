@@ -140,8 +140,10 @@
 # 6.Special Sponsors
 
 - **[亚洲云](https://www.asiayun.com/)**：提供云计算服务资源支持（高防服务器|福州高防|广东电信|香港服务器|美国服务器|海外服务器）
-
 - **[双翼鸟数据](https://www.synidc.cn/)**：提供云计算服务资源支持（国内外高防CDN|海内外云服务器|国内物理机）
+- [Tencent EdgeOne](https://edgeone.ai/?from=github)：提供CDN加速和安全保护
+
+![tencent logo](https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png)
 
 - **DartNode**：提供云计算服务资源支持
 
