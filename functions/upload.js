@@ -197,25 +197,7 @@ export async function onRequestPost(context) {  // Contents of context object
 
     // 构建文件ID
     const nameType = url.searchParams.get('uploadNameType') || 'default'; // 获取命名方式
-    const unique_index = time + Math.floor(Math.random() * 10000);
-    let fullId = '';
-    if (nameType === 'index') {
-        // 只在 normalizedFolder 非空时添加路径
-        fullId = normalizedFolder ? `${normalizedFolder}/${unique_index}.${fileExt}` : `${unique_index}.${fileExt}`;
-    } else if (nameType === 'origin') {
-        fullId = normalizedFolder ? `${normalizedFolder}/${fileName}` : fileName;
-    } else if (nameType === 'short') {
-        while (true) {
-            const shortId = generateShortId(8);
-            const testFullId = normalizedFolder ? `${normalizedFolder}/${shortId}.${fileExt}` : `${shortId}.${fileExt}`;
-            if (await env.img_url.get(testFullId) === null) {
-                fullId = testFullId;
-                break;
-            }
-        }
-    } else {
-        fullId = normalizedFolder ? `${normalizedFolder}/${unique_index}_${fileName}` : `${unique_index}_${fileName}`;
-    }
+    const fullId = await buildUniqueFileId(env, nameType, normalizedFolder, fileName, fileExt, time);
 
     // 获得返回链接格式, default为返回/file/id, full为返回完整链接
     const returnFormat = url.searchParams.get('returnFormat') || 'default';
@@ -837,4 +819,71 @@ async function getIPAddress(ip) {
         console.error('Error fetching IP address:', error);
     }
     return address;
+}
+
+// 构建唯一文件ID
+async function buildUniqueFileId(env, nameType, normalizedFolder, fileName, fileExt, time) {
+    const unique_index = time + Math.floor(Math.random() * 10000);
+    let baseId = '';
+    
+    // 根据命名方式构建基础ID
+    if (nameType === 'index') {
+        baseId = normalizedFolder ? `${normalizedFolder}/${unique_index}.${fileExt}` : `${unique_index}.${fileExt}`;
+    } else if (nameType === 'origin') {
+        baseId = normalizedFolder ? `${normalizedFolder}/${fileName}` : fileName;
+    } else if (nameType === 'short') {
+        // 对于短链接，直接在循环中生成不重复的ID
+        while (true) {
+            const shortId = generateShortId(8);
+            const testFullId = normalizedFolder ? `${normalizedFolder}/${shortId}.${fileExt}` : `${shortId}.${fileExt}`;
+            if (await env.img_url.get(testFullId) === null) {
+                return testFullId;
+            }
+        }
+    } else {
+        baseId = normalizedFolder ? `${normalizedFolder}/${unique_index}_${fileName}` : `${unique_index}_${fileName}`;
+    }
+    
+    // 检查基础ID是否已存在
+    if (await env.img_url.get(baseId) === null) {
+        return baseId;
+    }
+    
+    // 如果已存在，在文件名后面加上递增编号
+    let counter = 1;
+    while (true) {
+        let duplicateId;
+        
+        if (nameType === 'index') {
+            const baseName = unique_index;
+            duplicateId = normalizedFolder ? 
+                `${normalizedFolder}/${baseName}(${counter}).${fileExt}` : 
+                `${baseName}(${counter}).${fileExt}`;
+        } else if (nameType === 'origin') {
+            const nameWithoutExt = fileName.substring(0, fileName.lastIndexOf('.'));
+            const ext = fileName.substring(fileName.lastIndexOf('.'));
+            duplicateId = normalizedFolder ? 
+                `${normalizedFolder}/${nameWithoutExt}(${counter})${ext}` : 
+                `${nameWithoutExt}(${counter})${ext}`;
+        } else {
+            const baseName = `${unique_index}_${fileName}`;
+            const nameWithoutExt = baseName.substring(0, baseName.lastIndexOf('.'));
+            const ext = baseName.substring(baseName.lastIndexOf('.'));
+            duplicateId = normalizedFolder ? 
+                `${normalizedFolder}/${nameWithoutExt}(${counter})${ext}` : 
+                `${nameWithoutExt}(${counter})${ext}`;
+        }
+        
+        // 检查新ID是否已存在
+        if (await env.img_url.get(duplicateId) === null) {
+            return duplicateId;
+        }
+        
+        counter++;
+        
+        // 防止无限循环，最多尝试1000次
+        if (counter > 1000) {
+            throw new Error('无法生成唯一的文件ID');
+        }
+    }
 }
