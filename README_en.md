@@ -125,14 +125,14 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 
 # 6. Special Sponsors
 
-- **[AsiaYun](https://www.asiayun.com/)**: Provides cloud computing resources support (high defense servers | Fuzhou high defense | Guangdong Telecom | Hong Kong servers | US servers | Overseas servers)
+- **[AsiaYun](https://www.asiayun.com/)**: Provides cloud computing resources support (high defense servers | Hong Kong servers | US servers | Overseas servers)
 
-- **[ShuangyiNiao Data](https://www.synidc.cn/)**：Provides cloud computing resources support (High-Security CDN in China and Overseas | Cloud Servers Worldwide | Domestic Dedicated Servers)
+- **[ShuangyiNiao Data](https://www.synidc.cn/)**：Provides cloud computing resources support
 
-- [Tencent EdgeOne](https://edgeone.ai/?from=github): Provides CDN acceleration and security protection
+- <a href="https://edgeone.ai/?from=github"><img src="https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png" alt="tencent logo" width="150"/></a>: Provides CDN acceleration and security protection
 
-  <a href="https://edgeone.ai/?from=github"><img src="https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png" alt="tencent logo" width="300"/></a>
+- **[CloudFlare](https://www.cloudflare.com)**：Provides CDN acceleration, security protection, and underlying architecture support
 
-- **DartNode**: Provides cloud computing resources support
+- **[DartNode](https://dartnode.com)**: Provides cloud computing resources support
 
   [![Powered by DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")
