@@ -139,14 +139,27 @@
 
 # 6.Special Sponsors
 
-- **[亚洲云](https://www.asiayun.com/)**：提供云计算服务资源支持（高防服务器|香港服务器|美国服务器|海外服务器）
+<table>
+    <tr>
+        <td><a href="https://www.cloudflare.com">CloudFlare</a></td>     
+        <td>提供CDN加速和安全保护服务，提供项目底层架构支持</td>   
+    </tr>
+    <tr>
+        <td><a href="https://www.asiayun.com">亚洲云</a></td>     
+        <td>提供云计算服务资源支持（高防服务器|香港服务器|美国服务器|海外服务器）</td>   
+    </tr>
+    <tr>
+        <td><a href="https://www.synidc.cn">双翼鸟数据</a></td>     
+        <td>提供云计算服务资源支持</td>   
+    </tr>
+    <tr>     
+        <td><a href="https://edgeone.ai/?from=github"><img src="https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png" alt="Tencent Logo" width="150"></a></td>     
+        <td>提供CDN加速和安全保护服务</td>   
+    </tr> 
+    <tr>
+        <td><a href="https://dartnode.com">DartNode</a></td>     
+        <td>提供云计算服务资源支持</td>   
+    </tr>
+</table>
 
-- **[双翼鸟数据](https://www.synidc.cn/)**：提供云计算服务资源支持
-
-- <a href="https://edgeone.ai/?from=github"><img src="https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png" alt="tencent logo" width="150" style="vertical-align:middle;"/></a>：提供CDN加速和安全保护服务
-
-- **[CloudFlare](https://www.cloudflare.com)**：提供CDN加速和安全保护服务，提供项目底层架构支持
-
-- **[DartNode](https://dartnode.com)**：提供云计算服务资源支持
-
-  [![Powered by DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")
+[![Powered by DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")

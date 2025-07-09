@@ -125,14 +125,27 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 
 # 6. Special Sponsors
 
-- **[AsiaYun](https://www.asiayun.com/)**: Provides cloud computing resources support (high defense servers | Hong Kong servers | US servers | Overseas servers)
+<table>
+    <tr>
+        <td><a href="https://www.cloudflare.com">CloudFlare</a></td>     
+        <td>Provides CDN acceleration, security protection, and underlying architecture support</td>   
+    </tr>
+    <tr>
+        <td><a href="https://www.asiayun.com">AsiaYun</a></td>     
+        <td>Provides cloud computing resources support (high defense servers | Hong Kong servers | US servers | Overseas servers)</td>   
+    </tr>
+    <tr>
+        <td><a href="https://www.synidc.cn">ShuangyiNiao Data</a></td>     
+        <td>Provides cloud computing resources support</td>   
+    </tr>
+    <tr>     
+        <td><a href="https://edgeone.ai/?from=github"><img src="https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png" alt="Tencent Logo" width="150"></a></td>     
+        <td>Provides CDN acceleration and security protection</td>   
+    </tr> 
+    <tr>
+        <td><a href="https://dartnode.com">DartNode</a></td>     
+        <td>Provides cloud computing resources support</td>   
+    </tr>
+</table>
 
-- **[ShuangyiNiao Data](https://www.synidc.cn/)**：Provides cloud computing resources support
-
-- <a href="https://edgeone.ai/?from=github"><img src="https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png" alt="tencent logo" width="150"/></a>: Provides CDN acceleration and security protection
-
-- **[CloudFlare](https://www.cloudflare.com)**：Provides CDN acceleration, security protection, and underlying architecture support
-
-- **[DartNode](https://dartnode.com)**: Provides cloud computing resources support
-
-  [![Powered by DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")
+[![Powered by DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")
