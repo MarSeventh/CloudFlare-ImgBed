@@ -125,27 +125,52 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 
 # 6. Special Sponsors
 
-<table>
-    <tr>
-        <td><a href="https://www.cloudflare.com">CloudFlare</a></td>     
-        <td>Provides CDN acceleration, security protection, and underlying architecture support</td>   
+<table style="border-collapse: collapse; width: 100%; border: none;">
+  <tbody>
+    <tr style="border: none;">
+      <td style="width: 200px; padding: 8px 12px; vertical-align: middle; border: none;">
+        <a href="https://www.cloudflare.com" target="_blank">CloudFlare</a>
+      </td>
+      <td style="padding: 8px 12px; vertical-align: middle; border: none;">
+        Provides CDN acceleration, security protection, and underlying architecture support
+      </td>
     </tr>
-    <tr>
-        <td><a href="https://www.asiayun.com">AsiaYun</a></td>     
-        <td>Provides cloud computing resources support (high defense servers | Hong Kong servers | US servers | Overseas servers)</td>   
+    <tr style="border: none;">
+      <td style="width: 200px; padding: 8px 12px; vertical-align: middle; border: none;">
+        <a href="https://www.asiayun.com" target="_blank">AsiaYun</a>
+      </td>
+      <td style="padding: 8px 12px; vertical-align: middle; border: none;">
+        Provides cloud computing resources support (high defense servers | Hong Kong servers | US servers | Overseas servers)
+      </td>
     </tr>
-    <tr>
-        <td><a href="https://www.synidc.cn">ShuangyiNiao Data</a></td>     
-        <td>Provides cloud computing resources support</td>   
+    <tr style="border: none;">
+      <td style="width: 200px; padding: 8px 12px; vertical-align: middle; border: none;">
+        <a href="https://www.synidc.cn" target="_blank">ShuangyiNiao Data</a>
+      </td>
+      <td style="padding: 8px 12px; vertical-align: middle; border: none;">
+        Provides cloud computing resources support
+      </td>
     </tr>
-    <tr>     
-        <td><a href="https://edgeone.ai/?from=github"><img src="https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png" alt="Tencent Logo" width="150"></a></td>     
-        <td>Provides CDN acceleration and security protection</td>   
-    </tr> 
-    <tr>
-        <td><a href="https://dartnode.com">DartNode</a></td>     
-        <td>Provides cloud computing resources support</td>   
+    <tr style="border: none;">
+      <td style="width: 200px; padding: 8px 12px; vertical-align: middle; border: none;">
+        <a href="https://edgeone.ai/?from=github" target="_blank">
+          <img src="https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png" alt="Tencent Logo" width="150">
+        </a>
+      </td>
+      <td style="padding: 8px 12px; vertical-align: middle; border: none;">
+        Provides CDN acceleration and security protection
+      </td>
     </tr>
+    <tr style="border: none;">
+      <td style="width: 200px; padding: 8px 12px; vertical-align: middle; border: none;">
+        <a href="https://dartnode.com" target="_blank">DartNode</a>
+      </td>
+      <td style="padding: 8px 12px; vertical-align: middle; border: none;">
+        Provides cloud computing resources support
+      </td>
+    </tr>
+  </tbody>
 </table>
+
 
 [![Powered by DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")

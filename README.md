@@ -139,27 +139,52 @@
 
 # 6.Special Sponsors
 
-<table>
-    <tr>
-        <td><a href="https://www.cloudflare.com">CloudFlare</a></td>     
-        <td>提供CDN加速和安全保护服务，提供项目底层架构支持</td>   
+<table style="border-collapse: collapse; width: 100%; border: none;">
+  <tbody>
+    <tr style="border: none;">
+      <td style="width: 200px; padding: 8px 12px; vertical-align: middle; border: none;">
+        <a href="https://www.cloudflare.com" target="_blank">CloudFlare</a>
+      </td>
+      <td style="padding: 8px 12px; vertical-align: middle; border: none;">
+        提供CDN加速和安全保护服务，提供项目底层架构支持
+      </td>
     </tr>
-    <tr>
-        <td><a href="https://www.asiayun.com">亚洲云</a></td>     
-        <td>提供云计算服务资源支持（高防服务器|香港服务器|美国服务器|海外服务器）</td>   
+    <tr style="border: none;">
+      <td style="width: 200px; padding: 8px 12px; vertical-align: middle; border: none;">
+        <a href="https://www.asiayun.com" target="_blank">亚洲云</a>
+      </td>
+      <td style="padding: 8px 12px; vertical-align: middle; border: none;">
+        提供云计算服务资源支持（高防服务器|香港服务器|美国服务器|海外服务器）
+      </td>
     </tr>
-    <tr>
-        <td><a href="https://www.synidc.cn">双翼鸟数据</a></td>     
-        <td>提供云计算服务资源支持</td>   
+    <tr style="border: none;">
+      <td style="width: 200px; padding: 8px 12px; vertical-align: middle; border: none;">
+        <a href="https://www.synidc.cn" target="_blank">双翼鸟数据</a>
+      </td>
+      <td style="padding: 8px 12px; vertical-align: middle; border: none;">
+        提供云计算服务资源支持
+      </td>
     </tr>
-    <tr>     
-        <td><a href="https://edgeone.ai/?from=github"><img src="https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png" alt="Tencent Logo" width="150"></a></td>     
-        <td>提供CDN加速和安全保护服务</td>   
-    </tr> 
-    <tr>
-        <td><a href="https://dartnode.com">DartNode</a></td>     
-        <td>提供云计算服务资源支持</td>   
+    <tr style="border: none;">
+      <td style="width: 200px; padding: 8px 12px; vertical-align: middle; border: none;">
+        <a href="https://edgeone.ai/?from=github" target="_blank">
+          <img src="https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png" alt="Tencent Logo" width="150">
+        </a>
+      </td>
+      <td style="padding: 8px 12px; vertical-align: middle; border: none;">
+        提供CDN加速和安全保护服务
+      </td>
     </tr>
+    <tr style="border: none;">
+      <td style="width: 200px; padding: 8px 12px; vertical-align: middle; border: none;">
+        <a href="https://dartnode.com" target="_blank">DartNode</a>
+      </td>
+      <td style="padding: 8px 12px; vertical-align: middle; border: none;">
+        提供云计算服务资源支持
+      </td>
+    </tr>
+  </tbody>
 </table>
+
 
 [![Powered by DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")
