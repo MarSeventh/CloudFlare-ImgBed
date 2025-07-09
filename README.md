@@ -1,6 +1,6 @@
 <div align="center">
     <a href="https://github.com/MarSeventh/CloudFlare-ImgBed"><img width="80%" alt="logo" src="static/readme/banner.png"/></a>
-    <p><em>🗂️开源文件托管解决方案，基于 Cloudflare Pages，支持 Telegram Bot 、 Cloudflare R2 、S3 等多种存储渠道</em></p>
+    <p><em>🗂️开源文件托管解决方案，支持 Docker 和无服务器部署，支持 Telegram Bot 、 Cloudflare R2 、S3 等多种存储渠道</em></p>
     <p>
         <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README.md">简体中文</a> | <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README_en.md">English</a> | <a href="https://cfbed.sanyue.de">官方网站</a>
     </p>
@@ -28,6 +28,7 @@
         </a>
     </div>
 </div>
+
 
 
 
@@ -79,19 +80,19 @@
 
 
 
-# 1.Introduction
+# 1. Introduction
 
 免费文件托管解决方案，具有**上传**、**管理**、**读取**、**删除**等全链路功能，覆盖文件全生命周期，支持**鉴权**、**目录**、**图片审查**、**随机图**等各项特性（详见[功能文档](https://cfbed.sanyue.de/guide/features.html)）。
 
 ![CloudFlare](static/readme/海报.png)
 
-# 2.[Document](https://cfbed.sanyue.de)
+# 2. [Document](https://cfbed.sanyue.de)
 
 提供详细的部署文档、功能文档、开发计划、更新日志、常见问题解答等，帮助您快速上手。
 
 [![更新日志](https://recent-update.cfbed.sanyue.de/cn)](https://cfbed.sanyue.de/guide/update-log.html)
 
-# 3.Demo
+# 3. Demo
 
 **演示站点**：[CloudFlare ImgBed](https://cfbed.1314883.xyz/) 访问密码：`cfbed`
 
@@ -113,7 +114,7 @@
 </details>
 
 
-# 4.Tips
+# 4. Tips
 
 - **前端开源**：参见[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)项目。
 
@@ -131,35 +132,20 @@
 
   [![Contributors](https://contrib.rocks/image?repo=Marseventh/Cloudflare-ImgBed)](https://github.com/MarSeventh/CloudFlare-ImgBed/graphs/contributors)
 
-# 5.Star History
+# 5. Star History
 
 **如果觉得项目不错希望您能给个免费的star✨✨✨，非常感谢！**
 
 [![Star History Chart](https://api.star-history.com/svg?repos=MarSeventh/CloudFlare-ImgBed,MarSeventh/Sanyue-ImgHub&type=Date)](https://star-history.com/#MarSeventh/CloudFlare-ImgBed&MarSeventh/Sanyue-ImgHub&Date)
 
-# 6.Special Sponsors
+# 6. Special Sponsors
 
-<table>
-    <tr>
-        <td><a href="https://www.cloudflare.com">CloudFlare</a></td>     
-        <td>提供CDN加速和安全保护服务，提供项目底层架构支持</td>   
-    </tr>
-    <tr>
-        <td><a href="https://www.asiayun.com">亚洲云</a></td>     
-        <td>提供云计算服务资源支持（高防服务器|香港服务器|美国服务器|海外服务器）</td>   
-    </tr>
-    <tr>
-        <td><a href="https://www.synidc.cn">双翼鸟数据</a></td>     
-        <td>提供云计算服务资源支持</td>   
-    </tr>
-    <tr>     
-        <td><a href="https://edgeone.ai/?from=github"><img src="https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png" alt="Tencent Logo" width="150"></a></td>     
-        <td>提供CDN加速和安全保护服务</td>   
-    </tr> 
-    <tr>
-        <td><a href="https://dartnode.com">DartNode</a></td>     
-        <td>提供云计算服务资源支持</td>   
-    </tr>
-</table>
+- **[CloudFlare](https://www.cloudflare.com) & [EdgeOne](https://edgeone.ai/?from=github)**：提供CDN加速和安全保护服务
 
-[![Powered by DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")
+  <a href="https://edgeone.ai/?from=github"><img src="static/readme/cloudflare-logo.png" alt="Tencent Logo" height="25"></a><a href="https://edgeone.ai/?from=github"><img src="https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png" alt="Tencent Logo" height="25"></a>
+
+- **[亚洲云](https://www.asiayun.com) & [双翼鸟数据](https://www.synidc.cn) & [DartNode](https://dartnode.com)**：提供云计算服务资源支持
+
+  [![Powered by DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")
+
+

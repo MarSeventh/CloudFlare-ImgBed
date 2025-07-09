@@ -1,6 +1,6 @@
 <div align="center">
     <a href="https://github.com/MarSeventh/CloudFlare-ImgBed"><img width="80%" alt="logo" src="static/readme/banner.png"/></a>
-    <p><em>🗂️Open-source file hosting solution based on Cloudflare Pages, supporting multiple storage channels such as Telegram Bot, Cloudflare R2, S3, etc.</em></p>
+    <p><em>🗂️Open-source file hosting solution, supporting Docker and serverless deployment, supporting multiple storage channels such as Telegram Bot, Cloudflare R2, S3, etc.</em></p>
     <p>
         <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README.md">简体中文</a> | <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README_en.md">English</a> | <a
         href="https://cfbed.sanyue.de/en">Official Website</a>
@@ -29,6 +29,7 @@
         </a>
     </div>
 </div>
+
 
 ---
 
@@ -125,27 +126,10 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 
 # 6. Special Sponsors
 
-<table>
-    <tr>
-        <td><a href="https://www.cloudflare.com">CloudFlare</a></td>     
-        <td>Provides CDN acceleration, security protection, and underlying architecture support</td>   
-    </tr>
-    <tr>
-        <td><a href="https://www.asiayun.com">AsiaYun</a></td>     
-        <td>Provides cloud computing resources support (high defense servers | Hong Kong servers | US servers | Overseas servers)</td>   
-    </tr>
-    <tr>
-        <td><a href="https://www.synidc.cn">ShuangyiNiao Data</a></td>     
-        <td>Provides cloud computing resources support</td>   
-    </tr>
-    <tr>     
-        <td><a href="https://edgeone.ai/?from=github"><img src="https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png" alt="Tencent Logo" width="150"></a></td>     
-        <td>Provides CDN acceleration and security protection</td>   
-    </tr> 
-    <tr>
-        <td><a href="https://dartnode.com">DartNode</a></td>     
-        <td>Provides cloud computing resources support</td>   
-    </tr>
-</table>
+- **[CloudFlare](https://www.cloudflare.com) & [EdgeOne](https://edgeone.ai/?from=github)**：Provides CDN acceleration, and security protection
 
-[![Powered by DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")
+  <a href="https://edgeone.ai/?from=github"><img src="static/readme/cloudflare-logo.png" alt="Tencent Logo" height="25"></a><a href="https://edgeone.ai/?from=github"><img src="https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png" alt="Tencent Logo" height="25"></a>
+
+- **[AsiaYun](https://www.asiayun.com) & [ShuangyiNiao Data](https://www.synidc.cn) & [DartNode](https://dartnode.com)**：Provides cloud computing resources support
+
+  [![Powered by DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")
