@@ -21,99 +21,142 @@ export async function onRequest(context) {
         dir += '/';
     }
 
-
-    let allRecords = await getAllRecords(env, dir);
-
-    // 如果有搜索关键字，过滤记录
-    if (search) {
-        allRecords = allRecords.filter(record => {
-            return record.name.toLowerCase().includes(search) || record.metadata?.FileName?.toLowerCase().includes(search);
-        });
-    }
-
-    allRecords.sort((a, b) => {
-        return b.metadata.TimeStamp - a.metadata.TimeStamp;
-    });
-
-    // 解析目录下的文件和子目录
-    let filteredRecords = [];
-    let subdirectories = new Set();
-
-    for (let record of allRecords) {
-        let key = record.name;
-        if (key.startsWith(dir)) {
-            let relativePath = key.substring(dir.length);
-            if (relativePath.startsWith('/')) {
-                relativePath = relativePath.substring(1);
-            }
-
-            let parts = relativePath.split('/');
-            if (parts.length === 1) {
-                // 直接位于该目录的文件
-                filteredRecords.push(record);
-            } else {
-                // 该目录下的子文件夹
-                if (dir === '' || dir.endsWith('/')) {
-                    subdirectories.add(dir + parts[0]);
-                } else {
-                    subdirectories.add(dir + '/' + parts[0]);
-                }
-            }
-            }
-    }
-
-
-    // sum 参数为 true 时，只返回数据总数
+    // 只需要返回总数
     if (count === -1 && sum === 'true') {
-        return new Response(JSON.stringify({ sum: allRecords.length }), {
+        const totalCount = await getRecordCount(env, dir, search);
+        return new Response(JSON.stringify({ sum: totalCount }), {
             headers: { "Content-Type": "application/json" }
         });
     }
 
-    // count 为 -1 时返回所有数据
-    if (count === -1) {
-        return new Response(JSON.stringify({
-            files: filteredRecords,
-            directories: Array.from(subdirectories)
-        }), {
-            headers: { "Content-Type": "application/json" }
-        });
-    }
-
-    // 进行分页
-    start = Math.max(0, start);
-    count = Math.max(1, count);
-    const resultRecords = filteredRecords.slice(start, start + count);
+    // 返回数据
+    const result = await getRecords(env, dir, search, start, count);
 
     return new Response(JSON.stringify({
-        files: resultRecords,
-        directories: Array.from(subdirectories)
+        files: result.files,
+        directories: Array.from(result.directories)
     }), {
         headers: { "Content-Type": "application/json" }
     });
 }
 
-async function getAllRecords(env, dir) {
-    // 按前缀列出所有文件
-    let allRecords = [];
+// 快速获取记录总数
+async function getRecordCount(env, dir, search) {
+    let count = 0;
     let cursor = null;
+    const batchSize = 1000;
 
     while (true) {
-        const limit = 1000;
         const response = await env.img_url.list({
             prefix: dir,
-            limit: limit,
+            limit: batchSize,
             cursor: cursor
         });
         cursor = response.cursor;
 
-        const filteredRecords = response.keys.filter(item => !item.name.startsWith("manage@"));
-        allRecords.push(...filteredRecords);
+        for (const item of response.keys) {
+            if (item.name.startsWith("manage@")) continue;
+            
+            if (search) {
+                const matchesSearch = item.name.toLowerCase().includes(search) || 
+                                    item.metadata?.FileName?.toLowerCase().includes(search);
+                if (matchesSearch) count++;
+            } else {
+                count++;
+            }
+        }
 
-        if (!cursor) {
-            break;
+        if (!cursor) break;
+    }
+
+    return count;
+}
+
+// 获取需要的记录
+async function getRecords(env, dir, search, start, count) {
+    const subdirectories = new Set();
+    let cursor = null;
+    const batchSize = 1000;
+    
+    // 使用最小堆来维护排序，只保留需要的记录数量
+    const maxHeapSize = count === -1 ? Infinity : start + count + 1000; // 预留一些缓冲
+    let allValidRecords = [];
+
+    while (true) {
+        const response = await env.img_url.list({
+            prefix: dir,
+            limit: batchSize,
+            cursor: cursor
+        });
+        cursor = response.cursor;
+
+        // 批量处理当前批次的记录
+        const batchRecords = [];
+        for (const record of response.keys) {
+            if (record.name.startsWith("manage@")) continue;
+
+            // 搜索过滤
+            if (search) {
+                const matchesSearch = record.name.toLowerCase().includes(search) || 
+                                    record.metadata?.FileName?.toLowerCase().includes(search);
+                if (!matchesSearch) continue;
+            }
+
+            // 解析目录结构
+            let key = record.name;
+            if (key.startsWith(dir)) {
+                let relativePath = key.substring(dir.length);
+                if (relativePath.startsWith('/')) {
+                    relativePath = relativePath.substring(1);
+                }
+
+                let parts = relativePath.split('/');
+                if (parts.length === 1) {
+                    // 直接位于该目录的文件
+                    batchRecords.push(record);
+                } else {
+                    // 该目录下的子文件夹
+                    if (dir === '' || dir.endsWith('/')) {
+                        subdirectories.add(dir + parts[0]);
+                    } else {
+                        subdirectories.add(dir + '/' + parts[0]);
+                    }
+                }
+            }
+        }
+
+        // 将当前批次的记录添加到总记录中
+        allValidRecords.push(...batchRecords);
+
+        // 如果记录数量超过最大堆大小，进行部分排序和裁剪
+        if (allValidRecords.length > maxHeapSize && count !== -1) {
+            allValidRecords.sort((a, b) => b.metadata.TimeStamp - a.metadata.TimeStamp);
+            allValidRecords = allValidRecords.slice(0, maxHeapSize);
+        }
+
+        if (!cursor) break;
+        
+        // 添加协作点，避免长时间占用CPU
+        if (allValidRecords.length % 5000 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 0));
         }
     }
 
-    return allRecords;
+    // 最终排序
+    allValidRecords.sort((a, b) => b.metadata.TimeStamp - a.metadata.TimeStamp);
+
+    // 分页处理
+    let resultFiles;
+    if (count === -1) {
+        resultFiles = allValidRecords;
+    } else {
+        start = Math.max(0, start);
+        count = Math.max(1, count);
+        resultFiles = allValidRecords.slice(start, start + count);
+    }
+
+    return {
+        files: resultFiles,
+        directories: subdirectories
+    };
 }
