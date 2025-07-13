@@ -94,6 +94,7 @@ async function getRecords(env, dir, search, start, count) {
         const batchRecords = [];
         for (const record of response.keys) {
             if (record.name.startsWith("manage@")) continue;
+            if (!record.metadata || !record.metadata.TimeStamp) continue;
 
             // 搜索过滤
             if (search) {

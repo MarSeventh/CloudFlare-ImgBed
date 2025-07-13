@@ -55,6 +55,30 @@ export async function onRequest(context) {  // Contents of context object
     if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") {
         return new Response('Error: Please configure KV database', { status: 500 });
     }
+    
+    // 检查是否为临时文件（用于审查）
+    if (fileId.startsWith('temp_')) {
+        const tempRecord = await env.img_url.getWithMetadata(fileId);
+        if (!tempRecord) {
+            return new Response('Error: Temp file not found', { status: 404 });
+        }
+        
+        const tempMetadata = tempRecord.metadata;
+        if (tempMetadata?.skipModeration) {
+            return new Response('Error: Temp file unavailable for moderation', { status: 403 });
+        }
+        
+        const headers = new Headers();
+        headers.set('Content-Type', 'application/octet-stream');
+        headers.set('Access-Control-Allow-Origin', '*');
+        headers.set('Cache-Control', 'private, max-age=0, no-cache');
+        
+        return new Response(tempRecord.value, {
+            status: 200,
+            headers,
+        });
+    }
+    
     const imgRecord = await env.img_url.getWithMetadata(fileId);
     if (!imgRecord) {
         return new Response('Error: Image Not Found', { status: 404 });
@@ -76,87 +100,12 @@ export async function onRequest(context) {  // Contents of context object
     
     // Cloudflare R2渠道
     if (imgRecord.metadata?.Channel === 'CloudflareR2') {
-        // 检查是否配置了R2
-        if (typeof env.img_r2 == "undefined" || env.img_r2 == null || env.img_r2 == "") {
-            return new Response('Error: Please configure R2 database', { status: 500 });
-        }
-        
-        const R2DataBase = env.img_r2;
-        const object = await R2DataBase.get(fileId);
-
-        if (object === null) {
-            return new Response('Error: Failed to fetch image', { status: 500 });
-        }
-
-        const headers = new Headers();
-        object.writeHttpMetadata(headers)
-        headers.set('Content-Disposition', `inline; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
-        headers.set('Access-Control-Allow-Origin', '*');
-        if (fileType) {
-            headers.set('Content-Type', fileType);
-        }
-        // 根据Referer设置CDN缓存策略，如果是从/或/dashboard等访问，则仅允许浏览器缓存；否则设置为public，缓存时间为7天
-        if (Referer && Referer.includes(url.origin)) {
-            headers.set('Cache-Control', 'private, max-age=86400');
-        } else {
-            headers.set('Cache-Control', 'public, max-age=604800');
-        }
-
-        // 返回图片
-        const newRes = new Response(object.body, {
-            status: 200,
-            headers,
-        });
-
-        return newRes;
+        return await handleR2File(env, fileId, fileName, encodedFileName, fileType, Referer, url, request);
     }
 
     // S3渠道
     if (imgRecord.metadata?.Channel === "S3") {
-        const s3Client = new S3Client({
-            region: imgRecord.metadata?.S3Region || "auto", // 默认使用 auto 区域
-            endpoint: imgRecord.metadata?.S3Endpoint,
-            credentials: {
-                accessKeyId: imgRecord.metadata?.S3AccessKeyId,
-                secretAccessKey: imgRecord.metadata?.S3SecretAccessKey
-            },
-            forcePathStyle: imgRecord.metadata?.S3PathStyle || false // 是否启用路径风格
-        });
-
-        const bucketName = imgRecord.metadata?.S3BucketName;
-        const key = imgRecord.metadata?.S3FileKey;
-
-        try {
-            const command = new GetObjectCommand({
-                Bucket: bucketName,
-                Key: key
-            });
-
-
-            const response = await s3Client.send(command);
-
-            // 设置响应头
-            const headers = new Headers();
-            headers.set("Content-Disposition", `inline; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
-            headers.set("Access-Control-Allow-Origin", "*");
-
-            if (fileType) {
-                headers.set("Content-Type", fileType);
-            }
-
-            // 根据Referer设置CDN缓存策略
-            if (Referer && Referer.includes(url.origin)) {
-                headers.set('Cache-Control', 'private, max-age=86400');
-            } else {
-                headers.set('Cache-Control', 'public, max-age=604800');
-            }
-
-            // 返回 S3 文件流
-            return new Response(response.Body, { status: 200, headers });
-
-        } catch (error) {
-            return new Response(`Error: Failed to fetch from S3 - ${error.message}`, { status: 500 });
-        }
+        return await handleS3File(imgRecord.metadata, fileName, encodedFileName, fileType, Referer, url, request);
     }
 
     // 外链渠道
@@ -171,6 +120,11 @@ export async function onRequest(context) {  // Contents of context object
         // id为file_id + ext
         TgFileID = fileId.split('.')[0];
     } else if (imgRecord.metadata?.Channel === 'TelegramNew') {
+        // 检查是否为分片文件
+        if (imgRecord.metadata?.IsChunked === true) {
+            return await handleTelegramChunkedFile(imgRecord, request, env, fileName, encodedFileName, fileType, Referer, url);
+        }
+        
         // id为unique_id + file_name
         TgFileID = imgRecord.metadata?.TgFileId;
         if (TgFileID === null) {
@@ -374,5 +328,316 @@ async function returnWhiteListImg(url) {
                 "Cache-Control": "public, max-age=86400",
             },
         });
+    }
+}
+
+// 处理分片文件读取
+async function handleTelegramChunkedFile(imgRecord, request, env, fileName, encodedFileName, fileType, Referer, url) {
+    const metadata = imgRecord.metadata;
+    const TgBotToken = metadata.TgBotToken || env.TG_BOT_TOKEN;
+    
+    // 从KV的value中读取分片信息
+    let chunks = [];
+    try {
+        if (imgRecord.value) {
+            chunks = JSON.parse(imgRecord.value);
+            // 确保分片按索引排序
+            chunks.sort((a, b) => a.index - b.index);
+        }
+    } catch (parseError) {
+        console.error('Failed to parse chunks data:', parseError);
+        return new Response('Error: Invalid chunks data', { status: 500 });
+    }
+    
+    if (chunks.length === 0) {
+        return new Response('Error: No chunks found for this file', { status: 500 });
+    }
+    
+    // 验证分片完整性
+    const expectedChunks = metadata.TotalChunks || chunks.length;
+    if (chunks.length !== expectedChunks) {
+        return new Response(`Error: Missing chunks, expected ${expectedChunks}, got ${chunks.length}`, { status: 500 });
+    }
+    
+    try {
+        // 对于大文件，使用流式读取
+        if (metadata.FileSize && metadata.FileSize > 100 * 1024 * 1024) { // 大于60MB使用流式
+            const stream = new ReadableStream({
+                async start(controller) {
+                    try {
+                        for (let i = 0; i < chunks.length; i++) {
+                            const chunk = chunks[i];
+                            const chunkData = await fetchChunkWithRetry(TgBotToken, chunk, 3);
+                            if (!chunkData) {
+                                throw new Error(`Failed to fetch chunk ${chunk.index} after retries`);
+                            }
+                            controller.enqueue(chunkData);
+                        }
+                        controller.close();
+                    } catch (error) {
+                        controller.error(error);
+                    }
+                }
+            });
+            
+            const headers = new Headers();
+            headers.set('Content-Disposition', `inline; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
+            headers.set('Access-Control-Allow-Origin', '*');
+            headers.set('Accept-Ranges', 'bytes');
+            if (metadata.FileSize) {
+                headers.set('Content-Length', metadata.FileSize.toString());
+            }
+            
+            if (fileType) {
+                headers.set('Content-Type', fileType);
+            }
+            
+            // 根据Referer设置CDN缓存策略
+            if (Referer && Referer.includes(url.origin)) {
+                headers.set('Cache-Control', 'private, max-age=86400');
+            } else {
+                headers.set('Cache-Control', 'public, max-age=604800');
+            }
+            
+            return new Response(stream, {
+                status: 200,
+                headers,
+            });
+        }
+        
+        // 对于较小文件，预先获取所有分片数据
+        const chunkDataArray = [];
+        
+        for (const chunk of chunks) {
+            const chunkData = await fetchChunkWithRetry(TgBotToken, chunk, 3);
+            if (!chunkData) {
+                throw new Error(`Failed to fetch chunk ${chunk.index} after retries`);
+            }
+            chunkDataArray.push(chunkData);
+        }
+        
+        // 计算总大小
+        const totalSize = chunkDataArray.reduce((sum, chunk) => sum + chunk.length, 0);
+        
+        // 创建合并后的数组
+        const mergedData = new Uint8Array(totalSize);
+        let offset = 0;
+        
+        for (const chunkData of chunkDataArray) {
+            mergedData.set(chunkData, offset);
+            offset += chunkData.length;
+        }
+        
+        const headers = new Headers();
+        headers.set('Content-Disposition', `inline; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
+        headers.set('Access-Control-Allow-Origin', '*');
+        headers.set('Content-Length', totalSize.toString());
+        
+        if (fileType) {
+            headers.set('Content-Type', fileType);
+        }
+        
+        // 根据Referer设置CDN缓存策略
+        if (Referer && Referer.includes(url.origin)) {
+            headers.set('Cache-Control', 'private, max-age=86400');
+        } else {
+            headers.set('Cache-Control', 'public, max-age=604800');
+        }
+        
+        // 返回合并后的完整文件
+        return new Response(mergedData, {
+            status: 200,
+            headers,
+        });
+        
+    } catch (error) {
+        return new Response(`Error: Failed to reconstruct chunked file - ${error.message}`, { status: 500 });
+    }
+}
+
+// 带重试机制的分片获取函数
+async function fetchChunkWithRetry(botToken, chunk, maxRetries = 3) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            const filePath = await getFilePath(botToken, chunk.fileId);
+            if (!filePath) {
+                throw new Error(`Failed to get file path for chunk ${chunk.index}`);
+            }
+            
+            const chunkUrl = `https://api.telegram.org/file/bot${botToken}/${filePath}`;
+            const response = await fetch(chunkUrl, {
+                headers: {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            // 验证分片大小是否匹配
+            const chunkData = await response.arrayBuffer();
+            const actualSize = chunkData.byteLength;
+            
+            // 如果有期望大小且不匹配，抛出错误
+            if (chunk.size && actualSize !== chunk.size) {
+                console.warn(`Chunk ${chunk.index} size mismatch: expected ${chunk.size}, got ${actualSize}`);
+            }
+            
+            return new Uint8Array(chunkData);
+            
+        } catch (error) {
+            console.warn(`Chunk ${chunk.index} fetch attempt ${attempt + 1} failed:`, error.message);
+            
+            if (attempt === maxRetries - 1) {
+                return null; // 最后一次尝试也失败了
+            }
+            
+            // 重试前等待一段时间
+            await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+        }
+    }
+    
+    return null;
+}
+
+// 处理R2文件读取
+async function handleR2File(env, fileId, fileName, encodedFileName, fileType, Referer, url, request) {
+    // 检查是否配置了R2
+    if (typeof env.img_r2 == "undefined" || env.img_r2 == null || env.img_r2 == "") {
+        return new Response('Error: Please configure R2 database', { status: 500 });
+    }
+    
+    const R2DataBase = env.img_r2;
+    
+    // 检查Range请求头
+    const range = request.headers.get('Range');
+    let object;
+    
+    if (range) {
+        // 处理Range请求（用于大文件流式传输）
+        const matches = range.match(/bytes=(\d+)-(\d*)/);
+        if (matches) {
+            const start = parseInt(matches[1]);
+            const end = matches[2] ? parseInt(matches[2]) : undefined;
+            
+            const rangeOptions = { offset: start };
+            if (end !== undefined) {
+                rangeOptions.length = end - start + 1;
+            }
+            
+            object = await R2DataBase.get(fileId, rangeOptions);
+        } else {
+            object = await R2DataBase.get(fileId);
+        }
+    } else {
+        object = await R2DataBase.get(fileId);
+    }
+
+    if (object === null) {
+        return new Response('Error: Failed to fetch file', { status: 500 });
+    }
+
+    const headers = new Headers();
+    object.writeHttpMetadata(headers);
+    headers.set('Content-Disposition', `inline; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
+    headers.set('Access-Control-Allow-Origin', '*');
+    headers.set('Accept-Ranges', 'bytes');
+    
+    if (fileType) {
+        headers.set('Content-Type', fileType);
+    }
+    
+    // 根据Referer设置CDN缓存策略
+    if (Referer && Referer.includes(url.origin)) {
+        headers.set('Cache-Control', 'private, max-age=86400');
+    } else {
+        headers.set('Cache-Control', 'public, max-age=604800');
+    }
+
+    // 如果是Range请求，设置相应的状态码和头
+    if (range && object.range) {
+        headers.set('Content-Range', `bytes ${object.range.offset}-${object.range.offset + object.range.length - 1}/${object.size}`);
+        headers.set('Content-Length', object.range.length.toString());
+        
+        return new Response(object.body, {
+            status: 206, // Partial Content
+            headers,
+        });
+    }
+
+    // 正常请求
+    return new Response(object.body, {
+        status: 200,
+        headers,
+    });
+}
+
+// 处理S3文件读取
+async function handleS3File(metadata, fileName, encodedFileName, fileType, Referer, url, request) {
+    const s3Client = new S3Client({
+        region: metadata?.S3Region || "auto",
+        endpoint: metadata?.S3Endpoint,
+        credentials: {
+            accessKeyId: metadata?.S3AccessKeyId,
+            secretAccessKey: metadata?.S3SecretAccessKey
+        },
+        forcePathStyle: metadata?.S3PathStyle || false
+    });
+
+    const bucketName = metadata?.S3BucketName;
+    const key = metadata?.S3FileKey;
+
+    try {
+        // 检查Range请求头
+        const range = request.headers.get('Range');
+        const commandParams = {
+            Bucket: bucketName,
+            Key: key
+        };
+        
+        if (range) {
+            // 添加Range参数用于部分内容请求
+            commandParams.Range = range;
+        }
+        
+        const command = new GetObjectCommand(commandParams);
+        const response = await s3Client.send(command);
+
+        // 设置响应头
+        const headers = new Headers();
+        headers.set("Content-Disposition", `inline; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
+        headers.set("Access-Control-Allow-Origin", "*");
+        headers.set('Accept-Ranges', 'bytes');
+
+        if (fileType) {
+            headers.set("Content-Type", fileType);
+        }
+
+        // 根据Referer设置CDN缓存策略
+        if (Referer && Referer.includes(url.origin)) {
+            headers.set('Cache-Control', 'private, max-age=86400');
+        } else {
+            headers.set('Cache-Control', 'public, max-age=604800');
+        }
+
+        // 设置Content-Length和Content-Range头
+        if (response.ContentLength) {
+            headers.set('Content-Length', response.ContentLength.toString());
+        }
+        
+        if (response.ContentRange) {
+            headers.set('Content-Range', response.ContentRange);
+        }
+
+        // 返回响应，支持流式传输
+        const statusCode = range ? 206 : 200; // Range请求返回206 Partial Content
+        return new Response(response.Body, { 
+            status: statusCode, 
+            headers 
+        });
+
+    } catch (error) {
+        return new Response(`Error: Failed to fetch from S3 - ${error.message}`, { status: 500 });
     }
 }
