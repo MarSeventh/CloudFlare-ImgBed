@@ -1045,73 +1045,36 @@ async function performAsyncMerge(env, url, uploadId, totalChunks, originalFileNa
         let mergedFile;
 
         if (totalSize > LARGE_FILE_THRESHOLD) {
-            // 超大文件：使用多个Uint8Array分段处理，避免单个Uint8Array长度限制
+            // 超大文件：使用Blob分块合并，避免Uint8Array长度限制
             await updateMergeStatus(env, statusKey, {
                 progress: 50,
-                message: 'Processing large file with multiple segments...'
+                message: 'Processing large file in chunks...'
             });
 
-            // 分段处理：每段最大100MB，避免Uint8Array长度限制
-            const SEGMENT_SIZE = 100 * 1024 * 1024; // 100MB
-            const uint8ArraySegments = [];
-            let currentSegmentSize = 0;
-            let currentSegmentData = [];
-
+            // 直接使用Blob数组合并，避免创建超大Uint8Array
+            const blobChunks = [];
             for (let i = 0; i < chunks.length; i++) {
                 const chunk = chunks[i];
-                const chunkData = new Uint8Array(chunk.data);
+                blobChunks.push(new Blob([chunk.data]));
                 
-                // 检查是否需要开始新的段
-                if (currentSegmentSize + chunkData.byteLength > SEGMENT_SIZE && currentSegmentData.length > 0) {
-                    // 合并当前段
-                    const segmentSize = currentSegmentData.reduce((sum, data) => sum + data.byteLength, 0);
-                    const segmentArray = new Uint8Array(segmentSize);
-                    let offset = 0;
-                    
-                    for (const data of currentSegmentData) {
-                        segmentArray.set(data, offset);
-                        offset += data.byteLength;
-                    }
-                    
-                    uint8ArraySegments.push(segmentArray);
-                    
-                    // 重置当前段
-                    currentSegmentData = [];
-                    currentSegmentSize = 0;
-                }
-                
-                // 添加到当前段
-                currentSegmentData.push(chunkData);
-                currentSegmentSize += chunkData.byteLength;
-                
-                // 更新进度
-                if (i > 0 && i % 10 === 0) {
+                // 每处理30个分块更新进度，增加频率
+                if (i > 0 && i % 30 === 0) {
                     const currentProgress = 50 + (i / chunks.length) * 10; // 50-60%
                     await updateMergeStatus(env, statusKey, {
                         progress: Math.round(currentProgress),
-                        message: `Processing segment ${uint8ArraySegments.length + 1}, chunk ${i}/${chunks.length}...`
+                        message: `Processing chunk ${i}/${chunks.length}...`
                     });
                     // 增加延迟避免CPU超时
                     await new Promise(resolve => setTimeout(resolve, 20));
                 }
             }
 
-            // 处理最后一个段
-            if (currentSegmentData.length > 0) {
-                const segmentSize = currentSegmentData.reduce((sum, data) => sum + data.byteLength, 0);
-                const segmentArray = new Uint8Array(segmentSize);
-                let offset = 0;
-                
-                for (const data of currentSegmentData) {
-                    segmentArray.set(data, offset);
-                    offset += data.byteLength;
-                }
-                
-                uint8ArraySegments.push(segmentArray);
-            }
-
-            // 使用多个Uint8Array段创建文件
-            mergedFile = new File(uint8ArraySegments, originalFileName, {
+            // 使用Blob合并所有数据块
+            const mergedBlob = new Blob(blobChunks, {
+                type: originalFileType || 'application/octet-stream'
+            });
+            
+            mergedFile = new File([mergedBlob], originalFileName, {
                 type: originalFileType || 'application/octet-stream'
             });
 
