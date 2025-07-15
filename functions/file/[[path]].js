@@ -1,10 +1,8 @@
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { fetchSecurityConfig } from "../utils/sysConfig";
+import { TelegramAPI } from "../utils/telegramAPI";
 
 let targetUrl = '';
-let securityConfig = {};
-let allowedDomains = null;
-let whiteListMode = false;
 
 export async function onRequest(context) {  // Contents of context object
     const {
@@ -28,29 +26,36 @@ export async function onRequest(context) {  // Contents of context object
     }
 
     // 读取安全配置
-    securityConfig = await fetchSecurityConfig(env);
-    allowedDomains = securityConfig.access.allowedDomains;
-    whiteListMode = securityConfig.access.whiteListMode;
+    const securityConfig = await fetchSecurityConfig(env);
+    context.securityConfig = securityConfig;
+
+    const allowedDomains = securityConfig.access.allowedDomains;
     
     const url = new URL(request.url);
+    context.url = url;
+
     let Referer = request.headers.get('Referer')
     if (Referer) {
         try {
             let refererUrl = new URL(Referer);
             if (allowedDomains && allowedDomains.trim() !== '') {
                 const domains = allowedDomains.split(',');
+                domains.push(url.hostname);// 把自身域名加入白名单
+
                 let isAllowed = domains.some(domain => {
                     let domainPattern = new RegExp(`(^|\\.)${domain.replace('.', '\\.')}$`); // Escape dot in domain
                     return domainPattern.test(refererUrl.hostname);
                 });
+                
                 if (!isAllowed) {
-                    return Response.redirect(new URL("/blockimg", request.url).href, 302); // Ensure URL is correctly formed
+                    return await returnBlockImg(url);
                 }
             }
         } catch (e) {
-            return Response.redirect(new URL("/blockimg", request.url).href, 302); // Ensure URL is correctly formed
+            return await returnBlockImg(url);
         }
     }
+
     // 检查是否配置了 KV 数据库
     if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") {
         return new Response('Error: Please configure KV database', { status: 500 });
@@ -93,7 +98,7 @@ export async function onRequest(context) {  // Contents of context object
     const fileType = imgRecord.metadata?.FileType || null;
     
     // 检查文件可访问状态
-    let accessRes = await returnWithCheck(request, env, url, imgRecord);
+    let accessRes = await returnWithCheck(context, imgRecord);
     if (accessRes.status !== 200) {
         return accessRes; // 如果不可访问，直接返回
     }
@@ -133,11 +138,13 @@ export async function onRequest(context) {  // Contents of context object
     } else {
         // 旧版telegraph
     }
+
     // 构建目标 URL
     if (isTgChannel(imgRecord)) {
         // 获取TG图片真实地址
         const TgBotToken = imgRecord.metadata?.TgBotToken || env.TG_BOT_TOKEN;
-        const filePath = await getFilePath(TgBotToken, TgFileID);
+        const tgApi = new TelegramAPI(TgBotToken);
+        const filePath = await tgApi.getFilePath(TgFileID);
         if (filePath === null) {
             return new Response('Error: Failed to fetch image path', { status: 500 });
         }
@@ -145,12 +152,14 @@ export async function onRequest(context) {  // Contents of context object
     } else {
         targetUrl = 'https://telegra.ph/' + url.pathname + url.search;
     }
+
     const response = await getFileContent(request);
     if (response === null) {
         return new Response('Error: Failed to fetch image', { status: 500 });
     } else if (response.status === 404) {
         return await return404(url);
     }
+    
     try {
         const headers = new Headers(response.headers);
         headers.set('Content-Disposition', `inline; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
@@ -178,8 +187,11 @@ export async function onRequest(context) {  // Contents of context object
     }
 }
 
-async function returnWithCheck(request, env, url, imgRecord) {
-    const response = new Response('good', { status: 200 });
+async function returnWithCheck(context, imgRecord) {
+    const { request, env, url, securityConfig } = context;
+    const whiteListMode = securityConfig.access.whiteListMode;
+
+    const response = new Response('success', { status: 200 });
 
     // Referer header equal to the dashboard page or upload page
     if (request.headers.get('Referer') && request.headers.get('Referer').includes(url.origin)) {
@@ -213,122 +225,6 @@ async function returnWithCheck(request, env, url, imgRecord) {
     }
     // other cases
     return response;
-}
-
-async function getFileContent(request, max_retries = 2) {
-    let retries = 0;
-    while (retries <= max_retries) {
-        try {
-            const response = await fetch(targetUrl, {
-                method: request.method,
-                headers: request.headers,
-                body: request.body,
-            });
-            if (response.ok || response.status === 304) {
-                return response;
-            } else if (response.status === 404) {
-                return new Response('Error: Image Not Found', { status: 404 });
-            } else {
-                retries++;
-            }
-        } catch (error) {
-            retries++;
-        }
-    }
-    return null;
-}
-
-async function getFilePath(bot_token, file_id) {
-    try {
-        const url = `https://api.telegram.org/bot${bot_token}/getFile?file_id=${file_id}`;
-        const res = await fetch(url, {
-          method: 'GET',
-          headers: {
-            "User-Agent": " Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome"
-          },
-        })
-    
-        let responseData = await res.json();
-        if (responseData.ok) {
-          const file_path = responseData.result.file_path
-          return file_path
-        } else {
-          return null;
-        }
-      } catch (error) {
-        return null;
-      }
-}
-
-function isTgChannel(imgRecord) {
-    return imgRecord.metadata?.Channel === 'Telegram' || imgRecord.metadata?.Channel === 'TelegramNew';
-}
-
-async function return404(url) {
-    const Img404 = await fetch(url.origin + "/static/404.png");
-    if (!Img404.ok) {
-        return new Response('Error: Image Not Found',
-            {
-                status: 404,
-                headers: {
-                    "Cache-Control": "public, max-age=86400"
-                }
-            }
-        );
-    } else {
-        return new Response(Img404.body, {
-            status: 404,
-            headers: {
-                "Content-Type": "image/png",
-                "Content-Disposition": "inline",
-                "Cache-Control": "public, max-age=86400",
-            },
-        });
-    }
-}
-
-async function returnBlockImg(url) {
-    const blockImg = await fetch(url.origin + "/static/BlockImg.png");
-    if (!blockImg.ok) {
-        return new Response(null, {
-            status: 302,
-            headers: {
-                "Location": url.origin + "/blockimg",
-                "Cache-Control": "public, max-age=86400"
-            }
-        })
-    } else {
-        return new Response(blockImg.body, {
-            status: 403,
-            headers: {
-                "Content-Type": "image/png",
-                "Content-Disposition": "inline",
-                "Cache-Control": "public, max-age=86400",
-            },
-        });
-    }
-}
-
-async function returnWhiteListImg(url) {
-    const WhiteListImg = await fetch(url.origin + "/static/WhiteListOn.png");
-    if (!WhiteListImg.ok) {
-        return new Response(null, {
-            status: 302,
-            headers: {
-                "Location": url.origin + "/whiteliston",
-                "Cache-Control": "public, max-age=86400"
-            }
-        })
-    } else {
-        return new Response(WhiteListImg.body, {
-            status: 403,
-            headers: {
-                "Content-Type": "image/png",
-                "Content-Disposition": "inline",
-                "Cache-Control": "public, max-age=86400",
-            },
-        });
-    }
 }
 
 // 处理分片文件读取
@@ -459,17 +355,9 @@ async function handleTelegramChunkedFile(imgRecord, request, env, fileName, enco
 async function fetchChunkWithRetry(botToken, chunk, maxRetries = 3) {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
-            const filePath = await getFilePath(botToken, chunk.fileId);
-            if (!filePath) {
-                throw new Error(`Failed to get file path for chunk ${chunk.index}`);
-            }
-            
-            const chunkUrl = `https://api.telegram.org/file/bot${botToken}/${filePath}`;
-            const response = await fetch(chunkUrl, {
-                headers: {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
-                }
-            });
+            const tgApi = new TelegramAPI(botToken);
+
+            const response = await tgApi.getFileContent(chunk.fileId);
             
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -639,5 +527,99 @@ async function handleS3File(metadata, fileName, encodedFileName, fileType, Refer
 
     } catch (error) {
         return new Response(`Error: Failed to fetch from S3 - ${error.message}`, { status: 500 });
+    }
+}
+
+async function getFileContent(request, max_retries = 2) {
+    let retries = 0;
+    while (retries <= max_retries) {
+        try {
+            const response = await fetch(targetUrl, {
+                method: request.method,
+                headers: request.headers,
+                body: request.body,
+            });
+            if (response.ok || response.status === 304) {
+                return response;
+            } else if (response.status === 404) {
+                return new Response('Error: Image Not Found', { status: 404 });
+            } else {
+                retries++;
+            }
+        } catch (error) {
+            retries++;
+        }
+    }
+    return null;
+}
+
+function isTgChannel(imgRecord) {
+    return imgRecord.metadata?.Channel === 'Telegram' || imgRecord.metadata?.Channel === 'TelegramNew';
+}
+
+async function return404(url) {
+    const Img404 = await fetch(url.origin + "/static/404.png");
+    if (!Img404.ok) {
+        return new Response('Error: Image Not Found',
+            {
+                status: 404,
+                headers: {
+                    "Cache-Control": "public, max-age=86400"
+                }
+            }
+        );
+    } else {
+        return new Response(Img404.body, {
+            status: 404,
+            headers: {
+                "Content-Type": "image/png",
+                "Content-Disposition": "inline",
+                "Cache-Control": "public, max-age=86400",
+            },
+        });
+    }
+}
+
+async function returnBlockImg(url) {
+    const blockImg = await fetch(url.origin + "/static/BlockImg.png");
+    if (!blockImg.ok) {
+        return new Response(null, {
+            status: 302,
+            headers: {
+                "Location": url.origin + "/blockimg",
+                "Cache-Control": "public, max-age=86400"
+            }
+        })
+    } else {
+        return new Response(blockImg.body, {
+            status: 403,
+            headers: {
+                "Content-Type": "image/png",
+                "Content-Disposition": "inline",
+                "Cache-Control": "public, max-age=86400",
+            },
+        });
+    }
+}
+
+async function returnWhiteListImg(url) {
+    const WhiteListImg = await fetch(url.origin + "/static/WhiteListOn.png");
+    if (!WhiteListImg.ok) {
+        return new Response(null, {
+            status: 302,
+            headers: {
+                "Location": url.origin + "/whiteliston",
+                "Cache-Control": "public, max-age=86400"
+            }
+        })
+    } else {
+        return new Response(WhiteListImg.body, {
+            status: 403,
+            headers: {
+                "Content-Type": "image/png",
+                "Content-Disposition": "inline",
+                "Cache-Control": "public, max-age=86400",
+            },
+        });
     }
 }

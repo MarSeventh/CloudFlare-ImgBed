@@ -26,11 +26,11 @@ export async function errorHandling(context) {
       tracesSampleRate: sampleRate,
     })(context);;
   }
+
   return context.next();
 }
 
 export async function telemetryData(context) {
-  const env = context.env;
   // 读取KV中的设置
   const othersConfig = await fetchOthersConfig(context.env);
   disableTelemetry = !othersConfig.telemetry.enabled;
@@ -75,13 +75,14 @@ export async function telemetryData(context) {
       const transaction = context.data.sentry.startTransaction({ name: `${context.request.method} ${hostname}` });
       //add the transaction to the context
       context.data.transaction = transaction;
-      return context.next();
+      return await context.next();
     } catch (e) {
       console.log(e);
     } finally {
       context.data.transaction.finish();
     }
   }
+
   return context.next();
 }
 
