@@ -1,7 +1,7 @@
 /* ========== 分块合并处理 ========== */
-import { createResponse, buildUniqueFileId, getUploadIp, getIPAddress, isExtValid, selectConsistentChannel } from './uploadTools';
-import { retryFailedChunks } from './chunkUpload';
-import { S3Client, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { createResponse, getUploadIp, getIPAddress, selectConsistentChannel } from './uploadTools';
+import { retryFailedChunks, cleanupFailedMultipartUploads, checkChunkUploadStatuses, cleanupChunkData, cleanupUploadSession } from './chunkUpload';
+import { S3Client, CompleteMultipartUploadCommand } from "@aws-sdk/client-s3";
 
 // 处理分块合并
 export async function handleChunkMerge(context) {
@@ -18,11 +18,33 @@ export async function handleChunkMerge(context) {
         originalFileName = formdata.get('originalFileName');
         originalFileType = formdata.get('originalFileType');
         originalFileSize = parseInt(formdata.get('originalFileSize'));
-        uploadChannel = url.searchParams.get('uploadChannel') || 'telegram'; // 默认Telegram渠道
 
         if (!uploadId || !totalChunks || !originalFileName) {
             return createResponse('Error: Missing merge parameters', { status: 400 });
         }
+
+        // 验证上传会话
+        const sessionKey = `upload_session_${uploadId}`;
+        const sessionData = await env.img_url.get(sessionKey);
+        if (!sessionData) {
+            return createResponse('Error: Invalid or expired upload session', { status: 400 });
+        }
+
+        const sessionInfo = JSON.parse(sessionData);
+        
+        // 验证会话信息
+        if (sessionInfo.originalFileName !== originalFileName || 
+            sessionInfo.totalChunks !== totalChunks) {
+            return createResponse('Error: Session parameters mismatch', { status: 400 });
+        }
+
+        // 检查会话是否过期
+        if (Date.now() > sessionInfo.expiresAt) {
+            return createResponse('Error: Upload session expired', { status: 410 });
+        }
+
+        // 使用会话中的上传渠道，或者从URL参数获取
+        uploadChannel = url.searchParams.get('uploadChannel') || sessionInfo.uploadChannel || 'telegram';
 
         // 检查分块上传状态并处理失败的分块
         const chunkStatuses = await checkChunkUploadStatuses(env, uploadId, totalChunks);
@@ -57,69 +79,72 @@ export async function handleChunkMerge(context) {
             console.log(`Found ${uploadingChunks.length} chunks still uploading, will wait for completion...`);
         }
 
-        // 直接进行合并处理（因为分块已经异步上传到存储端）
-        return await handleDirectMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel);
+        // 开始合并处理
+        return await startMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel);
 
     } catch (error) {
+        // 清理失败的multipart uploads
+        if (uploadChannel === 'cfr2' || uploadChannel === 's3') {
+            waitUntil(cleanupFailedMultipartUploads(context, uploadId, uploadChannel));
+        }
+        
         // 清理临时分块数据
         waitUntil(cleanupChunkData(env, uploadId, totalChunks));
 
+        // 清理上传会话
+        waitUntil(cleanupUploadSession(env, uploadId));
+
         return createResponse(`Error: Failed to merge chunks - ${error.message}`, { status: 500 });
     }
 }
 
-// 直接合并处理（分块已经异步上传到存储端）
-async function handleDirectMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel) {
+// 开始合并处理
+async function startMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel) {
     const { env, url, waitUntil } = context;
 
     try {
-        // 对于分块较多的情况，使用异步处理避免超时
-        if (totalChunks > 5) {
-            // 创建合并任务状态记录
-            const mergeStatus = {
-                uploadId,
-                status: 'processing',
-                progress: 0,
-                totalChunks,
-                originalFileName,
-                originalFileType,
-                uploadChannel,
-                createdAt: Date.now(),
-                message: 'Starting merge process...'
-            };
 
-            // 存储合并状态
-            const statusKey = `merge_status_${uploadId}`;
-            await env.img_url.put(statusKey, JSON.stringify(mergeStatus), {
-                expirationTtl: 3600 // 1小时过期
-            });
+        // 创建合并任务状态记录
+        const mergeStatus = {
+            uploadId,
+            status: 'processing',
+            progress: 0,
+            totalChunks,
+            originalFileName,
+            originalFileType,
+            uploadChannel,
+            createdAt: Date.now(),
+            message: 'Starting merge process...'
+        };
 
-            // 启动异步合并进程
-            waitUntil(performDirectAsyncMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel));
+        // 存储合并状态
+        const statusKey = `merge_status_${uploadId}`;
+        await env.img_url.put(statusKey, JSON.stringify(mergeStatus), {
+            expirationTtl: 3600 // 1小时过期
+        });
 
-            // 立即返回处理状态
-            return createResponse(JSON.stringify({
-                success: true,
-                uploadId,
-                status: 'processing',
-                message: 'File merge started in background. Please check status using statusCheck API.',
-                statusCheckUrl: `${url.pathname}?uploadId=${uploadId}&statusCheck=true&chunked=true&merge=true`
-            }), {
-                status: 202, // Accepted
-                headers: { 'Content-Type': 'application/json' }
-            });
-        } else {
-            // 分块较少，直接同步处理
-            return await performDirectSyncMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel);
-        }
+        // 启动异步合并进程
+        waitUntil(performAsyncMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel));
+
+        // 立即返回处理状态
+        return createResponse(JSON.stringify({
+            success: true,
+            uploadId,
+            status: 'processing',
+            message: 'File merge started in background. Please check status using statusCheck API.',
+            statusCheckUrl: `${url.pathname}?uploadId=${uploadId}&statusCheck=true&chunked=true&merge=true`
+        }), {
+            status: 202, // Accepted
+            headers: { 'Content-Type': 'application/json' }
+        });
 
     } catch (error) {
         return createResponse(`Error: Failed to merge chunks - ${error.message}`, { status: 500 });
     }
 }
 
-// 直接异步合并处理
-async function performDirectAsyncMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel) {
+// 异步合并处理
+async function performAsyncMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel) {
     const { env } = context;
     const statusKey = `merge_status_${uploadId}`;
     
@@ -131,11 +156,14 @@ async function performDirectAsyncMerge(context, uploadId, totalChunks, originalF
             message: 'Collecting uploaded chunks...'
         });
 
-        const result = await handleChannelBasedDirectMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel, statusKey);
-        
+        const result = await handleChannelBasedMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel, statusKey);
+
         if (result.success) {
             // 清理临时分块数据
             await cleanupChunkData(env, uploadId, totalChunks);
+
+            // 清理上传会话
+            await cleanupUploadSession(env, uploadId);
 
             // 最终状态
             await updateMergeStatus(env, statusKey, {
@@ -151,8 +179,16 @@ async function performDirectAsyncMerge(context, uploadId, totalChunks, originalF
     } catch (error) {
         console.error('Direct async merge failed:', error);
         
+        // 清理失败的multipart uploads
+        if (uploadChannel === 'cfr2' || uploadChannel === 's3') {
+            await cleanupFailedMultipartUploads(context, uploadId, uploadChannel);
+        }
+        
         // 清理分块数据
         await cleanupChunkData(env, uploadId, totalChunks);
+
+        // 清理上传会话
+        await cleanupUploadSession(env, uploadId);
 
         // 更新状态：失败
         await updateMergeStatus(env, statusKey, {
@@ -164,59 +200,16 @@ async function performDirectAsyncMerge(context, uploadId, totalChunks, originalF
     }
 }
 
-// 直接同步合并处理
-async function performDirectSyncMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel) {
-    const { env, waitUntil } = context;
 
-    try {
-        const result = await handleChannelBasedDirectMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel);
-        
-        if (result.success) {
-            // 清理临时分块数据
-            waitUntil(cleanupChunkData(env, uploadId, totalChunks));
-            
-            return createResponse(JSON.stringify(result.result), {
-                status: 200,
-                headers: { 'Content-Type': 'application/json' }
-            });
-        } else {
-            throw new Error(result.error || 'Merge failed');
-        }
-
-    } catch (error) {
-        // 清理分块数据
-        waitUntil(cleanupChunkData(env, uploadId, totalChunks));
-        return createResponse(`Error: Failed to merge chunks - ${error.message}`, { status: 500 });
-    }
-}
-
-// 基于渠道的直接合并处理
-async function handleChannelBasedDirectMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel, statusKey = null) {
+// 基于渠道的合并处理
+async function handleChannelBasedMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel, statusKey = null) {
     const { request, env, url } = context;
 
     try {
-        // 生成文件ID
-        const time = new Date().getTime();
-        let fileExt = originalFileName.split('.').pop();
-        if (!isExtValid(fileExt)) {
-            fileExt = originalFileType.split('/').pop();
-            if (fileExt === originalFileType || fileExt === '' || fileExt === null || fileExt === undefined) {
-                fileExt = 'unknown';
-            }
-        }
-
-        const nameType = url.searchParams.get('uploadNameType') || 'default';
-        const uploadFolder = url.searchParams.get('uploadFolder') || '';
-        const normalizedFolder = uploadFolder 
-            ? uploadFolder.replace(/^\/+/, '').replace(/\/{2,}/g, '/').replace(/\/$/, '') 
-            : '';
-
-        const finalFileId = await buildUniqueFileId(env, nameType, normalizedFolder, originalFileName, fileExt, time);
-
         // 获得上传IP
         const uploadIp = getUploadIp(request);
 
-        // 构建metadata
+        // 构建基础metadata
         const metadata = {
             FileName: originalFileName,
             FileType: originalFileType,
@@ -224,20 +217,10 @@ async function handleChannelBasedDirectMerge(context, uploadId, totalChunks, ori
             UploadIP: uploadIp,
             UploadAddress: await getIPAddress(uploadIp),
             ListType: "None",
-            TimeStamp: time,
+            TimeStamp: Date.now(),
             Label: "None",
-            Folder: normalizedFolder || 'root',
-            finalFileId: finalFileId
+            Folder: (url.searchParams.get('uploadFolder') || '').replace(/^\/+/, '').replace(/\/{2,}/g, '/').replace(/\/$/, '') || 'root'
         };
-
-        // 获得返回链接格式
-        const returnFormat = url.searchParams.get('returnFormat') || 'default';
-        let returnLink = '';
-        if (returnFormat === 'full') {
-            returnLink = `${url.origin}/file/${finalFileId}`;
-        } else {
-            returnLink = `/file/${finalFileId}`;
-        }
 
         // 更新进度（如果有状态跟踪）
         if (statusKey) {
@@ -252,7 +235,7 @@ async function handleChannelBasedDirectMerge(context, uploadId, totalChunks, ori
         let completedChunks = chunkStatuses.filter(chunk => chunk.status === 'completed');
         
         // 如果还有分块在上传中，等待一段时间后重试
-        const uploadingChunks = chunkStatuses.filter(chunk => chunk.status === 'uploading');
+        let uploadingChunks = chunkStatuses.filter(chunk => chunk.status === 'uploading');
         if (uploadingChunks.length > 0) {
             console.log(`Found ${uploadingChunks.length} chunks still uploading, waiting...`);
             
@@ -264,13 +247,13 @@ async function handleChannelBasedDirectMerge(context, uploadId, totalChunks, ori
                 await new Promise(resolve => setTimeout(resolve, 5000)); // 等待5秒
                 
                 const updatedStatuses = await checkChunkUploadStatuses(env, uploadId, totalChunks);
-                const stillUploading = updatedStatuses.filter(chunk => chunk.status === 'uploading');
+                uploadingChunks = updatedStatuses.filter(chunk => chunk.status === 'uploading');
                 
-                if (stillUploading.length < uploadingChunks.length) {
-                    console.log(`Upload progress: ${totalChunks - stillUploading.length}/${totalChunks} chunks completed`);
+                if (uploadingChunks.length < (chunkStatuses.filter(chunk => chunk.status === 'uploading')).length) {
+                    console.log(`Upload progress: ${totalChunks - uploadingChunks.length}/${totalChunks} chunks completed`);
                 }
                 
-                if (stillUploading.length === 0) {
+                if (uploadingChunks.length === 0) {
                     completedChunks = updatedStatuses.filter(chunk => chunk.status === 'completed');
                     break;
                 }
@@ -282,10 +265,10 @@ async function handleChannelBasedDirectMerge(context, uploadId, totalChunks, ori
             if (uploadingChunks.length > 0) {
                 const finalStatuses = await checkChunkUploadStatuses(env, uploadId, totalChunks);
                 completedChunks = finalStatuses.filter(chunk => chunk.status === 'completed');
-                const stillUploading = finalStatuses.filter(chunk => chunk.status === 'uploading');
+                uploadingChunks = finalStatuses.filter(chunk => chunk.status === 'uploading');
                 
-                if (stillUploading.length > 0) {
-                    console.warn(`Timeout waiting for ${stillUploading.length} chunks to complete upload`);
+                if (uploadingChunks.length > 0) {
+                    console.warn(`Timeout waiting for ${uploadingChunks.length} chunks to complete upload`);
                 }
             }
         }
@@ -303,11 +286,11 @@ async function handleChannelBasedDirectMerge(context, uploadId, totalChunks, ori
         // 根据渠道合并分块信息
         let result;
         if (uploadChannel === 'cfr2') {
-            result = await mergeR2ChunksInfo(context, uploadId, completedChunks, metadata, returnLink);
+            result = await mergeR2ChunksInfo(context, uploadId, completedChunks, metadata, '');
         } else if (uploadChannel === 's3') {
-            result = await mergeS3ChunksInfo(context, uploadId, completedChunks, metadata, returnLink);
+            result = await mergeS3ChunksInfo(context, uploadId, completedChunks, metadata, '');
         } else if (uploadChannel === 'telegram') {
-            result = await mergeTelegramChunksInfo(context, uploadId, completedChunks, metadata, returnLink);
+            result = await mergeTelegramChunksInfo(context, uploadId, completedChunks, metadata, '');
         } else {
             throw new Error(`Unsupported upload channel: ${uploadChannel}`);
         }
@@ -324,54 +307,64 @@ async function handleChannelBasedDirectMerge(context, uploadId, totalChunks, ori
 
 // 合并R2分块信息
 async function mergeR2ChunksInfo(context, uploadId, completedChunks, metadata, returnLink) {
-    const { env, uploadConfig } = context;
+    const { env } = context;
     
     try {
-        const r2Settings = uploadConfig.cfr2;
         const R2DataBase = env.img_r2;
+        const multipartKey = `multipart_${uploadId}`;
         
-        // 创建multipart upload
-        const multipartUpload = await R2DataBase.createMultipartUpload(metadata.finalFileId);
-        const uploadedParts = [];
+        // 获取multipart info
+        const multipartInfoData = await env.img_url.get(multipartKey);
+        if (!multipartInfoData) {
+            throw new Error('Multipart upload info not found');
+        }
         
-        // 按顺序处理分块
-        for (const chunk of completedChunks.sort((a, b) => a.index - b.index)) {
-            const tempChunkKey = chunk.uploadResult.chunkKey;
-            
-            // 从R2获取临时分块数据
-            const chunkObject = await R2DataBase.get(tempChunkKey);
-            if (!chunkObject) {
-                throw new Error(`Temp chunk ${chunk.index} not found in R2`);
+        const multipartInfo = JSON.parse(multipartInfoData);
+        
+        // 检查所有分块是否都已完成
+        const sortedChunks = completedChunks.sort((a, b) => a.index - b.index);
+        const parts = [];
+        
+        for (const chunk of sortedChunks) {
+            const part = multipartInfo.parts[chunk.index];
+            if (!part) {
+                throw new Error(`Part ${chunk.index + 1} not found in multipart upload`);
             }
-            
-            // 将R2Object转换为ArrayBuffer
-            const chunkData = await chunkObject.arrayBuffer();
-            
-            // 上传为multipart的一部分
-            const uploadPart = await multipartUpload.uploadPart(chunk.index + 1, chunkData);
-            uploadedParts.push(uploadPart);
-            
-            // 清理临时分块
-            await R2DataBase.delete(tempChunkKey);
+            parts.push(part);
         }
         
         // 完成multipart upload
-        await multipartUpload.complete(uploadedParts);
+        const multipartUpload = R2DataBase.resumeMultipartUpload(multipartInfo.key, multipartInfo.uploadId);
+        await multipartUpload.complete(parts);
         
         // 计算总大小
         const totalSize = completedChunks.reduce((sum, chunk) => sum + chunk.uploadResult.size, 0);
         
-        // 更新metadata
+        // 使用multipart info中的finalFileId更新metadata
+        const finalFileId = multipartInfo.finalFileId || multipartInfo.key;
         metadata.Channel = "CloudflareR2";
         metadata.ChannelName = "R2_env";
         metadata.FileSize = (totalSize / 1024 / 1024).toFixed(2);
         
+        // 清理multipart info
+        await env.img_url.delete(multipartKey);
+        
         // 写入KV数据库
-        await env.img_url.put(metadata.finalFileId, "", { metadata });
+        await env.img_url.put(finalFileId, "", { metadata });
+        
+        // 更新返回链接
+        const { url } = context;
+        const returnFormat = url.searchParams.get('returnFormat') || 'default';
+        let updatedReturnLink = '';
+        if (returnFormat === 'full') {
+            updatedReturnLink = `${url.origin}/file/${finalFileId}`;
+        } else {
+            updatedReturnLink = `/file/${finalFileId}`;
+        }
         
         return {
             success: true,
-            result: [{ 'src': returnLink }]
+            result: [{ 'src': updatedReturnLink }]
         };
         
     } catch (error) {
@@ -399,72 +392,50 @@ async function mergeS3ChunksInfo(context, uploadId, completedChunks, metadata, r
             forcePathStyle: pathStyle
         });
 
-        const s3FileName = metadata.finalFileId;
+        const multipartKey = `multipart_${uploadId}`;
         
-        // 创建multipart upload
-        const createResponse = await s3Client.send(new CreateMultipartUploadCommand({
-            Bucket: bucketName,
-            Key: s3FileName,
-            ContentType: metadata.FileType
-        }));
-
-        const uploadId_s3 = createResponse.UploadId;
-        const uploadedParts = [];
-
-        // 按顺序处理分块
-        for (const chunk of completedChunks.sort((a, b) => a.index - b.index)) {
-            const tempChunkKey = chunk.uploadResult.chunkKey;
-            
-            // 从S3获取临时分块数据
-            const getResponse = await s3Client.send(new GetObjectCommand({
-                Bucket: bucketName,
-                Key: tempChunkKey
-            }));
-            
-            const chunkData = await getResponse.Body.transformToByteArray();
-            
-            // 上传为multipart的一部分
-            const uploadResponse = await s3Client.send(new UploadPartCommand({
-                Bucket: bucketName,
-                Key: s3FileName,
-                PartNumber: chunk.index + 1,
-                UploadId: uploadId_s3,
-                Body: chunkData
-            }));
-
-            uploadedParts.push({
-                PartNumber: chunk.index + 1,
-                ETag: uploadResponse.ETag
-            });
-            
-            // 清理临时分块
-            await s3Client.send(new DeleteObjectCommand({
-                Bucket: bucketName,
-                Key: tempChunkKey
-            }));
+        // 获取multipart info
+        const multipartInfoData = await env.img_url.get(multipartKey);
+        if (!multipartInfoData) {
+            throw new Error('Multipart upload info not found');
+        }
+        
+        const multipartInfo = JSON.parse(multipartInfoData);
+        
+        // 检查所有分块是否都已完成
+        const sortedChunks = completedChunks.sort((a, b) => a.index - b.index);
+        const parts = [];
+        
+        for (const chunk of sortedChunks) {
+            const part = multipartInfo.parts[chunk.index];
+            if (!part) {
+                throw new Error(`Part ${chunk.index + 1} not found in multipart upload`);
+            }
+            parts.push(part);
         }
 
         // 完成multipart upload
         await s3Client.send(new CompleteMultipartUploadCommand({
             Bucket: bucketName,
-            Key: s3FileName,
-            UploadId: uploadId_s3,
-            MultipartUpload: { Parts: uploadedParts }
+            Key: multipartInfo.key,
+            UploadId: multipartInfo.uploadId,
+            MultipartUpload: { Parts: parts }
         }));
 
         // 计算总大小
         const totalSize = completedChunks.reduce((sum, chunk) => sum + chunk.uploadResult.size, 0);
         
-        // 更新metadata
+        // 使用multipart info中的finalFileId更新metadata
+        const finalFileId = multipartInfo.finalFileId || multipartInfo.key;
         metadata.Channel = "S3";
         metadata.ChannelName = s3Channel.name;
         metadata.FileSize = (totalSize / 1024 / 1024).toFixed(2);
 
         const s3ServerDomain = endpoint.replace(/https?:\/\//, "");
         if (pathStyle) {
-            metadata.S3Location = `https://${s3ServerDomain}/${bucketName}/${s3FileName}`;
+            metadata.S3Location = `https://${s3ServerDomain}/${bucketName}/${multipartInfo.key}`;
         } else {
-            metadata.S3Location = `https://${bucketName}.${s3ServerDomain}/${s3FileName}`;
+            metadata.S3Location = `https://${bucketName}.${s3ServerDomain}/${multipartInfo.key}`;
         }
         metadata.S3Endpoint = endpoint;
         metadata.S3PathStyle = pathStyle;
@@ -472,14 +443,27 @@ async function mergeS3ChunksInfo(context, uploadId, completedChunks, metadata, r
         metadata.S3SecretAccessKey = secretAccessKey;
         metadata.S3Region = region || "auto";
         metadata.S3BucketName = bucketName;
-        metadata.S3FileKey = s3FileName;
+        metadata.S3FileKey = multipartInfo.key;
+
+        // 清理multipart info
+        await env.img_url.delete(multipartKey);
 
         // 写入KV数据库
-        await env.img_url.put(metadata.finalFileId, "", { metadata });
+        await env.img_url.put(finalFileId, "", { metadata });
+
+        // 更新返回链接
+        const { url } = context;
+        const returnFormat = url.searchParams.get('returnFormat') || 'default';
+        let updatedReturnLink = '';
+        if (returnFormat === 'full') {
+            updatedReturnLink = `${url.origin}/file/${finalFileId}`;
+        } else {
+            updatedReturnLink = `/file/${finalFileId}`;
+        }
 
         return {
             success: true,
-            result: [{ src: returnLink }]
+            result: [{ src: updatedReturnLink }]
         };
         
     } catch (error) {
@@ -579,84 +563,5 @@ async function updateMergeStatus(env, statusKey, updates) {
         }
     } catch (error) {
         console.error('Failed to update merge status:', error);
-    }
-}
-
-// 检查分块上传状态
-async function checkChunkUploadStatuses(env, uploadId, totalChunks) {
-    const chunkStatuses = [];
-    
-    for (let i = 0; i < totalChunks; i++) {
-        const chunkKey = `chunk_${uploadId}_${i.toString().padStart(3, '0')}`;
-        try {
-            const chunkRecord = await env.img_url.getWithMetadata(chunkKey);
-            if (chunkRecord && chunkRecord.metadata) {
-                const status = chunkRecord.metadata.status || 'unknown';
-                const hasData = status === 'completed' 
-                    ? !!chunkRecord.metadata.uploadResult  // 已完成的分块通过uploadResult判断
-                    : (chunkRecord.value && chunkRecord.value.byteLength > 0); // 未完成的分块通过原始数据判断
-                
-                chunkStatuses.push({
-                    index: i,
-                    key: chunkKey,
-                    status: status,
-                    uploadResult: chunkRecord.metadata.uploadResult,
-                    error: chunkRecord.metadata.error,
-                    hasData: hasData
-                });
-            } else {
-                chunkStatuses.push({
-                    index: i,
-                    key: chunkKey,
-                    status: 'missing',
-                    hasData: false
-                });
-            }
-        } catch (error) {
-            chunkStatuses.push({
-                index: i,
-                key: chunkKey,
-                status: 'error',
-                error: error.message,
-                hasData: false
-            });
-        }
-    }
-    
-    return chunkStatuses;
-}
-
-// 清理分块数据
-async function cleanupChunkData(env, uploadId, totalChunks) {
-    try {
-        for (let i = 0; i < totalChunks; i++) {
-            const chunkKey = `chunk_${uploadId}_${i.toString().padStart(3, '0')}`;
-            
-            // 获取分块信息以确定是否需要清理存储端的临时文件
-            try {
-                const chunkRecord = await env.img_url.getWithMetadata(chunkKey);
-                if (chunkRecord && chunkRecord.metadata && chunkRecord.metadata.uploadResult) {
-                    const uploadResult = chunkRecord.metadata.uploadResult;
-                    const uploadChannel = chunkRecord.metadata.uploadChannel;
-                    
-                    // 根据渠道清理存储端的临时文件
-                    if (uploadChannel === 'cfr2' && uploadResult.chunkKey) {
-                        try {
-                            await env.img_r2.delete(uploadResult.chunkKey);
-                        } catch (r2Error) {
-                            console.warn(`Failed to cleanup R2 temp chunk ${uploadResult.chunkKey}:`, r2Error);
-                        }
-                    }
-                    // S3和Telegram的临时文件会在合并过程中清理，这里不需要额外处理
-                }
-            } catch (metaError) {
-                console.warn(`Failed to get metadata for chunk ${chunkKey}:`, metaError);
-            }
-            
-            // 删除KV中的分块记录
-            await env.img_url.delete(chunkKey);
-        }
-    } catch (cleanupError) {
-        console.warn('Failed to cleanup chunk data:', cleanupError);
     }
 }

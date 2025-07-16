@@ -2,7 +2,7 @@ import { userAuthCheck, UnauthorizedResponse } from "./utils/userAuth";
 import { fetchUploadConfig, fetchSecurityConfig } from "./utils/sysConfig";
 import { createResponse, getUploadIp, getIPAddress, sanitizeFileName, isExtValid, 
         moderateContent, purgeCDNCache, isBlockedUploadIp, buildUniqueFileId } from "./utils/uploadTools";
-import { handleChunkUpload, uploadLargeFileToTelegram } from "./utils/chunkUpload";
+import { initializeChunkedUpload, handleChunkUpload, uploadLargeFileToTelegram } from "./utils/chunkUpload";
 import { handleChunkMerge, checkMergeStatus } from "./utils/chunkMerge";
 import { TelegramAPI } from "./utils/telegramAPI";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
@@ -45,6 +45,12 @@ export async function onRequest(context) {  // Contents of context object
     if (statusCheck) {
         const uploadId = url.searchParams.get('uploadId');
         return await checkMergeStatus(env, uploadId);
+    }
+
+    // 检查是否为初始化分块上传请求
+    const initChunked = url.searchParams.get('initChunked') === 'true';
+    if (initChunked) {
+        return await initializeChunkedUpload(context);
     }
 
     // 检查是否为分块上传
@@ -151,8 +157,7 @@ export async function processFileUpload(context, formdata = null) {
     }
 
     // 构建文件ID
-    const nameType = url.searchParams.get('uploadNameType') || 'default'; // 获取命名方式
-    const fullId = await buildUniqueFileId(env, nameType, normalizedFolder, fileName, fileExt, time);
+    const fullId = await buildUniqueFileId(context, fileName, fileType);
 
     // 获得返回链接格式, default为返回/file/id, full为返回完整链接
     const returnFormat = url.searchParams.get('returnFormat') || 'default';

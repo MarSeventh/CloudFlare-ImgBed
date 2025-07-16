@@ -391,74 +391,78 @@ async function fetchChunkWithRetry(botToken, chunk, maxRetries = 3) {
 
 // 处理R2文件读取
 async function handleR2File(env, fileId, fileName, encodedFileName, fileType, Referer, url, request) {
-    // 检查是否配置了R2
-    if (typeof env.img_r2 == "undefined" || env.img_r2 == null || env.img_r2 == "") {
-        return new Response('Error: Please configure R2 database', { status: 500 });
-    }
-    
-    const R2DataBase = env.img_r2;
-    
-    // 检查Range请求头
-    const range = request.headers.get('Range');
-    let object;
-    
-    if (range) {
-        // 处理Range请求（用于大文件流式传输）
-        const matches = range.match(/bytes=(\d+)-(\d*)/);
-        if (matches) {
-            const start = parseInt(matches[1]);
-            const end = matches[2] ? parseInt(matches[2]) : undefined;
-            
-            const rangeOptions = { offset: start };
-            if (end !== undefined) {
-                rangeOptions.length = end - start + 1;
+    try {
+        // 检查是否配置了R2
+        if (typeof env.img_r2 == "undefined" || env.img_r2 == null || env.img_r2 == "") {
+            return new Response('Error: Please configure R2 database', { status: 500 });
+        }
+        
+        const R2DataBase = env.img_r2;
+        
+        // 检查Range请求头
+        const range = request.headers.get('Range');
+        let object;
+        
+        if (range) {
+            // 处理Range请求（用于大文件流式传输）
+            const matches = range.match(/bytes=(\d+)-(\d*)/);
+            if (matches) {
+                const start = parseInt(matches[1]);
+                const end = matches[2] ? parseInt(matches[2]) : undefined;
+                
+                const rangeOptions = { offset: start };
+                if (end !== undefined) {
+                    rangeOptions.length = end - start + 1;
+                }
+                
+                object = await R2DataBase.get(fileId, rangeOptions);
+            } else {
+                object = await R2DataBase.get(fileId);
             }
-            
-            object = await R2DataBase.get(fileId, rangeOptions);
         } else {
             object = await R2DataBase.get(fileId);
         }
-    } else {
-        object = await R2DataBase.get(fileId);
-    }
 
-    if (object === null) {
-        return new Response('Error: Failed to fetch file', { status: 500 });
-    }
+        if (object === null) {
+            return new Response('Error: Failed to fetch file', { status: 500 });
+        }
 
-    const headers = new Headers();
-    object.writeHttpMetadata(headers);
-    headers.set('Content-Disposition', `inline; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
-    headers.set('Access-Control-Allow-Origin', '*');
-    headers.set('Accept-Ranges', 'bytes');
-    
-    if (fileType) {
-        headers.set('Content-Type', fileType);
-    }
-    
-    // 根据Referer设置CDN缓存策略
-    if (Referer && Referer.includes(url.origin)) {
-        headers.set('Cache-Control', 'private, max-age=86400');
-    } else {
-        headers.set('Cache-Control', 'public, max-age=604800');
-    }
-
-    // 如果是Range请求，设置相应的状态码和头
-    if (range && object.range) {
-        headers.set('Content-Range', `bytes ${object.range.offset}-${object.range.offset + object.range.length - 1}/${object.size}`);
-        headers.set('Content-Length', object.range.length.toString());
+        const headers = new Headers();
+        object.writeHttpMetadata(headers);
+        headers.set('Content-Disposition', `inline; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
+        headers.set('Access-Control-Allow-Origin', '*');
+        headers.set('Accept-Ranges', 'bytes');
         
+        if (fileType) {
+            headers.set('Content-Type', fileType);
+        }
+        
+        // 根据Referer设置CDN缓存策略
+        if (Referer && Referer.includes(url.origin)) {
+            headers.set('Cache-Control', 'private, max-age=86400');
+        } else {
+            headers.set('Cache-Control', 'public, max-age=604800');
+        }
+
+        // 如果是Range请求，设置相应的状态码和头
+        if (range && object.range) {
+            headers.set('Content-Range', `bytes ${object.range.offset}-${object.range.offset + object.range.length - 1}/${object.size}`);
+            headers.set('Content-Length', object.range.length.toString());
+            
+            return new Response(object.body, {
+                status: 206, // Partial Content
+                headers,
+            });
+        }
+
+        // 正常请求
         return new Response(object.body, {
-            status: 206, // Partial Content
+            status: 200,
             headers,
         });
+    } catch (error) {
+        return new Response(`Error: Failed to fetch from R2 - ${error.message}`, { status: 500 });
     }
-
-    // 正常请求
-    return new Response(object.body, {
-        status: 200,
-        headers,
-    });
 }
 
 // 处理S3文件读取
