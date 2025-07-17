@@ -187,45 +187,6 @@ export async function onRequest(context) {  // Contents of context object
     }
 }
 
-async function returnWithCheck(context, imgRecord) {
-    const { request, env, url, securityConfig } = context;
-    const whiteListMode = securityConfig.access.whiteListMode;
-
-    const response = new Response('success', { status: 200 });
-
-    // Referer header equal to the dashboard page or upload page
-    if (request.headers.get('Referer') && request.headers.get('Referer').includes(url.origin)) {
-        //show the image
-        return response;
-    }
-
-    if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") {
-    } else {
-        //check the record from kv
-        const record = imgRecord;
-        if (record.metadata === null) {
-        } else {
-            //if the record is not null, redirect to the image
-            if (record.metadata.ListType == "White") {
-                return response;
-            } else if (record.metadata.ListType == "Block") {
-                return await returnBlockImg(url);
-            } else if (record.metadata.Label == "adult") {
-                return await returnBlockImg(url);
-            }
-            //check if the env variables WhiteList_Mode are set
-            if (whiteListMode) {
-                //if the env variables WhiteList_Mode are set, redirect to the image
-                return await returnWhiteListImg(url);
-            } else {
-                //if the env variables WhiteList_Mode are not set, redirect to the image
-                return response;
-            }
-        }
-    }
-    // other cases
-    return response;
-}
 
 // 处理分片文件读取
 async function handleTelegramChunkedFile(imgRecord, request, env, fileName, encodedFileName, fileType, Referer, url) {
@@ -256,78 +217,36 @@ async function handleTelegramChunkedFile(imgRecord, request, env, fileName, enco
     }
     
     try {
-        // 对于大文件，使用流式读取
-        if (metadata.FileSize && metadata.FileSize > 100 * 1024 * 1024) { // 大于60MB使用流式
-            const stream = new ReadableStream({
-                async start(controller) {
-                    try {
-                        for (let i = 0; i < chunks.length; i++) {
-                            const chunk = chunks[i];
-                            const chunkData = await fetchChunkWithRetry(TgBotToken, chunk, 3);
-                            if (!chunkData) {
-                                throw new Error(`Failed to fetch chunk ${chunk.index} after retries`);
-                            }
-                            controller.enqueue(chunkData);
+        // 所有文件都使用流式读取，避免大文件内存问题
+        const stream = new ReadableStream({
+            async start(controller) {
+                try {
+                    for (let i = 0; i < chunks.length; i++) {
+                        const chunk = chunks[i];
+                        const chunkData = await fetchChunkWithRetry(TgBotToken, chunk, 3);
+                        if (!chunkData) {
+                            throw new Error(`Failed to fetch chunk ${chunk.index} after retries`);
                         }
-                        controller.close();
-                    } catch (error) {
-                        controller.error(error);
+                        controller.enqueue(chunkData);
                     }
+                    controller.close();
+                } catch (error) {
+                    controller.error(error);
                 }
-            });
-            
-            const headers = new Headers();
-            headers.set('Content-Disposition', `inline; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
-            headers.set('Access-Control-Allow-Origin', '*');
-            headers.set('Accept-Ranges', 'bytes');
-            if (metadata.FileSize) {
-                headers.set('Content-Length', metadata.FileSize.toString());
             }
-            
-            if (fileType) {
-                headers.set('Content-Type', fileType);
-            }
-            
-            // 根据Referer设置CDN缓存策略
-            if (Referer && Referer.includes(url.origin)) {
-                headers.set('Cache-Control', 'private, max-age=86400');
-            } else {
-                headers.set('Cache-Control', 'public, max-age=604800');
-            }
-            
-            return new Response(stream, {
-                status: 200,
-                headers,
-            });
-        }
-        
-        // 对于较小文件，预先获取所有分片数据
-        const chunkDataArray = [];
-        
-        for (const chunk of chunks) {
-            const chunkData = await fetchChunkWithRetry(TgBotToken, chunk, 3);
-            if (!chunkData) {
-                throw new Error(`Failed to fetch chunk ${chunk.index} after retries`);
-            }
-            chunkDataArray.push(chunkData);
-        }
-        
-        // 计算总大小
-        const totalSize = chunkDataArray.reduce((sum, chunk) => sum + chunk.length, 0);
-        
-        // 创建合并后的数组
-        const mergedData = new Uint8Array(totalSize);
-        let offset = 0;
-        
-        for (const chunkData of chunkDataArray) {
-            mergedData.set(chunkData, offset);
-            offset += chunkData.length;
-        }
+        });
         
         const headers = new Headers();
         headers.set('Content-Disposition', `inline; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
         headers.set('Access-Control-Allow-Origin', '*');
-        headers.set('Content-Length', totalSize.toString());
+        headers.set('Accept-Ranges', 'bytes');
+        
+        // 设置Content-Length
+        if (metadata.FileSize) {
+            // 将MB转换为字节
+            const sizeInBytes = parseFloat(metadata.FileSize) * 1024 * 1024;
+            headers.set('Content-Length', sizeInBytes.toString());
+        }
         
         if (fileType) {
             headers.set('Content-Type', fileType);
@@ -340,8 +259,7 @@ async function handleTelegramChunkedFile(imgRecord, request, env, fileName, enco
             headers.set('Cache-Control', 'public, max-age=604800');
         }
         
-        // 返回合并后的完整文件
-        return new Response(mergedData, {
+        return new Response(stream, {
             status: 200,
             headers,
         });
@@ -559,6 +477,46 @@ async function getFileContent(request, max_retries = 2) {
 
 function isTgChannel(imgRecord) {
     return imgRecord.metadata?.Channel === 'Telegram' || imgRecord.metadata?.Channel === 'TelegramNew';
+}
+
+async function returnWithCheck(context, imgRecord) {
+    const { request, env, url, securityConfig } = context;
+    const whiteListMode = securityConfig.access.whiteListMode;
+
+    const response = new Response('success', { status: 200 });
+
+    // Referer header equal to the dashboard page or upload page
+    if (request.headers.get('Referer') && request.headers.get('Referer').includes(url.origin)) {
+        //show the image
+        return response;
+    }
+
+    if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") {
+    } else {
+        //check the record from kv
+        const record = imgRecord;
+        if (record.metadata === null) {
+        } else {
+            //if the record is not null, redirect to the image
+            if (record.metadata.ListType == "White") {
+                return response;
+            } else if (record.metadata.ListType == "Block") {
+                return await returnBlockImg(url);
+            } else if (record.metadata.Label == "adult") {
+                return await returnBlockImg(url);
+            }
+            //check if the env variables WhiteList_Mode are set
+            if (whiteListMode) {
+                //if the env variables WhiteList_Mode are set, redirect to the image
+                return await returnWhiteListImg(url);
+            } else {
+                //if the env variables WhiteList_Mode are not set, redirect to the image
+                return response;
+            }
+        }
+    }
+    // other cases
+    return response;
 }
 
 async function return404(url) {
