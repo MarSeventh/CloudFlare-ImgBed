@@ -56,29 +56,6 @@ export async function handleChunkMerge(context) {
         }, {});
         console.log(`Initial chunk status summary: ${JSON.stringify(initialStatusSummary)}`);
         
-        // 区分失败的分块和仍在上传中的分块
-        const failedChunks = chunkStatuses.filter(chunk => chunk.status === 'failed' && chunk.hasData);
-        const uploadingChunks = chunkStatuses.filter(chunk => chunk.status === 'uploading');
-        
-        if (failedChunks.length > 0) {
-            console.log(`Found ${failedChunks.length} failed chunks, retrying...`);
-            
-            // 输出详细的状态信息用于调试
-            const statusDetails = failedChunks.map(chunk => ({
-                index: chunk.index,
-                status: chunk.status,
-                hasData: chunk.hasData,
-                error: chunk.error
-            }));
-            console.log('Failed chunks before retry:', JSON.stringify(statusDetails, null, 2));
-            
-            await retryFailedChunks(context, failedChunks, uploadChannel);
-        }
-        
-        if (uploadingChunks.length > 0) {
-            console.log(`Found ${uploadingChunks.length} chunks still uploading, will wait for completion...`);
-        }
-
         // 开始合并处理
         return await startMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel);
 
@@ -103,7 +80,6 @@ async function startMerge(context, uploadId, totalChunks, originalFileName, orig
     const { env, url, waitUntil } = context;
 
     try {
-
         // 创建合并任务状态记录
         const mergeStatus = {
             uploadId,
