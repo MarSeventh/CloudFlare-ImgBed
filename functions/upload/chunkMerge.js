@@ -1,6 +1,6 @@
 /* ========== 分块合并处理 ========== */
 import { createResponse, getUploadIp, getIPAddress, selectConsistentChannel, buildUniqueFileId } from './uploadTools';
-import { retryFailedChunks, cleanupFailedMultipartUploads, checkChunkUploadStatuses, cleanupChunkData, cleanupUploadSession } from './chunkUpload';
+import { retryFailedChunks, cleanupFailedMultipartUploads, checkChunkUploadStatuses, cleanupChunkData, cleanupUploadSession, cleanupTimeoutChunks, forceCleanupUpload } from './chunkUpload';
 import { S3Client, CompleteMultipartUploadCommand } from "@aws-sdk/client-s3";
 
 // 处理分块合并
@@ -147,16 +147,28 @@ async function startMerge(context, uploadId, totalChunks, originalFileName, orig
 async function performAsyncMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel) {
     const { env } = context;
     const statusKey = `merge_status_${uploadId}`;
+    const MERGE_TIMEOUT = 120000; // 2分钟合并超时
+    const mergeStartTime = Date.now();
     
     try {
         // 更新状态：开始合并
         await updateMergeStatus(env, statusKey, {
             status: 'merging',
             progress: 10,
-            message: 'Collecting uploaded chunks...'
+            message: 'Collecting uploaded chunks...',
+            mergeStartTime: mergeStartTime,
+            mergeTimeoutThreshold: mergeStartTime + MERGE_TIMEOUT
         });
 
-        const result = await handleChannelBasedMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel, statusKey);
+        // 设置合并超时保护
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Merge operation timeout')), MERGE_TIMEOUT);
+        });
+        
+        const mergePromise = handleChannelBasedMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel, statusKey);
+        
+        // 竞速执行合并和超时
+        const result = await Promise.race([mergePromise, timeoutPromise]);
 
         if (result.success) {
             // 清理临时分块数据
@@ -170,32 +182,37 @@ async function performAsyncMerge(context, uploadId, totalChunks, originalFileNam
                 status: 'success',
                 progress: 100,
                 message: 'Merge completed successfully!',
-                result: result.result
+                result: result.result,
+                completedTime: Date.now()
             });
         } else {
             throw new Error(result.error || 'Merge failed');
         }
 
     } catch (error) {
-        console.error('Direct async merge failed:', error);
+        const isTimeout = error.message === 'Merge operation timeout';
+        console.error(`${isTimeout ? 'Merge timeout' : 'Direct async merge failed'}:`, error);
         
         // 清理失败的multipart uploads
         if (uploadChannel === 'cfr2' || uploadChannel === 's3') {
             await cleanupFailedMultipartUploads(context, uploadId, uploadChannel);
         }
         
-        // 清理分块数据
+        // 清理分块数据和超时数据
         await cleanupChunkData(env, uploadId, totalChunks);
+        await cleanupTimeoutChunks(env, uploadId, totalChunks);
 
         // 清理上传会话
         await cleanupUploadSession(env, uploadId);
 
-        // 更新状态：失败
+        // 更新状态：失败或超时
         await updateMergeStatus(env, statusKey, {
-            status: 'error',
+            status: isTimeout ? 'timeout' : 'error',
             progress: 0,
-            message: `Merge failed: ${error.message}`,
-            error: error.message
+            message: isTimeout ? 'Merge operation timed out' : `Merge failed: ${error.message}`,
+            error: error.message,
+            isTimeout: isTimeout,
+            failedTime: Date.now()
         });
     }
 }
@@ -234,23 +251,72 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
         const chunkStatuses = await checkChunkUploadStatuses(env, uploadId, totalChunks);
         let completedChunks = chunkStatuses.filter(chunk => chunk.status === 'completed');
         
-        // 如果还有分块在上传中，等待一段时间后重试
+        // 统计不同状态的分块
+        const statusSummary = chunkStatuses.reduce((acc, chunk) => {
+            acc[chunk.status] = (acc[chunk.status] || 0) + 1;
+            return acc;
+        }, {});
+        
+        console.log(`Chunk status summary: ${JSON.stringify(statusSummary)}`);
+        
+        // 检查失败、超时的分块
+        const failedChunks = chunkStatuses.filter(chunk => 
+            chunk.status === 'failed' || 
+            chunk.status === 'timeout' || 
+            chunk.status === 'retry_failed' || 
+            chunk.status === 'retry_timeout'
+        );
+        
+        // 检查还在上传中的分块
         let uploadingChunks = chunkStatuses.filter(chunk => chunk.status === 'uploading');
+        
+        // 检查超时但状态仍为uploading的分块
+        const timeoutUploading = uploadingChunks.filter(chunk => chunk.isTimeout);
+        if (timeoutUploading.length > 0) {
+            console.warn(`Found ${timeoutUploading.length} chunks timed out but still marked as uploading`);
+            failedChunks.push(...timeoutUploading);
+            uploadingChunks = uploadingChunks.filter(chunk => !chunk.isTimeout);
+        }
+        
+        // 如果有失败的分块，尝试重试
+        if (failedChunks.length > 0 && statusKey) {
+            await updateMergeStatus(env, statusKey, {
+                progress: 30,
+                message: `Retrying ${failedChunks.length} failed chunks...`
+            });
+            
+            console.log(`Retrying ${failedChunks.length} failed chunks...`);
+            await retryFailedChunks(context, failedChunks, uploadChannel);
+            
+            // 重新检查状态
+            const retryStatuses = await checkChunkUploadStatuses(env, uploadId, totalChunks);
+            completedChunks = retryStatuses.filter(chunk => chunk.status === 'completed');
+            uploadingChunks = retryStatuses.filter(chunk => chunk.status === 'uploading');
+        }
+        
+        // 如果还有分块在上传中，等待一段时间（减少等待时间以避免超时）
         if (uploadingChunks.length > 0) {
             console.log(`Found ${uploadingChunks.length} chunks still uploading, waiting...`);
             
-            // 等待并重试，最多等待60秒
+            // 等待并重试，最多等待30秒（减少从60秒）
             let retryCount = 0;
-            const maxRetries = 12; // 60秒，每次等待5秒
+            const maxRetries = 6; // 30秒，每次等待5秒
             
             while (uploadingChunks.length > 0 && retryCount < maxRetries) {
                 await new Promise(resolve => setTimeout(resolve, 5000)); // 等待5秒
                 
                 const updatedStatuses = await checkChunkUploadStatuses(env, uploadId, totalChunks);
-                uploadingChunks = updatedStatuses.filter(chunk => chunk.status === 'uploading');
+                uploadingChunks = updatedStatuses.filter(chunk => chunk.status === 'uploading' && !chunk.isTimeout);
                 
                 if (uploadingChunks.length < (chunkStatuses.filter(chunk => chunk.status === 'uploading')).length) {
                     console.log(`Upload progress: ${totalChunks - uploadingChunks.length}/${totalChunks} chunks completed`);
+                    
+                    if (statusKey) {
+                        await updateMergeStatus(env, statusKey, {
+                            progress: 40 + Math.floor((totalChunks - uploadingChunks.length) / totalChunks * 40),
+                            message: `Waiting for upload completion: ${totalChunks - uploadingChunks.length}/${totalChunks} chunks done`
+                        });
+                    }
                 }
                 
                 if (uploadingChunks.length === 0) {
@@ -261,26 +327,52 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
                 retryCount++;
             }
             
-            // 如果仍然有分块在上传，更新状态信息
+            // 如果仍然有分块在上传，标记为超时失败
             if (uploadingChunks.length > 0) {
                 const finalStatuses = await checkChunkUploadStatuses(env, uploadId, totalChunks);
                 completedChunks = finalStatuses.filter(chunk => chunk.status === 'completed');
                 uploadingChunks = finalStatuses.filter(chunk => chunk.status === 'uploading');
                 
-                if (uploadingChunks.length > 0) {
-                    console.warn(`Timeout waiting for ${uploadingChunks.length} chunks to complete upload`);
+                console.warn(`Timeout waiting for ${uploadingChunks.length} chunks to complete upload`);
+                
+                // 对于仍在上传的分块，标记为超时
+                for (const chunk of uploadingChunks) {
+                    try {
+                        const chunkRecord = await env.img_url.getWithMetadata(chunk.key);
+                        if (chunkRecord && chunkRecord.metadata) {
+                            const timeoutMetadata = {
+                                ...chunkRecord.metadata,
+                                status: 'timeout',
+                                error: 'Upload timeout during merge',
+                                timeoutDuringMerge: true,
+                                timeoutTime: Date.now()
+                            };
+                            
+                            await env.img_url.put(chunk.key, chunkRecord.value, { 
+                                metadata: timeoutMetadata,
+                                expirationTtl: 3600
+                            });
+                        }
+                    } catch (timeoutError) {
+                        console.warn(`Failed to update timeout status for chunk ${chunk.index}:`, timeoutError);
+                    }
                 }
             }
         }
         
+        // 最终检查是否所有分块都完成
         if (completedChunks.length !== totalChunks) {
-            // 获取详细的状态信息用于调试
-            const statusSummary = chunkStatuses.reduce((acc, chunk) => {
+            // 获取最新的状态信息
+            const finalStatuses = await checkChunkUploadStatuses(env, uploadId, totalChunks);
+            const finalStatusSummary = finalStatuses.reduce((acc, chunk) => {
                 acc[chunk.status] = (acc[chunk.status] || 0) + 1;
                 return acc;
             }, {});
             
-            throw new Error(`Only ${completedChunks.length}/${totalChunks} chunks completed successfully. Status summary: ${JSON.stringify(statusSummary)}`);
+            // 尝试清理超时的分块
+            await cleanupTimeoutChunks(env, uploadId, totalChunks);
+            
+            throw new Error(`Only ${completedChunks.length}/${totalChunks} chunks completed successfully. Final status: ${JSON.stringify(finalStatusSummary)}`);
         }
 
         // 根据渠道合并分块信息
@@ -545,19 +637,87 @@ export async function checkMergeStatus(env, uploadId) {
         
         if (!statusData) {
             return createResponse(JSON.stringify({
-                error: 'Merge task not found or expired'
+                error: 'Merge task not found or expired',
+                uploadId: uploadId,
+                recommendedAction: 'restart_upload'
             }), { status: 404, headers: { 'Content-Type': 'application/json' } });
         }
 
         const status = JSON.parse(statusData);
-        return createResponse(JSON.stringify(status), {
+        const currentTime = Date.now();
+        
+        // 检查是否超时
+        const mergeTimeoutThreshold = status.mergeTimeoutThreshold;
+        const mergeStartTime = status.mergeStartTime;
+        
+        // 如果任务正在处理但已经超过超时阈值，标记为超时
+        if (status.status === 'processing' || status.status === 'merging') {
+            if (mergeTimeoutThreshold && currentTime > mergeTimeoutThreshold) {
+                // 更新状态为超时
+                const timeoutStatus = {
+                    ...status,
+                    status: 'timeout',
+                    error: 'Merge operation timed out',
+                    timeoutDetectedTime: currentTime,
+                    isTimeout: true,
+                    recommendedAction: 'restart_upload'
+                };
+                
+                // 异步更新状态，启动清理
+                env.img_url.put(statusKey, JSON.stringify(timeoutStatus), {
+                    expirationTtl: 3600
+                }).catch(err => console.warn('Failed to update timeout status:', err));
+                
+                // 异步清理超时数据
+                if (status.totalChunks) {
+                    cleanupTimeoutChunks(env, uploadId, status.totalChunks).catch(err => 
+                        console.warn('Failed to cleanup timeout chunks:', err)
+                    );
+                }
+                
+                return createResponse(JSON.stringify(timeoutStatus), {
+                    status: 408, // Request Timeout
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            }
+            
+            // 检查是否长时间无更新（超过5分钟没有状态更新）
+            const lastUpdate = status.updatedAt || status.createdAt || mergeStartTime;
+            if (lastUpdate && currentTime - lastUpdate > 300000) { // 5分钟
+                const staleStatus = {
+                    ...status,
+                    status: 'stale',
+                    error: 'Merge operation appears to be stale (no updates for 5+ minutes)',
+                    staleDetectedTime: currentTime,
+                    isStale: true,
+                    recommendedAction: 'check_and_restart'
+                };
+                
+                return createResponse(JSON.stringify(staleStatus), {
+                    status: 408, // Request Timeout
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            }
+        }
+        
+        // 添加额外的状态信息
+        const enhancedStatus = {
+            ...status,
+            currentTime: currentTime,
+            elapsedTime: mergeStartTime ? currentTime - mergeStartTime : 0,
+            timeRemaining: mergeTimeoutThreshold ? Math.max(0, mergeTimeoutThreshold - currentTime) : null
+        };
+        
+        return createResponse(JSON.stringify(enhancedStatus), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
         });
 
     } catch (error) {
         return createResponse(JSON.stringify({
-            error: `Failed to check status: ${error.message}`
+            error: `Failed to check status: ${error.message}`,
+            uploadId: uploadId,
+            recommendedAction: 'retry_status_check'
         }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
 }

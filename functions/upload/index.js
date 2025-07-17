@@ -2,7 +2,7 @@ import { userAuthCheck, UnauthorizedResponse } from "../utils/userAuth";
 import { fetchUploadConfig, fetchSecurityConfig } from "../utils/sysConfig";
 import { createResponse, getUploadIp, getIPAddress, isExtValid, 
         moderateContent, purgeCDNCache, isBlockedUploadIp, buildUniqueFileId } from "./uploadTools";
-import { initializeChunkedUpload, handleChunkUpload, uploadLargeFileToTelegram } from "./chunkUpload";
+import { initializeChunkedUpload, handleChunkUpload, uploadLargeFileToTelegram, handleCleanupRequest} from "./chunkUpload";
 import { handleChunkMerge, checkMergeStatus } from "./chunkMerge";
 import { TelegramAPI } from "../utils/telegramAPI";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
@@ -45,6 +45,14 @@ export async function onRequest(context) {  // Contents of context object
     if (statusCheck) {
         const uploadId = url.searchParams.get('uploadId');
         return await checkMergeStatus(env, uploadId);
+    }
+
+    // 检查是否为清理请求
+    const cleanupRequest = url.searchParams.get('cleanup') === 'true';
+    if (cleanupRequest) {
+        const uploadId = url.searchParams.get('uploadId');
+        const totalChunks = parseInt(url.searchParams.get('totalChunks')) || 0;
+        return await handleCleanupRequest(env, uploadId, totalChunks);
     }
 
     // 检查是否为初始化分块上传请求
