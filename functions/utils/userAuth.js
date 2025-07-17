@@ -1,5 +1,4 @@
 import { fetchSecurityConfig } from './sysConfig';
-import { createResponse } from './uploadTools';
 
 export async function userAuthCheck(env, url, request) {
     const securityConfig = await fetchSecurityConfig(env);
@@ -39,10 +38,13 @@ export async function userAuthCheck(env, url, request) {
 }
 
 export function UnauthorizedResponse(reason) {
-    return createResponse(reason, {
+    return new Response(reason, {
         status: 401,
         statusText: "Unauthorized",
         headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST, GET',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization, authCode',
             "Content-Type": "text/plain;charset=UTF-8",
             "Cache-Control": "no-store",
             "Content-Length": reason.length,
