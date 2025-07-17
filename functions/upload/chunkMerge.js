@@ -147,7 +147,7 @@ async function startMerge(context, uploadId, totalChunks, originalFileName, orig
 async function performAsyncMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel) {
     const { env } = context;
     const statusKey = `merge_status_${uploadId}`;
-    const MERGE_TIMEOUT = 120000; // 2分钟合并超时
+    const MERGE_TIMEOUT = 300000; // 5分钟合并超时
     const mergeStartTime = Date.now();
     
     try {
