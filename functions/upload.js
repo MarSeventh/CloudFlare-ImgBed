@@ -1,6 +1,6 @@
 import { userAuthCheck, UnauthorizedResponse } from "./utils/userAuth";
 import { fetchUploadConfig, fetchSecurityConfig } from "./utils/sysConfig";
-import { createResponse, getUploadIp, getIPAddress, sanitizeFileName, isExtValid, 
+import { createResponse, getUploadIp, getIPAddress, isExtValid, 
         moderateContent, purgeCDNCache, isBlockedUploadIp, buildUniqueFileId } from "./utils/uploadTools";
 import { initializeChunkedUpload, handleChunkUpload, uploadLargeFileToTelegram } from "./utils/chunkUpload";
 import { handleChunkMerge, checkMergeStatus } from "./utils/chunkMerge";
@@ -119,9 +119,6 @@ export async function processFileUpload(context, formdata = null) {
     if (fileType === null || fileType === undefined || fileName === null || fileName === undefined) {
         return createResponse('Error: fileType or fileName is wrong, check the integrity of this file!', { status: 400 });
     }
-
-    // 处理文件名，移除特殊字符
-    fileName = sanitizeFileName(fileName);
     
     // 如果上传文件夹路径为空，尝试从文件名中获取
     if (uploadFolder === '' || uploadFolder === null || uploadFolder === undefined) {

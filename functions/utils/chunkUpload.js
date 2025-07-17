@@ -131,8 +131,11 @@ export async function handleChunkUpload(context) {
             uploadChannel
         };
 
-        // 立即保存分块记录和数据，避免状态检查时显示missing
-        await env.img_url.put(chunkKey, chunkData, { metadata: initialChunkMetadata });
+        // 立即保存分块记录和数据，设置过期时间
+        await env.img_url.put(chunkKey, chunkData, { 
+            metadata: initialChunkMetadata,
+            expirationTtl: 3600 // 1小时过期
+        });
 
         // 异步上传分块到存储端
         waitUntil(uploadChunkToStorage(context, chunk, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType, uploadChannel));
@@ -179,7 +182,7 @@ async function uploadChunkToStorage(context, chunk, chunkIndex, totalChunks, upl
         } else if (uploadChannel === 's3') {
             uploadResult = await uploadSingleChunkToS3Multipart(context, chunkData, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType);
         } else if (uploadChannel === 'telegram') {
-            uploadResult = await uploadSingleChunkToTelegram(context, chunkData, chunkIndex, uploadId, originalFileName, originalFileType);
+            uploadResult = await uploadSingleChunkToTelegram(context, chunkData, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType);
         }
 
         if (uploadResult && uploadResult.success) {
@@ -191,8 +194,11 @@ async function uploadChunkToStorage(context, chunk, chunkIndex, totalChunks, upl
                 completedTime: Date.now()
             };
             
-            // 只保存metadata，不保存原始数据
-            await env.img_url.put(chunkKey, '', { metadata: updatedMetadata });
+            // 只保存metadata，不保存原始数据，设置过期时间
+            await env.img_url.put(chunkKey, '', { 
+                metadata: updatedMetadata,
+                expirationTtl: 3600 // 1小时过期
+            });
             
             console.log(`Chunk ${chunkIndex} uploaded successfully to ${uploadChannel}`);
         } else {
@@ -204,8 +210,11 @@ async function uploadChunkToStorage(context, chunk, chunkIndex, totalChunks, upl
                 failedTime: Date.now()
             };
             
-            // 保留原始数据以便重试
-            await env.img_url.put(chunkKey, chunkData, { metadata: failedMetadata });
+            // 保留原始数据以便重试，设置过期时间
+            await env.img_url.put(chunkKey, chunkData, { 
+                metadata: failedMetadata,
+                expirationTtl: 3600 // 1小时过期
+            });
             
             console.warn(`Chunk ${chunkIndex} upload failed: ${failedMetadata.error}`);
         }
@@ -225,7 +234,10 @@ async function uploadChunkToStorage(context, chunk, chunkIndex, totalChunks, upl
                     failedTime: Date.now()
                 };
                 
-                await env.img_url.put(chunkKey, chunkRecord.value, { metadata: errorMetadata });
+                await env.img_url.put(chunkKey, chunkRecord.value, { 
+                    metadata: errorMetadata,
+                    expirationTtl: 3600 // 1小时过期
+                });
             }
         } catch (metaError) {
             console.error('Failed to save error metadata:', metaError);
@@ -256,8 +268,7 @@ async function uploadSingleChunkToR2Multipart(context, chunkData, chunkIndex, to
             const multipartInfo = {
                 uploadId: multipartUpload.uploadId,
                 key: finalFileId,
-                parts: [],
-                finalFileId: finalFileId
+                parts: []
             };
             
             // 保存multipart info
@@ -285,7 +296,7 @@ async function uploadSingleChunkToR2Multipart(context, chunkData, chunkIndex, to
             }
             
             const multipartInfo = JSON.parse(multipartInfoData);
-            finalFileId = multipartInfo.finalFileId;
+            finalFileId = multipartInfo.key;
         }
         
         // 获取multipart info
@@ -341,8 +352,7 @@ async function uploadSingleChunkToR2Multipart(context, chunkData, chunkIndex, to
             size: chunkData.byteLength,
             uploadTime: Date.now(),
             multipartUploadId: multipartInfo.uploadId,
-            key: finalFileId,
-            finalFileId: finalFileId
+            key: finalFileId
         };
         
     } catch (error) {
@@ -395,8 +405,7 @@ async function uploadSingleChunkToS3Multipart(context, chunkData, chunkIndex, to
             const multipartInfo = {
                 uploadId: createResponse.UploadId,
                 key: finalFileId,
-                parts: [],
-                finalFileId: finalFileId
+                parts: []
             };
             
             // 保存multipart info
@@ -424,7 +433,7 @@ async function uploadSingleChunkToS3Multipart(context, chunkData, chunkIndex, to
             }
             
             const multipartInfo = JSON.parse(multipartInfoData);
-            finalFileId = multipartInfo.finalFileId;
+            finalFileId = multipartInfo.key;
         }
         
         // 获取multipart info
@@ -489,8 +498,7 @@ async function uploadSingleChunkToS3Multipart(context, chunkData, chunkIndex, to
             uploadTime: Date.now(),
             s3Channel: s3Channel.name,
             multipartUploadId: multipartInfo.uploadId,
-            key: finalFileId,
-            finalFileId: finalFileId
+            key: finalFileId
         };
         
     } catch (error) {
@@ -502,7 +510,7 @@ async function uploadSingleChunkToS3Multipart(context, chunkData, chunkIndex, to
 }
 
 // 上传单个分块到Telegram
-async function uploadSingleChunkToTelegram(context, chunkData, chunkIndex, uploadId, originalFileName, originalFileType) {
+async function uploadSingleChunkToTelegram(context, chunkData, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType) {
     const { env, uploadConfig } = context;
     
     try {
@@ -599,7 +607,7 @@ export async function retryFailedChunks(context, failedChunks, uploadChannel) {
                 } else if (uploadChannel === 's3') {
                     uploadResult = await uploadSingleChunkToS3Multipart(context, chunkData, chunk.index, totalChunks, uploadId, originalFileName, originalFileType);
                 } else if (uploadChannel === 'telegram') {
-                    uploadResult = await uploadSingleChunkToTelegram(context, chunkData, chunk.index, uploadId, originalFileName, originalFileType);
+                    uploadResult = await uploadSingleChunkToTelegram(context, chunkData, chunk.index, totalChunks, uploadId, originalFileName, originalFileType);
                 }
                 
                 if (uploadResult && uploadResult.success) {
@@ -611,8 +619,11 @@ export async function retryFailedChunks(context, failedChunks, uploadChannel) {
                         retryCount: retryCount + 1
                     };
                     
-                    // 删除原始数据，只保留上传结果
-                    await env.img_url.put(chunk.key, '', { metadata: updatedMetadata });
+                    // 删除原始数据，只保留上传结果，设置过期时间
+                    await env.img_url.put(chunk.key, '', { 
+                        metadata: updatedMetadata,
+                        expirationTtl: 3600 // 1小时过期
+                    });
                     success = true;
                     console.log(`Chunk ${chunk.index} retry successful after ${retryCount + 1} attempts`);
                 } else {

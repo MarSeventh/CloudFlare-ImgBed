@@ -1,5 +1,5 @@
 /* ========== 分块合并处理 ========== */
-import { createResponse, getUploadIp, getIPAddress, selectConsistentChannel } from './uploadTools';
+import { createResponse, getUploadIp, getIPAddress, selectConsistentChannel, buildUniqueFileId } from './uploadTools';
 import { retryFailedChunks, cleanupFailedMultipartUploads, checkChunkUploadStatuses, cleanupChunkData, cleanupUploadSession } from './chunkUpload';
 import { S3Client, CompleteMultipartUploadCommand } from "@aws-sdk/client-s3";
 
@@ -341,7 +341,7 @@ async function mergeR2ChunksInfo(context, uploadId, completedChunks, metadata, r
         const totalSize = completedChunks.reduce((sum, chunk) => sum + chunk.uploadResult.size, 0);
         
         // 使用multipart info中的finalFileId更新metadata
-        const finalFileId = multipartInfo.finalFileId || multipartInfo.key;
+        const finalFileId = multipartInfo.key;
         metadata.Channel = "CloudflareR2";
         metadata.ChannelName = "R2_env";
         metadata.FileSize = (totalSize / 1024 / 1024).toFixed(2);
@@ -426,16 +426,16 @@ async function mergeS3ChunksInfo(context, uploadId, completedChunks, metadata, r
         const totalSize = completedChunks.reduce((sum, chunk) => sum + chunk.uploadResult.size, 0);
         
         // 使用multipart info中的finalFileId更新metadata
-        const finalFileId = multipartInfo.finalFileId || multipartInfo.key;
+        const finalFileId = multipartInfo.key;
         metadata.Channel = "S3";
         metadata.ChannelName = s3Channel.name;
         metadata.FileSize = (totalSize / 1024 / 1024).toFixed(2);
 
         const s3ServerDomain = endpoint.replace(/https?:\/\//, "");
         if (pathStyle) {
-            metadata.S3Location = `https://${s3ServerDomain}/${bucketName}/${multipartInfo.key}`;
+            metadata.S3Location = `https://${s3ServerDomain}/${bucketName}/${finalFileId}`;
         } else {
-            metadata.S3Location = `https://${bucketName}.${s3ServerDomain}/${multipartInfo.key}`;
+            metadata.S3Location = `https://${bucketName}.${s3ServerDomain}/${finalFileId}`;
         }
         metadata.S3Endpoint = endpoint;
         metadata.S3PathStyle = pathStyle;
@@ -443,7 +443,7 @@ async function mergeS3ChunksInfo(context, uploadId, completedChunks, metadata, r
         metadata.S3SecretAccessKey = secretAccessKey;
         metadata.S3Region = region || "auto";
         metadata.S3BucketName = bucketName;
-        metadata.S3FileKey = multipartInfo.key;
+        metadata.S3FileKey = finalFileId;
 
         // 清理multipart info
         await env.img_url.delete(multipartKey);
@@ -473,7 +473,7 @@ async function mergeS3ChunksInfo(context, uploadId, completedChunks, metadata, r
 
 // 合并Telegram分块信息
 async function mergeTelegramChunksInfo(context, uploadId, completedChunks, metadata, returnLink) {
-    const { env, uploadConfig } = context;
+    const { env, uploadConfig, url } = context;
     
     try {
         const tgSettings = uploadConfig.telegram;
@@ -499,6 +499,9 @@ async function mergeTelegramChunksInfo(context, uploadId, completedChunks, metad
             fileName: chunk.uploadResult.fileName
         }));
         
+        // 生成 finalFileId
+        const finalFileId = await buildUniqueFileId(context, metadata.FileName, metadata.FileType);
+
         // 更新metadata
         metadata.Channel = "TelegramNew";
         metadata.ChannelName = tgChannel.name;
@@ -512,11 +515,20 @@ async function mergeTelegramChunksInfo(context, uploadId, completedChunks, metad
         const chunksData = JSON.stringify(chunks);
         
         // 写入KV数据库
-        await env.img_url.put(metadata.finalFileId, chunksData, { metadata });
+        await env.img_url.put(finalFileId, chunksData, { metadata });
+
+        // 生成返回链接
+        const returnFormat = url.searchParams.get('returnFormat') || 'default';
+        let updatedReturnLink = '';
+        if (returnFormat === 'full') {
+            updatedReturnLink = `${url.origin}/file/${finalFileId}`;
+        } else {
+            updatedReturnLink = `/file/${finalFileId}`;
+        }
 
         return {
             success: true,
-            result: [{ 'src': returnLink }]
+            result: [{ 'src': updatedReturnLink }]
         };
         
     } catch (error) {
