@@ -159,7 +159,7 @@ export async function handleChunkUpload(context) {
 }
 
 // 处理清理请求
-export async function handleCleanupRequest(env, uploadId, totalChunks) {
+export async function handleCleanupRequest(context, uploadId, totalChunks) {
     try {
         if (!uploadId) {
             return createResponse(JSON.stringify({
@@ -168,7 +168,7 @@ export async function handleCleanupRequest(env, uploadId, totalChunks) {
         }
 
         // 强制清理所有相关数据
-        await forceCleanupUpload(env, uploadId, totalChunks);
+        await forceCleanupUpload(context, uploadId, totalChunks);
 
         return createResponse(JSON.stringify({
             success: true,
@@ -942,8 +942,18 @@ export async function cleanupUploadSession(env, uploadId) {
 }
 
 // 强制清理所有相关数据（用于彻底清理失败的上传）
-export async function forceCleanupUpload(env, uploadId, totalChunks) {
+export async function forceCleanupUpload(context, uploadId, totalChunks) {
+    const { env } = context;
+
     try {
+        // 读取 session 信息
+        const sessionKey = `upload_session_${uploadId}`;
+        const sessionRecord = await env.img_url.get(sessionKey);
+        const uploadChannel = sessionRecord ? JSON.parse(sessionRecord).uploadChannel : 'cfr2'; // 默认使用 cfr2
+
+        // 清理 multipart upload信息
+        await cleanupFailedMultipartUploads(context, uploadId, uploadChannel);
+
         const cleanupPromises = [];
         
         // 清理所有分块

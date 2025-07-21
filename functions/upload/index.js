@@ -47,7 +47,7 @@ export async function onRequest(context) {  // Contents of context object
     if (cleanupRequest) {
         const uploadId = url.searchParams.get('uploadId');
         const totalChunks = parseInt(url.searchParams.get('totalChunks')) || 0;
-        return await handleCleanupRequest(env, uploadId, totalChunks);
+        return await handleCleanupRequest(context, uploadId, totalChunks);
     }
 
     // 检查是否为初始化分块上传请求
