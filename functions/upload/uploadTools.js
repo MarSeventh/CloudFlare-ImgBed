@@ -191,11 +191,6 @@ export function getUploadIp(request) {
 
 // 检查上传IP是否被封禁
 export async function isBlockedUploadIp(env, uploadIp) {
-    // 检查是否配置了KV数据库
-    if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") {
-        return false;
-    }
-
     const kv = env.img_url;
     let list = await kv.get("manage@blockipList");
     if (list == null) {

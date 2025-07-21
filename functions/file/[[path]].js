@@ -38,11 +38,6 @@ export async function onRequest(context) {  // Contents of context object
     if (!isDomainAllowed(context)) {
         return await returnBlockImg(url);
     }
-
-    // 检查是否配置了 KV 数据库
-    if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") {
-        return new Response('Error: Please configure KV database', { status: 500 });
-    }
     
     // 从KV中获取图片记录
     const imgRecord = await env.img_url.getWithMetadata(fileId);
@@ -141,7 +136,7 @@ export async function onRequest(context) {  // Contents of context object
 }
 
 
-// 处理分片文件读取
+// 处理 Telegram 渠道分片文件读取
 async function handleTelegramChunkedFile(context, imgRecord, encodedFileName, fileType) {
     const { env, request, url, Referer } = context;
 

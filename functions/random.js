@@ -25,11 +25,6 @@ export async function onRequest(context) {
         return new Response(JSON.stringify({ error: "Random is disabled" }), { status: 403 });
     }
 
-    // 检查是否配置了KV数据库
-    if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") {
-        return new Response('Error: Please configure KV database', { status: 500 });
-    }
-
     // 处理允许的目录，每个目录调整为标准格式，去掉首尾空格，去掉开头的/，替换多个连续的/为单个/，去掉末尾的/
     const allowedDirList = allowedDir.split(',');
     const allowedDirListFormatted = allowedDirList.map(item => {

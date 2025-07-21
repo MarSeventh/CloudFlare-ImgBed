@@ -34,11 +34,6 @@ export async function onRequest(context) {  // Contents of context object
     if (isBlockedIp) {
         return createResponse('Error: Your IP is blocked', { status: 403 });
     }
-    
-    // KV 未定义或为空的处理逻辑
-    if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") {
-        return createResponse('Error: Please configure KV database', { status: 500 });
-    } 
 
     // 检查是否为状态查询请求
     const statusCheck = url.searchParams.get('statusCheck') === 'true';

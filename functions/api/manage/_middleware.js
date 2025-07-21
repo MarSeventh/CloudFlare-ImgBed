@@ -1,16 +1,9 @@
 import { fetchSecurityConfig } from "../../utils/sysConfig";
+import { checkKVConfig, errorHandling } from "../../utils/middleware";
 
 let securityConfig = {}
 let basicUser = ""
 let basicPass = ""
-
-async function errorHandling(context) {
-    try {
-      return await context.next();
-    } catch (err) {
-      return new Response(`${err.message}\n${err.stack}`, { status: 500 });
-    }
-  }
 
 function basicAuthentication(request) {
   const Authorization = request.headers.get('Authorization');
@@ -110,4 +103,4 @@ async function authentication(context) {
   
 }
 
-export const onRequest = [errorHandling, authentication];
+export const onRequest = [checkKVConfig, errorHandling, authentication];

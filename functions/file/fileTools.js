@@ -117,30 +117,28 @@ export async function returnWithCheck(context, imgRecord) {
         return response;
     }
 
-    if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") {
+    //check the record from kv
+    const record = imgRecord;
+    if (record.metadata === null) {
     } else {
-        //check the record from kv
-        const record = imgRecord;
-        if (record.metadata === null) {
+        //if the record is not null, redirect to the image
+        if (record.metadata.ListType == "White") {
+            return response;
+        } else if (record.metadata.ListType == "Block") {
+            return await returnBlockImg(url);
+        } else if (record.metadata.Label == "adult") {
+            return await returnBlockImg(url);
+        }
+        //check if the env variables WhiteList_Mode are set
+        if (whiteListMode) {
+            //if the env variables WhiteList_Mode are set, redirect to the image
+            return await returnWhiteListImg(url);
         } else {
-            //if the record is not null, redirect to the image
-            if (record.metadata.ListType == "White") {
-                return response;
-            } else if (record.metadata.ListType == "Block") {
-                return await returnBlockImg(url);
-            } else if (record.metadata.Label == "adult") {
-                return await returnBlockImg(url);
-            }
-            //check if the env variables WhiteList_Mode are set
-            if (whiteListMode) {
-                //if the env variables WhiteList_Mode are set, redirect to the image
-                return await returnWhiteListImg(url);
-            } else {
-                //if the env variables WhiteList_Mode are not set, redirect to the image
-                return response;
-            }
+            //if the env variables WhiteList_Mode are not set, redirect to the image
+            return response;
         }
     }
+    
     // other cases
     return response;
 }

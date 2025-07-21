@@ -8,11 +8,8 @@ export async function onRequest(context) {
       next, // used for middleware or to fetch assets
       data, // arbitrary space for passing data between middlewares
     } = context;
+    
     try {
-        // 检查是否配置了KV数据库
-        if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") {
-            return new Response('Error: Please configure KV database', { status: 500 });
-        }
 
         const kv = env.img_url;
         let list = await kv.get("manage@blockipList");
