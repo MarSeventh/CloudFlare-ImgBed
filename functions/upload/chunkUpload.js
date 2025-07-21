@@ -141,7 +141,7 @@ export async function handleChunkUpload(context) {
         });
 
         // 异步上传分块到存储端，添加超时保护
-        waitUntil(uploadChunkToStorageWithTimeout(context, chunk, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType, uploadChannel));
+        waitUntil(uploadChunkToStorageWithTimeout(context, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType, uploadChannel));
 
         return createResponse(JSON.stringify({
             success: true,
@@ -191,11 +191,11 @@ export async function handleCleanupRequest(env, uploadId, totalChunks) {
 /* ======= 单个分块上传到不同渠道的存储端 ======= */
 
 // 带超时保护的异步上传分块到存储端
-async function uploadChunkToStorageWithTimeout(context, chunk, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType, uploadChannel) {
+async function uploadChunkToStorageWithTimeout(context, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType, uploadChannel) {
     const { env } = context;
     const chunkKey = `chunk_${uploadId}_${chunkIndex.toString().padStart(3, '0')}`;
-    const UPLOAD_TIMEOUT = 45000; // 45秒超时
-    
+    const UPLOAD_TIMEOUT = 80000; // 80秒超时
+
     try {
         // 设置超时 Promise
         const timeoutPromise = new Promise((_, reject) => {
@@ -203,8 +203,8 @@ async function uploadChunkToStorageWithTimeout(context, chunk, chunkIndex, total
         });
         
         // 执行实际上传
-        const uploadPromise = uploadChunkToStorage(context, chunk, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType, uploadChannel);
-        
+        const uploadPromise = uploadChunkToStorage(context, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType, uploadChannel);
+
         // 竞速执行
         await Promise.race([uploadPromise, timeoutPromise]);
         
@@ -237,8 +237,8 @@ async function uploadChunkToStorageWithTimeout(context, chunk, chunkIndex, total
 }
 
 // 异步上传分块到存储端
-async function uploadChunkToStorage(context, chunk, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType, uploadChannel) {
-    const { env, url } = context;
+async function uploadChunkToStorage(context, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType, uploadChannel) {
+    const { env } = context;
     
     const chunkKey = `chunk_${uploadId}_${chunkIndex.toString().padStart(3, '0')}`;
     
@@ -444,7 +444,7 @@ async function uploadSingleChunkToR2Multipart(context, chunkData, chunkIndex, to
 
 // 上传单个分块到S3 (Multipart Upload)
 async function uploadSingleChunkToS3Multipart(context, chunkData, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType) {
-    const { env, uploadConfig, url } = context;
+    const { env, uploadConfig } = context;
     
     try {
         const s3Settings = uploadConfig.s3;
@@ -590,7 +590,7 @@ async function uploadSingleChunkToS3Multipart(context, chunkData, chunkIndex, to
 
 // 上传单个分块到Telegram
 async function uploadSingleChunkToTelegram(context, chunkData, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType) {
-    const { env, uploadConfig } = context;
+    const { uploadConfig } = context;
     
     try {
         const tgSettings = uploadConfig.telegram;
@@ -648,8 +648,8 @@ async function uploadSingleChunkToTelegram(context, chunkData, chunkIndex, total
 export async function retryFailedChunks(context, failedChunks, uploadChannel) {
     const { env } = context;
     const maxRetries = 3;
-    const RETRY_TIMEOUT = 30000; // 30秒重试超时
-    
+    const RETRY_TIMEOUT = 60000; // 60秒重试超时
+
     for (const chunk of failedChunks) {
         // 只重试真正失败、超时且有数据的分块
         if (!chunk.hasData) {
@@ -840,7 +840,7 @@ export async function checkChunkUploadStatuses(env, uploadId, totalChunks) {
     for (let i = 0; i < totalChunks; i++) {
         const chunkKey = `chunk_${uploadId}_${i.toString().padStart(3, '0')}`;
         try {
-            const chunkRecord = await env.img_url.getWithMetadata(chunkKey);
+            const chunkRecord = await env.img_url.getWithMetadata(chunkKey, { type: 'arrayBuffer' });
             if (chunkRecord && chunkRecord.metadata) {
                 let status = chunkRecord.metadata.status || 'unknown';
                 
@@ -848,7 +848,7 @@ export async function checkChunkUploadStatuses(env, uploadId, totalChunks) {
                 if (status === 'uploading' && chunkRecord.metadata.timeoutThreshold && currentTime > chunkRecord.metadata.timeoutThreshold) {
                     status = 'timeout';
                     
-                    // 异步更新状态为超时，不阻塞主流程
+                    // 更新状态为超时
                     const timeoutMetadata = {
                         ...chunkRecord.metadata,
                         status: 'timeout',
@@ -856,7 +856,7 @@ export async function checkChunkUploadStatuses(env, uploadId, totalChunks) {
                         timeoutDetectedTime: currentTime
                     };
                     
-                    env.img_url.put(chunkKey, chunkRecord.value, { 
+                    await env.img_url.put(chunkKey, chunkRecord.value, { 
                         metadata: timeoutMetadata,
                         expirationTtl: 3600
                     }).catch(err => console.warn(`Failed to update timeout status for chunk ${i}:`, err));
@@ -864,8 +864,8 @@ export async function checkChunkUploadStatuses(env, uploadId, totalChunks) {
                 
                 let hasData = false;
                 if (status === 'completed') {
-                    // 已完成的分块通过uploadResult判断
-                    hasData = !!chunkRecord.metadata.uploadResult;
+                    // 已完成的分块，不存储原始数据
+                    hasData = false;
                 } else if (status === 'uploading' || status === 'failed' || status === 'timeout') {
                     // 正在上传、失败或超时的分块通过原始数据判断
                     hasData = (chunkRecord.value && chunkRecord.value.byteLength > 0);
@@ -938,51 +938,6 @@ export async function cleanupUploadSession(env, uploadId) {
         console.log(`Cleaned up upload session for ${uploadId}`);
     } catch (cleanupError) {
         console.warn('Failed to cleanup upload session:', cleanupError);
-    }
-}
-
-// 清理超时和失败的分块数据
-export async function cleanupTimeoutChunks(env, uploadId, totalChunks) {
-    try {
-        const currentTime = Date.now();
-        const cleanupPromises = [];
-        
-        for (let i = 0; i < totalChunks; i++) {
-            const chunkKey = `chunk_${uploadId}_${i.toString().padStart(3, '0')}`;
-            
-            const cleanupPromise = (async () => {
-                try {
-                    const chunkRecord = await env.img_url.getWithMetadata(chunkKey);
-                    if (chunkRecord && chunkRecord.metadata) {
-                        const status = chunkRecord.metadata.status;
-                        const timeoutThreshold = chunkRecord.metadata.timeoutThreshold;
-                        
-                        // 清理超时、失败或长时间未完成的分块
-                        const shouldCleanup = 
-                            status === 'timeout' ||
-                            status === 'failed' ||
-                            status === 'retry_timeout' ||
-                            status === 'retry_failed' ||
-                            (status === 'uploading' && timeoutThreshold && currentTime > timeoutThreshold + 300000); // 超时5分钟后清理
-                        
-                        if (shouldCleanup) {
-                            await env.img_url.delete(chunkKey);
-                            console.log(`Cleaned up timeout/failed chunk ${i} for ${uploadId}`);
-                        }
-                    }
-                } catch (chunkError) {
-                    console.warn(`Failed to cleanup chunk ${i}:`, chunkError);
-                }
-            })();
-            
-            cleanupPromises.push(cleanupPromise);
-        }
-        
-        await Promise.allSettled(cleanupPromises);
-        console.log(`Cleanup completed for timeout chunks of ${uploadId}`);
-        
-    } catch (cleanupError) {
-        console.warn('Failed to cleanup timeout chunks:', cleanupError);
     }
 }
 

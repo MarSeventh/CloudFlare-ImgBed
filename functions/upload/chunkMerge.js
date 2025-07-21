@@ -1,6 +1,6 @@
 /* ========== 分块合并处理 ========== */
 import { createResponse, getUploadIp, getIPAddress, selectConsistentChannel, buildUniqueFileId } from './uploadTools';
-import { retryFailedChunks, cleanupFailedMultipartUploads, checkChunkUploadStatuses, cleanupChunkData, cleanupUploadSession, cleanupTimeoutChunks, forceCleanupUpload } from './chunkUpload';
+import { retryFailedChunks, cleanupFailedMultipartUploads, checkChunkUploadStatuses, cleanupChunkData, cleanupUploadSession } from './chunkUpload';
 import { S3Client, CompleteMultipartUploadCommand } from "@aws-sdk/client-s3";
 
 // 处理分块合并
@@ -46,7 +46,7 @@ export async function handleChunkMerge(context) {
         // 使用会话中的上传渠道，或者从URL参数获取
         uploadChannel = url.searchParams.get('uploadChannel') || sessionInfo.uploadChannel || 'telegram';
 
-        // 检查分块上传状态并处理失败的分块
+        // 检查分块上传状态
         const chunkStatuses = await checkChunkUploadStatuses(env, uploadId, totalChunks);
         
         // 输出初始状态摘要
@@ -123,7 +123,7 @@ async function startMerge(context, uploadId, totalChunks, originalFileName, orig
 async function performAsyncMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel) {
     const { env } = context;
     const statusKey = `merge_status_${uploadId}`;
-    const MERGE_TIMEOUT = 300000; // 5分钟合并超时
+    const MERGE_TIMEOUT = 360000; // 6分钟合并超时
     const mergeStartTime = Date.now();
     
     try {
@@ -173,10 +173,9 @@ async function performAsyncMerge(context, uploadId, totalChunks, originalFileNam
         if (uploadChannel === 'cfr2' || uploadChannel === 's3') {
             await cleanupFailedMultipartUploads(context, uploadId, uploadChannel);
         }
-        
-        // 清理分块数据和超时数据
+
+        // 清理分块数据
         await cleanupChunkData(env, uploadId, totalChunks);
-        await cleanupTimeoutChunks(env, uploadId, totalChunks);
 
         // 清理上传会话
         await cleanupUploadSession(env, uploadId);
@@ -196,7 +195,7 @@ async function performAsyncMerge(context, uploadId, totalChunks, originalFileNam
 
 // 基于渠道的合并处理
 async function handleChannelBasedMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel, statusKey = null) {
-    const { request, env, url } = context;
+    const { request, env, url, waitUntil } = context;
 
     try {
         // 获得上传IP
@@ -215,7 +214,7 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
             Folder: (url.searchParams.get('uploadFolder') || '').replace(/^\/+/, '').replace(/\/{2,}/g, '/').replace(/\/$/, '') || 'root'
         };
 
-        // 更新进度（如果有状态跟踪）
+        // 更新进度
         if (statusKey) {
             await updateMergeStatus(env, statusKey, {
                 progress: 20,
@@ -226,7 +225,8 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
         // 收集所有已上传的分块信息
         const chunkStatuses = await checkChunkUploadStatuses(env, uploadId, totalChunks);
         let completedChunks = chunkStatuses.filter(chunk => chunk.status === 'completed');
-        
+        let uploadingChunks = chunkStatuses.filter(chunk => chunk.status === 'uploading');
+
         // 统计不同状态的分块
         const statusSummary = chunkStatuses.reduce((acc, chunk) => {
             acc[chunk.status] = (acc[chunk.status] || 0) + 1;
@@ -236,25 +236,15 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
         console.log(`Chunk status summary: ${JSON.stringify(statusSummary)}`);
         
         // 检查失败、超时的分块
-        const failedChunks = chunkStatuses.filter(chunk => 
+        let failedChunks = chunkStatuses.filter(chunk => 
             chunk.status === 'failed' || 
             chunk.status === 'timeout' || 
             chunk.status === 'retry_failed' || 
             chunk.status === 'retry_timeout'
         );
+
         
-        // 检查还在上传中的分块
-        let uploadingChunks = chunkStatuses.filter(chunk => chunk.status === 'uploading');
-        
-        // 检查超时但状态仍为uploading的分块
-        const timeoutUploading = uploadingChunks.filter(chunk => chunk.isTimeout);
-        if (timeoutUploading.length > 0) {
-            console.warn(`Found ${timeoutUploading.length} chunks timed out but still marked as uploading`);
-            failedChunks.push(...timeoutUploading);
-            uploadingChunks = uploadingChunks.filter(chunk => !chunk.isTimeout);
-        }
-        
-        // 如果有失败的分块，尝试重试
+        // 如果有失败的分块，尝试异步重试
         if (failedChunks.length > 0 && statusKey) {
             await updateMergeStatus(env, statusKey, {
                 progress: 30,
@@ -262,53 +252,52 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
             });
             
             console.log(`Retrying ${failedChunks.length} failed chunks...`);
-            await retryFailedChunks(context, failedChunks, uploadChannel);
-            
-            // 重新检查状态
-            const retryStatuses = await checkChunkUploadStatuses(env, uploadId, totalChunks);
-            completedChunks = retryStatuses.filter(chunk => chunk.status === 'completed');
-            uploadingChunks = retryStatuses.filter(chunk => chunk.status === 'uploading');
+            waitUntil(retryFailedChunks(context, failedChunks, uploadChannel));
         }
         
-        // 如果还有分块在上传中，等待一段时间（减少等待时间以避免超时）
-        if (uploadingChunks.length > 0) {
-            console.log(`Found ${uploadingChunks.length} chunks still uploading, waiting...`);
-            
-            // 等待并重试，最多等待30秒（减少从60秒）
+        // 等待重试和上传中的分块完成
+        if (uploadingChunks.length > 0 || failedChunks.length > 0) {
+            console.log(`Found ${uploadingChunks.length} chunks still uploading, and ${failedChunks.length} chunks retrying, waiting...`);
+
+            // 等待并重试，最多等待360秒
             let retryCount = 0;
-            const maxRetries = 6; // 30秒，每次等待5秒
-            
-            while (uploadingChunks.length > 0 && retryCount < maxRetries) {
-                await new Promise(resolve => setTimeout(resolve, 5000)); // 等待5秒
-                
+            const maxRetries = 36; // 360秒，每次等待10秒
+
+            while (uploadingChunks.length > 0 || failedChunks.length > 0 && retryCount < maxRetries) {
+                await new Promise(resolve => setTimeout(resolve, 10000)); // 等待10秒
+
                 const updatedStatuses = await checkChunkUploadStatuses(env, uploadId, totalChunks);
-                uploadingChunks = updatedStatuses.filter(chunk => chunk.status === 'uploading' && !chunk.isTimeout);
-                
-                if (uploadingChunks.length < (chunkStatuses.filter(chunk => chunk.status === 'uploading')).length) {
-                    console.log(`Upload progress: ${totalChunks - uploadingChunks.length}/${totalChunks} chunks completed`);
-                    
+
+                uploadingChunks = updatedStatuses.filter(chunk => chunk.status === 'uploading');
+                failedChunks = updatedStatuses.filter(chunk => 
+                    chunk.status === 'failed' || 
+                    chunk.status === 'timeout' || 
+                    chunk.status === 'retry_failed' || 
+                    chunk.status === 'retry_timeout'
+                );
+                completedChunks = updatedStatuses.filter(chunk => chunk.status === 'completed');
+
+                if (completedChunks.length > chunkStatuses.filter(chunk => chunk.status === 'completed').length) {
+                    console.log(`Upload progress: ${completedChunks.length}/${totalChunks} chunks completed`);
+
                     if (statusKey) {
                         await updateMergeStatus(env, statusKey, {
-                            progress: 40 + Math.floor((totalChunks - uploadingChunks.length) / totalChunks * 40),
-                            message: `Waiting for upload completion: ${totalChunks - uploadingChunks.length}/${totalChunks} chunks done`
+                            progress: 40 + Math.floor(completedChunks.length / totalChunks * 40),
+                            message: `Waiting for upload completion: ${completedChunks.length}/${totalChunks} chunks done`
                         });
                     }
                 }
                 
-                if (uploadingChunks.length === 0) {
-                    completedChunks = updatedStatuses.filter(chunk => chunk.status === 'completed');
-                    break;
-                }
-                
                 retryCount++;
             }
-            
+
+            // 最终检查分块状态
+            const finalStatuses = await checkChunkUploadStatuses(env, uploadId, totalChunks);
+            completedChunks = finalStatuses.filter(chunk => chunk.status === 'completed');
+            uploadingChunks = finalStatuses.filter(chunk => chunk.status === 'uploading');
+
             // 如果仍然有分块在上传，标记为超时失败
             if (uploadingChunks.length > 0) {
-                const finalStatuses = await checkChunkUploadStatuses(env, uploadId, totalChunks);
-                completedChunks = finalStatuses.filter(chunk => chunk.status === 'completed');
-                uploadingChunks = finalStatuses.filter(chunk => chunk.status === 'uploading');
-                
                 console.warn(`Timeout waiting for ${uploadingChunks.length} chunks to complete upload`);
                 
                 // 对于仍在上传的分块，标记为超时
@@ -345,20 +334,25 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
                 return acc;
             }, {});
             
-            // 尝试清理超时的分块
-            await cleanupTimeoutChunks(env, uploadId, totalChunks);
-            
             throw new Error(`Only ${completedChunks.length}/${totalChunks} chunks completed successfully. Final status: ${JSON.stringify(finalStatusSummary)}`);
+        }
+
+        // 更新进度
+        if (statusKey) {
+            await updateMergeStatus(env, statusKey, {
+                progress: 80,
+                message: `All chunks uploaded successfully, starting merge for ${uploadChannel}...`
+            });
         }
 
         // 根据渠道合并分块信息
         let result;
         if (uploadChannel === 'cfr2') {
-            result = await mergeR2ChunksInfo(context, uploadId, completedChunks, metadata, '');
+            result = await mergeR2ChunksInfo(context, uploadId, completedChunks, metadata);
         } else if (uploadChannel === 's3') {
-            result = await mergeS3ChunksInfo(context, uploadId, completedChunks, metadata, '');
+            result = await mergeS3ChunksInfo(context, uploadId, completedChunks, metadata);
         } else if (uploadChannel === 'telegram') {
-            result = await mergeTelegramChunksInfo(context, uploadId, completedChunks, metadata, '');
+            result = await mergeTelegramChunksInfo(context, uploadId, completedChunks, metadata);
         } else {
             throw new Error(`Unsupported upload channel: ${uploadChannel}`);
         }
@@ -374,7 +368,7 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
 }
 
 // 合并R2分块信息
-async function mergeR2ChunksInfo(context, uploadId, completedChunks, metadata, returnLink) {
+async function mergeR2ChunksInfo(context, uploadId, completedChunks, metadata) {
     const { env } = context;
     
     try {
@@ -441,7 +435,7 @@ async function mergeR2ChunksInfo(context, uploadId, completedChunks, metadata, r
 }
 
 // 合并S3分块信息
-async function mergeS3ChunksInfo(context, uploadId, completedChunks, metadata, returnLink) {
+async function mergeS3ChunksInfo(context, uploadId, completedChunks, metadata) {
     const { env, uploadConfig } = context;
     
     try {
@@ -540,7 +534,7 @@ async function mergeS3ChunksInfo(context, uploadId, completedChunks, metadata, r
 }
 
 // 合并Telegram分块信息
-async function mergeTelegramChunksInfo(context, uploadId, completedChunks, metadata, returnLink) {
+async function mergeTelegramChunksInfo(context, uploadId, completedChunks, metadata) {
     const { env, uploadConfig, url } = context;
     
     try {
@@ -639,17 +633,10 @@ export async function checkMergeStatus(env, uploadId) {
                     recommendedAction: 'restart_upload'
                 };
                 
-                // 异步更新状态，启动清理
-                env.img_url.put(statusKey, JSON.stringify(timeoutStatus), {
+                // 更新状态
+                await env.img_url.put(statusKey, JSON.stringify(timeoutStatus), {
                     expirationTtl: 3600
                 }).catch(err => console.warn('Failed to update timeout status:', err));
-                
-                // 异步清理超时数据
-                if (status.totalChunks) {
-                    cleanupTimeoutChunks(env, uploadId, status.totalChunks).catch(err => 
-                        console.warn('Failed to cleanup timeout chunks:', err)
-                    );
-                }
                 
                 return createResponse(JSON.stringify(timeoutStatus), {
                     status: 408, // Request Timeout
@@ -657,13 +644,13 @@ export async function checkMergeStatus(env, uploadId) {
                 });
             }
             
-            // 检查是否长时间无更新（超过5分钟没有状态更新）
+            // 检查是否长时间无更新（超过6分钟没有状态更新）
             const lastUpdate = status.updatedAt || status.createdAt || mergeStartTime;
-            if (lastUpdate && currentTime - lastUpdate > 300000) { // 5分钟
+            if (lastUpdate && currentTime - lastUpdate > 360000) { // 6分钟
                 const staleStatus = {
                     ...status,
                     status: 'stale',
-                    error: 'Merge operation appears to be stale (no updates for 5+ minutes)',
+                    error: 'Merge operation appears to be stale (no updates for 6+ minutes)',
                     staleDetectedTime: currentTime,
                     isStale: true,
                     recommendedAction: 'check_and_restart'
