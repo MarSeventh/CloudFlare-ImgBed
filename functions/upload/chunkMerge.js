@@ -225,7 +225,14 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
         // 收集所有已上传的分块信息
         const chunkStatuses = await checkChunkUploadStatuses(env, uploadId, totalChunks);
         let completedChunks = chunkStatuses.filter(chunk => chunk.status === 'completed');
-        let uploadingChunks = chunkStatuses.filter(chunk => chunk.status === 'uploading');
+        let uploadingChunks = chunkStatuses.filter(chunk => 
+            chunk.status === 'uploading' || 
+            chunk.status === 'retrying'
+        );
+        let failedChunks = chunkStatuses.filter(chunk => 
+            chunk.status === 'failed' || 
+            chunk.status === 'timeout'
+        );
 
         // 统计不同状态的分块
         const statusSummary = chunkStatuses.reduce((acc, chunk) => {
@@ -234,15 +241,6 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
         }, {});
         
         console.log(`Chunk status summary: ${JSON.stringify(statusSummary)}`);
-        
-        // 检查失败、超时的分块
-        let failedChunks = chunkStatuses.filter(chunk => 
-            chunk.status === 'failed' || 
-            chunk.status === 'timeout' || 
-            chunk.status === 'retry_failed' || 
-            chunk.status === 'retry_timeout'
-        );
-
         
         // 如果有失败的分块，尝试异步重试
         if (failedChunks.length > 0 && statusKey) {
@@ -268,12 +266,13 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
 
                 const updatedStatuses = await checkChunkUploadStatuses(env, uploadId, totalChunks);
 
-                uploadingChunks = updatedStatuses.filter(chunk => chunk.status === 'uploading');
+                uploadingChunks = updatedStatuses.filter(chunk => 
+                    chunk.status === 'uploading' || 
+                    chunk.status === 'retrying'
+                );
                 failedChunks = updatedStatuses.filter(chunk => 
                     chunk.status === 'failed' || 
-                    chunk.status === 'timeout' || 
-                    chunk.status === 'retry_failed' || 
-                    chunk.status === 'retry_timeout'
+                    chunk.status === 'timeout'
                 );
                 completedChunks = updatedStatuses.filter(chunk => chunk.status === 'completed');
 
@@ -294,7 +293,10 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
             // 最终检查分块状态
             const finalStatuses = await checkChunkUploadStatuses(env, uploadId, totalChunks);
             completedChunks = finalStatuses.filter(chunk => chunk.status === 'completed');
-            uploadingChunks = finalStatuses.filter(chunk => chunk.status === 'uploading');
+            uploadingChunks = finalStatuses.filter(chunk => 
+                chunk.status === 'uploading' || 
+                chunk.status === 'retrying'
+            );
 
             // 如果仍然有分块在上传，标记为超时失败
             if (uploadingChunks.length > 0) {

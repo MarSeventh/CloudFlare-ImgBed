@@ -194,7 +194,7 @@ export async function handleCleanupRequest(context, uploadId, totalChunks) {
 async function uploadChunkToStorageWithTimeout(context, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType, uploadChannel) {
     const { env } = context;
     const chunkKey = `chunk_${uploadId}_${chunkIndex.toString().padStart(3, '0')}`;
-    const UPLOAD_TIMEOUT = 80000; // 80秒超时
+    const UPLOAD_TIMEOUT = 180000; // 3分钟超时
 
     try {
         // 设置超时 Promise
@@ -236,12 +236,14 @@ async function uploadChunkToStorageWithTimeout(context, chunkIndex, totalChunks,
     }
 }
 
-// 异步上传分块到存储端
+// 异步上传分块到存储端，失败自动重试
 async function uploadChunkToStorage(context, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType, uploadChannel) {
     const { env } = context;
     
     const chunkKey = `chunk_${uploadId}_${chunkIndex.toString().padStart(3, '0')}`;
-    
+
+    const MAX_RETRIES = 3;
+
     try {
         // 从KV获取分块数据和metadata
         const chunkRecord = await env.img_url.getWithMetadata(chunkKey, { type: 'arrayBuffer' });
@@ -253,49 +255,53 @@ async function uploadChunkToStorage(context, chunkIndex, totalChunks, uploadId, 
         const chunkData = chunkRecord.value;
         const chunkMetadata = chunkRecord.metadata;
 
-        // 根据渠道上传分块
-        let uploadResult = null;
-        
-        if (uploadChannel === 'cfr2') {
-            uploadResult = await uploadSingleChunkToR2Multipart(context, chunkData, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType);
-        } else if (uploadChannel === 's3') {
-            uploadResult = await uploadSingleChunkToS3Multipart(context, chunkData, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType);
-        } else if (uploadChannel === 'telegram') {
-            uploadResult = await uploadSingleChunkToTelegram(context, chunkData, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType);
-        }
+        for (let retry = 0; retry < MAX_RETRIES; retry++) {
+            // 根据渠道上传分块
+            let uploadResult = null;
+            
+            if (uploadChannel === 'cfr2') {
+                uploadResult = await uploadSingleChunkToR2Multipart(context, chunkData, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType);
+            } else if (uploadChannel === 's3') {
+                uploadResult = await uploadSingleChunkToS3Multipart(context, chunkData, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType);
+            } else if (uploadChannel === 'telegram') {
+                uploadResult = await uploadSingleChunkToTelegram(context, chunkData, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType);
+            }
 
-        if (uploadResult && uploadResult.success) {
-            // 上传成功，更新状态并保存上传信息
-            const updatedMetadata = {
-                ...chunkMetadata,
-                status: 'completed',
-                uploadResult: uploadResult,
-                completedTime: Date.now()
-            };
-            
-            // 只保存metadata，不保存原始数据，设置过期时间
-            await env.img_url.put(chunkKey, '', { 
-                metadata: updatedMetadata,
-                expirationTtl: 3600 // 1小时过期
-            });
-            
-            console.log(`Chunk ${chunkIndex} uploaded successfully to ${uploadChannel}`);
-        } else {
-            // 上传失败，标记为失败状态并保留原始数据以便重试
-            const failedMetadata = {
-                ...chunkMetadata,
-                status: 'failed',
-                error: uploadResult ? uploadResult.error : 'Unknown error',
-                failedTime: Date.now()
-            };
-            
-            // 保留原始数据以便重试，设置过期时间
-            await env.img_url.put(chunkKey, chunkData, { 
-                metadata: failedMetadata,
-                expirationTtl: 3600 // 1小时过期
-            });
-            
-            console.warn(`Chunk ${chunkIndex} upload failed: ${failedMetadata.error}`);
+            if (uploadResult && uploadResult.success) {
+                // 上传成功，更新状态并保存上传信息
+                const updatedMetadata = {
+                    ...chunkMetadata,
+                    status: 'completed',
+                    uploadResult: uploadResult,
+                    completedTime: Date.now()
+                };
+                
+                // 只保存metadata，不保存原始数据，设置过期时间
+                await env.img_url.put(chunkKey, '', { 
+                    metadata: updatedMetadata,
+                    expirationTtl: 3600 // 1小时过期
+                });
+                
+                console.log(`Chunk ${chunkIndex} uploaded successfully to ${uploadChannel}`);
+
+                break;
+            } else if (retry === MAX_RETRIES - 1) {
+                // 最后一次上传失败，标记为失败状态并保留原始数据以便重试
+                const failedMetadata = {
+                    ...chunkMetadata,
+                    status: 'failed',
+                    error: uploadResult ? uploadResult.error : 'Unknown error',
+                    failedTime: Date.now()
+                };
+                
+                // 保留原始数据以便重试，设置过期时间
+                await env.img_url.put(chunkKey, chunkData, { 
+                    metadata: failedMetadata,
+                    expirationTtl: 3600 // 1小时过期
+                });
+                
+                console.warn(`Chunk ${chunkIndex} upload failed: ${failedMetadata.error}`);
+            }
         }
         
     } catch (error) {
@@ -500,8 +506,8 @@ async function uploadSingleChunkToS3Multipart(context, chunkData, chunkIndex, to
             while (!multipartInfoData && retryCount < maxRetries) {
                 multipartInfoData = await env.img_url.get(multipartKey);
                 if (!multipartInfoData) {
-                    // 等待1秒后重试
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    // 等待2秒后重试
+                    await new Promise(resolve => setTimeout(resolve, 2000));
                     retryCount++;
                     console.log(`S3 chunk ${chunkIndex} waiting for multipart initialization... (${retryCount}/${maxRetries})`);
                 }
@@ -645,138 +651,218 @@ async function uploadSingleChunkToTelegram(context, chunkData, chunkIndex, total
 /* ======== 分块合并时与上传相关的工具函数 ======= */
 
 // 重传失败的分块
-export async function retryFailedChunks(context, failedChunks, uploadChannel) {
-    const { env } = context;
-    const maxRetries = 3;
-    const RETRY_TIMEOUT = 60000; // 60秒重试超时
+// 并发重试失败的分块
+export async function retryFailedChunks(context, failedChunks, uploadChannel, options = {}) {
+    const {
+        maxRetries = 5,
+        retryTimeout = 60000, // 60秒重试超时
+        maxConcurrency = 3, // 最大并发数
+        batchSize = 5 // 每批处理的分块数
+    } = options;
 
-    for (const chunk of failedChunks) {
-        // 只重试真正失败、超时且有数据的分块
-        if (!chunk.hasData) {
-            console.warn(`Chunk ${chunk.index} has no data, skipping retry (status: ${chunk.status})`);
-            continue;
-        }
+    if (!failedChunks || failedChunks.length === 0) {
+        console.log('No failed chunks to retry');
+        return { success: true, results: [] };
+    }
+
+    console.log(`Starting concurrent retry for ${failedChunks.length} failed chunks with max concurrency: ${maxConcurrency}`);
+    
+    const results = [];
+    const chunksToRetry = failedChunks.filter(chunk => 
+        chunk.hasData && 
+        chunk.status !== 'uploading' && 
+        chunk.status !== 'completed'
+    );
+
+    if (chunksToRetry.length === 0) {
+        console.log('No chunks need retry (all are either uploading, completed, or have no data)');
+        return { success: true, results: [] };
+    }
+
+    // 分批处理以控制并发
+    for (let i = 0; i < chunksToRetry.length; i += batchSize) {
+        const batch = chunksToRetry.slice(i, i + batchSize);
+        console.log(`Processing batch ${Math.floor(i / batchSize) + 1}: chunks ${batch.map(c => c.index).join(', ')}`);
         
-        if (chunk.status === 'uploading') {
-            console.warn(`Chunk ${chunk.index} is still uploading, skipping retry`);
-            continue;
-        }
-        
-        // 跳过已完成的分块
-        if (chunk.status === 'completed') {
-            continue;
-        }
-        
-        let retryCount = 0;
-        let success = false;
-        
-        while (retryCount < maxRetries && !success) {
-            try {
-                const chunkRecord = await env.img_url.getWithMetadata(chunk.key, { type: 'arrayBuffer' });
-                if (!chunkRecord || !chunkRecord.value) {
-                    console.error(`Chunk ${chunk.index} data missing for retry`);
-                    break;
-                }
-                
-                const chunkData = chunkRecord.value;
-                const originalFileName = chunkRecord.metadata?.originalFileName || 'unknown';
-                const originalFileType = chunkRecord.metadata?.originalFileType || 'application/octet-stream';
-                const uploadId = chunkRecord.metadata?.uploadId;
-                const totalChunks = chunkRecord.metadata?.totalChunks || 1;
-                
-                // 更新重试状态
-                const retryMetadata = {
-                    ...chunkRecord.metadata,
-                    status: 'retrying',
-                    retryCount: retryCount + 1,
-                    retryStartTime: Date.now(),
-                    retryTimeoutThreshold: Date.now() + RETRY_TIMEOUT
-                };
-                
-                await env.img_url.put(chunk.key, chunkData, { 
-                    metadata: retryMetadata,
-                    expirationTtl: 3600
-                });
-                
-                let uploadResult = null;
-                
-                // 根据渠道重新上传，添加超时保护
-                const retryPromise = (async () => {
-                    if (uploadChannel === 'cfr2') {
-                        return await uploadSingleChunkToR2Multipart(context, chunkData, chunk.index, totalChunks, uploadId, originalFileName, originalFileType);
-                    } else if (uploadChannel === 's3') {
-                        return await uploadSingleChunkToS3Multipart(context, chunkData, chunk.index, totalChunks, uploadId, originalFileName, originalFileType);
-                    } else if (uploadChannel === 'telegram') {
-                        return await uploadSingleChunkToTelegram(context, chunkData, chunk.index, totalChunks, uploadId, originalFileName, originalFileType);
-                    }
-                    return null;
-                })();
-                
-                const timeoutPromise = new Promise((_, reject) => {
-                    setTimeout(() => reject(new Error('Retry timeout')), RETRY_TIMEOUT);
-                });
-                
-                uploadResult = await Promise.race([retryPromise, timeoutPromise]);
-                
-                if (uploadResult && uploadResult.success) {
-                    // 更新状态为成功
-                    const updatedMetadata = {
-                        ...chunkRecord.metadata,
-                        status: 'completed',
-                        uploadResult: uploadResult,
-                        retryCount: retryCount + 1,
-                        completedTime: Date.now()
-                    };
-                    
-                    // 删除原始数据，只保留上传结果，设置过期时间
-                    await env.img_url.put(chunk.key, '', { 
-                        metadata: updatedMetadata,
-                        expirationTtl: 3600 // 1小时过期
-                    });
-                    success = true;
-                    console.log(`Chunk ${chunk.index} retry successful after ${retryCount + 1} attempts`);
+        // 创建并发控制的重试任务
+        const retryTasks = batch.map(async (chunk) => {
+            return retrySingleChunk(context, chunk, uploadChannel, maxRetries, retryTimeout);
+        });
+
+        // 限制并发数量
+        const batchResults = [];
+        for (let j = 0; j < retryTasks.length; j += maxConcurrency) {
+            const concurrentTasks = retryTasks.slice(j, j + maxConcurrency);
+            const concurrentResults = await Promise.allSettled(concurrentTasks);
+            
+            for (const result of concurrentResults) {
+                if (result.status === 'fulfilled') {
+                    batchResults.push(result.value);
                 } else {
-                    throw new Error(uploadResult?.error || 'Unknown retry error');
-                }
-                
-            } catch (error) {
-                retryCount++;
-                const isTimeout = error.message === 'Retry timeout';
-                console.warn(`Chunk ${chunk.index} retry ${retryCount} ${isTimeout ? 'timed out' : 'failed'}: ${error.message}`);
-                
-                // 更新重试失败状态
-                try {
-                    const chunkRecord = await env.img_url.getWithMetadata(chunk.key, { type: 'arrayBuffer' });
-                    if (chunkRecord) {
-                        const failedRetryMetadata = {
-                            ...chunkRecord.metadata,
-                            status: isTimeout ? 'retry_timeout' : 'retry_failed',
-                            retryCount: retryCount,
-                            lastRetryError: error.message,
-                            lastRetryTime: Date.now(),
-                            isRetryTimeout: isTimeout
-                        };
-                        
-                        await env.img_url.put(chunk.key, chunkRecord.value, { 
-                            metadata: failedRetryMetadata,
-                            expirationTtl: 3600
-                        });
-                    }
-                } catch (metaError) {
-                    console.error(`Failed to update retry error metadata for chunk ${chunk.index}:`, metaError);
-                }
-                
-                if (retryCount < maxRetries) {
-                    await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)); // 递增延迟
+                    console.error('Retry task failed:', result.reason);
+                    batchResults.push({
+                        success: false,
+                        chunk: null,
+                        error: result.reason?.message || 'Task failed',
+                        reason: 'task_error'
+                    });
                 }
             }
         }
+
+        results.push(...batchResults);
         
-        if (!success) {
-            console.error(`Chunk ${chunk.index} failed after ${maxRetries} retry attempts`);
+        // 批次间稍作延迟
+        if (i + batchSize < chunksToRetry.length) {
+            await new Promise(resolve => setTimeout(resolve, 500));
         }
     }
+
+    // 统计结果
+    const successCount = results.filter(r => r.success).length;
+    const failureCount = results.filter(r => !r.success).length;
+    
+    console.log(`Retry completed: ${successCount} successful, ${failureCount} failed out of ${results.length} chunks`);
+    
+    // 记录失败的分块信息
+    const failedResults = results.filter(r => !r.success);
+    if (failedResults.length > 0) {
+        console.warn('Failed chunks:', failedResults.map(r => ({
+            index: r.chunk?.index,
+            reason: r.reason,
+            error: r.error
+        })));
+    }
+
+    return {
+        success: failureCount === 0,
+        results,
+        summary: {
+            total: results.length,
+            successful: successCount,
+            failed: failureCount,
+            failedChunks: failedResults.map(r => r.chunk?.index).filter(Boolean)
+        }
+    };
 }
+
+// 重试单个失败的分块
+async function retrySingleChunk(context, chunk, uploadChannel, maxRetries = 5, retryTimeout = 60000) {
+    const { env } = context;
+    
+    let retryCount = 0;
+    let lastError = null;
+    
+    try {
+        const chunkRecord = await env.img_url.getWithMetadata(chunk.key, { type: 'arrayBuffer' });
+        if (!chunkRecord || !chunkRecord.value) {
+            console.error(`Chunk ${chunk.index} data missing for retry`);
+            return { success: false, chunk, reason: 'data_missing', error: 'Chunk data not found' };
+        }
+        
+        const chunkData = chunkRecord.value;
+        const originalFileName = chunkRecord.metadata?.originalFileName || 'unknown';
+        const originalFileType = chunkRecord.metadata?.originalFileType || 'application/octet-stream';
+        const uploadId = chunkRecord.metadata?.uploadId;
+        const totalChunks = chunkRecord.metadata?.totalChunks || 1;
+        
+        // 更新重试状态
+        const retryMetadata = {
+            ...chunkRecord.metadata,
+            status: 'retrying',
+            retryCount: retryCount + 1,
+            retryStartTime: Date.now(),
+            retryTimeoutThreshold: Date.now() + retryTimeout
+        };
+        
+        await env.img_url.put(chunk.key, chunkData, { 
+            metadata: retryMetadata,
+            expirationTtl: 3600
+        });
+            
+        while (retryCount < maxRetries) {
+            // 根据渠道重新上传，添加超时保护
+            const retryPromise = (async () => {
+                if (uploadChannel === 'cfr2') {
+                    return await uploadSingleChunkToR2Multipart(context, chunkData, chunk.index, totalChunks, uploadId, originalFileName, originalFileType);
+                } else if (uploadChannel === 's3') {
+                    return await uploadSingleChunkToS3Multipart(context, chunkData, chunk.index, totalChunks, uploadId, originalFileName, originalFileType);
+                } else if (uploadChannel === 'telegram') {
+                    return await uploadSingleChunkToTelegram(context, chunkData, chunk.index, totalChunks, uploadId, originalFileName, originalFileType);
+                }
+                return null;
+            })();
+            
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Retry timeout')), retryTimeout);
+            });
+            
+            const uploadResult = await Promise.race([retryPromise, timeoutPromise]);
+            
+            if (uploadResult && uploadResult.success) {
+                // 更新状态为成功
+                const updatedMetadata = {
+                    ...chunkRecord.metadata,
+                    status: 'completed',
+                    uploadResult: uploadResult,
+                    retryCount: retryCount + 1,
+                    completedTime: Date.now()
+                };
+                
+                // 删除原始数据，只保留上传结果，设置过期时间
+                await env.img_url.put(chunk.key, '', { 
+                    metadata: updatedMetadata,
+                    expirationTtl: 3600 // 1小时过期
+                });
+                
+                console.log(`Chunk ${chunk.index} retry successful after ${retryCount + 1} attempts`);
+                return { success: true, chunk, retryCount: retryCount + 1 };
+            } else if (retryCount === maxRetries - 1) {
+                throw new Error(uploadResult?.error || 'Unknown retry error');
+            }
+
+            retryCount++;
+            lastError = uploadResult?.error || 'Unknown error';
+            console.warn(`Chunk ${chunk.index} retry ${retryCount} failed: ${lastError}`);
+        }
+    } catch (error) {
+        lastError = error;
+        const isTimeout = error.message === 'Retry timeout';
+        console.warn(`Chunk ${chunk.index} retry ${retryCount} ${isTimeout ? 'timed out' : 'failed'}: ${error.message}`);
+        
+        // 更新重试失败状态
+        try {
+            const chunkRecord = await env.img_url.getWithMetadata(chunk.key, { type: 'arrayBuffer' });
+            if (chunkRecord) {
+                const failedRetryMetadata = {
+                    ...chunkRecord.metadata,
+                    status: isTimeout ? 'retry_timeout' : 'retry_failed',
+                    retryCount: retryCount,
+                    lastRetryError: error.message,
+                    lastRetryTime: Date.now(),
+                    isRetryTimeout: isTimeout
+                };
+                
+                await env.img_url.put(chunk.key, chunkRecord.value, { 
+                    metadata: failedRetryMetadata,
+                    expirationTtl: 3600
+                });
+            }
+        } catch (metaError) {
+            console.error(`Failed to update retry error metadata for chunk ${chunk.index}:`, metaError);
+        }
+        
+        if (retryCount < maxRetries) {
+            // 指数退避延迟
+            const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 10000);
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+    
+    console.error(`Chunk ${chunk.index} failed after ${maxRetries} retry attempts`);
+    return { success: false, chunk, retryCount, error: lastError?.message || 'Max retries exceeded' };
+}
+
 
 // 清理失败的multipart upload
 export async function cleanupFailedMultipartUploads(context, uploadId, uploadChannel) {
