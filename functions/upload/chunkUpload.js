@@ -254,10 +254,6 @@ async function uploadChunkToStorage(context, chunkIndex, totalChunks, uploadId, 
         const chunkMetadata = chunkRecord.metadata;
 
         for (let retry = 0; retry < MAX_RETRIES; retry++) {
-            // 模拟上传失败
-            if (Math.random() < 0.5) {
-                throw new Error(`Simulated upload failure for chunk ${chunkIndex}`);
-            }
             // 根据渠道上传分块
             let uploadResult = null;
             
