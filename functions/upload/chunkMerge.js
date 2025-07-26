@@ -11,13 +11,12 @@ export async function handleChunkMerge(context) {
     const formdata = await request.formData();
     context.formdata = formdata;
 
-    let uploadId, totalChunks, originalFileName, originalFileType, originalFileSize, uploadChannel;
+    let uploadId, totalChunks, originalFileName, originalFileType, uploadChannel;
     try {
         uploadId = formdata.get('uploadId');
         totalChunks = parseInt(formdata.get('totalChunks'));
         originalFileName = formdata.get('originalFileName');
         originalFileType = formdata.get('originalFileType');
-        originalFileSize = parseInt(formdata.get('originalFileSize'));
 
         if (!uploadId || !totalChunks || !originalFileName) {
             return createResponse('Error: Missing merge parameters', { status: 400 });
@@ -384,16 +383,16 @@ async function mergeR2ChunksInfo(context, uploadId, completedChunks, metadata) {
         }
         
         const multipartInfo = JSON.parse(multipartInfoData);
-        
-        // 检查所有分块是否都已完成
+
+        // 组织所有分块
         const sortedChunks = completedChunks.sort((a, b) => a.index - b.index);
         const parts = [];
         
         for (const chunk of sortedChunks) {
-            const part = multipartInfo.parts[chunk.index];
-            if (!part) {
-                throw new Error(`Part ${chunk.index + 1} not found in multipart upload`);
-            }
+            const part = {
+                etag: chunk.uploadResult.etag,
+                partNumber: chunk.uploadResult.partNumber,
+            };
             parts.push(part);
         }
         
@@ -466,15 +465,15 @@ async function mergeS3ChunksInfo(context, uploadId, completedChunks, metadata) {
         
         const multipartInfo = JSON.parse(multipartInfoData);
         
-        // 检查所有分块是否都已完成
+        // 组织所有分块
         const sortedChunks = completedChunks.sort((a, b) => a.index - b.index);
         const parts = [];
         
         for (const chunk of sortedChunks) {
-            const part = multipartInfo.parts[chunk.index];
-            if (!part) {
-                throw new Error(`Part ${chunk.index + 1} not found in multipart upload`);
-            }
+            const part = {
+                ETag: chunk.uploadResult.etag,
+                PartNumber: chunk.uploadResult.partNumber
+            };
             parts.push(part);
         }
 

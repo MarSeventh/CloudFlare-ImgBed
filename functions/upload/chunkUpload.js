@@ -13,10 +13,9 @@ export async function initializeChunkedUpload(context) {
         
         const originalFileName = formdata.get('originalFileName');
         const originalFileType = formdata.get('originalFileType');
-        const originalFileSize = parseInt(formdata.get('originalFileSize'));
         const totalChunks = parseInt(formdata.get('totalChunks'));
-        
-        if (!originalFileName || !originalFileType || !originalFileSize || !totalChunks) {
+
+        if (!originalFileName || !originalFileType || !totalChunks) {
             return createResponse('Error: Missing initialization parameters', { status: 400 });
         }
         
@@ -37,7 +36,6 @@ export async function initializeChunkedUpload(context) {
             uploadId,
             originalFileName,
             originalFileType,
-            originalFileSize,
             totalChunks,
             uploadChannel,
             uploadIp,
@@ -89,7 +87,7 @@ export async function handleChunkUpload(context) {
         const originalFileName = formdata.get('originalFileName');
         const originalFileType = formdata.get('originalFileType');
 
-        if (!chunk || chunkIndex === null || !totalChunks || !uploadId || !originalFileName) {
+        if (!chunk || chunkIndex === null || !totalChunks || !uploadId || !originalFileName || !originalFileType) {
             return createResponse('Error: Missing chunk upload parameters', { status: 400 });
         }
 
@@ -256,6 +254,10 @@ async function uploadChunkToStorage(context, chunkIndex, totalChunks, uploadId, 
         const chunkMetadata = chunkRecord.metadata;
 
         for (let retry = 0; retry < MAX_RETRIES; retry++) {
+            // 模拟上传失败
+            if (Math.random() < 0.5) {
+                throw new Error(`Simulated upload failure for chunk ${chunkIndex}`);
+            }
             // 根据渠道上传分块
             let uploadResult = null;
             
@@ -315,7 +317,6 @@ async function uploadChunkToStorage(context, chunkIndex, totalChunks, uploadId, 
                     ...chunkRecord.metadata,
                     status: 'failed',
                     error: error.message,
-                    stackTrace: error.stack,
                     failedTime: Date.now()
                 };
                 
@@ -352,8 +353,7 @@ async function uploadSingleChunkToR2Multipart(context, chunkData, chunkIndex, to
             const multipartUpload = await R2DataBase.createMultipartUpload(finalFileId);
             const multipartInfo = {
                 uploadId: multipartUpload.uploadId,
-                key: finalFileId,
-                parts: []
+                key: finalFileId
             };
             
             // 保存multipart info
@@ -364,13 +364,13 @@ async function uploadSingleChunkToR2Multipart(context, chunkData, chunkIndex, to
             // 其他分块需要等待第一个分块完成multipart upload初始化
             let multipartInfoData = null;
             let retryCount = 0;
-            const maxRetries = 30; // 最多等待30秒
-            
+            const maxRetries = 30; // 最多等待60秒
+
             while (!multipartInfoData && retryCount < maxRetries) {
                 multipartInfoData = await env.img_url.get(multipartKey);
                 if (!multipartInfoData) {
-                    // 等待1秒后重试
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    // 等待2秒后重试
+                    await new Promise(resolve => setTimeout(resolve, 2000));
                     retryCount++;
                     console.log(`R2 chunk ${chunkIndex} waiting for multipart initialization... (${retryCount}/${maxRetries})`);
                 }
@@ -395,41 +395,11 @@ async function uploadSingleChunkToR2Multipart(context, chunkData, chunkIndex, to
         // 上传分块
         const multipartUpload = R2DataBase.resumeMultipartUpload(finalFileId, multipartInfo.uploadId);
         const uploadedPart = await multipartUpload.uploadPart(chunkIndex + 1, chunkData);
-        
-        // 更新parts信息 - 使用重试机制处理并发冲突
-        let updateSuccess = false;
-        let updateRetries = 0;
-        const maxUpdateRetries = 3;
-        
-        while (!updateSuccess && updateRetries < maxUpdateRetries) {
-            try {
-                // 重新获取最新的multipart info
-                const latestMultipartInfoData = await env.img_url.get(multipartKey);
-                if (latestMultipartInfoData) {
-                    const latestMultipartInfo = JSON.parse(latestMultipartInfoData);
-                    latestMultipartInfo.parts[chunkIndex] = uploadedPart;
-                    
-                    await env.img_url.put(multipartKey, JSON.stringify(latestMultipartInfo), {
-                        expirationTtl: 3600
-                    });
-                    updateSuccess = true;
-                } else {
-                    throw new Error('Multipart info disappeared during update');
-                }
-            } catch (updateError) {
-                updateRetries++;
-                console.warn(`R2 chunk ${chunkIndex} multipart info update attempt ${updateRetries} failed:`, updateError.message);
-                
-                if (updateRetries < maxUpdateRetries) {
-                    await new Promise(resolve => setTimeout(resolve, 100 * updateRetries)); // 递增延迟
-                }
-            }
+
+        if (!uploadedPart || !uploadedPart.etag) {
+            throw new Error(`Failed to upload part ${chunkIndex + 1} to R2`);
         }
-        
-        if (!updateSuccess) {
-            console.error(`Failed to update R2 multipart info for chunk ${chunkIndex} after ${maxUpdateRetries} attempts`);
-        }
-        
+
         return {
             success: true,
             partNumber: chunkIndex + 1,
@@ -489,8 +459,7 @@ async function uploadSingleChunkToS3Multipart(context, chunkData, chunkIndex, to
             
             const multipartInfo = {
                 uploadId: createResponse.UploadId,
-                key: finalFileId,
-                parts: []
+                key: finalFileId
             };
             
             // 保存multipart info
@@ -501,7 +470,7 @@ async function uploadSingleChunkToS3Multipart(context, chunkData, chunkIndex, to
             // 其他分块需要等待第一个分块完成multipart upload初始化
             let multipartInfoData = null;
             let retryCount = 0;
-            const maxRetries = 30; // 最多等待30秒
+            const maxRetries = 30; // 最多等待60秒
             
             while (!multipartInfoData && retryCount < maxRetries) {
                 multipartInfoData = await env.img_url.get(multipartKey);
@@ -538,41 +507,8 @@ async function uploadSingleChunkToS3Multipart(context, chunkData, chunkIndex, to
             Body: new Uint8Array(chunkData)
         }));
         
-        // 更新parts信息 - 使用重试机制处理并发冲突
-        let updateSuccess = false;
-        let updateRetries = 0;
-        const maxUpdateRetries = 3;
-        
-        while (!updateSuccess && updateRetries < maxUpdateRetries) {
-            try {
-                // 重新获取最新的multipart info
-                const latestMultipartInfoData = await env.img_url.get(multipartKey);
-                if (latestMultipartInfoData) {
-                    const latestMultipartInfo = JSON.parse(latestMultipartInfoData);
-                    latestMultipartInfo.parts[chunkIndex] = {
-                        PartNumber: chunkIndex + 1,
-                        ETag: uploadResponse.ETag
-                    };
-                    
-                    await env.img_url.put(multipartKey, JSON.stringify(latestMultipartInfo), {
-                        expirationTtl: 3600
-                    });
-                    updateSuccess = true;
-                } else {
-                    throw new Error('Multipart info disappeared during update');
-                }
-            } catch (updateError) {
-                updateRetries++;
-                console.warn(`S3 chunk ${chunkIndex} multipart info update attempt ${updateRetries} failed:`, updateError.message);
-                
-                if (updateRetries < maxUpdateRetries) {
-                    await new Promise(resolve => setTimeout(resolve, 100 * updateRetries)); // 递增延迟
-                }
-            }
-        }
-        
-        if (!updateSuccess) {
-            console.error(`Failed to update S3 multipart info for chunk ${chunkIndex} after ${maxUpdateRetries} attempts`);
+        if (!uploadResponse || !uploadResponse.ETag) {
+            throw new Error(`Failed to upload part ${chunkIndex + 1} to S3`);
         }
         
         return {
@@ -770,11 +706,9 @@ async function retrySingleChunk(context, chunk, uploadChannel, maxRetries = 5, r
         const retryMetadata = {
             ...chunkRecord.metadata,
             status: 'retrying',
-            retryCount: retryCount + 1,
-            retryStartTime: Date.now(),
-            retryTimeoutThreshold: Date.now() + retryTimeout
+            retryCount: retryCount + 1
         };
-        
+
         await env.img_url.put(chunk.key, chunkData, { 
             metadata: retryMetadata,
             expirationTtl: 3600
@@ -837,10 +771,7 @@ async function retrySingleChunk(context, chunk, uploadChannel, maxRetries = 5, r
                 const failedRetryMetadata = {
                     ...chunkRecord.metadata,
                     status: isTimeout ? 'retry_timeout' : 'retry_failed',
-                    retryCount: retryCount,
-                    lastRetryError: error.message,
-                    lastRetryTime: Date.now(),
-                    isRetryTimeout: isTimeout
+                    retryCount: retryCount
                 };
                 
                 await env.img_url.put(chunk.key, chunkRecord.value, { 
