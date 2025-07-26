@@ -589,7 +589,7 @@ export async function retryFailedChunks(context, failedChunks, uploadChannel, op
         maxRetries = 5,
         retryTimeout = 60000, // 60秒重试超时
         maxConcurrency = 3, // 最大并发数
-        batchSize = 5 // 每批处理的分块数
+        batchSize = 6 // 每批处理的分块数
     } = options;
 
     if (!failedChunks || failedChunks.length === 0) {
@@ -702,7 +702,6 @@ async function retrySingleChunk(context, chunk, uploadChannel, maxRetries = 5, r
         const retryMetadata = {
             ...chunkRecord.metadata,
             status: 'retrying',
-            retryCount: retryCount + 1
         };
 
         await env.img_url.put(chunk.key, chunkData, { 
@@ -723,8 +722,11 @@ async function retrySingleChunk(context, chunk, uploadChannel, maxRetries = 5, r
                 return null;
             })();
             
-            const timeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error('Retry timeout')), retryTimeout);
+            const timeoutPromise = new Promise((resolve) => {
+                setTimeout(() => resolve({
+                    success: false,
+                    error: 'Retry timeout'
+                }), retryTimeout);
             });
             
             const uploadResult = await Promise.race([retryPromise, timeoutPromise]);
@@ -766,8 +768,7 @@ async function retrySingleChunk(context, chunk, uploadChannel, maxRetries = 5, r
             if (chunkRecord) {
                 const failedRetryMetadata = {
                     ...chunkRecord.metadata,
-                    status: isTimeout ? 'retry_timeout' : 'retry_failed',
-                    retryCount: retryCount
+                    status: isTimeout ? 'retry_timeout' : 'retry_failed'
                 };
                 
                 await env.img_url.put(chunk.key, chunkRecord.value, { 
