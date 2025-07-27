@@ -341,15 +341,19 @@ async function handleR2File(context, fileId, encodedFileName, fileType) {
         let object;
         
         if (range) {
-            // 处理Range请求（用于大文件流式传输）
+            // 处理Range请求
             const matches = range.match(/bytes=(\d+)-(\d*)/);
             if (matches) {
                 const start = parseInt(matches[1]);
                 const end = matches[2] ? parseInt(matches[2]) : undefined;
-                
-                const rangeOptions = { offset: start };
+
+                const rangeOptions = { 
+                    range: {
+                        offset: start
+                    }
+                };
                 if (end !== undefined) {
-                    rangeOptions.length = end - start + 1;
+                    rangeOptions.range.length = end - start + 1;
                 }
                 
                 object = await R2DataBase.get(fileId, rangeOptions);
