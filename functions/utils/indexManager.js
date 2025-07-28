@@ -302,10 +302,10 @@ export async function readIndex(context, options = {}) {
         // 搜索过滤
         if (search) {
             const searchLower = search.toLowerCase();
-            filteredFiles = filteredFiles.filter(file => 
-                file.metadata.FileName.toLowerCase().includes(searchLower) ||
-                file.id.toLowerCase().includes(searchLower)
-            );
+            filteredFiles = filteredFiles.filter(file => {
+                return file.metadata.FileName?.toLowerCase().includes(searchLower) ||
+                    file.id.toLowerCase().includes(searchLower);
+            });
         }
 
         // 如果只需要总数
