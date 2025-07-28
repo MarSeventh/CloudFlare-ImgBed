@@ -1,5 +1,5 @@
 /* ========== 分块合并处理 ========== */
-import { createResponse, getUploadIp, getIPAddress, selectConsistentChannel, buildUniqueFileId } from './uploadTools';
+import { createResponse, getUploadIp, getIPAddress, selectConsistentChannel, buildUniqueFileId, endUpload } from './uploadTools';
 import { retryFailedChunks, cleanupFailedMultipartUploads, checkChunkUploadStatuses, cleanupChunkData, cleanupUploadSession } from './chunkUpload';
 import { S3Client, CompleteMultipartUploadCommand } from "@aws-sdk/client-s3";
 
@@ -200,6 +200,8 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
         // 获得上传IP
         const uploadIp = getUploadIp(request);
 
+        const normalizedFolder = (url.searchParams.get('uploadFolder') || '').replace(/^\/+/, '').replace(/\/{2,}/g, '/').replace(/\/$/, '');
+
         // 构建基础metadata
         const metadata = {
             FileName: originalFileName,
@@ -210,7 +212,7 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
             ListType: "None",
             TimeStamp: Date.now(),
             Label: "None",
-            Folder: (url.searchParams.get('uploadFolder') || '').replace(/^\/+/, '').replace(/\/{2,}/g, '/').replace(/\/$/, '') || 'root'
+            Directory: normalizedFolder === '' ? '' : normalizedFolder + '/',
         };
 
         // 更新进度
@@ -370,8 +372,8 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
 
 // 合并R2分块信息
 async function mergeR2ChunksInfo(context, uploadId, completedChunks, metadata) {
-    const { env } = context;
-    
+    const { env, waitUntil, url } = context;
+
     try {
         const R2DataBase = env.img_r2;
         const multipartKey = `multipart_${uploadId}`;
@@ -414,9 +416,11 @@ async function mergeR2ChunksInfo(context, uploadId, completedChunks, metadata) {
         
         // 写入KV数据库
         await env.img_url.put(finalFileId, "", { metadata });
-        
+
+        // 结束上传
+        waitUntil(endUpload(context, finalFileId, metadata));
+
         // 更新返回链接
-        const { url } = context;
         const returnFormat = url.searchParams.get('returnFormat') || 'default';
         let updatedReturnLink = '';
         if (returnFormat === 'full') {
@@ -437,8 +441,8 @@ async function mergeR2ChunksInfo(context, uploadId, completedChunks, metadata) {
 
 // 合并S3分块信息
 async function mergeS3ChunksInfo(context, uploadId, completedChunks, metadata) {
-    const { env, uploadConfig } = context;
-    
+    const { env, waitUntil, uploadConfig, url } = context;
+
     try {
         const s3Settings = uploadConfig.s3;
         const s3Channels = s3Settings.channels;
@@ -514,8 +518,10 @@ async function mergeS3ChunksInfo(context, uploadId, completedChunks, metadata) {
         // 写入KV数据库
         await env.img_url.put(finalFileId, "", { metadata });
 
+        // 异步结束上传
+        waitUntil(endUpload(context, finalFileId, metadata));
+
         // 更新返回链接
-        const { url } = context;
         const returnFormat = url.searchParams.get('returnFormat') || 'default';
         let updatedReturnLink = '';
         if (returnFormat === 'full') {
@@ -536,8 +542,8 @@ async function mergeS3ChunksInfo(context, uploadId, completedChunks, metadata) {
 
 // 合并Telegram分块信息
 async function mergeTelegramChunksInfo(context, uploadId, completedChunks, metadata) {
-    const { env, uploadConfig, url } = context;
-    
+    const { env, waitUntil, uploadConfig, url } = context;
+
     try {
         const tgSettings = uploadConfig.telegram;
         const tgChannels = tgSettings.channels;
@@ -579,6 +585,9 @@ async function mergeTelegramChunksInfo(context, uploadId, completedChunks, metad
         
         // 写入KV数据库
         await env.img_url.put(finalFileId, chunksData, { metadata });
+
+        // 异步结束上传
+        waitUntil(endUpload(context, finalFileId, metadata));
 
         // 生成返回链接
         const returnFormat = url.searchParams.get('returnFormat') || 'default';

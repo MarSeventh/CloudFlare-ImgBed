@@ -1,12 +1,9 @@
 import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { purgeCFCache } from "../../../utils/purgeCache";
+import { removeFileFromIndex, batchRemoveFilesFromIndex } from "../../../utils/indexManager.js";
 
 export async function onRequest(context) {
-    const {
-        request,
-        env,
-        params,
-    } = context;
+    const { request, env, params, waitUntil } = context;
 
     const url = new URL(request.url);
 
@@ -56,6 +53,10 @@ export async function onRequest(context) {
                 }
             }
 
+            // 批量从索引中删除文件
+            if (deletedFiles.length > 0) {
+                waitUntil(batchRemoveFilesFromIndex(context, deletedFiles));
+            }
 
             // 返回处理结果
             return new Response(JSON.stringify({
@@ -82,6 +83,9 @@ export async function onRequest(context) {
         const success = await deleteFile(env, fileId, cdnUrl, url);
         if (!success) {
             throw new Error('Delete file failed');
+        } else {
+            // 从索引中删除文件
+            waitUntil(removeFileFromIndex(context, fileId));
         }
 
         return new Response(JSON.stringify({

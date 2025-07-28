@@ -1,5 +1,6 @@
 import { fetchSecurityConfig } from "../utils/sysConfig";
 import { purgeCFCache } from "../utils/purgeCache";
+import { addFileToIndex } from "../utils/indexManager.js";
 
 // 统一的响应创建函数
 export function createResponse(body, options = {}) {
@@ -173,6 +174,19 @@ export async function purgeCDNCache(env, cdnUrl, url, normalizedFolder) {
     } catch (error) {
         console.error('Failed to clear cache:', error);
     }
+}
+
+// 结束上传：清除缓存，维护索引
+export async function endUpload(context, fileId, metadata) {
+    const { env, url } = context;
+
+    // 清除CDN缓存
+    const cdnUrl = `https://${url.hostname}/file/${fileId}`;
+    const normalizedFolder = (url.searchParams.get('uploadFolder') || '').replace(/^\/+/, '').replace(/\/{2,}/g, '/').replace(/\/$/, '');
+    await purgeCDNCache(env, cdnUrl, url, normalizedFolder);
+    
+    // 更新文件索引
+    await addFileToIndex(context, fileId, metadata);
 }
 
 // 从 request 中解析 ip 地址

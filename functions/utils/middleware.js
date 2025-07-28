@@ -1,6 +1,7 @@
 import sentryPlugin from "@cloudflare/pages-plugin-sentry";
 import '@sentry/tracing';
 import { fetchOthersConfig } from "./sysConfig";
+import { getIndexInfo, rebuildIndex } from "./indexManager";
 
 let disableTelemetry = false;
 
@@ -111,9 +112,9 @@ async function fetchSampleRate(context) {
   }
 }
 
-// 检查 KV 是否配置 - Cloudflare Pages Function 中间件
+// 检查 KV 是否配置，文件索引是否存在
 export async function checkKVConfig(context) {
-  const { env } = context;
+  const { env, waitUntil } = context;
 
   // 检查 img_url KV 绑定是否存在
   if (typeof env.img_url == "undefined" || env.img_url == null) {

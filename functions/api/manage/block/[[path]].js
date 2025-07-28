@@ -1,4 +1,5 @@
 import { purgeCFCache } from "../../../utils/purgeCache";
+import { addFileToIndex } from "../../../utils/indexManager.js";
 
 export async function onRequest(context) {
     // Contents of context object
@@ -32,6 +33,9 @@ export async function onRequest(context) {
 
     // 清除CDN缓存
     await purgeCFCache(env, cdnUrl);
+
+    // 更新索引
+    waitUntil(addFileToIndex(context, params.path, value.metadata));
 
     return new Response(info);
 

@@ -1,12 +1,9 @@
 import { S3Client, CopyObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { purgeCFCache } from "../../../utils/purgeCache";
+import { removeFileFromIndex, addFileToIndex, batchRemoveFilesFromIndex, batchAddFilesToIndex } from "../../../utils/indexManager.js";
 
 export async function onRequest(context) {
-    const {
-        request,
-        env,
-        params,
-    } = context;
+    const { request, env, params, waitUntil } = context;
 
     const url = new URL(request.url);
 
@@ -53,7 +50,7 @@ export async function onRequest(context) {
 
                     const success = await moveFile(env, fileId, newFileId, cdnUrl, url);
                     if (success) {
-                        processedFiles.push(fileId);
+                        processedFiles.push({ fileId: fileId, newFileId: newFileId });
                     } else {
                         failedFiles.push(fileId);
                     }
@@ -67,6 +64,16 @@ export async function onRequest(context) {
                         dist: folderDist
                     });
                 }
+            }
+
+            // 批量从索引中删除文件，添加新文件
+            if (processedFiles.length > 0) {
+                waitUntil(batchRemoveFilesFromIndex(context, processedFiles.map(file => file.fileId)));
+                waitUntil(batchAddFilesToIndex(context, processedFiles.map(file => {
+                    return {
+                        fileId: file.newFileId,
+                    };
+                })));
             }
 
             // 返回处理结果
@@ -96,6 +103,10 @@ export async function onRequest(context) {
         const success = await moveFile(env, fileId, newFileId, cdnUrl, url);
         if (!success) {
             throw new Error('Move file failed');
+        } else {
+            // 从索引中删除旧文件，并添加新文件
+            waitUntil(removeFileFromIndex(context, fileId));
+            waitUntil(addFileToIndex(context, newFileId, metadata));
         }
 
         return new Response(JSON.stringify({

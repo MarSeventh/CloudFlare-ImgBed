@@ -1,5 +1,5 @@
 /* ======= 客户端分块上传处理 ======= */
-import { createResponse, selectConsistentChannel, getUploadIp, getIPAddress, buildUniqueFileId } from './uploadTools';
+import { createResponse, selectConsistentChannel, getUploadIp, getIPAddress, buildUniqueFileId, endUpload } from './uploadTools';
 import { TelegramAPI } from '../utils/telegramAPI';
 import { S3Client, CreateMultipartUploadCommand, UploadPartCommand, AbortMultipartUploadCommand } from "@aws-sdk/client-s3";
 
@@ -1001,7 +1001,7 @@ export async function forceCleanupUpload(context, uploadId, totalChunks) {
 
 /* ======= 单个大文件大文件分块上传到Telegram ======= */
 export async function uploadLargeFileToTelegram(context, file, fullId, metadata, fileName, fileType, returnLink, tgBotToken, tgChatId, tgChannel) {
-    const { env } = context;
+    const { env, waitUntil } = context;
 
     const CHUNK_SIZE = 20 * 1024 * 1024; // 20MB
     const fileSize = file.size;
@@ -1079,7 +1079,10 @@ export async function uploadLargeFileToTelegram(context, file, fullId, metadata,
         
         // 写入最终的KV记录，分片信息作为value
         await env.img_url.put(fullId, chunksData, { metadata });
-        
+
+        // 异步结束上传
+        waitUntil(endUpload(context, fullId, metadata));
+
         return createResponse(
             JSON.stringify([{ 'src': returnLink }]),
             {
