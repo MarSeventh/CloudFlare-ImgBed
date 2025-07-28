@@ -24,6 +24,9 @@ export async function onRequest(context) {
         dir = dir.substring(1);
     }
 
+    // Trick: 重建索引
+    waitUntil(rebuildIndex(context));
+
     try {
         // 特殊操作：重建索引
         if (action === 'rebuild') {
