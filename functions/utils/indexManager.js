@@ -30,7 +30,8 @@
 
 const INDEX_KEY = 'manage@index';
 const OPERATION_KEY_PREFIX = 'manage@index@operation_';
-const BATCH_SIZE = 1000; // 批量处理大小
+const KV_LIST_LIMIT = 1000; // KV 列出批量大小
+const BATCH_SIZE = 10; // 批量处理大小
 
 /**
  * 添加文件到索引
@@ -306,7 +307,7 @@ export async function mergeOperationsToIndex(context, options = {}) {
         operations.sort((a, b) => a.timestamp - b.timestamp);
 
         // 创建索引的副本进行操作
-        const workingIndex = JSON.parse(JSON.stringify(currentIndex));
+        const workingIndex = currentIndex;
         let operationsProcessed = 0;
         let addedCount = 0;
         let removedCount = 0;
@@ -357,6 +358,11 @@ export async function mergeOperationsToIndex(context, options = {}) {
                 
                 operationsProcessed++;
                 processedOperationIds.push(operation.id);
+
+                // 增加协作点
+                if (operationsProcessed % 3 === 0) {
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                }
                 
             } catch (error) {
                 console.error(`Error applying operation ${operation.id}:`, error);
@@ -561,7 +567,7 @@ export async function rebuildIndex(context, progressCallback = null) {
         // 分批读取所有文件
         while (true) {
             const response = await env.img_url.list({
-                limit: BATCH_SIZE,
+                limit: KV_LIST_LIMIT,
                 cursor: cursor
             });
 
@@ -726,7 +732,7 @@ async function getAllPendingOperations(context, lastOperationId = null) {
         while (true) {
             const response = await env.img_url.list({
                 prefix: OPERATION_KEY_PREFIX,
-                limit: BATCH_SIZE,
+                limit: KV_LIST_LIMIT,
                 cursor: cursor
             });
             
@@ -923,19 +929,22 @@ function applyBatchMoveOperation(index, data) {
  * 清理已处理的操作记录
  * @param {Object} context - 上下文对象
  * @param {Array} operationIds - 要清理的操作ID数组
+ * @param {number} concurrency - 并发数量，默认为10
  */
-async function cleanupOperations(context, operationIds) {
+async function cleanupOperations(context, operationIds, concurrency = 10) {
     const { env } = context;
 
     try {
-        console.log(`Cleaning up ${operationIds.length} processed operations...`);
+        console.log(`Cleaning up ${operationIds.length} processed operations with concurrency ${concurrency}...`);
         
-        const deletePromises = operationIds.map(operationId => {
+        // 创建删除任务数组
+        const deleteTasks = operationIds.map(operationId => {
             const operationKey = OPERATION_KEY_PREFIX + operationId;
-            return env.img_url.delete(operationKey);
+            return () => env.img_url.delete(operationKey);
         });
         
-        await Promise.all(deletePromises);
+        // 使用并发控制执行删除操作
+        await promiseLimit(deleteTasks, concurrency);
         console.log(`Successfully cleaned up ${operationIds.length} operations`);
     } catch (error) {
         console.error('Error cleaning up operations:', error);
@@ -966,7 +975,7 @@ export async function deleteAllOperations(context, options = {}) {
         while (true) {
             const response = await env.img_url.list({
                 prefix: OPERATION_KEY_PREFIX,
-                limit: BATCH_SIZE,
+                limit: KV_LIST_LIMIT,
                 cursor: cursor
             });
             
@@ -1159,4 +1168,40 @@ function insertFileInOrder(sortedFiles, fileItem) {
     
     // 在找到的位置插入文件
     sortedFiles.splice(left, 0, fileItem);
+}
+
+/**
+ * 并发控制工具函数 - 限制同时执行的Promise数量
+ * @param {Array} tasks - 任务数组，每个任务是一个返回Promise的函数
+ * @param {number} concurrency - 并发数量
+ * @returns {Promise<Array>} 所有任务的结果数组
+ */
+async function promiseLimit(tasks, concurrency = BATCH_SIZE) {
+    const results = [];
+    const executing = [];
+    
+    for (let i = 0; i < tasks.length; i++) {
+        const task = tasks[i];
+        const promise = Promise.resolve().then(() => task()).then(result => {
+            results[i] = result;
+            return result;
+        });
+        
+        executing.push(promise);
+        
+        if (executing.length >= concurrency) {
+            await Promise.race(executing);
+            // 移除已完成的Promise
+            for (let j = executing.length - 1; j >= 0; j--) {
+                if (results[i] !== undefined || promise === executing[j]) {
+                    executing.splice(j, 1);
+                    break;
+                }
+            }
+        }
+    }
+    
+    // 等待所有剩余的Promise完成
+    await Promise.all(executing);
+    return results;
 }
