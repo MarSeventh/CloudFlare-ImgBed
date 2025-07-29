@@ -1185,19 +1185,17 @@ async function promiseLimit(tasks, concurrency = BATCH_SIZE) {
         const promise = Promise.resolve().then(() => task()).then(result => {
             results[i] = result;
             return result;
+        }).finally(() => {
+            const index = executing.indexOf(promise);
+            if (index >= 0) {
+                executing.splice(index, 1);
+            }
         });
         
         executing.push(promise);
         
         if (executing.length >= concurrency) {
             await Promise.race(executing);
-            // 移除已完成的Promise
-            for (let j = executing.length - 1; j >= 0; j--) {
-                if (results[i] !== undefined || promise === executing[j]) {
-                    executing.splice(j, 1);
-                    break;
-                }
-            }
         }
     }
     
