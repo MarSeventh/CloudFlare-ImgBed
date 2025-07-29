@@ -1,6 +1,6 @@
 import { S3Client, CopyObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { purgeCFCache } from "../../../utils/purgeCache";
-import { removeFileFromIndex, addFileToIndex, batchRemoveFilesFromIndex, batchAddFilesToIndex } from "../../../utils/indexManager.js";
+import { moveFileInIndex, batchMoveFilesInIndex } from "../../../utils/indexManager.js";
 
 export async function onRequest(context) {
     const { request, env, params, waitUntil } = context;
@@ -68,10 +68,10 @@ export async function onRequest(context) {
 
             // 批量从索引中删除文件，添加新文件
             if (processedFiles.length > 0) {
-                waitUntil(batchRemoveFilesFromIndex(context, processedFiles.map(file => file.fileId)));
-                waitUntil(batchAddFilesToIndex(context, processedFiles.map(file => {
+                waitUntil(batchMoveFilesInIndex(context, processedFiles.map(file => {
                     return {
-                        fileId: file.newFileId,
+                        originalFileId: file.fileId,
+                        newFileId: file.newFileId,
                     };
                 })));
             }
@@ -105,8 +105,7 @@ export async function onRequest(context) {
             throw new Error('Move file failed');
         } else {
             // 从索引中删除旧文件，并添加新文件
-            waitUntil(removeFileFromIndex(context, fileId));
-            waitUntil(addFileToIndex(context, newFileId, metadata));
+            waitUntil(moveFileInIndex(context, fileId, newFileId));
         }
 
         return new Response(JSON.stringify({

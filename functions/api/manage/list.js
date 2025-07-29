@@ -1,4 +1,4 @@
-import { readIndex, getIndexInfo, rebuildIndex } from '../../utils/indexManager.js';
+import { readIndex, getIndexInfo, rebuildIndex, mergeOperationsToIndex } from '../../utils/indexManager.js';
 
 export async function onRequest(context) {
     const { request, env, waitUntil } = context;
@@ -24,8 +24,8 @@ export async function onRequest(context) {
         dir = dir.substring(1);
     }
 
-    // Trick: 重建索引
-    waitUntil(rebuildIndex(context));
+    // 处理挂起索引
+    await mergeOperationsToIndex(context);
 
     try {
         // 特殊操作：重建索引
