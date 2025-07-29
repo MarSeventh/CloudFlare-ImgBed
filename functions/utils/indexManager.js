@@ -39,10 +39,12 @@ const BATCH_SIZE = 1000; // 批量处理大小
  * @param {Object} metadata - 文件元数据
  */
 export async function addFileToIndex(context, fileId, metadata = null) {
+    const { env } = context;
+
     try {
         if (metadata === null) {
             // 如果未传入metadata，尝试从KV中获取
-            const fileData = await context.env.img_url.getWithMetadata(fileId);
+            const fileData = await env.img_url.getWithMetadata(fileId);
             metadata = fileData.metadata || {};
         }
 
@@ -270,6 +272,7 @@ export async function batchMoveFilesInIndex(context, moveOperations) {
  * @returns {Object} 合并结果
  */
 export async function mergeOperationsToIndex(context, options = {}) {
+    const { env } = context;
     const { cleanupAfterMerge = true } = options;
     
     try {
@@ -360,15 +363,8 @@ export async function mergeOperationsToIndex(context, options = {}) {
             }
         }
 
-        // 如果有任何修改，重新排序并保存索引
+        // 如果有任何修改，保存索引
         if (operationsProcessed > 0) {
-            // 按时间戳倒序排序
-            workingIndex.files.sort((a, b) => {
-                const aTime = a.metadata.TimeStamp || 0;
-                const bTime = b.metadata.TimeStamp || 0;
-                return bTime - aTime;
-            });
-
             workingIndex.lastUpdated = Date.now();
             workingIndex.totalCount = workingIndex.files.length;
             
@@ -378,8 +374,8 @@ export async function mergeOperationsToIndex(context, options = {}) {
             }
 
             // 保存更新后的索引
-            await context.env.img_url.put(INDEX_KEY, JSON.stringify(workingIndex));
-            
+            await env.img_url.put(INDEX_KEY, JSON.stringify(workingIndex));
+
             console.log(`Index updated: ${addedCount} added, ${updatedCount} updated, ${removedCount} removed, ${movedCount} moved`);
         }
 
@@ -700,6 +696,8 @@ function generateOperationId() {
  * @param {Object} data - 操作数据
  */
 async function recordOperation(context, type, data) {
+    const { env } = context;
+
     const operationId = generateOperationId();
     const operation = {
         type,
@@ -708,8 +706,8 @@ async function recordOperation(context, type, data) {
     };
     
     const operationKey = OPERATION_KEY_PREFIX + operationId;
-    await context.env.img_url.put(operationKey, JSON.stringify(operation));
-    
+    await env.img_url.put(operationKey, JSON.stringify(operation));
+
     return operationId;
 }
 
@@ -719,12 +717,14 @@ async function recordOperation(context, type, data) {
  * @param {string} lastOperationId - 最后处理的操作ID
  */
 async function getAllPendingOperations(context, lastOperationId = null) {
+    const { env } = context;
+
     const operations = [];
     let cursor = null;
     
     try {
         while (true) {
-            const response = await context.env.img_url.list({
+            const response = await env.img_url.list({
                 prefix: OPERATION_KEY_PREFIX,
                 limit: BATCH_SIZE,
                 cursor: cursor
@@ -737,7 +737,7 @@ async function getAllPendingOperations(context, lastOperationId = null) {
                 }
                 
                 try {
-                    const operationData = await context.env.img_url.get(item.name);
+                    const operationData = await env.img_url.get(item.name);
                     if (operationData) {
                         const operation = JSON.parse(operationData);
                         operation.id = item.name.substring(OPERATION_KEY_PREFIX.length);
@@ -925,12 +925,14 @@ function applyBatchMoveOperation(index, data) {
  * @param {Array} operationIds - 要清理的操作ID数组
  */
 async function cleanupOperations(context, operationIds) {
+    const { env } = context;
+
     try {
         console.log(`Cleaning up ${operationIds.length} processed operations...`);
         
         const deletePromises = operationIds.map(operationId => {
             const operationKey = OPERATION_KEY_PREFIX + operationId;
-            return context.env.img_url.delete(operationKey);
+            return env.img_url.delete(operationKey);
         });
         
         await Promise.all(deletePromises);
@@ -949,6 +951,7 @@ async function cleanupOperations(context, operationIds) {
  * @returns {Object} 删除结果 { success, deletedCount, errors?, totalFound? }
  */
 export async function deleteAllOperations(context, options = {}) {
+    const { env } = context;
     const { force = false, progressCallback = null } = options;
     
     try {
@@ -961,7 +964,7 @@ export async function deleteAllOperations(context, options = {}) {
         
         // 首先收集所有操作键
         while (true) {
-            const response = await context.env.img_url.list({
+            const response = await env.img_url.list({
                 prefix: OPERATION_KEY_PREFIX,
                 limit: BATCH_SIZE,
                 cursor: cursor
@@ -998,7 +1001,7 @@ export async function deleteAllOperations(context, options = {}) {
             // 并行删除当前批次
             const deletePromises = batch.map(async (operationKey) => {
                 try {
-                    await context.env.img_url.delete(operationKey);
+                    await env.img_url.delete(operationKey);
                     return { success: true, key: operationKey };
                 } catch (error) {
                     const errorInfo = { 
