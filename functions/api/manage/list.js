@@ -1,4 +1,4 @@
-import { readIndex, getIndexInfo, rebuildIndex, mergeOperationsToIndex } from '../../utils/indexManager.js';
+import { readIndex, getIndexInfo, rebuildIndex, mergeOperationsToIndex, getIndexStorageStats } from '../../utils/indexManager.js';
 
 export async function onRequest(context) {
     const { request, env, waitUntil } = context;
@@ -36,6 +36,14 @@ export async function onRequest(context) {
 
             return new Response('Index rebuilt asynchronously', {
                 headers: { "Content-Type": "text/plain" }
+            });
+        }
+
+        // 特殊操作：获取索引存储统计
+        if (action === 'storage-stats') {
+            const stats = await getIndexStorageStats(context);
+            return new Response(JSON.stringify(stats), {
+                headers: { "Content-Type": "application/json" }
             });
         }
 
