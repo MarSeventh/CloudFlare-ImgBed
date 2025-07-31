@@ -39,8 +39,8 @@ export async function onRequest(context) {
             });
         }
 
-        // 特殊操作：获取索引存储统计
-        if (action === 'storage-stats') {
+        // 特殊操作：获取索引存储信息
+        if (action === 'index-storage-stats') {
             const stats = await getIndexStorageStats(context);
             return new Response(JSON.stringify(stats), {
                 headers: { "Content-Type": "application/json" }

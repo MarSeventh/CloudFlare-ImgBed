@@ -699,6 +699,7 @@ export async function getIndexInfo(context) {
             
             // 类型统计
             typeStats[file.metadata.ListType] = (typeStats[file.metadata.ListType] || 0) + 1;
+            typeStats[file.metadata.Label] = (typeStats[file.metadata.Label] || 0) + 1;
         });
 
         return {
