@@ -698,8 +698,8 @@ export async function getIndexInfo(context) {
             directoryStats[dir] = (directoryStats[dir] || 0) + 1;
             
             // 类型统计
-            const listType = file.metadata.ListType || 'None';
-            const label = file.metadata.Label || 'None';
+            const listType = file.metadata.ListType || 'Normal';
+            const label = file.metadata.Label || 'Unknown';
             typeStats[listType] = (typeStats[listType] || 0) + 1;
             typeStats[label] = (typeStats[label] || 0) + 1;
         });
