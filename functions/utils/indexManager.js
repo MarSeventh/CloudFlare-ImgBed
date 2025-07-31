@@ -698,8 +698,10 @@ export async function getIndexInfo(context) {
             directoryStats[dir] = (directoryStats[dir] || 0) + 1;
             
             // 类型统计
-            typeStats[file.metadata.ListType] = (typeStats[file.metadata.ListType] || 0) + 1;
-            typeStats[file.metadata.Label] = (typeStats[file.metadata.Label] || 0) + 1;
+            const listType = file.metadata.ListType || 'None';
+            const label = file.metadata.Label || 'None';
+            typeStats[listType] = (typeStats[listType] || 0) + 1;
+            typeStats[label] = (typeStats[label] || 0) + 1;
         });
 
         return {
