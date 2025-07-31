@@ -690,7 +690,10 @@ export async function getIndexInfo(context) {
         
         index.files.forEach(file => {
             // 渠道统计
-            const channel = file.metadata.Channel || 'Unknown';
+            let channel = file.metadata.Channel || 'Telegraph';
+            if (channel === 'TelegramNew') {
+                channel = 'Telegram';
+            }
             channelStats[channel] = (channelStats[channel] || 0) + 1;
 
             // 目录统计
@@ -698,10 +701,12 @@ export async function getIndexInfo(context) {
             directoryStats[dir] = (directoryStats[dir] || 0) + 1;
             
             // 类型统计
-            const listType = file.metadata.ListType || 'Normal';
-            const label = file.metadata.Label || 'Unknown';
+            let listType = file.metadata.ListType || 'None';
+            const label = file.metadata.Label || 'None';
+            if (listType !== 'White' && label === 'adult') {
+                listType = 'Block';
+            }
             typeStats[listType] = (typeStats[listType] || 0) + 1;
-            typeStats[label] = (typeStats[label] || 0) + 1;
         });
 
         return {
