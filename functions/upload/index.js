@@ -23,7 +23,8 @@ export async function onRequest(context) {  // Contents of context object
     context.uploadConfig = uploadConfig;
 
     // 鉴权
-    if (!await userAuthCheck(env, url, request)) {
+    const requiredPermission = 'upload';
+    if (!await userAuthCheck(env, url, request, requiredPermission)) {
         return UnauthorizedResponse('Unauthorized');
     }
 

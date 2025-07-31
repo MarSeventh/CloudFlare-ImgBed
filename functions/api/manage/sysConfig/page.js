@@ -47,69 +47,117 @@ export async function getPageConfig(kv, env) {
     const config = []
     settings.config = config
     config.push(
+        // 全局设置
         {
             id: 'siteTitle',
             label: '网站标题',
             placeholder: 'Sanyue ImgHub',
+            category: '全局设置',
         },
         {
             id: 'siteIcon',
             label: '网站图标',
+            category: '全局设置',
         },
         {
             id: 'ownerName',
             label: '图床名称',
             placeholder: 'Sanyue ImgHub',
+            category: '全局设置',
         },
         {
             id: 'logoUrl',
             label: '图床Logo',
-        },
-        {
-            id: 'announcement',
-            label: '公告',
-            tooltip: '支持HTML标签',
-        },
-        {
-            id: 'loginBkImg',
-            label: '登录页背景图',
-            tooltip: '1.填写 bing 使用必应壁纸轮播 <br/> 2.填写 ["url1","url2"] 使用多张图片轮播 <br/> 3.填写 ["url"] 使用单张图片',
-        },
-        {
-            id: 'uploadBkImg',
-            label: '上传页背景图',
-            tooltip: '1.填写 bing 使用必应壁纸轮播 <br/> 2.填写 ["url1","url2"] 使用多张图片轮播 <br/> 3.填写 ["url"] 使用单张图片',
-        },
-        {
-            id: 'adminLoginBkImg',
-            label: '后台登录背景',
-            tooltip: '1.填写 bing 使用必应壁纸轮播 <br/> 2.填写 ["url1","url2"] 使用多张图片轮播 <br/> 3.填写 ["url"] 使用单张图片',
+            category: '全局设置',
         },
         {
             id: 'bkInterval',
             label: '背景切换间隔',
             placeholder: '3000',
             tooltip: '单位：毫秒 ms',
+            category: '全局设置',
         },
         {
             id: 'bkOpacity',
             label: '背景图透明度',
             placeholder: '1',
             tooltip: '0-1 之间的小数',
-        },
-        {
-            id: 'footerLink',
-            label: '页脚传送门链接',
-        },
-        {
-            id: 'disableFooter',
-            label: '隐藏页脚',
-            placeholder: 'false',
+            category: '全局设置',
         },
         {
             id: 'urlPrefix',
             label: '默认URL前缀',
-            tooltip: '自定义URL前缀，如：https://img.a.com/file/，留空则使用当前域名 <br/> 设置后将应用于上传和管理界面',
+            tooltip: '自定义URL前缀，如：https://img.a.com/file/，留空则使用当前域名 <br/> 设置后将应用于客户端和管理端',
+            category: '全局设置',
+        },
+        // 客户端设置
+        {
+            id: 'announcement',
+            label: '公告',
+            tooltip: '支持HTML标签',
+            category: '客户端设置',
+        },
+        {
+            id: 'defaultUploadChannel',
+            label: '默认上传渠道',
+            type: 'select',
+            options: [
+                { label: 'Telegram', value: 'telegram' },
+                { label: 'Cloudflare R2', value: 'cfr2' },
+                { label: 'S3', value: 's3' },
+            ],
+            placeholder: 'telegram',
+            category: '客户端设置',
+        },
+        {
+            id: 'defaultUploadFolder',
+            label: '默认上传目录',
+            placeholder: '/ 开头的合法目录，不能包含特殊字符， 默认为根目录',
+            category: '客户端设置',
+        },
+        {
+            id: 'defaultUploadNameType',
+            label: '默认命名方式',
+            type: 'select',
+            options: [
+                { label: '默认', value: 'default' },
+                { label: '仅前缀', value: 'index' },
+                { label: '仅原名', value: 'origin' },
+                { label: '短链接', value: 'short' },
+            ],
+            placeholder: 'default',
+            category: '客户端设置',
+        },
+        {
+            id: 'loginBkImg',
+            label: '登录页背景图',
+            tooltip: '1.填写 bing 使用必应壁纸轮播 <br/> 2.填写 ["url1","url2"] 使用多张图片轮播 <br/> 3.填写 ["url"] 使用单张图片',
+            category: '客户端设置',
+        },
+        {
+            id: 'uploadBkImg',
+            label: '上传页背景图',
+            tooltip: '1.填写 bing 使用必应壁纸轮播 <br/> 2.填写 ["url1","url2"] 使用多张图片轮播 <br/> 3.填写 ["url"] 使用单张图片',
+            category: '客户端设置',
+        },
+        {
+            id: 'footerLink',
+            label: '页脚传送门链接',
+            category: '客户端设置',
+        },
+        {
+            id: 'disableFooter',
+            label: '隐藏页脚',
+            type: 'boolean',
+            default: false,
+            category: '客户端设置',
+        },
+        // 管理端设置
+        {
+            id: 'adminLoginBkImg',
+            label: '登录页背景图',
+            tooltip: '1.填写 bing 使用必应壁纸轮播 <br/> 2.填写 ["url1","url2"] 使用多张图片轮播 <br/> 3.填写 ["url"] 使用单张图片',
+            category: '管理端设置',
         }
     )
 

@@ -1,6 +1,22 @@
 import { fetchSecurityConfig } from './sysConfig';
+import { validateApiToken } from './tokenValidator';
 
-export async function userAuthCheck(env, url, request) {
+/** 
+ * 客户端用户认证
+ * @param {Object} env - 环境变量
+ * @param {URL} url - 请求的URL
+ * @param {Request} request - 请求对象
+ * @param {string|null} requiredPermission - 如果提供，则进行Token验证
+ * @return {Promise<boolean>} 返回是否认证通过
+ */
+export async function userAuthCheck(env, url, request, requiredPermission = null) {
+    // 首先使用Token验证
+    const tokenValidation = await validateApiToken(request, env.img_url, requiredPermission);
+    if (tokenValidation.valid) {
+        return true;
+    }
+        
+    // Token验证失败，继续尝试传统认证方式
     const securityConfig = await fetchSecurityConfig(env);
     const rightAuthCode = securityConfig.auth.user.authCode;
 

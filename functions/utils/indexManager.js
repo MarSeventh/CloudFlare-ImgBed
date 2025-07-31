@@ -441,6 +441,7 @@ export async function mergeOperationsToIndex(context, options = {}) {
  * @param {string} options.channel - 渠道过滤
  * @param {string} options.listType - 列表类型过滤
  * @param {boolean} options.countOnly - 仅返回总数
+ * @param {boolean} options.includeSubdirFiles - 是否包含子目录下的文件
  */
 export async function readIndex(context, options = {}) {
     try {
@@ -451,7 +452,8 @@ export async function readIndex(context, options = {}) {
             count = 50,
             channel = '',
             listType = '',
-            countOnly = false
+            countOnly = false,
+            includeSubdirFiles = false
         } = options;
 
         const index = await getIndex(context);
@@ -499,12 +501,17 @@ export async function readIndex(context, options = {}) {
 
         // 分页处理
         const totalCount = filteredFiles.length;
-        // 获取当前目录下的直接文件
-        let resultFiles = filteredFiles.filter(file => {
-            const fileDir = file.metadata.Directory ? file.metadata.Directory : extractDirectory(file.id);
+
+        let resultFiles = filteredFiles;
+
+        // 如果不包含子目录文件，获取当前目录下的直接文件
+        if (!includeSubdirFiles) {
             const dirPrefix = directory === '' || directory.endsWith('/') ? directory : directory + '/';
-            return fileDir === dirPrefix;
-        });
+            resultFiles = filteredFiles.filter(file => {
+                const fileDir = file.metadata.Directory ? file.metadata.Directory : extractDirectory(file.id);
+                return fileDir === dirPrefix;
+            });
+        }
 
         if (count !== -1) {
             const startIndex = Math.max(0, start);

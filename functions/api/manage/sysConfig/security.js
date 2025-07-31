@@ -78,5 +78,12 @@ export async function getSecurityConfig(kv, env) {
     }
     settings.access = access
 
+    // API Token 管理
+    const kvApiTokens = settingsKV.apiTokens || {}
+    const apiTokens = {
+        tokens: kvApiTokens.tokens || {}
+    }
+    settings.apiTokens = apiTokens
+
     return settings;
 }

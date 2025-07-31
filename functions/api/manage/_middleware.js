@@ -1,5 +1,6 @@
 import { fetchSecurityConfig } from "../../utils/sysConfig";
 import { checkKVConfig, errorHandling } from "../../utils/middleware";
+import { validateApiToken } from "../../utils/tokenValidator";
 
 let securityConfig = {}
 let basicUser = ""
@@ -39,32 +40,55 @@ function basicAuthentication(request) {
 
 function UnauthorizedException(reason) {
   return new Response(reason, {
-      status: 401,
-      statusText: 'Unauthorized',
-      headers: {
-        'Content-Type': 'text/plain;charset=UTF-8',
-        // Disables caching by default.
-        'Cache-Control': 'no-store',
-        // Returns the "Content-Length" header for HTTP HEAD requests.
-        'Content-Length': reason.length,
-      },
-    });
+    status: 401,
+    statusText: 'Unauthorized',
+    headers: {
+      'Content-Type': 'text/plain;charset=UTF-8',
+      // Disables caching by default.
+      'Cache-Control': 'no-store',
+      // Returns the "Content-Length" header for HTTP HEAD requests.
+      'Content-Length': reason.length,
+    },
+  });
 }
 
 function BadRequestException(reason) {
   return new Response(reason, {
-      status: 400,
-      statusText: 'Bad Request',
-      headers: {
-        'Content-Type': 'text/plain;charset=UTF-8',
-        // Disables caching by default.
-        'Cache-Control': 'no-store',
-        // Returns the "Content-Length" header for HTTP HEAD requests.
-        'Content-Length': reason.length,
-      },
-    });
+    status: 400,
+    statusText: 'Bad Request',
+    headers: {
+      'Content-Type': 'text/plain;charset=UTF-8',
+      // Disables caching by default.
+      'Cache-Control': 'no-store',
+      // Returns the "Content-Length" header for HTTP HEAD requests.
+      'Content-Length': reason.length,
+    },
+  });
 }
 
+
+/**
+ * 根据请求路径提取所需权限
+ * @param {string} pathname - 请求路径
+ * @returns {string|null} 需要的权限类型或null
+ */
+function extractRequiredPermission(pathname) {
+  // 提取路径中的关键部分
+  const pathParts = pathname.toLowerCase().split('/');
+  
+  // 检查是否包含delete路径
+  if (pathParts.includes('delete')) {
+    return 'delete';
+  }
+  
+  // 检查是否包含list路径
+  if (pathParts.includes('list')) {
+    return 'list';
+  }
+  
+  // 其他情况返回null
+  return null;
+}
 
 async function authentication(context) {
   // 读取安全配置
@@ -72,33 +96,44 @@ async function authentication(context) {
   basicUser = securityConfig.auth.admin.adminUsername
   basicPass = securityConfig.auth.admin.adminPassword
 
-  //check if the env variables Disable_Dashboard are set
-  if (typeof context.env.img_url == "undefined" || context.env.img_url == null || context.env.img_url == "") {
-      return new Response('Dashboard is disabled. Please bind a KV namespace to use this feature.', { status: 200 });
-  }
-
   if(typeof basicUser == "undefined" || basicUser == null || basicUser == ""){
-      return context.next();
+    // 无需身份验证
+    return context.next();
   }else{
-      if (context.request.headers.has('Authorization')) {
-          // Throws exception when authorization fails.
-          const { user, pass } = basicAuthentication(context.request);                         
-              if (basicUser !== user || basicPass !== pass) {
-                  return UnauthorizedException('Invalid credentials.');
-              }else{
-                  return context.next();
-              }
-          
-      } else {
-          return new Response('You need to login.', {
-              status: 401,
-              headers: {
-              // Prompts the user for credentials.
-              'WWW-Authenticate': 'Basic realm="my scope", charset="UTF-8"',
-              // 'WWW-Authenticate': 'None',
-              },
-          });
+
+    if (context.request.headers.has('Authorization')) {
+      // 首先尝试使用API Token验证
+
+      // 根据请求的 url 判断所需权限
+      const pathname = new URL(context.request.url).pathname;
+      const requiredPermission = extractRequiredPermission(pathname);
+
+      const tokenValidation = await validateApiToken(context.request, context.env.img_url, requiredPermission);
+      if (tokenValidation.valid) {
+        // Token验证通过，继续处理请求
+        return context.next();
       }
+      
+      // 回退到使用传统身份认证方式
+      const { user, pass } = basicAuthentication(context.request);                         
+      if (basicUser !== user || basicPass !== pass) {
+        return UnauthorizedException('Invalid credentials.');
+      }else{
+        return context.next();
+      }
+        
+    } else {
+      // 要求客户端进行基本认证
+      return new Response('You need to login.', {
+        status: 401,
+        headers: {
+        // Prompts the user for credentials.
+        'WWW-Authenticate': 'Basic realm="my scope", charset="UTF-8"',
+        // 'WWW-Authenticate': 'None',
+        },
+      });
+    }
+
   }  
   
 }
