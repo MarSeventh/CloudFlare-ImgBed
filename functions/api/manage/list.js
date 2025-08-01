@@ -1,7 +1,7 @@
-import { readIndex, getIndexInfo, rebuildIndex, mergeOperationsToIndex, getIndexStorageStats } from '../../utils/indexManager.js';
+import { readIndex, getIndexInfo, rebuildIndex, getIndexStorageStats } from '../../utils/indexManager.js';
 
 export async function onRequest(context) {
-    const { request, env, waitUntil } = context;
+    const { request, waitUntil } = context;
     const url = new URL(request.url);
 
     // 解析查询参数
@@ -23,9 +23,6 @@ export async function onRequest(context) {
     if (dir.startsWith('/')) {
         dir = dir.substring(1);
     }
-
-    // 处理挂起索引
-    await mergeOperationsToIndex(context);
 
     try {
         // 特殊操作：重建索引

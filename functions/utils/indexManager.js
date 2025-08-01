@@ -456,6 +456,10 @@ export async function readIndex(context, options = {}) {
             includeSubdirFiles = false
         } = options;
 
+        // 处理挂起的操作
+        await mergeOperationsToIndex(context);
+
+        // 获取当前索引
         const index = await getIndex(context);
         let filteredFiles = index.files;
 

@@ -1,4 +1,5 @@
 import { fetchOthersConfig } from "./utils/sysConfig";
+import { readIndex } from "./utils/indexManager";
 
 let othersConfig = {};
 let allowRandom = false;
@@ -56,10 +57,10 @@ export async function onRequest(context) {
     }
 
     // 调用randomFileList接口，读取KV数据库中的所有记录
-    let allRecords = await getRandomFileList(env, requestUrl, dir);
+    let allRecords = await getRandomFileList(context, requestUrl, dir);
 
     // 筛选出符合fileType要求的记录
-    allRecords = allRecords.filter(item => { return fileType.some(type => item.FileType.includes(type)) });
+    allRecords = allRecords.filter(item => { return fileType.some(type => item.FileType?.includes(type)) });
 
 
     if (allRecords.length == 0) {
@@ -100,7 +101,7 @@ export async function onRequest(context) {
     }
 }
 
-async function getRandomFileList(env, url, dir) {
+async function getRandomFileList(context, url, dir) {
     // 检查缓存中是否有记录，有则直接返回
     const cache = caches.default;
     const cacheRes = await cache.match(`${url.origin}/api/randomFileList?dir=${dir}`);
@@ -108,28 +109,12 @@ async function getRandomFileList(env, url, dir) {
         return JSON.parse(await cacheRes.text());
     }
 
-    let allRecords = [];
-    let cursor = null;
-
-    do {
-        const prefix = dir === ''? '' : dir + '/';
-        const records = await env.img_url.list({
-            prefix: prefix,
-            limit: 1000,
-            cursor,
-        });
-        // 除去records中key以manage@开头的记录
-        records.keys = records.keys.filter(item => !item.name.startsWith("manage@"));
-        // 保留metadata中fileType为image或video的记录
-        records.keys = records.keys.filter(item => item.metadata?.FileType?.includes("image") || item.metadata?.FileType?.includes("video"));
-        allRecords.push(...records.keys);
-        cursor = records.cursor;
-    } while (cursor);
+    let allRecords = await readIndex(context, { directory: dir, count: -1, includeSubdirFiles: true });
 
     // 仅保留记录的name和metadata中的FileType字段
-    allRecords = allRecords.map(item => {
+    allRecords = allRecords.files?.map(item => {
         return {
-            name: item.name,
+            name: item.id,
             FileType: item.metadata?.FileType
         }
     });
