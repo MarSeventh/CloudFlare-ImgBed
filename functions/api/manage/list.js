@@ -8,6 +8,7 @@ export async function onRequest(context) {
     let start = parseInt(url.searchParams.get('start'), 10) || 0;
     let count = parseInt(url.searchParams.get('count'), 10) || 50;
     let sum = url.searchParams.get('sum') === 'true';
+    let recursive = url.searchParams.get('recursive') === 'true';
     let dir = url.searchParams.get('dir') || '';
     let search = url.searchParams.get('search') || '';
     let channel = url.searchParams.get('channel') || '';
@@ -77,7 +78,8 @@ export async function onRequest(context) {
             start,
             count,
             channel,
-            listType
+            listType,
+            includeSubdirFiles: recursive,
         });
 
         // 转换文件格式
