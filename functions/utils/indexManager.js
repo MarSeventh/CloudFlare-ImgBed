@@ -284,7 +284,7 @@ export async function batchMoveFilesInIndex(context, moveOperations) {
  * @returns {Object} 合并结果
  */
 export async function mergeOperationsToIndex(context, options = {}) {
-    const { env } = context;
+    const { waitUntil } = context;
     const { cleanupAfterMerge = true } = options;
     
     try {
@@ -405,7 +405,7 @@ export async function mergeOperationsToIndex(context, options = {}) {
 
         // 清理已处理的操作记录
         if (cleanupAfterMerge && processedOperationIds.length > 0) {
-            await cleanupOperations(context, processedOperationIds);
+            waitUntil(cleanupOperations(context, processedOperationIds));
         }
 
         const result = {
@@ -455,6 +455,8 @@ export async function readIndex(context, options = {}) {
             countOnly = false,
             includeSubdirFiles = false
         } = options;
+        // 处理目录满足无头有尾的格式，根目录为空
+        const dirPrefix = directory === '' || directory.endsWith('/') ? directory : directory + '/';
 
         // 处理挂起的操作
         await mergeOperationsToIndex(context);
@@ -510,7 +512,6 @@ export async function readIndex(context, options = {}) {
 
         // 如果不包含子目录文件，获取当前目录下的直接文件
         if (!includeSubdirFiles) {
-            const dirPrefix = directory === '' || directory.endsWith('/') ? directory : directory + '/';
             resultFiles = filteredFiles.filter(file => {
                 const fileDir = file.metadata.Directory ? file.metadata.Directory : extractDirectory(file.id);
                 return fileDir === dirPrefix;
@@ -525,40 +526,25 @@ export async function readIndex(context, options = {}) {
 
         // 提取目录信息
         const directories = new Set();
-        if (directory === '') {
-            // 如果查询根目录，提取一级子目录
-            filteredFiles.forEach(file => {
-                const fileDir = file.metadata.Directory ? file.metadata.Directory : extractDirectory(file.id);
-                if (fileDir) {
-                    const firstSlashIndex = fileDir.indexOf('/');
-                    const topLevelDir = firstSlashIndex === -1 ? 
-                        fileDir : 
-                        fileDir.substring(0, firstSlashIndex);
-                    directories.add(topLevelDir);
+        filteredFiles.forEach(file => {
+            const fileDir = file.metadata.Directory ? file.metadata.Directory : extractDirectory(file.id);
+            if (fileDir && fileDir.startsWith(dirPrefix)) {
+                const relativePath = fileDir.substring(dirPrefix.length);
+                const firstSlashIndex = relativePath.indexOf('/');
+                if (firstSlashIndex !== -1) {
+                    const subDir = dirPrefix + relativePath.substring(0, firstSlashIndex);
+                    directories.add(subDir);
                 }
-            });
-        } else {
-            // 如果查询特定目录，提取其子目录
-            const dirPrefix = directory.endsWith('/') ? directory : directory + '/';
-            filteredFiles.forEach(file => {
-                const fileDir = file.metadata.Directory ? file.metadata.Directory : extractDirectory(file.id);
-                if (fileDir && fileDir.startsWith(dirPrefix)) {
-                    const relativePath = fileDir.substring(dirPrefix.length);
-                    const firstSlashIndex = relativePath.indexOf('/');
-                    if (firstSlashIndex !== -1) {
-                        const subDir = dirPrefix + relativePath.substring(0, firstSlashIndex);
-                        directories.add(subDir);
-                    }
-                }
-            });
-        }
+            }
+        });
 
         return {
             files: resultFiles,
             directories: Array.from(directories),
             totalCount: totalCount,
             indexLastUpdated: index.lastUpdated,
-            returnedCount: resultFiles.length
+            returnedCount: resultFiles.length,
+            success: index.success ?? true
         };
 
     } catch (error) {
@@ -568,7 +554,8 @@ export async function readIndex(context, options = {}) {
             directories: [],
             totalCount: 0,
             indexLastUpdated: Date.now(),
-            returnedCount: 0
+            returnedCount: 0,
+            success: false,
         };
     }
 }
@@ -579,7 +566,7 @@ export async function readIndex(context, options = {}) {
  * @param {Function} progressCallback - 进度回调函数
  */
 export async function rebuildIndex(context, progressCallback = null) {
-    const { env } = context;
+    const { env, waitUntil } = context;
 
     try {
         console.log('Starting index rebuild...');
@@ -650,10 +637,10 @@ export async function rebuildIndex(context, progressCallback = null) {
         }
 
         // 清除旧的操作记录和多余索引
-        await deleteAllOperations(context, { force: true });
-        await clearChunkedIndex(context, true);
-        
-        
+        waitUntil(deleteAllOperations(context));
+        waitUntil(clearChunkedIndex(context, true));
+
+
         console.log(`Index rebuild completed. Processed ${processedCount} files, indexed ${newIndex.totalCount} files.`);
         return {
             success: true,
@@ -985,7 +972,13 @@ async function cleanupOperations(context, operationIds, concurrency = 10) {
         // 创建删除任务数组
         const deleteTasks = operationIds.map(operationId => {
             const operationKey = OPERATION_KEY_PREFIX + operationId;
-            return () => env.img_url.delete(operationKey);
+            return async () => {
+                try {
+                    await env.img_url.delete(operationKey);
+                } catch (error) {
+                    console.error(`Error deleting operation ${operationId}:`, error);
+                }
+            };
         });
         
         // 使用并发控制执行删除操作
@@ -999,20 +992,16 @@ async function cleanupOperations(context, operationIds, concurrency = 10) {
 /**
  * 删除所有原子操作记录
  * @param {Object} context - 上下文对象，包含 env 和其他信息
- * @param {Object} options - 选项
- * @param {boolean} options.force - 是否强制删除，即使有错误也继续，默认为 false
- * @param {Function} options.progressCallback - 进度回调函数，接收 (processed, total) 参数
  * @returns {Object} 删除结果 { success, deletedCount, errors?, totalFound? }
  */
-export async function deleteAllOperations(context, options = {}) {
+export async function deleteAllOperations(context) {
     const { env } = context;
-    const { force = false, progressCallback = null } = options;
     
     try {
         console.log('Starting to delete all atomic operations...');
         
         // 获取所有原子操作
-        const allOperations = [];
+        const allOperationIds = [];
         let cursor = null;
         let totalFound = 0;
         
@@ -1025,7 +1014,7 @@ export async function deleteAllOperations(context, options = {}) {
             });
             
             for (const item of response.keys) {
-                allOperations.push(item.name);
+                allOperationIds.push(item.name.substring(OPERATION_KEY_PREFIX.length));
                 totalFound++;
             }
             
@@ -1045,93 +1034,13 @@ export async function deleteAllOperations(context, options = {}) {
         
         console.log(`Found ${totalFound} atomic operations to delete`);
         
-        // 批量删除操作
-        let deletedCount = 0;
-        const errors = [];
-        
-        for (let i = 0; i < allOperations.length; i += BATCH_SIZE) {
-            const batch = allOperations.slice(i, i + BATCH_SIZE);
-            
-            // 并行删除当前批次
-            const deletePromises = batch.map(async (operationKey) => {
-                try {
-                    await env.img_url.delete(operationKey);
-                    return { success: true, key: operationKey };
-                } catch (error) {
-                    const errorInfo = { 
-                        success: false, 
-                        key: operationKey, 
-                        error: error.message 
-                    };
-                    
-                    if (!force) {
-                        throw error;
-                    }
-                    
-                    return errorInfo;
-                }
-            });
-            
-            try {
-                const results = await Promise.all(deletePromises);
-                
-                // 统计结果
-                for (const result of results) {
-                    if (result.success) {
-                        deletedCount++;
-                    } else {
-                        errors.push(result);
-                        console.warn(`Failed to delete operation ${result.key}: ${result.error}`);
-                    }
-                }
-                
-            } catch (error) {
-                if (!force) {
-                    console.error(`Error deleting operations batch:`, error);
-                    return {
-                        success: false,
-                        error: error.message,
-                        deletedCount,
-                        totalFound
-                    };
-                }
-            }
-            
-            // 报告进度
-            if (progressCallback) {
-                progressCallback(Math.min(deletedCount + errors.length, totalFound), totalFound);
-            }
-            
-            // 添加协作点，避免长时间阻塞
-            if (i + BATCH_SIZE < allOperations.length) {
-                await new Promise(resolve => setTimeout(resolve, 10));
-            }
-        }
-        
-        const result = {
-            success: true,
-            deletedCount,
-            totalFound,
-            message: `Successfully deleted ${deletedCount} out of ${totalFound} operations`
-        };
-        
-        // 如果有错误且开启了强制模式，包含错误信息
-        if (errors.length > 0) {
-            result.errors = errors;
-            result.errorCount = errors.length;
-            result.message += `, ${errors.length} operations failed to delete`;
-        }
-        
-        console.log(`Delete all operations completed: ${result.message}`);
-        return result;
-        
+        // 批量删除原子操作
+        await cleanupOperations(context, allOperationIds);
+
+        console.log(`Delete all operations completed`);
+
     } catch (error) {
         console.error('Error deleting all operations:', error);
-        return {
-            success: false,
-            error: error.message,
-            deletedCount: 0
-        };
     }
 }
 
@@ -1383,28 +1292,56 @@ export async function clearChunkedIndex(context, onlyNonUsed = false) {
         if (metadataStr) {
             const metadata = JSON.parse(metadataStr);
             chunkCount = metadata.chunkCount || 0;
-        }
-        
-        if (!onlyNonUsed) {
-            // 删除元数据
-            await env.img_url.delete(INDEX_META_KEY).catch(() => {});
+
+            if (!onlyNonUsed) {
+                // 删除元数据
+                await env.img_url.delete(INDEX_META_KEY).catch(() => {});
+            }
         }
 
         // 删除分块
-        const startChunkId = onlyNonUsed ? chunkCount : 0;
+        const recordedChunks = []; // 现有的索引分块键
+        let cursor = null;
+        while (true) {
+            const response = await env.img_url.list({
+                prefix: INDEX_KEY,
+                limit: KV_LIST_LIMIT,
+                cursor: cursor
+            });
+            
+            for (const item of response.keys) {
+                recordedChunks.push(item.name);
+            }
+
+            cursor = response.cursor;
+            if (!cursor) break;
+        }
+
+        const reservedChunks = [];
+        if (onlyNonUsed) {
+            // 如果仅清理未使用的分块索引，保留当前在使用的分块
+            for (let chunkId = 0; chunkId < chunkCount; chunkId++) {
+                reservedChunks.push(`${INDEX_KEY}_${chunkId}`);
+            }
+        }
+
         const deletePromises = [];
-        for (let chunkId = startChunkId; chunkId < chunkCount + 10; chunkId++) {
-            const chunkKey = `${INDEX_KEY}_${chunkId}`;
+        for (let chunkKey of recordedChunks) {
+            if (reservedChunks.includes(chunkKey) || !chunkKey.startsWith(INDEX_KEY + '_')) {
+                // 保留的分块和非分块键不删除
+                continue;
+            }
+
             deletePromises.push(
-                env.img_url.delete(chunkKey).catch(() => {
-                    // 忽略删除不存在键的错误
-                })
+                env.img_url.delete(chunkKey).catch(() => {})
             );
         }
 
-        deletePromises.push(
-            env.img_url.delete(INDEX_KEY).catch(() => {})
-        );
+        if (recordedChunks.includes(INDEX_KEY)) {
+            deletePromises.push(
+                env.img_url.delete(INDEX_KEY).catch(() => {})
+            );
+        }
 
         await Promise.all(deletePromises);
         
