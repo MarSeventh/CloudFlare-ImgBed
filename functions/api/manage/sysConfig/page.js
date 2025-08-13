@@ -1,5 +1,4 @@
-var databaseAdapter = require('../../../utils/databaseAdapter');
-var getDatabase = databaseAdapter.getDatabase;
+import { getDatabase } from '../../../utils/databaseAdapter.js';
 
 export async function onRequest(context) {
     // 页面设置相关，GET方法读取设置，POST方法保存设置

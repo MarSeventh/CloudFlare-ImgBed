@@ -112,8 +112,7 @@ async function fetchSampleRate(context) {
   }
 }
 
-var databaseAdapter = require('./databaseAdapter');
-var checkDbConfig = databaseAdapter.checkDatabaseConfig;
+import { checkDatabaseConfig as checkDbConfig } from './databaseAdapter.js';
 
 // 检查数据库是否配置，文件索引是否存在
 function checkDatabaseConfigMiddleware(context) {
@@ -143,13 +142,5 @@ function checkDatabaseConfigMiddleware(context) {
 }
 
 // 保持向后兼容性的别名
-var checkKVConfig = checkDatabaseConfigMiddleware;
-
-// 导出函数
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports.checkDatabaseConfig = checkDatabaseConfigMiddleware;
-    module.exports.checkKVConfig = checkKVConfig;
-} else if (typeof exports !== 'undefined') {
-    exports.checkDatabaseConfig = checkDatabaseConfigMiddleware;
-    exports.checkKVConfig = checkKVConfig;
-}
+export const checkKVConfig = checkDatabaseConfigMiddleware;
+export const checkDatabaseConfig = checkDatabaseConfigMiddleware;

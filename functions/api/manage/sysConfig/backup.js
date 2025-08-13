@@ -1,6 +1,5 @@
 import { readIndex } from '../../../utils/indexManager.js';
-var databaseAdapter = require('../../../utils/databaseAdapter');
-var getDatabase = databaseAdapter.getDatabase;
+import { getDatabase } from '../../../utils/databaseAdapter.js';
 
 export async function onRequest(context) {
     const { request, env } = context;

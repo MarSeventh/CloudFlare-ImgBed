@@ -393,8 +393,4 @@ D1Database.prototype.list = function(options) {
 };
 
 // 导出构造函数
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { D1Database: D1Database };
-} else if (typeof exports !== 'undefined') {
-    exports.D1Database = D1Database;
-}
+export { D1Database };

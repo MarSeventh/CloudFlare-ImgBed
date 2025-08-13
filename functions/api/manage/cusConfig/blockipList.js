@@ -1,5 +1,4 @@
-var databaseAdapter = require('../../../utils/databaseAdapter');
-var getDatabase = databaseAdapter.getDatabase;
+import { getDatabase } from '../../../utils/databaseAdapter.js';
 
 export async function onRequest(context) {
     // Contents of context object
