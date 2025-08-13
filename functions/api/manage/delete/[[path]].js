@@ -1,7 +1,8 @@
 import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { purgeCFCache } from "../../../utils/purgeCache";
 import { removeFileFromIndex, batchRemoveFilesFromIndex } from "../../../utils/indexManager.js";
-import { getDatabase } from '../../../utils/databaseAdapter';
+var databaseAdapter = require('../../../utils/databaseAdapter');
+var getDatabase = databaseAdapter.getDatabase;
 
 export async function onRequest(context) {
     const { request, env, params, waitUntil } = context;
