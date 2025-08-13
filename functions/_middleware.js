@@ -1,3 +1,3 @@
-import { errorHandling, telemetryData, checkKVConfig } from './utils/middleware';
+import { checkKVConfig } from './utils/middleware';
 
-export const onRequest = [checkKVConfig, errorHandling, telemetryData];
+export const onRequest = [checkKVConfig];
