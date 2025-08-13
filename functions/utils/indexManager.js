@@ -1,6 +1,7 @@
 /* 索引管理器 - D1数据库版本 */
 
-import { getDatabase } from './databaseAdapter.js';
+var databaseAdapter = require('./databaseAdapter');
+var getDatabase = databaseAdapter.getDatabase;
 
 /**
  * 文件索引结构（D1数据库存储）：
