@@ -16,12 +16,13 @@ export function createDatabaseAdapter(env) {
         // 使用D1数据库
         console.log('Using D1 Database');
         return new D1Database(env.DB);
-    } else if (env.img_url) {
+    } else if (env.img_url && typeof env.img_url.get === 'function') {
         // 回退到KV存储
         console.log('Using KV Storage (fallback)');
         return new KVAdapter(env.img_url);
     } else {
-        throw new Error('No database configured. Please configure either D1 (env.DB) or KV (env.img_url)');
+        console.error('No database configured. Please configure either D1 (env.DB) or KV (env.img_url)');
+        return null;
     }
 }
 
@@ -144,7 +145,11 @@ class KVAdapter {
  * @returns {Object} 数据库实例
  */
 export function getDatabase(env) {
-    return createDatabaseAdapter(env);
+    var adapter = createDatabaseAdapter(env);
+    if (!adapter) {
+        throw new Error('Database not configured. Please configure D1 database (env.DB) or KV storage (env.img_url).');
+    }
+    return adapter;
 }
 
 /**
