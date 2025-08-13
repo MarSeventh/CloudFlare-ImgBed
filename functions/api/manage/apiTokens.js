@@ -1,4 +1,5 @@
-import { getDatabase } from '../../utils/databaseAdapter.js';
+var databaseAdapter = require('../../utils/databaseAdapter');
+var getDatabase = databaseAdapter.getDatabase;
 
 export async function onRequest(context) {
     // API Token管理，支持创建、删除、列出Token
