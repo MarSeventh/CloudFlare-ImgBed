@@ -1,38 +1,26 @@
-/* 索引管理器 */
+/* 索引管理器 - D1数据库版本 */
+
+import { getDatabase } from './databaseAdapter.js';
 
 /**
- * 文件索引结构（分块存储）：
- * 
- * 索引元数据：
- * - key: manage@index@meta
- * - value: JSON.stringify(metadata)
- * - metadata: {
- *     lastUpdated: 1640995200000,
- *     totalCount: 1000,
- *     lastOperationId: "operation_timestamp_uuid",
- *     chunkCount: 3,
- *     chunkSize: 10000
- *   }
- * 
- * 索引分块：
- * - key: manage@index_${chunkId} (例如: manage@index_0, manage@index_1, ...)
- * - value: JSON.stringify(filesChunk)
- * - filesChunk: [
- *     {
- *       id: "file_unique_id",
- *       metadata: {}
- *     },
- *     ...
- *   ]
- * 
- * 原子操作结构（保持不变）：
- * - key: manage@index@operation_${timestamp}_${uuid}
- * - value: JSON.stringify(operation)
+ * 文件索引结构（D1数据库存储）：
+ *
+ * 文件表：
+ * - 直接存储在 files 表中，包含所有文件信息和元数据
+ *
+ * 索引元数据表：
+ * - 存储在 index_metadata 表中
+ * - 包含 lastUpdated, totalCount, lastOperationId 等信息
+ *
+ * 原子操作表：
+ * - 存储在 index_operations 表中
+ * - 包含 id, type, timestamp, data, processed 等字段
  * - operation: {
  *     type: "add" | "remove" | "move" | "batch_add" | "batch_remove" | "batch_move",
  *     timestamp: 1640995200000,
  *     data: {
- *       // 根据操作类型包含不同的数据
+ *       fileId: "file_unique_id",
+ *       metadata: {}
  *     }
  *   }
  */
@@ -55,8 +43,9 @@ export async function addFileToIndex(context, fileId, metadata = null) {
 
     try {
         if (metadata === null) {
-            // 如果未传入metadata，尝试从KV中获取
-            const fileData = await env.img_url.getWithMetadata(fileId);
+            // 如果未传入metadata，尝试从数据库中获取
+            const db = getDatabase(env);
+            const fileData = await db.getWithMetadata(fileId);
             metadata = fileData.metadata || {};
         }
 
@@ -390,8 +379,8 @@ export async function mergeOperationsToIndex(context, options = {}) {
                 workingIndex.lastOperationId = processedOperationIds[processedOperationIds.length - 1];
             }
 
-            // 保存更新后的索引（使用分块格式）
-            const saveSuccess = await saveChunkedIndex(context, workingIndex);
+            // 保存更新后的索引元数据
+            const saveSuccess = await saveIndexMetadata(context, workingIndex);
             if (!saveSuccess) {
                 console.error('Failed to save chunked index');
                 return {
@@ -580,30 +569,24 @@ export async function rebuildIndex(context, progressCallback = null) {
             lastOperationId: null
         };
 
-        // 分批读取所有文件
-        while (true) {
-            const response = await env.img_url.list({
-                limit: KV_LIST_LIMIT,
-                cursor: cursor
-            });
+        // 从D1数据库读取所有文件
+        const db = getDatabase(env);
+        const filesStmt = db.db.prepare('SELECT id, metadata FROM files WHERE timestamp IS NOT NULL ORDER BY timestamp DESC');
+        const fileResults = await filesStmt.all();
 
-            cursor = response.cursor;
+        for (const row of fileResults) {
+            try {
+                const metadata = JSON.parse(row.metadata || '{}');
 
-            for (const item of response.keys) {
-                // 跳过管理相关的键
-                if (item.name.startsWith('manage@') || item.name.startsWith('chunk_')) {
-                    continue;
-                }
-
-                // 跳过没有元数据的文件
-                if (!item.metadata || !item.metadata.TimeStamp) {
+                // 跳过没有时间戳的文件
+                if (!metadata.TimeStamp) {
                     continue;
                 }
 
                 // 构建文件索引项
                 const fileItem = {
-                    id: item.name,
-                    metadata: item.metadata || {}
+                    id: row.id,
+                    metadata: metadata
                 };
 
                 newIndex.files.push(fileItem);
@@ -613,12 +596,9 @@ export async function rebuildIndex(context, progressCallback = null) {
                 if (progressCallback && processedCount % 100 === 0) {
                     progressCallback(processedCount);
                 }
+            } catch (error) {
+                console.warn(`Failed to parse metadata for file ${row.id}:`, error);
             }
-
-            if (!cursor) break;
-            
-            // 添加协作点
-            await new Promise(resolve => setTimeout(resolve, 10));
         }
 
         // 按时间戳倒序排序
@@ -626,8 +606,8 @@ export async function rebuildIndex(context, progressCallback = null) {
 
         newIndex.totalCount = newIndex.files.length;
 
-        // 保存新索引（使用分块格式）
-        const saveSuccess = await saveChunkedIndex(context, newIndex);
+        // 保存新索引元数据
+        const saveSuccess = await saveIndexMetadata(context, newIndex);
         if (!saveSuccess) {
             console.error('Failed to save chunked index during rebuild');
             return {
@@ -742,9 +722,9 @@ async function recordOperation(context, type, data) {
         timestamp: Date.now(),
         data
     };
-    
-    const operationKey = OPERATION_KEY_PREFIX + operationId;
-    await env.img_url.put(operationKey, JSON.stringify(operation));
+
+    const db = getDatabase(env);
+    await db.putIndexOperation(operationId, operation);
 
     return operationId;
 }
@@ -761,33 +741,18 @@ async function getAllPendingOperations(context, lastOperationId = null) {
     let cursor = null;
     
     try {
-        while (true) {
-            const response = await env.img_url.list({
-                prefix: OPERATION_KEY_PREFIX,
-                limit: KV_LIST_LIMIT,
-                cursor: cursor
-            });
-            
-            for (const item of response.keys) {
-                // 如果指定了lastOperationId，跳过已处理的操作
-                if (lastOperationId && item.name <= OPERATION_KEY_PREFIX + lastOperationId) {
-                    continue;
-                }
-                
-                try {
-                    const operationData = await env.img_url.get(item.name);
-                    if (operationData) {
-                        const operation = JSON.parse(operationData);
-                        operation.id = item.name.substring(OPERATION_KEY_PREFIX.length);
-                        operations.push(operation);
-                    }
-                } catch (error) {
-                    console.warn(`Failed to parse operation ${item.name}:`, error);
-                }
+        const db = getDatabase(env);
+        const allOperations = await db.listIndexOperations({
+            processed: false,
+            limit: 10000 // 获取所有未处理的操作
+        });
+
+        // 如果指定了lastOperationId，过滤已处理的操作
+        for (const operation of allOperations) {
+            if (lastOperationId && operation.id <= lastOperationId) {
+                continue;
             }
-            
-            cursor = response.cursor;
-            if (!cursor) break;
+            operations.push(operation);
         }
     } catch (error) {
         console.error('Error getting pending operations:', error);
@@ -1053,8 +1018,8 @@ export async function deleteAllOperations(context) {
 async function getIndex(context) {
     const { waitUntil } = context;
     try {
-        // 首先尝试加载分块索引
-        const index = await loadChunkedIndex(context);
+        // 首先尝试加载索引
+        const index = await loadIndexFromDatabase(context);
         if (index.success) {
             return index;
         } else {
@@ -1167,93 +1132,66 @@ async function promiseLimit(tasks, concurrency = BATCH_SIZE) {
  * @param {Object} index - 完整的索引对象
  * @returns {Promise<boolean>} 是否保存成功
  */
-async function saveChunkedIndex(context, index) {
+async function saveIndexMetadata(context, index) {
     const { env } = context;
-    
+
     try {
-        const files = index.files || [];
-        const chunks = [];
-        
-        // 将文件数组分块
-        for (let i = 0; i < files.length; i += INDEX_CHUNK_SIZE) {
-            const chunk = files.slice(i, i + INDEX_CHUNK_SIZE);
-            chunks.push(chunk);
-        }
-        
-        // 保存索引元数据
-        const metadata = {
-            lastUpdated: index.lastUpdated,
-            totalCount: index.totalCount,
-            lastOperationId: index.lastOperationId,
-            chunkCount: chunks.length,
-            chunkSize: INDEX_CHUNK_SIZE
-        };
-        
-        await env.img_url.put(INDEX_META_KEY, JSON.stringify(metadata));
-        
-        // 保存各个分块
-        const savePromises = chunks.map((chunk, chunkId) => {
-            const chunkKey = `${INDEX_KEY}_${chunkId}`;
-            return env.img_url.put(chunkKey, JSON.stringify(chunk));
-        });
-        
-        await Promise.all(savePromises);
-        
-        console.log(`Saved chunked index: ${chunks.length} chunks, ${files.length} total files`);
+        const db = getDatabase(env);
+
+        // 保存索引元数据到index_metadata表
+        const stmt = db.db.prepare(`
+            INSERT OR REPLACE INTO index_metadata (key, last_updated, total_count, last_operation_id)
+            VALUES (?, ?, ?, ?)
+        `);
+
+        await stmt.bind(
+            'main_index',
+            index.lastUpdated,
+            index.totalCount,
+            index.lastOperationId
+        ).run();
+
+        console.log(`Saved index metadata: ${index.totalCount} total files, last updated: ${index.lastUpdated}`);
         return true;
-        
+
     } catch (error) {
-        console.error('Error saving chunked index:', error);
+        console.error('Error saving index metadata:', error);
         return false;
     }
 }
 
 /**
- * 从KV存储加载分块索引
+ * 从D1数据库加载索引
  * @param {Object} context - 上下文对象，包含 env
  * @returns {Promise<Object>} 完整的索引对象
  */
-async function loadChunkedIndex(context) {
+async function loadIndexFromDatabase(context) {
     const { env } = context;
-    
+
     try {
+        const db = getDatabase(env);
+
         // 首先获取元数据
-        const metadataStr = await env.img_url.get(INDEX_META_KEY);
-        if (!metadataStr) {
+        const metadataStmt = db.db.prepare('SELECT * FROM index_metadata WHERE key = ?');
+        const metadata = await metadataStmt.bind('main_index').first();
+
+        if (!metadata) {
             throw new Error('Index metadata not found');
         }
-        
-        const metadata = JSON.parse(metadataStr);
-        const files = [];
-        
-        // 并行加载所有分块
-        const loadPromises = [];
-        for (let chunkId = 0; chunkId < metadata.chunkCount; chunkId++) {
-            const chunkKey = `${INDEX_KEY}_${chunkId}`;
-            loadPromises.push(
-                env.img_url.get(chunkKey).then(chunkStr => {
-                    if (chunkStr) {
-                        return JSON.parse(chunkStr);
-                    }
-                    return [];
-                })
-            );
-        }
-        
-        const chunks = await Promise.all(loadPromises);
-        
-        // 合并所有分块
-        chunks.forEach(chunk => {
-            if (Array.isArray(chunk)) {
-                files.push(...chunk);
-            }
-        });
-        
+        // 从files表直接查询所有文件
+        const filesStmt = db.db.prepare('SELECT id, metadata FROM files ORDER BY timestamp DESC');
+        const fileResults = await filesStmt.all();
+
+        const files = fileResults.map(row => ({
+            id: row.id,
+            metadata: JSON.parse(row.metadata || '{}')
+        }));
+
         const index = {
             files,
-            lastUpdated: metadata.lastUpdated,
-            totalCount: metadata.totalCount,
-            lastOperationId: metadata.lastOperationId,
+            lastUpdated: metadata.last_updated,
+            totalCount: metadata.total_count,
+            lastOperationId: metadata.last_operation_id,
             success: true
         };
         

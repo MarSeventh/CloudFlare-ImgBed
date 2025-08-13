@@ -1,4 +1,5 @@
 import { readIndex } from '../../../utils/indexManager.js';
+import { getDatabase } from '../../../utils/databaseAdapter.js';
 
 export async function onRequest(context) {
     const { request, env } = context;
@@ -54,10 +55,11 @@ async function handleBackup(context) {
             const fileId = file.id;
             const metadata = file.metadata;
             
-            // 对于TelegramNew渠道且IsChunked为true的文件，需要从KV读取其值
+            // 对于TelegramNew渠道且IsChunked为true的文件，需要从数据库读取其值
             if (metadata.Channel === 'TelegramNew' && metadata.IsChunked === true) {
                 try {
-                    const fileData = await env.img_url.getWithMetadata(fileId);
+                    const db = getDatabase(env);
+                    const fileData = await db.getWithMetadata(fileId);
                     backupData.data.files[fileId] = {
                         metadata: metadata,
                         value: fileData.value
@@ -80,12 +82,13 @@ async function handleBackup(context) {
         }
 
         // 备份系统设置
-        const settingsList = await env.img_url.list({ prefix: 'manage@' });
+        const db = getDatabase(env);
+        const settingsList = await db.listSettings({ prefix: 'manage@' });
         for (const key of settingsList.keys) {
             // 忽略索引文件
             if (key.name.startsWith('manage@index')) continue;
 
-            const setting = await env.img_url.get(key.name);
+            const setting = key.value;
             if (setting) {
                 backupData.data.settings[key.name] = setting;
             }
@@ -131,16 +134,17 @@ async function handleRestore(request, env) {
         let restoredSettings = 0;
 
         // 恢复文件数据
+        const db = getDatabase(env);
         for (const [key, fileData] of Object.entries(backupData.data.files)) {
             try {
                 if (fileData.value) {
                     // 对于有value的文件（如telegram分块文件），恢复完整数据
-                    await env.img_url.put(key, fileData.value, {
+                    await db.put(key, fileData.value, {
                         metadata: fileData.metadata
                     });
                 } else if (fileData.metadata) {
                     // 只恢复元数据
-                    await env.img_url.put(key, '', {
+                    await db.put(key, '', {
                         metadata: fileData.metadata
                     });
                 }
@@ -153,7 +157,7 @@ async function handleRestore(request, env) {
         // 恢复系统设置
         for (const [key, value] of Object.entries(backupData.data.settings)) {
             try {
-                await env.img_url.put(key, value);
+                await db.put(key, value);
                 restoredSettings++;
             } catch (error) {
                 console.error(`恢复设置 ${key} 失败:`, error);
