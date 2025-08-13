@@ -83,13 +83,27 @@ async function handleBackup(context) {
 
         // 备份系统设置
         const db = getDatabase(env);
-        const settingsList = await db.listSettings({ prefix: 'manage@' });
-        for (const key of settingsList.keys) {
+
+        // 备份所有设置，不仅仅是manage@开头的
+        const allSettingsList = await db.listSettings({});
+        for (const key of allSettingsList.keys) {
             // 忽略索引文件
             if (key.name.startsWith('manage@index')) continue;
 
             const setting = key.value;
             if (setting) {
+                backupData.data.settings[key.name] = setting;
+            }
+        }
+
+        // 额外确保备份manage@开头的设置
+        const manageSettingsList = await db.listSettings({ prefix: 'manage@' });
+        for (const key of manageSettingsList.keys) {
+            // 忽略索引文件
+            if (key.name.startsWith('manage@index')) continue;
+
+            const setting = key.value;
+            if (setting && !backupData.data.settings[key.name]) {
                 backupData.data.settings[key.name] = setting;
             }
         }
@@ -157,8 +171,17 @@ async function handleRestore(request, env) {
         // 恢复系统设置
         for (const [key, value] of Object.entries(backupData.data.settings)) {
             try {
+                console.log(`恢复设置: ${key}, 长度: ${value.length}`);
                 await db.put(key, value);
-                restoredSettings++;
+
+                // 验证是否成功保存
+                const retrieved = await db.get(key);
+                if (retrieved === value) {
+                    restoredSettings++;
+                    console.log(`设置 ${key} 恢复成功`);
+                } else {
+                    console.error(`设置 ${key} 恢复后验证失败`);
+                }
             } catch (error) {
                 console.error(`恢复设置 ${key} 失败:`, error);
             }
