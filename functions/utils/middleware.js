@@ -115,7 +115,7 @@ async function fetchSampleRate(context) {
 import { checkDatabaseConfig as checkDbConfig } from './databaseAdapter.js';
 
 // 检查数据库是否配置，文件索引是否存在
-function checkDatabaseConfigMiddleware(context) {
+async function checkDatabaseConfigMiddleware(context) {
   var env = context.env;
   var waitUntil = context.waitUntil;
 
@@ -138,7 +138,7 @@ function checkDatabaseConfigMiddleware(context) {
   }
 
   // 继续执行
-  return context.next();
+  return await context.next();
 }
 
 // 保持向后兼容性的别名
