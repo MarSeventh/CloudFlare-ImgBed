@@ -3,7 +3,8 @@ import { fetchSecurityConfig } from "../utils/sysConfig";
 import { TelegramAPI } from "../utils/telegramAPI";
 import { setCommonHeaders, setRangeHeaders, handleHeadRequest, getFileContent, isTgChannel,
             returnWithCheck, return404, isDomainAllowed } from './fileTools';
-import { getDatabase } from '../utils/databaseAdapter';
+var databaseAdapter = require('../utils/databaseAdapter');
+var getDatabase = databaseAdapter.getDatabase;
 
 
 export async function onRequest(context) {  // Contents of context object

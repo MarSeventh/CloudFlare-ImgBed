@@ -3,14 +3,15 @@
  * 提供统一的接口，可以在KV和D1之间切换
  */
 
-import { D1Database } from './d1Database.js';
+var D1DatabaseModule = require('./d1Database.js');
+var D1Database = D1DatabaseModule.D1Database;
 
 /**
  * 创建数据库适配器
  * @param {Object} env - 环境变量
  * @returns {Object} 数据库适配器实例
  */
-export function createDatabaseAdapter(env) {
+function createDatabaseAdapter(env) {
     // 检查是否配置了D1数据库
     if (env.DB && typeof env.DB.prepare === 'function') {
         // 使用D1数据库
@@ -143,7 +144,7 @@ class KVAdapter {
  * @param {Object} env - 环境变量
  * @returns {Object} 数据库实例
  */
-export function getDatabase(env) {
+function getDatabase(env) {
     return createDatabaseAdapter(env);
 }
 
@@ -152,7 +153,7 @@ export function getDatabase(env) {
  * @param {Object} env - 环境变量
  * @returns {Object} 配置信息
  */
-export function checkDatabaseConfig(env) {
+function checkDatabaseConfig(env) {
     const hasD1 = env.DB && typeof env.DB.prepare === 'function';
     const hasKV = env.img_url && typeof env.img_url.get === 'function';
     
@@ -170,7 +171,7 @@ export function checkDatabaseConfig(env) {
  * @param {Object} env - 环境变量
  * @returns {Promise<Object>} 健康检查结果
  */
-export async function healthCheck(env) {
+function healthCheck(env) {
     const config = checkDatabaseConfig(env);
     
     if (!config.configured) {
@@ -204,4 +205,19 @@ export async function healthCheck(env) {
             config
         };
     }
+}
+
+// 导出函数
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        createDatabaseAdapter: createDatabaseAdapter,
+        getDatabase: getDatabase,
+        checkDatabaseConfig: checkDatabaseConfig,
+        healthCheck: healthCheck
+    };
+} else if (typeof exports !== 'undefined') {
+    exports.createDatabaseAdapter = createDatabaseAdapter;
+    exports.getDatabase = getDatabase;
+    exports.checkDatabaseConfig = checkDatabaseConfig;
+    exports.healthCheck = healthCheck;
 }
