@@ -140,4 +140,22 @@ async function authentication(context) {
   
 }
 
-export const onRequest = [checkDatabaseConfig, errorHandling, authentication];
+// 暂时禁用中间件来排查问题
+// export const onRequest = [checkDatabaseConfig, errorHandling, authentication];
+
+// 临时的简单中间件
+export async function onRequest(context) {
+    try {
+        return await context.next();
+    } catch (error) {
+        console.error('Manage middleware error:', error);
+        return new Response(JSON.stringify({
+            error: 'Manage middleware error: ' + error.message
+        }), {
+            status: 500,
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+    }
+}
