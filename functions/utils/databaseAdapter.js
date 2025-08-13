@@ -154,12 +154,12 @@ function getDatabase(env) {
  * @returns {Object} 配置信息
  */
 function checkDatabaseConfig(env) {
-    const hasD1 = env.DB && typeof env.DB.prepare === 'function';
-    const hasKV = env.img_url && typeof env.img_url.get === 'function';
-    
+    var hasD1 = env.DB && typeof env.DB.prepare === 'function';
+    var hasKV = env.img_url && typeof env.img_url.get === 'function';
+
     return {
-        hasD1,
-        hasKV,
+        hasD1: hasD1,
+        hasKV: hasKV,
         usingD1: hasD1,
         usingKV: !hasD1 && hasKV,
         configured: hasD1 || hasKV
@@ -171,38 +171,38 @@ function checkDatabaseConfig(env) {
  * @param {Object} env - 环境变量
  * @returns {Promise<Object>} 健康检查结果
  */
-function healthCheck(env) {
-    const config = checkDatabaseConfig(env);
-    
+async function healthCheck(env) {
+    var config = checkDatabaseConfig(env);
+
     if (!config.configured) {
         return {
             healthy: false,
             error: 'No database configured',
-            config
+            config: config
         };
     }
-    
+
     try {
-        const db = getDatabase(env);
-        
+        var db = getDatabase(env);
+
         if (config.usingD1) {
             // D1健康检查 - 尝试查询一个简单的表
-            const stmt = db.db.prepare('SELECT 1 as test');
+            var stmt = db.db.prepare('SELECT 1 as test');
             await stmt.first();
         } else {
             // KV健康检查 - 尝试列出键
             await db.list({ limit: 1 });
         }
-        
+
         return {
             healthy: true,
-            config
+            config: config
         };
     } catch (error) {
         return {
             healthy: false,
             error: error.message,
-            config
+            config: config
         };
     }
 }
