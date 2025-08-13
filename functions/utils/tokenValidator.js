@@ -36,7 +36,8 @@ export async function validateApiToken(request, kv, requiredPermission) {
     }
 
     // 检查权限
-    if (!permissions.includes(requiredPermission)) {
+    // 如果不需要特定权限（requiredPermission为null），则只要token有效就通过
+    if (requiredPermission !== null && !permissions.includes(requiredPermission)) {
         return { valid: false, error: `缺少${requiredPermission}权限` };
     }
 
