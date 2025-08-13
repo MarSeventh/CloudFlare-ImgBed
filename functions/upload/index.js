@@ -6,8 +6,7 @@ import { initializeChunkedUpload, handleChunkUpload, uploadLargeFileToTelegram, 
 import { handleChunkMerge, checkMergeStatus } from "./chunkMerge";
 import { TelegramAPI } from "../utils/telegramAPI";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-var databaseAdapter = require('../utils/databaseAdapter');
-var getDatabase = databaseAdapter.getDatabase;
+import { getDatabase } from '../utils/databaseAdapter.js';
 
 
 export async function onRequest(context) {  // Contents of context object

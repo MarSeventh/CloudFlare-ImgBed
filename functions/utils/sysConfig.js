@@ -2,8 +2,7 @@ import { getUploadConfig } from '../api/manage/sysConfig/upload';
 import { getSecurityConfig } from '../api/manage/sysConfig/security';
 import { getPageConfig } from '../api/manage/sysConfig/page';
 import { getOthersConfig } from '../api/manage/sysConfig/others';
-var databaseAdapter = require('./databaseAdapter');
-var getDatabase = databaseAdapter.getDatabase;
+import { getDatabase } from './databaseAdapter.js';
 
 export async function fetchUploadConfig(env) {
     const db = getDatabase(env);

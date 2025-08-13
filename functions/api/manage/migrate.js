@@ -3,9 +3,7 @@
  * 用于将KV数据迁移到D1数据库
  */
 
-var databaseAdapter = require('../../utils/databaseAdapter');
-var getDatabase = databaseAdapter.getDatabase;
-var checkDatabaseConfig = databaseAdapter.checkDatabaseConfig;
+import { getDatabase, checkDatabaseConfig } from '../../utils/databaseAdapter.js';
 
 export async function onRequest(context) {
     const { request, env } = context;
