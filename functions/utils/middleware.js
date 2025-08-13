@@ -112,18 +112,21 @@ async function fetchSampleRate(context) {
   }
 }
 
-// 检查 KV 是否配置，文件索引是否存在
-export async function checkKVConfig(context) {
+import { checkDatabaseConfig } from './databaseAdapter.js';
+
+// 检查数据库是否配置，文件索引是否存在
+export async function checkDatabaseConfig(context) {
   const { env, waitUntil } = context;
 
-  // 检查 img_url KV 绑定是否存在
-  if (typeof env.img_url == "undefined" || env.img_url == null) {
+  const dbConfig = checkDatabaseConfig(env);
+
+  if (!dbConfig.configured) {
     return new Response(
       JSON.stringify({
         success: false,
-        error: "KV 数据库未配置 / KV not configured",
-        message: "img_url KV 绑定未找到，请检查您的 KV 配置。 / img_url KV binding not found, please check your KV configuration."
-      }), 
+        error: "数据库未配置 / Database not configured",
+        message: "请配置 D1 数据库 (env.DB) 或 KV 存储 (env.img_url)。 / Please configure D1 database (env.DB) or KV storage (env.img_url)."
+      }),
       {
         status: 500,
         headers: {
@@ -136,3 +139,6 @@ export async function checkKVConfig(context) {
   // 继续执行
   return context.next();
 }
+
+// 保持向后兼容性的别名
+export const checkKVConfig = checkDatabaseConfig;
