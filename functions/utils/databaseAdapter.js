@@ -35,7 +35,8 @@ class KVAdapter {
     }
 
     // 直接代理到KV的方法
-    async put(key, value, options = {}) {
+    async put(key, value, options) {
+        options = options || {};
         return await this.kv.put(key, value, options);
     }
 
@@ -51,7 +52,8 @@ class KVAdapter {
         return await this.kv.delete(key);
     }
 
-    async list(options = {}) {
+    async list(options) {
+        options = options || {};
         return await this.kv.list(options);
     }
 
@@ -110,10 +112,9 @@ class KVAdapter {
     }
 
     async listIndexOperations(options) {
-        const listOptions = {
-            ...options,
+        const listOptions = Object.assign({}, options, {
             prefix: 'manage@index@operation_'
-        };
+        });
         const result = await this.list(listOptions);
         
         // 转换格式以匹配D1Database的返回格式

@@ -16,7 +16,9 @@ export class D1Database {
      * @param {string} value - 文件值 (对于分块文件)
      * @param {Object} options - 选项，包含metadata
      */
-    async putFile(fileId, value = '', options = {}) {
+    async putFile(fileId, value, options) {
+        value = value || '';
+        options = options || {};
         const metadata = options.metadata || {};
         
         // 从metadata中提取字段用于索引
@@ -92,8 +94,11 @@ export class D1Database {
      * 列出文件 (替代 KV.list)
      * @param {Object} options - 选项
      */
-    async listFiles(options = {}) {
-        const { prefix = '', limit = 1000, cursor = null } = options;
+    async listFiles(options) {
+        options = options || {};
+        const prefix = options.prefix || '';
+        const limit = options.limit || 1000;
+        const cursor = options.cursor || null;
         
         let query = 'SELECT id, metadata FROM files';
         let params = [];
@@ -178,8 +183,10 @@ export class D1Database {
      * 列出设置 (替代 KV.list)
      * @param {Object} options - 选项
      */
-    async listSettings(options = {}) {
-        const { prefix = '', limit = 1000 } = options;
+    async listSettings(options) {
+        options = options || {};
+        const prefix = options.prefix || '';
+        const limit = options.limit || 1000;
         
         let query = 'SELECT key, value FROM settings';
         let params = [];
@@ -254,8 +261,10 @@ export class D1Database {
      * 列出索引操作记录
      * @param {Object} options - 选项
      */
-    async listIndexOperations(options = {}) {
-        const { limit = 1000, processed = null } = options;
+    async listIndexOperations(options) {
+        options = options || {};
+        const limit = options.limit || 1000;
+        const processed = options.processed || null;
         
         let query = 'SELECT * FROM index_operations';
         let params = [];
@@ -385,8 +394,9 @@ export class D1Database {
      * 通用的list方法
      * @param {Object} options - 选项
      */
-    async list(options = {}) {
-        const { prefix = '' } = options;
+    async list(options) {
+        options = options || {};
+        const prefix = options.prefix || '';
 
         if (prefix.startsWith('manage@sysConfig@') || prefix.startsWith('manage@')) {
             // 系统配置
@@ -411,7 +421,8 @@ export class D1Database {
      * @param {string} value - 值
      * @param {Object} options - 选项
      */
-    async put(key, value, options = {}) {
+    async put(key, value, options) {
+        options = options || {};
         if (key.startsWith('manage@sysConfig@') || key.startsWith('manage@')) {
             // 系统配置
             return await this.putSetting(key, value);
@@ -479,26 +490,5 @@ export class D1Database {
         }
     }
 
-    /**
-     * 通用的list方法
-     * @param {Object} options - 选项
-     */
-    async list(options = {}) {
-        const { prefix = '' } = options;
-        
-        if (prefix.startsWith('manage@sysConfig@') || prefix.startsWith('manage@')) {
-            // 系统配置
-            return await this.listSettings(options);
-        } else if (prefix.startsWith('manage@index@operation_')) {
-            // 索引操作 - 需要特殊处理
-            const operations = await this.listIndexOperations(options);
-            const keys = operations.map(op => ({
-                name: 'manage@index@operation_' + op.id
-            }));
-            return { keys };
-        } else {
-            // 文件记录
-            return await this.listFiles(options);
-        }
-    }
+
 }
