@@ -205,20 +205,41 @@ export function getUploadIp(request) {
 
 // 检查上传IP是否被封禁
 export async function isBlockedUploadIp(env, uploadIp) {
-    const kv = env.img_url;
-    let list = await kv.get("manage@blockipList");
-    if (list == null) {
-        list = [];
-    } else {
-        list = list.split(",");
-    }
+    try {
+        // 使用数据库适配器而不是直接访问KV
+        const { getDatabase } = await import('../utils/databaseAdapter.js');
+        const db = getDatabase(env);
+        let list = await db.get("manage@blockipList");
+        if (list == null) {
+            list = [];
+        } else {
+            list = list.split(",");
+        }
 
-    return list.includes(uploadIp);
+        return list.includes(uploadIp);
+    } catch (error) {
+        console.error('Failed to check blocked IP:', error);
+        // 如果数据库未配置，默认不阻止任何IP
+        return false;
+    }
 }
 
 // 构建唯一文件ID
 export async function buildUniqueFileId(context, fileName, fileType = 'application/octet-stream') {
     const { env, url } = context;
+
+    // 获取数据库适配器
+    const { getDatabase } = await import('../utils/databaseAdapter.js');
+    let db;
+    try {
+        db = getDatabase(env);
+    } catch (error) {
+        console.error('Database not configured for buildUniqueFileId:', error);
+        // 如果数据库未配置，生成一个简单的唯一ID
+        const timestamp = Date.now();
+        const random = Math.random().toString(36).substring(2, 8);
+        return `${timestamp}_${random}_${fileName}`;
+    }
 
     let fileExt = fileName.split('.').pop();
     if (!fileExt || fileExt === fileName) {
@@ -257,7 +278,7 @@ export async function buildUniqueFileId(context, fileName, fileType = 'applicati
         while (true) {
             const shortId = generateShortId(8);
             const testFullId = normalizedFolder ? `${normalizedFolder}/${shortId}.${fileExt}` : `${shortId}.${fileExt}`;
-            if (await env.img_url.get(testFullId) === null) {
+            if (await db.get(testFullId) === null) {
                 return testFullId;
             }
         }
@@ -266,7 +287,7 @@ export async function buildUniqueFileId(context, fileName, fileType = 'applicati
     }
     
     // 检查基础ID是否已存在
-    if (await env.img_url.get(baseId) === null) {
+    if (await db.get(baseId) === null) {
         return baseId;
     }
     
@@ -296,7 +317,7 @@ export async function buildUniqueFileId(context, fileName, fileType = 'applicati
         }
         
         // 检查新ID是否已存在
-        if (await env.img_url.get(duplicateId) === null) {
+        if (await db.get(duplicateId) === null) {
             return duplicateId;
         }
         
