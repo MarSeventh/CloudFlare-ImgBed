@@ -1,4 +1,5 @@
 import { readIndex, getIndexInfo, rebuildIndex, getIndexStorageStats } from '../../utils/indexManager.js';
+import { getDatabase } from '../../utils/databaseAdapter.js';
 
 export async function onRequest(context) {
     const { request, waitUntil } = context;
@@ -135,7 +136,8 @@ async function getAllFileRecords(env, dir) {
     let cursor = null;
 
     while (true) {
-        const response = await env.img_url.list({
+        const db = getDatabase(env);
+        const response = await db.list({
             prefix: dir,
             limit: 1000,
             cursor: cursor

@@ -1,5 +1,6 @@
 import { fetchSecurityConfig } from './sysConfig';
 import { validateApiToken } from './tokenValidator';
+import { getDatabase } from './databaseAdapter.js';
 
 /** 
  * 客户端用户认证
@@ -11,7 +12,7 @@ import { validateApiToken } from './tokenValidator';
  */
 export async function userAuthCheck(env, url, request, requiredPermission = null) {
     // 首先使用Token验证
-    const tokenValidation = await validateApiToken(request, env.img_url, requiredPermission);
+    const tokenValidation = await validateApiToken(request, getDatabase(env), requiredPermission);
     if (tokenValidation.valid) {
         return true;
     }

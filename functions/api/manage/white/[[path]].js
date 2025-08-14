@@ -1,5 +1,6 @@
 import { purgeCFCache } from "../../../utils/purgeCache";
 import { addFileToIndex } from "../../../utils/indexManager.js";
+import { getDatabase } from "../../../utils/databaseAdapter.js";
 
 export async function onRequest(context) {
     // Contents of context object
@@ -24,11 +25,12 @@ export async function onRequest(context) {
     params.path = decodeURIComponent(params.path);
 
     //read the metadata
-    const value = await env.img_url.getWithMetadata(params.path);
+    const db = getDatabase(env);
+    const value = await db.getWithMetadata(params.path);
 
     //change the metadata
     value.metadata.ListType = "White"
-    await env.img_url.put(params.path,"",{metadata: value.metadata});
+    await db.put(params.path,"",{metadata: value.metadata});
     const info = JSON.stringify(value.metadata);
 
     // 清除CDN缓存

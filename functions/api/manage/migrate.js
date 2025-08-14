@@ -117,7 +117,7 @@ async function migrateFiles(env, result) {
     const batchSize = 100;
 
     while (true) {
-        const response = await env.img_url.list({
+        const response = await getDatabase(env).list({
             limit: batchSize,
             cursor: cursor
         });
@@ -129,7 +129,7 @@ async function migrateFiles(env, result) {
             }
 
             try {
-                const fileData = await env.img_url.getWithMetadata(item.name);
+                const fileData = await getDatabase(env).getWithMetadata(item.name);
                 
                 if (fileData && fileData.metadata) {
                     await db.putFile(item.name, fileData.value || '', {
@@ -159,7 +159,7 @@ async function migrateFiles(env, result) {
 async function migrateSettings(env, result) {
     const db = getDatabase(env);
     
-    const settingsList = await env.img_url.list({ prefix: 'manage@' });
+    const settingsList = await getDatabase(env).list({ prefix: 'manage@' });
     
     for (const item of settingsList.keys) {
         // 跳过索引相关的键
@@ -168,7 +168,7 @@ async function migrateSettings(env, result) {
         }
 
         try {
-            const value = await env.img_url.get(item.name);
+            const value = await getDatabase(env).get(item.name);
             if (value) {
                 await db.putSetting(item.name, value);
                 result.settings.migrated++;
@@ -189,11 +189,11 @@ async function migrateIndexOperations(env, result) {
     const db = getDatabase(env);
     const operationPrefix = 'manage@index@operation_';
     
-    const operationsList = await env.img_url.list({ prefix: operationPrefix });
+    const operationsList = await getDatabase(env).list({ prefix: operationPrefix });
     
     for (const item of operationsList.keys) {
         try {
-            const operationData = await env.img_url.get(item.name);
+            const operationData = await getDatabase(env).get(item.name);
             if (operationData) {
                 const operation = JSON.parse(operationData);
                 const operationId = item.name.replace(operationPrefix, '');
@@ -222,12 +222,12 @@ async function handleStatus(env) {
     try {
         // 统计KV中的数据
         if (dbConfig.hasKV) {
-            const kvFiles = await env.img_url.list({ limit: 1000 });
+            const kvFiles = await getDatabase(env).list({ limit: 1000 });
             fileCount.kv = kvFiles.keys.filter(k => 
                 !k.name.startsWith('manage@') && !k.name.startsWith('chunk_')
             ).length;
 
-            const kvSettings = await env.img_url.list({ prefix: 'manage@', limit: 1000 });
+            const kvSettings = await getDatabase(env).list({ prefix: 'manage@', limit: 1000 });
             settingCount.kv = kvSettings.keys.filter(k => 
                 !k.name.startsWith('manage@index')
             ).length;

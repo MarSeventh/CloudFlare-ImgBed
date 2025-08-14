@@ -1,3 +1,5 @@
+import { getDatabase } from '../../../utils/databaseAdapter.js';
+
 export async function onRequest(context) {
     // Contents of context object
     const {
@@ -11,7 +13,7 @@ export async function onRequest(context) {
     
     try {
 
-        const kv = env.img_url;
+        const kv = getDatabase(env);
         let list = await kv.get("manage@blockipList");
         if (list == null) {
             list = [];

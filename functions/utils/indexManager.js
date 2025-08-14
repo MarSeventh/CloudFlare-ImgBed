@@ -85,7 +85,7 @@ export async function batchAddFilesToIndex(context, files, options = {}) {
             // 如果没有提供metadata，尝试从KV中获取
             if (!finalMetadata) {
                 try {
-                    const fileData = await env.img_url.getWithMetadata(fileId);
+                    const fileData = await getDatabase(env).getWithMetadata(fileId);
                     finalMetadata = fileData.metadata || {};
                 } catch (error) {
                     console.warn(`Failed to get metadata for file ${fileId}:`, error);
@@ -186,7 +186,7 @@ export async function moveFileInIndex(context, originalFileId, newFileId, newMet
         if (finalMetadata === null) {
             // 如果没有提供新metadata，尝试从KV中获取
             try {
-                const fileData = await env.img_url.getWithMetadata(newFileId);
+                const fileData = await getDatabase(env).getWithMetadata(newFileId);
                 finalMetadata = fileData.metadata || {};
             } catch (error) {
                 console.warn(`Failed to get metadata for new file ${newFileId}:`, error);
@@ -229,7 +229,7 @@ export async function batchMoveFilesInIndex(context, moveOperations) {
             if (finalMetadata === null || finalMetadata === undefined) {
                 // 如果没有提供新metadata，尝试从KV中获取
                 try {
-                    const fileData = await env.img_url.getWithMetadata(newFileId);
+                    const fileData = await getDatabase(env).getWithMetadata(newFileId);
                     finalMetadata = fileData.metadata || {};
                 } catch (error) {
                     console.warn(`Failed to get metadata for new file ${newFileId}:`, error);
@@ -939,7 +939,7 @@ async function cleanupOperations(context, operationIds, concurrency = 10) {
             const operationKey = OPERATION_KEY_PREFIX + operationId;
             return async () => {
                 try {
-                    await env.img_url.delete(operationKey);
+                    await getDatabase(env).delete(operationKey);
                 } catch (error) {
                     console.error(`Error deleting operation ${operationId}:`, error);
                 }
@@ -972,7 +972,7 @@ export async function deleteAllOperations(context) {
         
         // 首先收集所有操作键
         while (true) {
-            const response = await env.img_url.list({
+            const response = await getDatabase(env).list({
                 prefix: OPERATION_KEY_PREFIX,
                 limit: KV_LIST_LIMIT,
                 cursor: cursor
@@ -1224,7 +1224,7 @@ export async function clearChunkedIndex(context, onlyNonUsed = false) {
         console.log('Starting chunked index cleanup...');
         
         // 获取元数据
-        const metadataStr = await env.img_url.get(INDEX_META_KEY);
+        const metadataStr = await getDatabase(env).get(INDEX_META_KEY);
         let chunkCount = 0;
         
         if (metadataStr) {
@@ -1233,7 +1233,7 @@ export async function clearChunkedIndex(context, onlyNonUsed = false) {
 
             if (!onlyNonUsed) {
                 // 删除元数据
-                await env.img_url.delete(INDEX_META_KEY).catch(() => {});
+                await getDatabase(env).delete(INDEX_META_KEY).catch(() => {});
             }
         }
 
@@ -1241,7 +1241,7 @@ export async function clearChunkedIndex(context, onlyNonUsed = false) {
         const recordedChunks = []; // 现有的索引分块键
         let cursor = null;
         while (true) {
-            const response = await env.img_url.list({
+            const response = await getDatabase(env).list({
                 prefix: INDEX_KEY,
                 limit: KV_LIST_LIMIT,
                 cursor: cursor
@@ -1271,13 +1271,13 @@ export async function clearChunkedIndex(context, onlyNonUsed = false) {
             }
 
             deletePromises.push(
-                env.img_url.delete(chunkKey).catch(() => {})
+                getDatabase(env).delete(chunkKey).catch(() => {})
             );
         }
 
         if (recordedChunks.includes(INDEX_KEY)) {
             deletePromises.push(
-                env.img_url.delete(INDEX_KEY).catch(() => {})
+                getDatabase(env).delete(INDEX_KEY).catch(() => {})
             );
         }
 
@@ -1302,7 +1302,7 @@ export async function getIndexStorageStats(context) {
     
     try {
         // 获取元数据
-        const metadataStr = await env.img_url.get(INDEX_META_KEY);
+        const metadataStr = await getDatabase(env).get(INDEX_META_KEY);
         if (!metadataStr) {
             return {
                 success: false,
@@ -1318,7 +1318,7 @@ export async function getIndexStorageStats(context) {
         for (let chunkId = 0; chunkId < metadata.chunkCount; chunkId++) {
             const chunkKey = `${INDEX_KEY}_${chunkId}`;
             chunkChecks.push(
-                env.img_url.get(chunkKey).then(data => ({
+                getDatabase(env).get(chunkKey).then(data => ({
                     chunkId,
                     exists: !!data,
                     size: data ? data.length : 0
