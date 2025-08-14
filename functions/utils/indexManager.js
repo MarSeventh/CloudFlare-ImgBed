@@ -447,12 +447,46 @@ export async function readIndex(context, options = {}) {
         // 处理目录满足无头有尾的格式，根目录为空
         const dirPrefix = directory === '' || directory.endsWith('/') ? directory : directory + '/';
 
-        // 处理挂起的操作
-        await mergeOperationsToIndex(context);
+        // 直接从数据库读取文件，不依赖索引
+        const { env } = context;
+        const db = getDatabase(env);
 
-        // 获取当前索引
-        const index = await getIndex(context);
-        let filteredFiles = index.files;
+        let allFiles = [];
+        let cursor = null;
+
+        // 分批获取所有文件
+        while (true) {
+            const response = await db.listFiles({
+                limit: 1000,
+                cursor: cursor
+            });
+
+            if (!response || !response.keys || !Array.isArray(response.keys)) {
+                break;
+            }
+
+            for (const item of response.keys) {
+                // 跳过管理相关的键和分块数据
+                if (item.name.startsWith('manage@') || item.name.startsWith('chunk_')) {
+                    continue;
+                }
+
+                // 跳过没有元数据的文件
+                if (!item.metadata || !item.metadata.TimeStamp) {
+                    continue;
+                }
+
+                allFiles.push({
+                    id: item.name,
+                    metadata: item.metadata
+                });
+            }
+
+            cursor = response.cursor;
+            if (!cursor) break;
+        }
+
+        let filteredFiles = allFiles;
 
         // 目录过滤
         if (directory) {
@@ -531,9 +565,9 @@ export async function readIndex(context, options = {}) {
             files: resultFiles,
             directories: Array.from(directories),
             totalCount: totalCount,
-            indexLastUpdated: index.lastUpdated,
+            indexLastUpdated: Date.now(),
             returnedCount: resultFiles.length,
-            success: index.success ?? true
+            success: true
         };
 
     } catch (error) {
@@ -643,23 +677,65 @@ export async function rebuildIndex(context, progressCallback = null) {
  */
 export async function getIndexInfo(context) {
     try {
-        const index = await getIndex(context);
+        // 直接从数据库读取文件信息，不依赖索引
+        const { env } = context;
+        const db = getDatabase(env);
 
-        // 检查索引是否成功获取
-        if (index.success === false) {
-            return {
-                success: false,
-                error: 'Failed to retrieve index',
-                message: 'Index is not available or corrupted'
+        let allFiles = [];
+        let cursor = null;
+
+        // 分批获取所有文件
+        while (true) {
+            const response = await db.listFiles({
+                limit: 1000,
+                cursor: cursor
+            });
+
+            if (!response || !response.keys || !Array.isArray(response.keys)) {
+                break;
             }
+
+            for (const item of response.keys) {
+                // 跳过管理相关的键和分块数据
+                if (item.name.startsWith('manage@') || item.name.startsWith('chunk_')) {
+                    continue;
+                }
+
+                // 跳过没有元数据的文件
+                if (!item.metadata || !item.metadata.TimeStamp) {
+                    continue;
+                }
+
+                allFiles.push({
+                    id: item.name,
+                    metadata: item.metadata
+                });
+            }
+
+            cursor = response.cursor;
+            if (!cursor) break;
+        }
+
+        // 如果没有文件，返回空结果
+        if (allFiles.length === 0) {
+            return {
+                success: true,
+                totalFiles: 0,
+                lastUpdated: Date.now(),
+                channelStats: {},
+                directoryStats: {},
+                typeStats: {},
+                oldestFile: null,
+                newestFile: null
+            };
         }
 
         // 统计各渠道文件数量
         const channelStats = {};
         const directoryStats = {};
         const typeStats = {};
-        
-        index.files.forEach(file => {
+
+        allFiles.forEach(file => {
             // 渠道统计
             let channel = file.metadata.Channel || 'Telegraph';
             if (channel === 'TelegramNew') {
@@ -680,15 +756,31 @@ export async function getIndexInfo(context) {
             typeStats[listType] = (typeStats[listType] || 0) + 1;
         });
 
+        // 找到最新和最旧的文件
+        let oldestFile = null;
+        let newestFile = null;
+
+        if (allFiles.length > 0) {
+            // 按时间戳排序
+            const sortedFiles = [...allFiles].sort((a, b) => {
+                const timeA = a.metadata.TimeStamp || 0;
+                const timeB = b.metadata.TimeStamp || 0;
+                return timeA - timeB;
+            });
+
+            oldestFile = sortedFiles[0];
+            newestFile = sortedFiles[sortedFiles.length - 1];
+        }
+
         return {
             success: true,
-            totalFiles: index.totalCount,
-            lastUpdated: index.lastUpdated,
+            totalFiles: allFiles.length,
+            lastUpdated: Date.now(),
             channelStats,
             directoryStats,
             typeStats,
-            oldestFile: index.files[index.files.length - 1],
-            newestFile: index.files[0]
+            oldestFile,
+            newestFile
         };
     } catch (error) {
         console.error('Error getting index info:', error);
