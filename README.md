@@ -128,7 +128,7 @@
   
 - **Sponsors**：感谢以下赞助者对本项目的支持！
 
-  [![赞助者](https://afdian-sponsors.sanyue.de/image?columns=9)](https://afdian.com/a/marseventh)
+  [![赞助者](https://afdian-sponsors.sanyue.de/image)](https://afdian.com/a/marseventh)
   
 - **Contributors**：感谢以下贡献者对本项目的无私贡献！
 
