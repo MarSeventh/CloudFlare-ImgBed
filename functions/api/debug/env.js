@@ -2,6 +2,7 @@
  * 环境变量调试工具
  * 用于检查 D1 和 KV 绑定状态
  */
+import { getDatabase } from '../utils/databaseAdapter.js';
 
 export async function onRequest(context) {
     const { env } = context;
@@ -33,7 +34,7 @@ export async function onRequest(context) {
         let kvTest = null;
         if (env.img_url) {
             try {
-                const result = await env.img_url.list({ limit: 1 });
+                const result = await getDatabase(env).list({ limit: 1 });
                 kvTest = { success: true, hasKeys: result.keys.length > 0 };
             } catch (error) {
                 kvTest = { success: false, error: error.message };
