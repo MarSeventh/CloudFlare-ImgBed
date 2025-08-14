@@ -28,13 +28,24 @@ export async function onRequest(context) {
                 // 查询前5条记录
                 var stmt2 = db.db.prepare('SELECT id, metadata, created_at FROM files ORDER BY created_at DESC LIMIT 5');
                 var fileResults = await stmt2.all();
-                results.sampleFiles = fileResults.map(function(row) {
-                    return {
-                        id: row.id,
-                        metadata: JSON.parse(row.metadata || '{}'),
-                        created_at: row.created_at
-                    };
-                });
+
+                // 检查结果格式
+                console.log('fileResults type:', typeof fileResults);
+                console.log('fileResults:', fileResults);
+
+                if (Array.isArray(fileResults)) {
+                    results.sampleFiles = fileResults.map(function(row) {
+                        return {
+                            id: row.id,
+                            metadata: JSON.parse(row.metadata || '{}'),
+                            created_at: row.created_at
+                        };
+                    });
+                } else {
+                    results.sampleFiles = [];
+                    results.fileResultsType = typeof fileResults;
+                    results.fileResultsValue = fileResults;
+                }
             } catch (error) {
                 results.error = 'Direct query failed: ' + error.message;
             }
