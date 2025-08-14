@@ -135,29 +135,37 @@ async function getAllFileRecords(env, dir) {
     const allRecords = [];
     let cursor = null;
 
-    while (true) {
+    try {
         const db = getDatabase(env);
-        const response = await db.list({
-            prefix: dir,
-            limit: 1000,
-            cursor: cursor
-        });
 
-        cursor = response.cursor;
+        while (true) {
+            const response = await db.list({
+                prefix: dir,
+                limit: 1000,
+                cursor: cursor
+            });
 
-        for (const item of response.keys) {
-            // 跳过管理相关的键
-            if (item.name.startsWith('manage@') || item.name.startsWith('chunk_')) {
-                continue;
+            // 检查响应格式
+            if (!response || !response.keys || !Array.isArray(response.keys)) {
+                console.error('Invalid response from database list:', response);
+                break;
             }
 
-            // 跳过没有元数据的文件
-            if (!item.metadata || !item.metadata.TimeStamp) {
-                continue;
-            }
+            cursor = response.cursor;
 
-            allRecords.push(item);
-        }
+            for (const item of response.keys) {
+                // 跳过管理相关的键
+                if (item.name.startsWith('manage@') || item.name.startsWith('chunk_')) {
+                    continue;
+                }
+
+                // 跳过没有元数据的文件
+                if (!item.metadata || !item.metadata.TimeStamp) {
+                    continue;
+                }
+
+                allRecords.push(item);
+            }
 
         if (!cursor) break;
         
@@ -184,4 +192,15 @@ async function getAllFileRecords(env, dir) {
         totalCount: allRecords.length,
         returnedCount: filteredRecords.length
     };
+
+    } catch (error) {
+        console.error('Error in getAllFileRecords:', error);
+        return {
+            files: [],
+            directories: [],
+            totalCount: 0,
+            returnedCount: 0,
+            error: error.message
+        };
+    }
 }

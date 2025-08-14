@@ -977,7 +977,13 @@ export async function deleteAllOperations(context) {
                 limit: KV_LIST_LIMIT,
                 cursor: cursor
             });
-            
+
+            // 检查响应格式
+            if (!response || !response.keys || !Array.isArray(response.keys)) {
+                console.error('Invalid response from database list in cleanupProcessedOperations:', response);
+                break;
+            }
+
             for (const item of response.keys) {
                 allOperationIds.push(item.name.substring(OPERATION_KEY_PREFIX.length));
                 totalFound++;
@@ -1246,7 +1252,13 @@ export async function clearChunkedIndex(context, onlyNonUsed = false) {
                 limit: KV_LIST_LIMIT,
                 cursor: cursor
             });
-            
+
+            // 检查响应格式
+            if (!response || !response.keys || !Array.isArray(response.keys)) {
+                console.error('Invalid response from database list in getIndexStorageStats:', response);
+                break;
+            }
+
             for (const item of response.keys) {
                 recordedChunks.push(item.name);
             }
