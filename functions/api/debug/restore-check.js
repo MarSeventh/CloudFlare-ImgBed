@@ -106,29 +106,35 @@ export async function onRequest(context) {
             
         } else if (action === 'sample') {
             // 提供样本恢复数据
+            // 创建样本数据
+            var testFileKey = "test_file_" + Date.now();
+            var testSettingKey = "test_setting_" + Date.now();
+            var testSettingValue = "test_value_" + Date.now();
+
             results.sampleData = {
                 timestamp: Date.now(),
                 version: "2.0.2",
                 data: {
                     fileCount: 1,
-                    files: {
-                        "test_file_" + Date.now(): {
-                            metadata: {
-                                FileName: "test.jpg",
-                                FileType: "image/jpeg",
-                                FileSize: "0.1",
-                                TimeStamp: Date.now(),
-                                Channel: "Test",
-                                ListType: "None"
-                            },
-                            value: null
-                        }
-                    },
-                    settings: {
-                        "test_setting_" + Date.now(): "test_value_" + Date.now()
-                    }
+                    files: {},
+                    settings: {}
                 }
             };
+
+            // 动态添加文件和设置
+            results.sampleData.data.files[testFileKey] = {
+                metadata: {
+                    FileName: "test.jpg",
+                    FileType: "image/jpeg",
+                    FileSize: "0.1",
+                    TimeStamp: Date.now(),
+                    Channel: "Test",
+                    ListType: "None"
+                },
+                value: null
+            };
+
+            results.sampleData.data.settings[testSettingKey] = testSettingValue;
             
             results.instructions = {
                 usage: "Use this sample data to test restore functionality",
