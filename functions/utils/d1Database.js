@@ -112,12 +112,13 @@ D1Database.prototype.listFiles = function(options) {
     if (params.length > 0) {
         stmt = stmt.bind.apply(stmt, params);
     }
-    return stmt.all().then(function(results) {
+    return stmt.all().then(function(response) {
+        var results = response.results || [];
         var hasMore = results.length > limit;
         if (hasMore) {
             results.pop();
         }
-        
+
         var keys = results.map(function(row) {
             return {
                 name: row.id,
@@ -191,14 +192,15 @@ D1Database.prototype.listSettings = function(options) {
     if (params.length > 0) {
         stmt = stmt.bind.apply(stmt, params);
     }
-    return stmt.all().then(function(results) {
+    return stmt.all().then(function(response) {
+        var results = response.results || [];
         var keys = results.map(function(row) {
             return {
                 name: row.key,
                 value: row.value
             };
         });
-        
+
         return { keys: keys };
     });
 };
@@ -268,7 +270,8 @@ D1Database.prototype.listIndexOperations = function(options) {
     if (params.length > 0) {
         stmt = stmt.bind.apply(stmt, params);
     }
-    return stmt.all().then(function(results) {
+    return stmt.all().then(function(response) {
+        var results = response.results || [];
         return results.map(function(row) {
             return {
                 id: row.id,
