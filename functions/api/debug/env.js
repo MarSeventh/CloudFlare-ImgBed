@@ -2,7 +2,7 @@
  * 环境变量调试工具
  * 用于检查 D1 和 KV 绑定状态
  */
-import { getDatabase } from '../utils/databaseAdapter.js';
+import { getDatabase } from '../../utils/databaseAdapter.js';
 
 export async function onRequest(context) {
     const { env } = context;
