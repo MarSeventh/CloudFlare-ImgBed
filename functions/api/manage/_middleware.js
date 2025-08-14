@@ -1,10 +1,18 @@
 import { fetchSecurityConfig } from "../../utils/sysConfig";
-import { checkKVConfig, errorHandling } from "../../utils/middleware";
+import { checkKVConfig } from "../../utils/middleware";
 import { validateApiToken } from "../../utils/tokenValidator";
 
 let securityConfig = {}
 let basicUser = ""
 let basicPass = ""
+
+async function errorHandling(context) {
+  try {
+    return await context.next();
+  } catch (err) {
+    return new Response(`${err.message}\n${err.stack}`, { status: 500 });
+  }
+}
 
 function basicAuthentication(request) {
   const Authorization = request.headers.get('Authorization');

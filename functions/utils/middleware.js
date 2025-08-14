@@ -1,7 +1,6 @@
 import sentryPlugin from "@cloudflare/pages-plugin-sentry";
 import '@sentry/tracing';
 import { fetchOthersConfig } from "./sysConfig";
-import { getIndexInfo, rebuildIndex } from "./indexManager";
 
 let disableTelemetry = false;
 
