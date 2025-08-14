@@ -165,14 +165,7 @@ CREATE TABLE IF NOT EXISTS other_data (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
-
--- 插入初始的索引元数据
-INSERT OR REPLACE INTO index_metadata (key, last_updated, total_count, last_operation_id)
-VALUES ('main_index', 0, 0, NULL);
-
 -- 初始化完成
--- 数据库已准备就绪，可以开始迁移数据
-
 ```
 
 ###  在 Cloudflare Dashboard 配置 Pages 绑定
