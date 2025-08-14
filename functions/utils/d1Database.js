@@ -109,8 +109,10 @@ D1Database.prototype.listFiles = function(options) {
     params.push(limit + 1);
     
     var stmt = this.db.prepare(query);
-    var bindMethod = stmt.bind;
-    return bindMethod.apply(stmt, params).all().then(function(results) {
+    if (params.length > 0) {
+        stmt = stmt.bind.apply(stmt, params);
+    }
+    return stmt.all().then(function(results) {
         var hasMore = results.length > limit;
         if (hasMore) {
             results.pop();
@@ -186,8 +188,10 @@ D1Database.prototype.listSettings = function(options) {
     params.push(limit);
     
     var stmt = this.db.prepare(query);
-    var bindMethod = stmt.bind;
-    return bindMethod.apply(stmt, params).all().then(function(results) {
+    if (params.length > 0) {
+        stmt = stmt.bind.apply(stmt, params);
+    }
+    return stmt.all().then(function(results) {
         var keys = results.map(function(row) {
             return {
                 name: row.key,
@@ -261,8 +265,10 @@ D1Database.prototype.listIndexOperations = function(options) {
     params.push(limit);
     
     var stmt = this.db.prepare(query);
-    var bindMethod = stmt.bind;
-    return bindMethod.apply(stmt, params).all().then(function(results) {
+    if (params.length > 0) {
+        stmt = stmt.bind.apply(stmt, params);
+    }
+    return stmt.all().then(function(results) {
         return results.map(function(row) {
             return {
                 id: row.id,
