@@ -1,4 +1,5 @@
-import { readIndex, getIndexInfo, rebuildIndex, getIndexStorageStats } from '../../utils/indexManager.js';
+import { readIndex, mergeOperationsToIndex, deleteAllOperations, rebuildIndex,
+    getIndexInfo, getIndexStorageStats } from '../../utils/indexManager.js';
 
 export async function onRequest(context) {
     const { request, waitUntil } = context;
@@ -36,6 +37,24 @@ export async function onRequest(context) {
             }));
 
             return new Response('Index rebuilt asynchronously', {
+                headers: { "Content-Type": "text/plain" }
+            });
+        }
+
+        // 特殊操作：合并挂起的原子操作到索引
+        if (action === 'merge-operations') {
+            waitUntil(mergeOperationsToIndex(context));
+
+            return new Response('Operations merged into index asynchronously', {
+                headers: { "Content-Type": "text/plain" }
+            });
+        }
+
+        // 特殊操作：清除所有原子操作
+        if (action === 'delete-operations') {
+            waitUntil(deleteAllOperations(context));
+
+            return new Response('All operations deleted asynchronously', {
                 headers: { "Content-Type": "text/plain" }
             });
         }
