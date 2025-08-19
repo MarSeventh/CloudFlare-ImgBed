@@ -125,8 +125,17 @@ async function checkDatabaseConfigMiddleware(context) {
     return new Response(
       JSON.stringify({
         success: false,
-        error: "数据库未配置 / Database not configured",
-        message: "请配置 D1 数据库 (env.DB) 或 KV 存储 (env.img_url)。 / Please configure D1 database (env.DB) or KV storage (env.img_url)."
+        error: "D1数据库未配置 / D1 Database not configured",
+        message: "请在 Cloudflare Pages Dashboard 中配置 D1 数据库绑定。 / Please configure D1 database binding in Cloudflare Pages Dashboard.",
+        details: {
+          hasD1: dbConfig.hasD1,
+          database: dbConfig.database,
+          steps: [
+            "1. Go to Pages Dashboard → Your Project → Settings → Functions",
+            "2. Add D1 database binding: Variable name = 'DB', Database = 'imgbed-database'",
+            "3. Redeploy your project"
+          ]
+        }
       }),
       {
         status: 500,
@@ -136,6 +145,9 @@ async function checkDatabaseConfigMiddleware(context) {
       }
     );
   }
+
+  // 记录使用D1数据库
+  console.log('Using D1 database');
 
   // 继续执行
   return await context.next();
