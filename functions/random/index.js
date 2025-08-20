@@ -1,5 +1,5 @@
-import { fetchOthersConfig } from "./utils/sysConfig";
-import { readIndex } from "./utils/indexManager";
+import { fetchOthersConfig } from "../utils/sysConfig";
+import { readIndex } from "../utils/indexManager";
 
 let othersConfig = {};
 let allowRandom = false;
