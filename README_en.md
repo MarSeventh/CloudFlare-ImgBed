@@ -1,9 +1,8 @@
 <div align="center">
     <a href="https://github.com/MarSeventh/CloudFlare-ImgBed"><img width="80%" alt="logo" src="static/readme/banner.png"/></a>
-    <p><em>🗂️Open-source file hosting solution, supporting Docker and serverless deployment, supporting multiple storage channels such as Telegram Bot, Cloudflare R2, S3, etc.</em></p>
+    <p><em>🗂️Open-source file hosting solution, supporting Docker and serverless deployment, supporting multiple storage channels such as Telegram Bot, Cloudflare R2, S3, etc.</em> Modified version that replaces KV with D1 storage</p>
     <p>
-        <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README.md">简体中文</a> | <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README_en.md">English</a> | <a
-        href="https://cfbed.sanyue.de/en">Official Website</a>
+        <a href="https://github.com/ccxyChuzhong/CloudFlare-ImgBed-D1/blob/main/README.md">简体中文</a> | <a href="https://github.com/ccxyChuzhong/CloudFlare-ImgBed-D1/blob/main/README_en.md">English</a> | <a href="https://github.com/MarSeventh/CloudFlare-ImgBed">KV Version (Original)</a> | <a href="https://github.com/ccxyChuzhong/CloudFlare-ImgBed-D1">D1 Version</a> | <a href="https://cfbed.sanyue.de/en">Official Website</a>
     </p>
     <div>
         <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/LICENSE">
@@ -66,6 +65,145 @@
 > For issues, please check section 5 FAQ first.
 
 </details>
+
+
+# Important! Important! Important!
+If you are using KV storage and want to migrate to D1 storage, it is recommended to create a new image hosting service. Use the system's backup and restore functions for data migration!!!!
+
+<details>
+    <summary>Detailed KV to D1 Storage Migration Guide</summary>
+
+- First, confirm that your D1 database has been created: The database name must be: `imgbed-database`. Execute all SQL statements section by section:
+```sql
+-- CloudFlare ImgBed D1 Database Initialization Script
+-- This script is used to initialize the D1 database
+
+-- Drop existing tables (if re-initialization is needed)
+-- Note: Use with caution in production environment
+-- DROP TABLE IF EXISTS files;
+-- DROP TABLE IF EXISTS settings;
+-- DROP TABLE IF EXISTS index_operations;
+-- DROP TABLE IF EXISTS index_metadata;
+-- DROP TABLE IF EXISTS other_data;
+
+-- Execute main database schema creation
+-- This will include the content of schema.sql
+
+-- 1. Files table - stores file metadata
+CREATE TABLE IF NOT EXISTS files (
+    id TEXT PRIMARY KEY,
+    value TEXT,
+    metadata TEXT NOT NULL,
+    file_name TEXT,
+    file_type TEXT,
+    file_size TEXT,
+    upload_ip TEXT,
+    upload_address TEXT,
+    list_type TEXT,
+    timestamp INTEGER,
+    label TEXT,
+    directory TEXT,
+    channel TEXT,
+    channel_name TEXT,
+    tg_file_id TEXT,
+    tg_chat_id TEXT,
+    tg_bot_token TEXT,
+    is_chunked BOOLEAN DEFAULT FALSE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. System configuration table
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    category TEXT,
+    description TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 3. Index operations table
+CREATE TABLE IF NOT EXISTS index_operations (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    timestamp INTEGER NOT NULL,
+    data TEXT NOT NULL,
+    processed BOOLEAN DEFAULT FALSE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4. Index metadata table
+CREATE TABLE IF NOT EXISTS index_metadata (
+    key TEXT PRIMARY KEY,
+    last_updated INTEGER,
+    total_count INTEGER DEFAULT 0,
+    last_operation_id TEXT,
+    chunk_count INTEGER DEFAULT 0,
+    chunk_size INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 5. Other data table
+CREATE TABLE IF NOT EXISTS other_data (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    type TEXT,
+    description TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Insert initial index metadata
+INSERT OR REPLACE INTO index_metadata (key, last_updated, total_count, last_operation_id)
+VALUES ('main_index', 0, 0, NULL);
+
+-- Initialization complete
+-- Database is ready, data migration can begin
+
+```
+
+### Configure Pages Bindings in Cloudflare Dashboard
+
+#### Step A: Login to Cloudflare Dashboard
+1. Visit https://dash.cloudflare.com
+2. Login to your account
+
+#### Step B: Enter Pages Project
+1. Click **"Pages"** in the left menu
+2. Find and click your image hosting project
+
+#### Step C: Configure Functions Bindings
+1. Click the **"Settings"** tab on the project page
+2. Click **"Functions"** in the left menu
+3. Scroll down to find the **"D1 database bindings"** section
+
+#### Step D: Add D1 Binding
+1. Click the **"Add binding"** button
+2. Fill in the following information:
+   - **Variable name**: `DB` (must be uppercase DB)
+   - **D1 database**: Select your created `imgbed-database` from the dropdown
+3. Click the **"Save"** button
+
+#### Step E: Redeploy Pages
+
+After configuring bindings, you need to redeploy:
+
+#### Step F: Verify Configuration
+
+After deployment is complete, visit the following URL to verify configuration:
+
+```
+https://your-domain.com/api/manage/migrate?action=check
+```
+
+View detailed configuration status:
+```
+https://your-domain.com/api/manage/migrate?action=status
+```
+</details>
+
 
 
 

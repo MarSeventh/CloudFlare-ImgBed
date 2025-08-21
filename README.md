@@ -1,8 +1,8 @@
 <div align="center">
     <a href="https://github.com/MarSeventh/CloudFlare-ImgBed"><img width="80%" alt="logo" src="static/readme/banner.png"/></a>
-    <p><em>🗂️开源文件托管解决方案，支持 Docker 和无服务器部署，支持 Telegram Bot 、 Cloudflare R2 、S3 等多种存储渠道</em></p>
+    <p><em>🗂️开源文件托管解决方案，支持 Docker 和无服务器部署，支持 Telegram Bot 、 Cloudflare R2 、S3 等多种存储渠道.</em> 魔改原版将KV改为D1存储</p>
     <p>
-        <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README.md">简体中文</a> | <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README_en.md">English</a> | <a href="https://cfbed.sanyue.de">官方网站</a>
+        <a href="https://github.com/ccxyChuzhong/CloudFlare-ImgBed-D1/blob/main/README.md">简体中文</a> | <a href="https://github.com/ccxyChuzhong/CloudFlare-ImgBed-D1/blob/main/README_en.md">English</a> | <a href="https://github.com/MarSeventh/CloudFlare-ImgBed">KV版本（原版）</a> | <a href="https://github.com/ccxyChuzhong/CloudFlare-ImgBed-D1">D1版本</a> | <a href="https://cfbed.sanyue.de">官方网站</a>
     </p>
     <div>
         <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/LICENSE">
@@ -75,6 +75,137 @@
 >
 > 出现问题，请先查看第5节常见问题Q&A部分。
 
+</details>
+
+
+# 必看！必看 ！必看！
+如果是使用KV存储想转D1存储。建议重新创建一个图床。使用系统的备份和恢复功能进行数据迁移！！！！
+
+<details>
+    <summary>KV转D1存储详细如下</summary>
+    
+- 首先确认您的 D1 数据库已经创建：数据库名称必须为： `imgbed-database` 将数据库sql语句一段一段的全部执行
+```sql
+-- CloudFlare ImgBed D1 Database Initialization Script
+-- 这个脚本用于初始化D1数据库
+
+-- 删除已存在的表（如果需要重新初始化）
+-- 注意：在生产环境中使用时请谨慎
+-- DROP TABLE IF EXISTS files;
+-- DROP TABLE IF EXISTS settings;
+-- DROP TABLE IF EXISTS index_operations;
+-- DROP TABLE IF EXISTS index_metadata;
+-- DROP TABLE IF EXISTS other_data;
+
+-- 执行主要的数据库架构创建
+-- 这里会包含 schema.sql 的内容
+
+-- 1. 文件表 - 存储文件元数据
+CREATE TABLE IF NOT EXISTS files (
+    id TEXT PRIMARY KEY,
+    value TEXT,
+    metadata TEXT NOT NULL,
+    file_name TEXT,
+    file_type TEXT,
+    file_size TEXT,
+    upload_ip TEXT,
+    upload_address TEXT,
+    list_type TEXT,
+    timestamp INTEGER,
+    label TEXT,
+    directory TEXT,
+    channel TEXT,
+    channel_name TEXT,
+    tg_file_id TEXT,
+    tg_chat_id TEXT,
+    tg_bot_token TEXT,
+    is_chunked BOOLEAN DEFAULT FALSE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. 系统配置表
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    category TEXT,
+    description TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 3. 索引操作表
+CREATE TABLE IF NOT EXISTS index_operations (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    timestamp INTEGER NOT NULL,
+    data TEXT NOT NULL,
+    processed BOOLEAN DEFAULT FALSE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4. 索引元数据表
+CREATE TABLE IF NOT EXISTS index_metadata (
+    key TEXT PRIMARY KEY,
+    last_updated INTEGER,
+    total_count INTEGER DEFAULT 0,
+    last_operation_id TEXT,
+    chunk_count INTEGER DEFAULT 0,
+    chunk_size INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 5. 其他数据表
+CREATE TABLE IF NOT EXISTS other_data (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    type TEXT,
+    description TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+-- 初始化完成
+```
+
+###  在 Cloudflare Dashboard 配置 Pages 绑定
+
+#### 步骤 A: 登录 Cloudflare Dashboard
+1. 访问 https://dash.cloudflare.com
+2. 登录您的账户
+
+#### 步骤 B: 进入 Pages 项目
+1. 在左侧菜单中点击 **"Pages"**
+2. 找到并点击您的图床项目
+
+#### 步骤 C: 配置 Functions 绑定
+1. 在项目页面中，点击 **"Settings"** 标签
+2. 在左侧菜单中点击 **"Functions"**
+3. 向下滚动找到 **"D1 database bindings"** 部分
+
+#### 步骤 D: 添加 D1 绑定
+1. 点击 **"Add binding"** 按钮
+2. 填写以下信息：
+   - **Variable name**: `DB` （必须是大写的 DB）
+   - **D1 database**: 从下拉菜单中选择您创建的 `imgbed-database`
+3. 点击 **"Save"** 按钮
+
+#### 步骤 E: 重新部署 Pages
+
+配置绑定后，需要重新部署：
+
+#### 步骤 F: 验证配置
+
+部署完成后，访问以下URL验证配置：
+
+```
+https://your-domain.com/api/manage/migrate?action=check
+```
+
+查看详细的配置状态
+```
+https://your-domain.com/api/manage/migrate?action=status
+``` 
 </details>
 
 

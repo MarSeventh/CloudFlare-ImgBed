@@ -2,6 +2,7 @@
 import { createResponse, selectConsistentChannel, getUploadIp, getIPAddress, buildUniqueFileId, endUpload } from './uploadTools';
 import { TelegramAPI } from '../utils/telegramAPI';
 import { S3Client, CreateMultipartUploadCommand, UploadPartCommand, AbortMultipartUploadCommand } from "@aws-sdk/client-s3";
+import { getDatabase } from '../utils/databaseAdapter.js';
 
 // 初始化分块上传
 export async function initializeChunkedUpload(context) {
@@ -46,8 +47,9 @@ export async function initializeChunkedUpload(context) {
         };
         
         // 保存会话信息
+        const db = getDatabase(env);
         const sessionKey = `upload_session_${uploadId}`;
-        await env.img_url.put(sessionKey, JSON.stringify(sessionInfo), {
+        await db.put(sessionKey, JSON.stringify(sessionInfo), {
             expirationTtl: 3600 // 1小时过期
         });
         
@@ -93,7 +95,7 @@ export async function handleChunkUpload(context) {
 
         // 验证上传会话
         const sessionKey = `upload_session_${uploadId}`;
-        const sessionData = await env.img_url.get(sessionKey);
+        const sessionData = await getDatabase(env).get(sessionKey);
         if (!sessionData) {
             return createResponse('Error: Invalid or expired upload session', { status: 400 });
         }
@@ -133,7 +135,7 @@ export async function handleChunkUpload(context) {
         };
 
         // 立即保存分块记录和数据，设置过期时间
-        await env.img_url.put(chunkKey, chunkData, { 
+        await getDatabase(env).put(chunkKey, chunkData, { 
             metadata: initialChunkMetadata,
             expirationTtl: 3600 // 1小时过期
         });
@@ -211,7 +213,7 @@ async function uploadChunkToStorageWithTimeout(context, chunkIndex, totalChunks,
         
         // 超时或失败时，更新状态为超时/失败
         try {
-            const chunkRecord = await env.img_url.getWithMetadata(chunkKey, { type: 'arrayBuffer' });
+            const chunkRecord = await getDatabase(env).getWithMetadata(chunkKey, { type: 'arrayBuffer' });
             if (chunkRecord && chunkRecord.metadata) {
                 const isTimeout = error.message === 'Upload timeout';
                 const errorMetadata = {
@@ -223,7 +225,7 @@ async function uploadChunkToStorageWithTimeout(context, chunkIndex, totalChunks,
                 };
                 
                 // 保留原始数据以便重试
-                await env.img_url.put(chunkKey, chunkRecord.value, { 
+                await getDatabase(env).put(chunkKey, chunkRecord.value, { 
                     metadata: errorMetadata,
                     expirationTtl: 3600
                 });
@@ -244,7 +246,7 @@ async function uploadChunkToStorage(context, chunkIndex, totalChunks, uploadId, 
 
     try {
         // 从KV获取分块数据和metadata
-        const chunkRecord = await env.img_url.getWithMetadata(chunkKey, { type: 'arrayBuffer' });
+        const chunkRecord = await getDatabase(env).getWithMetadata(chunkKey, { type: 'arrayBuffer' });
         if (!chunkRecord || !chunkRecord.value) {
             console.error(`Chunk ${chunkIndex} data not found in KV`);
             return;
@@ -275,7 +277,7 @@ async function uploadChunkToStorage(context, chunkIndex, totalChunks, uploadId, 
                 };
                 
                 // 只保存metadata，不保存原始数据，设置过期时间
-                await env.img_url.put(chunkKey, '', { 
+                await getDatabase(env).put(chunkKey, '', { 
                     metadata: updatedMetadata,
                     expirationTtl: 3600 // 1小时过期
                 });
@@ -293,7 +295,7 @@ async function uploadChunkToStorage(context, chunkIndex, totalChunks, uploadId, 
                 };
                 
                 // 保留原始数据以便重试，设置过期时间
-                await env.img_url.put(chunkKey, chunkData, { 
+                await getDatabase(env).put(chunkKey, chunkData, { 
                     metadata: failedMetadata,
                     expirationTtl: 3600 // 1小时过期
                 });
@@ -307,7 +309,7 @@ async function uploadChunkToStorage(context, chunkIndex, totalChunks, uploadId, 
         
         // 发生异常时，确保保留原始数据并标记为失败
         try {
-            const chunkRecord = await env.img_url.getWithMetadata(chunkKey, { type: 'arrayBuffer' });
+            const chunkRecord = await getDatabase(env).getWithMetadata(chunkKey, { type: 'arrayBuffer' });
             if (chunkRecord && chunkRecord.metadata) {
                 const errorMetadata = {
                     ...chunkRecord.metadata,
@@ -316,7 +318,7 @@ async function uploadChunkToStorage(context, chunkIndex, totalChunks, uploadId, 
                     failedTime: Date.now()
                 };
                 
-                await env.img_url.put(chunkKey, chunkRecord.value, { 
+                await getDatabase(env).put(chunkKey, chunkRecord.value, { 
                     metadata: errorMetadata,
                     expirationTtl: 3600 // 1小时过期
                 });
@@ -353,7 +355,7 @@ async function uploadSingleChunkToR2Multipart(context, chunkData, chunkIndex, to
             };
             
             // 保存multipart info
-            await env.img_url.put(multipartKey, JSON.stringify(multipartInfo), {
+            await getDatabase(env).put(multipartKey, JSON.stringify(multipartInfo), {
                 expirationTtl: 3600 // 1小时过期
             });
         } else {
@@ -363,7 +365,7 @@ async function uploadSingleChunkToR2Multipart(context, chunkData, chunkIndex, to
             const maxRetries = 30; // 最多等待60秒
 
             while (!multipartInfoData && retryCount < maxRetries) {
-                multipartInfoData = await env.img_url.get(multipartKey);
+                multipartInfoData = await getDatabase(env).get(multipartKey);
                 if (!multipartInfoData) {
                     // 等待2秒后重试
                     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -381,7 +383,7 @@ async function uploadSingleChunkToR2Multipart(context, chunkData, chunkIndex, to
         }
         
         // 获取multipart info
-        const multipartInfoData = await env.img_url.get(multipartKey);
+        const multipartInfoData = await getDatabase(env).get(multipartKey);
         if (!multipartInfoData) {
             return { success: false, error: 'Multipart upload not initialized' };
         }
@@ -459,7 +461,7 @@ async function uploadSingleChunkToS3Multipart(context, chunkData, chunkIndex, to
             };
             
             // 保存multipart info
-            await env.img_url.put(multipartKey, JSON.stringify(multipartInfo), {
+            await getDatabase(env).put(multipartKey, JSON.stringify(multipartInfo), {
                 expirationTtl: 3600 // 1小时过期
             });
         } else {
@@ -469,7 +471,7 @@ async function uploadSingleChunkToS3Multipart(context, chunkData, chunkIndex, to
             const maxRetries = 30; // 最多等待60秒
             
             while (!multipartInfoData && retryCount < maxRetries) {
-                multipartInfoData = await env.img_url.get(multipartKey);
+                multipartInfoData = await getDatabase(env).get(multipartKey);
                 if (!multipartInfoData) {
                     // 等待2秒后重试
                     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -487,7 +489,7 @@ async function uploadSingleChunkToS3Multipart(context, chunkData, chunkIndex, to
         }
         
         // 获取multipart info
-        const multipartInfoData = await env.img_url.get(multipartKey);
+        const multipartInfoData = await getDatabase(env).get(multipartKey);
         if (!multipartInfoData) {
             return { success: false, error: 'Multipart upload not initialized' };
         }
@@ -686,7 +688,7 @@ async function retrySingleChunk(context, chunk, uploadChannel, maxRetries = 5, r
     let lastError = null;
     
     try {
-        const chunkRecord = await env.img_url.getWithMetadata(chunk.key, { type: 'arrayBuffer' });
+        const chunkRecord = await getDatabase(env).getWithMetadata(chunk.key, { type: 'arrayBuffer' });
         if (!chunkRecord || !chunkRecord.value) {
             console.error(`Chunk ${chunk.index} data missing for retry`);
             return { success: false, chunk, reason: 'data_missing', error: 'Chunk data not found' };
@@ -704,7 +706,7 @@ async function retrySingleChunk(context, chunk, uploadChannel, maxRetries = 5, r
             status: 'retrying',
         };
 
-        await env.img_url.put(chunk.key, chunkData, { 
+        await getDatabase(env).put(chunk.key, chunkData, { 
             metadata: retryMetadata,
             expirationTtl: 3600
         });
@@ -742,7 +744,7 @@ async function retrySingleChunk(context, chunk, uploadChannel, maxRetries = 5, r
                 };
                 
                 // 删除原始数据，只保留上传结果，设置过期时间
-                await env.img_url.put(chunk.key, '', { 
+                await getDatabase(env).put(chunk.key, '', { 
                     metadata: updatedMetadata,
                     expirationTtl: 3600 // 1小时过期
                 });
@@ -764,14 +766,14 @@ async function retrySingleChunk(context, chunk, uploadChannel, maxRetries = 5, r
         
         // 更新重试失败状态
         try {
-            const chunkRecord = await env.img_url.getWithMetadata(chunk.key, { type: 'arrayBuffer' });
+            const chunkRecord = await getDatabase(env).getWithMetadata(chunk.key, { type: 'arrayBuffer' });
             if (chunkRecord) {
                 const failedRetryMetadata = {
                     ...chunkRecord.metadata,
                     status: isTimeout ? 'retry_timeout' : 'retry_failed'
                 };
                 
-                await env.img_url.put(chunk.key, chunkRecord.value, { 
+                await getDatabase(env).put(chunk.key, chunkRecord.value, { 
                     metadata: failedRetryMetadata,
                     expirationTtl: 3600
                 });
@@ -798,7 +800,7 @@ export async function cleanupFailedMultipartUploads(context, uploadId, uploadCha
     
     try {
         const multipartKey = `multipart_${uploadId}`;
-        const multipartInfoData = await env.img_url.get(multipartKey);
+        const multipartInfoData = await getDatabase(env).get(multipartKey);
         
         if (!multipartInfoData) {
             return; // 没有multipart upload需要清理
@@ -837,7 +839,7 @@ export async function cleanupFailedMultipartUploads(context, uploadId, uploadCha
         }
         
         // 清理multipart info
-        await env.img_url.delete(multipartKey);
+        await getDatabase(env).delete(multipartKey);
         console.log(`Cleaned up failed multipart upload for ${uploadId}`);
         
     } catch (error) {
@@ -854,7 +856,7 @@ export async function checkChunkUploadStatuses(env, uploadId, totalChunks) {
     for (let i = 0; i < totalChunks; i++) {
         const chunkKey = `chunk_${uploadId}_${i.toString().padStart(3, '0')}`;
         try {
-            const chunkRecord = await env.img_url.getWithMetadata(chunkKey, { type: 'arrayBuffer' });
+            const chunkRecord = await getDatabase(env).getWithMetadata(chunkKey, { type: 'arrayBuffer' });
             if (chunkRecord && chunkRecord.metadata) {
                 let status = chunkRecord.metadata.status || 'unknown';
                 
@@ -870,7 +872,7 @@ export async function checkChunkUploadStatuses(env, uploadId, totalChunks) {
                         timeoutDetectedTime: currentTime
                     };
                     
-                    await env.img_url.put(chunkKey, chunkRecord.value, { 
+                    await getDatabase(env).put(chunkKey, chunkRecord.value, { 
                         metadata: timeoutMetadata,
                         expirationTtl: 3600
                     }).catch(err => console.warn(`Failed to update timeout status for chunk ${i}:`, err));
@@ -932,12 +934,12 @@ export async function cleanupChunkData(env, uploadId, totalChunks) {
             const chunkKey = `chunk_${uploadId}_${i.toString().padStart(3, '0')}`;
             
             // 删除KV中的分块记录
-            await env.img_url.delete(chunkKey);
+            await getDatabase(env).delete(chunkKey);
         }
         
         // 清理multipart info（如果存在）
         const multipartKey = `multipart_${uploadId}`;
-        await env.img_url.delete(multipartKey);
+        await getDatabase(env).delete(multipartKey);
         
     } catch (cleanupError) {
         console.warn('Failed to cleanup chunk data:', cleanupError);
@@ -948,7 +950,7 @@ export async function cleanupChunkData(env, uploadId, totalChunks) {
 export async function cleanupUploadSession(env, uploadId) {
     try {
         const sessionKey = `upload_session_${uploadId}`;
-        await env.img_url.delete(sessionKey);
+        await getDatabase(env).delete(sessionKey);
         console.log(`Cleaned up upload session for ${uploadId}`);
     } catch (cleanupError) {
         console.warn('Failed to cleanup upload session:', cleanupError);
@@ -962,7 +964,7 @@ export async function forceCleanupUpload(context, uploadId, totalChunks) {
     try {
         // 读取 session 信息
         const sessionKey = `upload_session_${uploadId}`;
-        const sessionRecord = await env.img_url.get(sessionKey);
+        const sessionRecord = await getDatabase(env).get(sessionKey);
         const uploadChannel = sessionRecord ? JSON.parse(sessionRecord).uploadChannel : 'cfr2'; // 默认使用 cfr2
 
         // 清理 multipart upload信息
@@ -973,7 +975,7 @@ export async function forceCleanupUpload(context, uploadId, totalChunks) {
         // 清理所有分块
         for (let i = 0; i < totalChunks; i++) {
             const chunkKey = `chunk_${uploadId}_${i.toString().padStart(3, '0')}`;
-            cleanupPromises.push(env.img_url.delete(chunkKey).catch(err => 
+            cleanupPromises.push(getDatabase(env).delete(chunkKey).catch(err => 
                 console.warn(`Failed to delete chunk ${i}:`, err)
             ));
         }
@@ -986,7 +988,7 @@ export async function forceCleanupUpload(context, uploadId, totalChunks) {
         ];
         
         keysToCleanup.forEach(key => {
-            cleanupPromises.push(env.img_url.delete(key).catch(err => 
+            cleanupPromises.push(getDatabase(env).delete(key).catch(err => 
                 console.warn(`Failed to delete key ${key}:`, err)
             ));
         });
@@ -1078,7 +1080,7 @@ export async function uploadLargeFileToTelegram(context, file, fullId, metadata,
         }
         
         // 写入最终的KV记录，分片信息作为value
-        await env.img_url.put(fullId, chunksData, { metadata });
+        await getDatabase(env).put(fullId, chunksData, { metadata });
 
         // 异步结束上传
         waitUntil(endUpload(context, fullId, metadata));

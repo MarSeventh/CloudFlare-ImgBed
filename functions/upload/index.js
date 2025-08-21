@@ -1,11 +1,12 @@
 import { userAuthCheck, UnauthorizedResponse } from "../utils/userAuth";
 import { fetchUploadConfig, fetchSecurityConfig } from "../utils/sysConfig";
-import { createResponse, getUploadIp, getIPAddress, isExtValid, 
+import { createResponse, getUploadIp, getIPAddress, isExtValid,
         moderateContent, purgeCDNCache, isBlockedUploadIp, buildUniqueFileId, endUpload } from "./uploadTools";
 import { initializeChunkedUpload, handleChunkUpload, uploadLargeFileToTelegram, handleCleanupRequest} from "./chunkUpload";
 import { handleChunkMerge, checkMergeStatus } from "./chunkMerge";
 import { TelegramAPI } from "../utils/telegramAPI";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getDatabase } from '../utils/databaseAdapter.js';
 
 
 export async function onRequest(context) {  // Contents of context object
@@ -241,13 +242,14 @@ async function uploadFileToCloudflareR2(context, fullId, metadata, returnLink) {
     let moderateUrl = `${R2PublicUrl}/${fullId}`;
     metadata.Label = await moderateContent(env, moderateUrl);
 
-    // 写入KV数据库
+    // 写入数据库
     try {
-        await env.img_url.put(fullId, "", {
+        const db = getDatabase(env);
+        await db.put(fullId, "", {
             metadata: metadata,
         });
     } catch (error) {
-        return createResponse('Error: Failed to write to KV database', { status: 500 });
+        return createResponse('Error: Failed to write to database', { status: 500 });
     }
 
     // 结束上传
@@ -337,7 +339,8 @@ async function uploadFileToS3(context, fullId, metadata, returnLink) {
         // 图像审查
         if (uploadModerate && uploadModerate.enabled) {
             try {
-                await env.img_url.put(fullId, "", { metadata });
+                const db = getDatabase(env);
+                await db.put(fullId, "", { metadata });
             } catch {
                 return createResponse("Error: Failed to write to KV database", { status: 500 });
             }
@@ -347,11 +350,12 @@ async function uploadFileToS3(context, fullId, metadata, returnLink) {
             metadata.Label = await moderateContent(env, moderateUrl);
         }
 
-        // 写入 KV 数据库
+        // 写入数据库
         try {
-            await env.img_url.put(fullId, "", { metadata });
+            const db = getDatabase(env);
+            await db.put(fullId, "", { metadata });
         } catch {
-            return createResponse("Error: Failed to write to KV database", { status: 500 });
+            return createResponse("Error: Failed to write to database", { status: 500 });
         }
 
         // 结束上传
@@ -465,7 +469,8 @@ async function uploadFileToTelegram(context, fullId, metadata, fileExt, fileName
             metadata.TgFileId = id;
             metadata.TgChatId = tgChatId;
             metadata.TgBotToken = tgBotToken;
-            await env.img_url.put(fullId, "", {
+            const db = getDatabase(env);
+            await db.put(fullId, "", {
                 metadata: metadata,
             });
         } catch (error) {
@@ -498,7 +503,8 @@ async function uploadFileToExternal(context, fullId, metadata, returnLink) {
     metadata.ExternalLink = extUrl;
     // 写入KV数据库
     try {
-        await env.img_url.put(fullId, "", {
+        const db = getDatabase(env);
+        await db.put(fullId, "", {
             metadata: metadata,
         });
     } catch (error) {

@@ -1,3 +1,5 @@
+import { getDatabase } from '../../utils/databaseAdapter.js';
+
 export async function onRequest(context) {
     // API Token管理，支持创建、删除、列出Token
     const {
@@ -9,13 +11,13 @@ export async function onRequest(context) {
       data,
     } = context;
 
-    const kv = env.img_url
+    const db = getDatabase(env);
     const url = new URL(request.url)
     const method = request.method
 
     // GET - 获取所有Token列表
     if (method === 'GET') {
-        const tokens = await getApiTokens(kv)
+        const tokens = await getApiTokens(db)
         return new Response(JSON.stringify(tokens), {
             headers: {
                 'content-type': 'application/json',
@@ -37,7 +39,7 @@ export async function onRequest(context) {
             })
         }
 
-        const token = await createApiToken(kv, name, permissions, owner)
+        const token = await createApiToken(db, name, permissions, owner)
         return new Response(JSON.stringify(token), {
             headers: {
                 'content-type': 'application/json',
@@ -58,7 +60,7 @@ export async function onRequest(context) {
             })
         }
 
-        const result = await deleteApiToken(kv, tokenId)
+        const result = await deleteApiToken(db, tokenId)
         return new Response(JSON.stringify(result), {
             headers: {
                 'content-type': 'application/json',
@@ -80,7 +82,7 @@ export async function onRequest(context) {
             })
         }
 
-        const result = await updateApiToken(kv, tokenId, permissions)
+        const result = await updateApiToken(db, tokenId, permissions)
         return new Response(JSON.stringify(result), {
             headers: {
                 'content-type': 'application/json',
@@ -92,8 +94,8 @@ export async function onRequest(context) {
 }
 
 // 获取所有API Token
-async function getApiTokens(kv) {
-    const settingsStr = await kv.get('manage@sysConfig@security')
+async function getApiTokens(db) {
+    const settingsStr = await db.get('manage@sysConfig@security')
     const settings = settingsStr ? JSON.parse(settingsStr) : {}
     const tokens = settings.apiTokens?.tokens || {}
     
@@ -115,8 +117,8 @@ async function getApiTokens(kv) {
 }
 
 // 创建新的API Token
-async function createApiToken(kv, name, permissions, owner) {
-    const settingsStr = await kv.get('manage@sysConfig@security')
+async function createApiToken(db, name, permissions, owner) {
+    const settingsStr = await db.get('manage@sysConfig@security')
     const settings = settingsStr ? JSON.parse(settingsStr) : {}
     
     if (!settings.apiTokens) {
@@ -139,8 +141,8 @@ async function createApiToken(kv, name, permissions, owner) {
     
     settings.apiTokens.tokens[tokenId] = tokenData
     
-    // 保存到KV
-    await kv.put('manage@sysConfig@security', JSON.stringify(settings))
+    // 保存到数据库
+    await db.put('manage@sysConfig@security', JSON.stringify(settings))
     
     return {
         id: tokenId,
@@ -154,8 +156,8 @@ async function createApiToken(kv, name, permissions, owner) {
 }
 
 // 删除API Token
-async function deleteApiToken(kv, tokenId) {
-    const settingsStr = await kv.get('manage@sysConfig@security')
+async function deleteApiToken(db, tokenId) {
+    const settingsStr = await db.get('manage@sysConfig@security')
     const settings = settingsStr ? JSON.parse(settingsStr) : {}
     
     if (!settings.apiTokens?.tokens?.[tokenId]) {
@@ -164,15 +166,15 @@ async function deleteApiToken(kv, tokenId) {
     
     delete settings.apiTokens.tokens[tokenId]
     
-    // 保存到KV
-    await kv.put('manage@sysConfig@security', JSON.stringify(settings))
+    // 保存到数据库
+    await db.put('manage@sysConfig@security', JSON.stringify(settings))
     
     return { success: true, message: 'Token 已删除' }
 }
 
 // 更新API Token权限
-async function updateApiToken(kv, tokenId, permissions) {
-    const settingsStr = await kv.get('manage@sysConfig@security')
+async function updateApiToken(db, tokenId, permissions) {
+    const settingsStr = await db.get('manage@sysConfig@security')
     const settings = settingsStr ? JSON.parse(settingsStr) : {}
     
     if (!settings.apiTokens?.tokens?.[tokenId]) {
@@ -182,8 +184,8 @@ async function updateApiToken(kv, tokenId, permissions) {
     settings.apiTokens.tokens[tokenId].permissions = permissions
     settings.apiTokens.tokens[tokenId].updatedAt = new Date().toISOString()
     
-    // 保存到KV
-    await kv.put('manage@sysConfig@security', JSON.stringify(settings))
+    // 保存到数据库
+    await db.put('manage@sysConfig@security', JSON.stringify(settings))
     
     return { 
         success: true, 
@@ -208,8 +210,8 @@ function generateTokenId() {
 }
 
 // 根据Token获取权限（供其他API使用）
-export async function getTokenPermissions(kv, token) {
-    const settingsStr = await kv.get('manage@sysConfig@security')
+export async function getTokenPermissions(db, token) {
+    const settingsStr = await db.get('manage@sysConfig@security')
     const settings = settingsStr ? JSON.parse(settingsStr) : {}
     const tokens = settings.apiTokens?.tokens || {}
     

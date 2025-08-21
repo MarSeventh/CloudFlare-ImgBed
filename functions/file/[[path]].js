@@ -1,8 +1,9 @@
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { fetchSecurityConfig } from "../utils/sysConfig";
 import { TelegramAPI } from "../utils/telegramAPI";
-import { setCommonHeaders, setRangeHeaders, handleHeadRequest, getFileContent, isTgChannel, 
+import { setCommonHeaders, setRangeHeaders, handleHeadRequest, getFileContent, isTgChannel,
             returnWithCheck, return404, isDomainAllowed } from './fileTools';
+import { getDatabase } from '../utils/databaseAdapter.js';
 
 
 export async function onRequest(context) {  // Contents of context object
@@ -39,8 +40,9 @@ export async function onRequest(context) {  // Contents of context object
         return await returnBlockImg(url);
     }
     
-    // 从KV中获取图片记录
-    const imgRecord = await env.img_url.getWithMetadata(fileId);
+    // 从数据库中获取图片记录
+    const db = getDatabase(env);
+    const imgRecord = await db.getWithMetadata(fileId);
     if (!imgRecord) {
         return new Response('Error: Image Not Found', { status: 404 });
     }
