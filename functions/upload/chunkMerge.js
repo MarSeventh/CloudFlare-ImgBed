@@ -2,6 +2,7 @@
 import { createResponse, getUploadIp, getIPAddress, selectConsistentChannel, buildUniqueFileId, endUpload } from './uploadTools';
 import { retryFailedChunks, cleanupFailedMultipartUploads, checkChunkUploadStatuses, cleanupChunkData, cleanupUploadSession } from './chunkUpload';
 import { S3Client, CompleteMultipartUploadCommand } from "@aws-sdk/client-s3";
+import { getDatabase } from '../utils/databaseAdapter.js';
 
 // 处理分块合并
 export async function handleChunkMerge(context) {
@@ -23,8 +24,9 @@ export async function handleChunkMerge(context) {
         }
 
         // 验证上传会话
+        const db = getDatabase(env);
         const sessionKey = `upload_session_${uploadId}`;
-        const sessionData = await env.img_url.get(sessionKey);
+        const sessionData = await db.get(sessionKey);
         if (!sessionData) {
             return createResponse('Error: Invalid or expired upload session', { status: 400 });
         }
@@ -94,7 +96,7 @@ async function startMerge(context, uploadId, totalChunks, originalFileName, orig
 
         // 存储合并状态
         const statusKey = `merge_status_${uploadId}`;
-        await env.img_url.put(statusKey, JSON.stringify(mergeStatus), {
+        await db.put(statusKey, JSON.stringify(mergeStatus), {
             expirationTtl: 3600 // 1小时过期
         });
 
@@ -306,7 +308,8 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
                 // 对于仍在上传的分块，标记为超时
                 for (const chunk of uploadingChunks) {
                     try {
-                        const chunkRecord = await env.img_url.getWithMetadata(chunk.key);
+                        const db = getDatabase(env);
+                        const chunkRecord = await db.getWithMetadata(chunk.key);
                         if (chunkRecord && chunkRecord.metadata) {
                             const timeoutMetadata = {
                                 ...chunkRecord.metadata,
@@ -315,8 +318,8 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
                                 timeoutDuringMerge: true,
                                 timeoutTime: Date.now()
                             };
-                            
-                            await env.img_url.put(chunk.key, chunkRecord.value, { 
+
+                            await db.put(chunk.key, chunkRecord.value, {
                                 metadata: timeoutMetadata,
                                 expirationTtl: 3600
                             });
@@ -379,7 +382,8 @@ async function mergeR2ChunksInfo(context, uploadId, completedChunks, metadata) {
         const multipartKey = `multipart_${uploadId}`;
         
         // 获取multipart info
-        const multipartInfoData = await env.img_url.get(multipartKey);
+        const db = getDatabase(env);
+        const multipartInfoData = await db.get(multipartKey);
         if (!multipartInfoData) {
             throw new Error('Multipart upload info not found');
         }
@@ -412,10 +416,10 @@ async function mergeR2ChunksInfo(context, uploadId, completedChunks, metadata) {
         metadata.FileSize = (totalSize / 1024 / 1024).toFixed(2);
         
         // 清理multipart info
-        await env.img_url.delete(multipartKey);
-        
-        // 写入KV数据库
-        await env.img_url.put(finalFileId, "", { metadata });
+        await db.delete(multipartKey);
+
+        // 写入数据库
+        await db.put(finalFileId, "", { metadata });
 
         // 结束上传
         waitUntil(endUpload(context, finalFileId, metadata));
@@ -462,7 +466,8 @@ async function mergeS3ChunksInfo(context, uploadId, completedChunks, metadata) {
         const multipartKey = `multipart_${uploadId}`;
         
         // 获取multipart info
-        const multipartInfoData = await env.img_url.get(multipartKey);
+        const db = getDatabase(env);
+        const multipartInfoData = await db.get(multipartKey);
         if (!multipartInfoData) {
             throw new Error('Multipart upload info not found');
         }
@@ -513,10 +518,10 @@ async function mergeS3ChunksInfo(context, uploadId, completedChunks, metadata) {
         metadata.S3FileKey = finalFileId;
 
         // 清理multipart info
-        await env.img_url.delete(multipartKey);
+        await db.delete(multipartKey);
 
-        // 写入KV数据库
-        await env.img_url.put(finalFileId, "", { metadata });
+        // 写入数据库
+        await db.put(finalFileId, "", { metadata });
 
         // 异步结束上传
         waitUntil(endUpload(context, finalFileId, metadata));
@@ -583,8 +588,9 @@ async function mergeTelegramChunksInfo(context, uploadId, completedChunks, metad
         // 将分片信息存储到value中
         const chunksData = JSON.stringify(chunks);
         
-        // 写入KV数据库
-        await env.img_url.put(finalFileId, chunksData, { metadata });
+        // 写入数据库
+        const db = getDatabase(env);
+        await db.put(finalFileId, chunksData, { metadata });
 
         // 异步结束上传
         waitUntil(endUpload(context, finalFileId, metadata));
@@ -612,8 +618,9 @@ async function mergeTelegramChunksInfo(context, uploadId, completedChunks, metad
 // 检查合并状态
 export async function checkMergeStatus(env, uploadId) {
     try {
+        const db = getDatabase(env);
         const statusKey = `merge_status_${uploadId}`;
-        const statusData = await env.img_url.get(statusKey);
+        const statusData = await db.get(statusKey);
         
         if (!statusData) {
             return createResponse(JSON.stringify({
@@ -644,7 +651,7 @@ export async function checkMergeStatus(env, uploadId) {
                 };
                 
                 // 更新状态
-                await env.img_url.put(statusKey, JSON.stringify(timeoutStatus), {
+                await db.put(statusKey, JSON.stringify(timeoutStatus), {
                     expirationTtl: 3600
                 }).catch(err => console.warn('Failed to update timeout status:', err));
                 
@@ -698,11 +705,12 @@ export async function checkMergeStatus(env, uploadId) {
 // 更新合并状态
 async function updateMergeStatus(env, statusKey, updates) {
     try {
-        const currentData = await env.img_url.get(statusKey);
+        const db = getDatabase(env);
+        const currentData = await db.get(statusKey);
         if (currentData) {
             const status = JSON.parse(currentData);
             const updatedStatus = { ...status, ...updates, updatedAt: Date.now() };
-            await env.img_url.put(statusKey, JSON.stringify(updatedStatus), {
+            await db.put(statusKey, JSON.stringify(updatedStatus), {
                 expirationTtl: 3600 // 1小时过期
             });
         }

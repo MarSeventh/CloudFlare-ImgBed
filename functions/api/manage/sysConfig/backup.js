@@ -1,4 +1,5 @@
 import { readIndex } from '../../../utils/indexManager.js';
+import { getDatabase } from '../../../utils/databaseAdapter.js';
 
 export async function onRequest(context) {
     const { request, env } = context;
@@ -41,23 +42,54 @@ async function handleBackup(context) {
             }
         };
 
-        // 首先从索引中读取所有文件信息
-        const indexResult = await readIndex(context, { 
-            count: -1,  // 获取所有文件
-            start: 0,
-            includeSubdirFiles: true  // 包含子目录下的文件
-        });
-        backupData.data.fileCount = indexResult.files.length;
+        // 直接从数据库读取所有文件信息，不依赖索引
+        const db = getDatabase(env);
+        let allFiles = [];
+        let cursor = null;
+
+        // 分批获取所有文件
+        while (true) {
+            const response = await db.listFiles({
+                limit: 1000,
+                cursor: cursor
+            });
+
+            if (!response || !response.keys || !Array.isArray(response.keys)) {
+                break;
+            }
+
+            for (const item of response.keys) {
+                // 跳过管理相关的键和分块数据
+                if (item.name.startsWith('manage@') || item.name.startsWith('chunk_')) {
+                    continue;
+                }
+
+                // 跳过没有元数据的文件
+                if (!item.metadata || !item.metadata.TimeStamp) {
+                    continue;
+                }
+
+                allFiles.push({
+                    id: item.name,
+                    metadata: item.metadata
+                });
+            }
+
+            cursor = response.cursor;
+            if (!cursor) break;
+        }
+
+        backupData.data.fileCount = allFiles.length;
 
         // 备份文件数据
-        for (const file of indexResult.files) {
+        for (const file of allFiles) {
             const fileId = file.id;
             const metadata = file.metadata;
             
-            // 对于TelegramNew渠道且IsChunked为true的文件，需要从KV读取其值
+            // 对于TelegramNew渠道且IsChunked为true的文件，需要从数据库读取其值
             if (metadata.Channel === 'TelegramNew' && metadata.IsChunked === true) {
                 try {
-                    const fileData = await env.img_url.getWithMetadata(fileId);
+                    const fileData = await db.getWithMetadata(fileId);
                     backupData.data.files[fileId] = {
                         metadata: metadata,
                         value: fileData.value
@@ -80,13 +112,28 @@ async function handleBackup(context) {
         }
 
         // 备份系统设置
-        const settingsList = await env.img_url.list({ prefix: 'manage@' });
-        for (const key of settingsList.keys) {
+        // db 已经在上面定义了
+
+        // 备份所有设置，不仅仅是manage@开头的
+        const allSettingsList = await db.listSettings({});
+        for (const key of allSettingsList.keys) {
             // 忽略索引文件
             if (key.name.startsWith('manage@index')) continue;
 
-            const setting = await env.img_url.get(key.name);
+            const setting = key.value;
             if (setting) {
+                backupData.data.settings[key.name] = setting;
+            }
+        }
+
+        // 额外确保备份manage@开头的设置
+        const manageSettingsList = await db.listSettings({ prefix: 'manage@' });
+        for (const key of manageSettingsList.keys) {
+            // 忽略索引文件
+            if (key.name.startsWith('manage@index')) continue;
+
+            const setting = key.value;
+            if (setting && !backupData.data.settings[key.name]) {
                 backupData.data.settings[key.name] = setting;
             }
         }
@@ -131,30 +178,56 @@ async function handleRestore(request, env) {
         let restoredSettings = 0;
 
         // 恢复文件数据
-        for (const [key, fileData] of Object.entries(backupData.data.files)) {
-            try {
-                if (fileData.value) {
-                    // 对于有value的文件（如telegram分块文件），恢复完整数据
-                    await env.img_url.put(key, fileData.value, {
-                        metadata: fileData.metadata
-                    });
-                } else if (fileData.metadata) {
-                    // 只恢复元数据
-                    await env.img_url.put(key, '', {
-                        metadata: fileData.metadata
-                    });
+        const db = getDatabase(env);
+        const fileEntries = Object.entries(backupData.data.files);
+        const batchSize = 50; // 批量处理，避免超时
+
+        for (let i = 0; i < fileEntries.length; i += batchSize) {
+            const batch = fileEntries.slice(i, i + batchSize);
+
+            for (const [key, fileData] of batch) {
+                try {
+                    if (fileData.value) {
+                        // 对于有value的文件（如telegram分块文件），恢复完整数据
+                        await db.put(key, fileData.value, {
+                            metadata: fileData.metadata
+                        });
+                    } else if (fileData.metadata) {
+                        // 只恢复元数据
+                        await db.put(key, '', {
+                            metadata: fileData.metadata
+                        });
+                    }
+                    restoredFiles++;
+                } catch (error) {
+                    console.error(`恢复文件 ${key} 失败:`, error);
                 }
-                restoredFiles++;
-            } catch (error) {
-                console.error(`恢复文件 ${key} 失败:`, error);
+            }
+
+            // 每批处理后短暂暂停，避免过载
+            if (i + batchSize < fileEntries.length) {
+                await new Promise(resolve => setTimeout(resolve, 10));
             }
         }
 
         // 恢复系统设置
-        for (const [key, value] of Object.entries(backupData.data.settings)) {
+        const settingEntries = Object.entries(backupData.data.settings);
+        console.log(`开始恢复 ${settingEntries.length} 个设置`);
+
+        for (const [key, value] of settingEntries) {
             try {
-                await env.img_url.put(key, value);
-                restoredSettings++;
+                console.log(`恢复设置: ${key}, 长度: ${value.length}`);
+                await db.put(key, value);
+
+                // 验证是否成功保存
+                const retrieved = await db.get(key);
+                if (retrieved === value) {
+                    restoredSettings++;
+                    console.log(`设置 ${key} 恢复成功`);
+                } else {
+                    console.error(`设置 ${key} 恢复后验证失败`);
+                    console.error(`原始长度: ${value.length}, 检索长度: ${retrieved ? retrieved.length : 'null'}`);
+                }
             } catch (error) {
                 console.error(`恢复设置 ${key} 失败:`, error);
             }

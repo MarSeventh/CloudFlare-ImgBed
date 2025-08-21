@@ -1,6 +1,7 @@
 import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { purgeCFCache } from "../../../utils/purgeCache";
 import { removeFileFromIndex, batchRemoveFilesFromIndex } from "../../../utils/indexManager.js";
+import { getDatabase } from '../../../utils/databaseAdapter.js';
 
 export async function onRequest(context) {
     const { request, env, params, waitUntil } = context;
@@ -104,7 +105,8 @@ export async function onRequest(context) {
 async function deleteFile(env, fileId, cdnUrl, url) {
     try {
         // 读取图片信息
-        const img = await env.img_url.getWithMetadata(fileId);
+        const db = getDatabase(env);
+        const img = await db.getWithMetadata(fileId);
 
         // 如果是R2渠道的图片，需要删除R2中对应的图片
         if (img.metadata?.Channel === 'CloudflareR2') {
@@ -117,8 +119,8 @@ async function deleteFile(env, fileId, cdnUrl, url) {
             await deleteS3File(img);
         }
 
-        // 删除KV存储中的记录
-        await env.img_url.delete(fileId);
+        // 删除数据库中的记录
+        await db.delete(fileId);
 
         // 清除CDN缓存
         await purgeCFCache(env, cdnUrl);

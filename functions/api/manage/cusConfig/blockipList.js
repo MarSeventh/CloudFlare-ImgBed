@@ -1,3 +1,5 @@
+import { getDatabase } from '../../../utils/databaseAdapter.js';
+
 export async function onRequest(context) {
     // Contents of context object
     const {
@@ -9,8 +11,8 @@ export async function onRequest(context) {
       data, // arbitrary space for passing data between middlewares
     } = context;
     try {
-        const kv = env.img_url;
-        const list = await kv.get("manage@blockipList");
+        const db = getDatabase(env);
+        const list = await db.get("manage@blockipList");
         if (list == null) {
             return new Response('', { status: 200 });
         } else {

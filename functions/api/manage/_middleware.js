@@ -1,18 +1,11 @@
 import { fetchSecurityConfig } from "../../utils/sysConfig";
-import { checkKVConfig } from "../../utils/middleware";
+import { checkDatabaseConfig, errorHandling } from "../../utils/middleware";
 import { validateApiToken } from "../../utils/tokenValidator";
+import { getDatabase } from "../../utils/databaseAdapter.js";
 
 let securityConfig = {}
 let basicUser = ""
 let basicPass = ""
-
-async function errorHandling(context) {
-  try {
-    return await context.next();
-  } catch (err) {
-    return new Response(`${err.message}\n${err.stack}`, { status: 500 });
-  }
-}
 
 function basicAuthentication(request) {
   const Authorization = request.headers.get('Authorization');
@@ -116,7 +109,8 @@ async function authentication(context) {
       const pathname = new URL(context.request.url).pathname;
       const requiredPermission = extractRequiredPermission(pathname);
 
-      const tokenValidation = await validateApiToken(context.request, context.env.img_url, requiredPermission);
+      const db = getDatabase(context.env);
+      const tokenValidation = await validateApiToken(context.request, db, requiredPermission);
       if (tokenValidation.valid) {
         // Token验证通过，继续处理请求
         return context.next();
@@ -146,4 +140,22 @@ async function authentication(context) {
   
 }
 
-export const onRequest = [checkKVConfig, errorHandling, authentication];
+// 暂时禁用中间件来排查问题
+// export const onRequest = [checkDatabaseConfig, errorHandling, authentication];
+
+// 临时的简单中间件
+export async function onRequest(context) {
+    try {
+        return await context.next();
+    } catch (error) {
+        console.error('Manage middleware error:', error);
+        return new Response(JSON.stringify({
+            error: 'Manage middleware error: ' + error.message
+        }), {
+            status: 500,
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+    }
+}
