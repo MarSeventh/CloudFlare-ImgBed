@@ -1,6 +1,7 @@
 import { fetchSecurityConfig } from "../utils/sysConfig";
 import { purgeCFCache } from "../utils/purgeCache";
 import { addFileToIndex } from "../utils/indexManager.js";
+import { getDatabase } from '../utils/databaseAdapter.js';
 
 // 统一的响应创建函数
 export function createResponse(body, options = {}) {
@@ -206,9 +207,8 @@ export function getUploadIp(request) {
 // 检查上传IP是否被封禁
 export async function isBlockedUploadIp(env, uploadIp) {
     try {
-        // 使用数据库适配器而不是直接访问KV
-        const { getDatabase } = await import('../utils/databaseAdapter.js');
         const db = getDatabase(env);
+
         let list = await db.get("manage@blockipList");
         if (list == null) {
             list = [];
@@ -227,19 +227,7 @@ export async function isBlockedUploadIp(env, uploadIp) {
 // 构建唯一文件ID
 export async function buildUniqueFileId(context, fileName, fileType = 'application/octet-stream') {
     const { env, url } = context;
-
-    // 获取数据库适配器
-    const { getDatabase } = await import('../utils/databaseAdapter.js');
-    let db;
-    try {
-        db = getDatabase(env);
-    } catch (error) {
-        console.error('Database not configured for buildUniqueFileId:', error);
-        // 如果数据库未配置，生成一个简单的唯一ID
-        const timestamp = Date.now();
-        const random = Math.random().toString(36).substring(2, 8);
-        return `${timestamp}_${random}_${fileName}`;
-    }
+    const db = getDatabase(env);
 
     let fileExt = fileName.split('.').pop();
     if (!fileExt || fileExt === fileName) {

@@ -1,6 +1,7 @@
 import sentryPlugin from "@cloudflare/pages-plugin-sentry";
 import '@sentry/tracing';
 import { fetchOthersConfig } from "./sysConfig";
+import { checkDatabaseConfig as checkDbConfig } from './databaseAdapter.js';
 
 let disableTelemetry = false;
 
@@ -111,12 +112,9 @@ async function fetchSampleRate(context) {
   }
 }
 
-import { checkDatabaseConfig as checkDbConfig } from './databaseAdapter.js';
-
-// 检查数据库是否配置，文件索引是否存在
-async function checkDatabaseConfigMiddleware(context) {
+// 检查数据库是否配置
+export async function checkDatabaseConfig(context) {
   var env = context.env;
-  var waitUntil = context.waitUntil;
 
   var dbConfig = checkDbConfig(env);
 
@@ -139,7 +137,3 @@ async function checkDatabaseConfigMiddleware(context) {
   // 继续执行
   return await context.next();
 }
-
-// 保持向后兼容性的别名
-export const checkKVConfig = checkDatabaseConfigMiddleware;
-export const checkDatabaseConfig = checkDatabaseConfigMiddleware;

@@ -4,11 +4,7 @@ export async function onRequest(context) {
     // API Token管理，支持创建、删除、列出Token
     const {
       request,
-      env,
-      params,
-      waitUntil,
-      next,
-      data,
+      env
     } = context;
 
     const db = getDatabase(env);

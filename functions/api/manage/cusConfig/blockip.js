@@ -13,8 +13,8 @@ export async function onRequest(context) {
     
     try {
 
-        const kv = getDatabase(env);
-        let list = await kv.get("manage@blockipList");
+        const db = getDatabase(env);
+        let list = await db.get("manage@blockipList");
         if (list == null) {
             list = [];
         } else {
@@ -29,7 +29,7 @@ export async function onRequest(context) {
 
         //将ip添加到list中
         list.push(ip);
-        await kv.put("manage@blockipList", list.join(","));
+        await db.put("manage@blockipList", list.join(","));
         return new Response('Add ip to block list successfully', { status: 200 });
     } catch (e) {
         return new Response('Add ip to block list failed', { status: 500 });
