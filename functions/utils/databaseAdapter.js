@@ -14,11 +14,9 @@ export function createDatabaseAdapter(env) {
     // 检查是否配置了D1数据库
     if (env.DB && typeof env.DB.prepare === 'function') {
         // 使用D1数据库
-        console.log('Using D1 Database');
         return new D1Database(env.DB);
     } else if (env.img_url && typeof env.img_url.get === 'function') {
         // 回退到KV存储
-        console.log('Using KV Storage (fallback)');
         return new KVAdapter(env.img_url);
     } else {
         console.error('No database configured. Please configure either D1 (env.DB) or KV (env.img_url)');
@@ -169,46 +167,3 @@ export function checkDatabaseConfig(env) {
         configured: hasD1 || hasKV
     };
 }
-
-/**
- * 数据库健康检查
- * @param {Object} env - 环境变量
- * @returns {Promise<Object>} 健康检查结果
- */
-export async function healthCheck(env) {
-    var config = checkDatabaseConfig(env);
-
-    if (!config.configured) {
-        return {
-            healthy: false,
-            error: 'No database configured',
-            config: config
-        };
-    }
-
-    try {
-        var db = getDatabase(env);
-
-        if (config.usingD1) {
-            // D1健康检查 - 尝试查询一个简单的表
-            var stmt = db.db.prepare('SELECT 1 as test');
-            await stmt.first();
-        } else {
-            // KV健康检查 - 尝试列出键
-            await db.list({ limit: 1 });
-        }
-
-        return {
-            healthy: true,
-            config: config
-        };
-    } catch (error) {
-        return {
-            healthy: false,
-            error: error.message,
-            config: config
-        };
-    }
-}
-
-

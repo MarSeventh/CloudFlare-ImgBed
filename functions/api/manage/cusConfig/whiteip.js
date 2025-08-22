@@ -11,8 +11,8 @@ export async function onRequest(context) {
       data, // arbitrary space for passing data between middlewares
     } = context;
     try {
-        const kv = getDatabase(env);
-        let list = await kv.get("manage@blockipList");
+        const db = getDatabase(env);
+        let list = await db.get("manage@blockipList");
         if (list == null) {
             list = [];
         } else {
@@ -27,7 +27,7 @@ export async function onRequest(context) {
 
         //将ip从list中删除
         list = list.filter(item => item !== ip);
-        await kv.put("manage@blockipList", list.join(","));
+        await db.put("manage@blockipList", list.join(","));
         return new Response('delete ip from block ip list successfully', { status: 200 });
     } catch (e) {
         return new Response('delete ip from block ip list failed', { status: 500 });

@@ -1,11 +1,19 @@
 import { fetchSecurityConfig } from "../../utils/sysConfig";
-import { checkDatabaseConfig, errorHandling } from "../../utils/middleware";
+import { checkDatabaseConfig } from "../../utils/middleware";
 import { validateApiToken } from "../../utils/tokenValidator";
 import { getDatabase } from "../../utils/databaseAdapter.js";
 
 let securityConfig = {}
 let basicUser = ""
 let basicPass = ""
+
+async function errorHandling(context) {
+  try {
+    return await context.next();
+  } catch (err) {
+    return new Response(`${err.message}\n${err.stack}`, { status: 500 });
+  }
+}
 
 function basicAuthentication(request) {
   const Authorization = request.headers.get('Authorization');
@@ -140,22 +148,4 @@ async function authentication(context) {
   
 }
 
-// 暂时禁用中间件来排查问题
-// export const onRequest = [checkDatabaseConfig, errorHandling, authentication];
-
-// 临时的简单中间件
-export async function onRequest(context) {
-    try {
-        return await context.next();
-    } catch (error) {
-        console.error('Manage middleware error:', error);
-        return new Response(JSON.stringify({
-            error: 'Manage middleware error: ' + error.message
-        }), {
-            status: 500,
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-    }
-}
+export const onRequest = [checkDatabaseConfig, errorHandling, authentication];

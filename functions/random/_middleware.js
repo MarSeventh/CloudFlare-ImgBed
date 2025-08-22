@@ -1,3 +1,3 @@
-import { checkKVConfig } from '../utils/middleware';
+import { checkDatabaseConfig } from '../utils/middleware';
 
-export const onRequest = [checkKVConfig];
+export const onRequest = [checkDatabaseConfig];

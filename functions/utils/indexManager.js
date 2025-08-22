@@ -1,35 +1,49 @@
-/* 索引管理器 - D1数据库版本 */
-
-import { getDatabase } from './databaseAdapter.js';
+/* 索引管理器 */
 
 /**
- * 文件索引结构（D1数据库存储）：
- *
- * 文件表：
- * - 直接存储在 files 表中，包含所有文件信息和元数据
- *
- * 索引元数据表：
- * - 存储在 index_metadata 表中
- * - 包含 lastUpdated, totalCount, lastOperationId 等信息
- *
- * 原子操作表：
- * - 存储在 index_operations 表中
- * - 包含 id, type, timestamp, data, processed 等字段
+ * 文件索引结构（分块存储）：
+ * 
+ * 索引元数据：
+ * - key: manage@index@meta
+ * - value: JSON.stringify(metadata)
+ * - metadata: {
+ *     lastUpdated: 1640995200000,
+ *     totalCount: 1000,
+ *     lastOperationId: "operation_timestamp_uuid",
+ *     chunkCount: 3,
+ *     chunkSize: 10000
+ *   }
+ * 
+ * 索引分块：
+ * - key: manage@index_${chunkId} (例如: manage@index_0, manage@index_1, ...)
+ * - value: JSON.stringify(filesChunk)
+ * - filesChunk: [
+ *     {
+ *       id: "file_unique_id",
+ *       metadata: {}
+ *     },
+ *     ...
+ *   ]
+ * 
+ * 原子操作结构（保持不变）：
+ * - key: manage@index@operation_${timestamp}_${uuid}
+ * - value: JSON.stringify(operation)
  * - operation: {
  *     type: "add" | "remove" | "move" | "batch_add" | "batch_remove" | "batch_move",
  *     timestamp: 1640995200000,
  *     data: {
- *       fileId: "file_unique_id",
- *       metadata: {}
+ *       // 根据操作类型包含不同的数据
  *     }
  *   }
  */
+
+import { getDatabase } from './databaseAdapter.js';
 
 const INDEX_KEY = 'manage@index';
 const INDEX_META_KEY = 'manage@index@meta'; // 索引元数据键
 const OPERATION_KEY_PREFIX = 'manage@index@operation_';
 const INDEX_CHUNK_SIZE = 10000; // 索引分块大小
-const KV_LIST_LIMIT = 1000; // KV 列出批量大小
+const KV_LIST_LIMIT = 1000; // 数据库列出批量大小
 const BATCH_SIZE = 10; // 批量处理大小
 
 /**
@@ -40,11 +54,11 @@ const BATCH_SIZE = 10; // 批量处理大小
  */
 export async function addFileToIndex(context, fileId, metadata = null) {
     const { env } = context;
+    const db = getDatabase(env);
 
     try {
         if (metadata === null) {
             // 如果未传入metadata，尝试从数据库中获取
-            const db = getDatabase(env);
             const fileData = await db.getWithMetadata(fileId);
             metadata = fileData.metadata || {};
         }
@@ -75,6 +89,7 @@ export async function batchAddFilesToIndex(context, files, options = {}) {
     try {
         const { env } = context;
         const { skipExisting = false } = options;
+        const db = getDatabase(env);
 
         // 处理每个文件的metadata
         const processedFiles = [];
@@ -82,10 +97,10 @@ export async function batchAddFilesToIndex(context, files, options = {}) {
             const { fileId, metadata } = fileItem;
             let finalMetadata = metadata;
 
-            // 如果没有提供metadata，尝试从KV中获取
+            // 如果没有提供metadata，尝试从数据库中获取
             if (!finalMetadata) {
                 try {
-                    const fileData = await getDatabase(env).getWithMetadata(fileId);
+                    const fileData = await db.getWithMetadata(fileId);
                     finalMetadata = fileData.metadata || {};
                 } catch (error) {
                     console.warn(`Failed to get metadata for file ${fileId}:`, error);
@@ -180,13 +195,14 @@ export async function batchRemoveFilesFromIndex(context, fileIds) {
 export async function moveFileInIndex(context, originalFileId, newFileId, newMetadata = null) {
     try {
         const { env } = context;
+        const db = getDatabase(env);
 
         // 确定最终的metadata
         let finalMetadata = newMetadata;
         if (finalMetadata === null) {
-            // 如果没有提供新metadata，尝试从KV中获取
+            // 如果没有提供新metadata，尝试从数据库中获取
             try {
-                const fileData = await getDatabase(env).getWithMetadata(newFileId);
+                const fileData = await db.getWithMetadata(newFileId);
                 finalMetadata = fileData.metadata || {};
             } catch (error) {
                 console.warn(`Failed to get metadata for new file ${newFileId}:`, error);
@@ -218,6 +234,7 @@ export async function moveFileInIndex(context, originalFileId, newFileId, newMet
 export async function batchMoveFilesInIndex(context, moveOperations) {
     try {
         const { env } = context;
+        const db = getDatabase(env);
 
         // 处理每个移动操作的metadata
         const processedOperations = [];
@@ -227,9 +244,9 @@ export async function batchMoveFilesInIndex(context, moveOperations) {
             // 确定最终的metadata
             let finalMetadata = metadata;
             if (finalMetadata === null || finalMetadata === undefined) {
-                // 如果没有提供新metadata，尝试从KV中获取
+                // 如果没有提供新metadata，尝试从数据库中获取
                 try {
-                    const fileData = await getDatabase(env).getWithMetadata(newFileId);
+                    const fileData = await db.getWithMetadata(newFileId);
                     finalMetadata = fileData.metadata || {};
                 } catch (error) {
                     console.warn(`Failed to get metadata for new file ${newFileId}:`, error);
@@ -273,7 +290,7 @@ export async function batchMoveFilesInIndex(context, moveOperations) {
  * @returns {Object} 合并结果
  */
 export async function mergeOperationsToIndex(context, options = {}) {
-    const { waitUntil } = context;
+    const { request } = context;
     const { cleanupAfterMerge = true } = options;
     
     try {
@@ -290,8 +307,11 @@ export async function mergeOperationsToIndex(context, options = {}) {
         }
 
         // 获取所有待处理的操作
-        const operations = await getAllPendingOperations(context, currentIndex.lastOperationId);
-        
+        const operationsResult = await getAllPendingOperations(context, currentIndex.lastOperationId);
+
+        const operations = operationsResult.operations;
+        const isALLOperations = operationsResult.isAll;
+
         if (operations.length === 0) {
             console.log('No pending operations to merge');
             return {
@@ -301,7 +321,7 @@ export async function mergeOperationsToIndex(context, options = {}) {
             };
         }
 
-        console.log(`Found ${operations.length} pending operations to merge`);
+        console.log(`Found ${operations.length} pending operations to merge. Is all operations: ${isALLOperations}, if there are remaining operations they will be processed in the next merge.`);
 
         // 按时间戳排序操作，确保按正确顺序应用
         operations.sort((a, b) => a.timestamp - b.timestamp);
@@ -379,8 +399,8 @@ export async function mergeOperationsToIndex(context, options = {}) {
                 workingIndex.lastOperationId = processedOperationIds[processedOperationIds.length - 1];
             }
 
-            // 保存更新后的索引元数据
-            const saveSuccess = await saveIndexMetadata(context, workingIndex);
+            // 保存更新后的索引（使用分块格式）
+            const saveSuccess = await saveChunkedIndex(context, workingIndex);
             if (!saveSuccess) {
                 console.error('Failed to save chunked index');
                 return {
@@ -394,7 +414,23 @@ export async function mergeOperationsToIndex(context, options = {}) {
 
         // 清理已处理的操作记录
         if (cleanupAfterMerge && processedOperationIds.length > 0) {
-            waitUntil(cleanupOperations(context, processedOperationIds));
+            await cleanupOperations(context, processedOperationIds);
+        }
+
+        // 如果未处理完所有操作，调用 merge-operations API 递归处理
+        if (!isALLOperations) {
+            console.log('There are remaining operations, will process them in subsequent calls.');
+
+            const headers = new Headers(request.headers);
+            const originUrl = new URL(request.url);
+            const mergeUrl = `${originUrl.protocol}//${originUrl.host}/api/manage/list?action=merge-operations`;
+
+            await fetch(mergeUrl, { method: 'GET', headers });
+
+            return {
+                success: false,
+                error: 'There are remaining operations, will process them in subsequent calls.'
+            };
         }
 
         const result = {
@@ -447,46 +483,19 @@ export async function readIndex(context, options = {}) {
         // 处理目录满足无头有尾的格式，根目录为空
         const dirPrefix = directory === '' || directory.endsWith('/') ? directory : directory + '/';
 
-        // 直接从数据库读取文件，不依赖索引
-        const { env } = context;
-        const db = getDatabase(env);
-
-        let allFiles = [];
-        let cursor = null;
-
-        // 分批获取所有文件
-        while (true) {
-            const response = await db.listFiles({
-                limit: 1000,
-                cursor: cursor
-            });
-
-            if (!response || !response.keys || !Array.isArray(response.keys)) {
-                break;
-            }
-
-            for (const item of response.keys) {
-                // 跳过管理相关的键和分块数据
-                if (item.name.startsWith('manage@') || item.name.startsWith('chunk_')) {
-                    continue;
-                }
-
-                // 跳过没有元数据的文件
-                if (!item.metadata || !item.metadata.TimeStamp) {
-                    continue;
-                }
-
-                allFiles.push({
-                    id: item.name,
-                    metadata: item.metadata
-                });
-            }
-
-            cursor = response.cursor;
-            if (!cursor) break;
+        // 处理挂起的操作
+        const mergeResult = await mergeOperationsToIndex(context);
+        if (!mergeResult.success) {
+            throw new Error('Failed to merge operations: ' + mergeResult.error);
         }
 
-        let filteredFiles = allFiles;
+        // 获取当前索引
+        const index = await getIndex(context);
+        if (!index.success) {
+            throw new Error('Failed to get index');
+        }
+
+        let filteredFiles = index.files;
 
         // 目录过滤
         if (directory) {
@@ -565,7 +574,7 @@ export async function readIndex(context, options = {}) {
             files: resultFiles,
             directories: Array.from(directories),
             totalCount: totalCount,
-            indexLastUpdated: Date.now(),
+            indexLastUpdated: index.lastUpdated,
             returnedCount: resultFiles.length,
             success: true
         };
@@ -584,12 +593,13 @@ export async function readIndex(context, options = {}) {
 }
 
 /**
- * 重建索引（从 KV 中的所有文件重新构建索引）
+ * 重建索引（从数据库中的所有文件重新构建索引）
  * @param {Object} context - 上下文对象
  * @param {Function} progressCallback - 进度回调函数
  */
 export async function rebuildIndex(context, progressCallback = null) {
     const { env, waitUntil } = context;
+    const db = getDatabase(env);
 
     try {
         console.log('Starting index rebuild...');
@@ -603,24 +613,30 @@ export async function rebuildIndex(context, progressCallback = null) {
             lastOperationId: null
         };
 
-        // 从D1数据库读取所有文件
-        const db = getDatabase(env);
-        const filesStmt = db.db.prepare('SELECT id, metadata FROM files WHERE timestamp IS NOT NULL ORDER BY timestamp DESC');
-        const fileResults = await filesStmt.all();
+        // 分批读取所有文件
+        while (true) {
+            const response = await db.list({
+                limit: KV_LIST_LIMIT,
+                cursor: cursor
+            });
 
-        for (const row of fileResults) {
-            try {
-                const metadata = JSON.parse(row.metadata || '{}');
+            cursor = response.cursor;
 
-                // 跳过没有时间戳的文件
-                if (!metadata.TimeStamp) {
+            for (const item of response.keys) {
+                // 跳过管理相关的键
+                if (item.name.startsWith('manage@') || item.name.startsWith('chunk_')) {
+                    continue;
+                }
+
+                // 跳过没有元数据的文件
+                if (!item.metadata || !item.metadata.TimeStamp) {
                     continue;
                 }
 
                 // 构建文件索引项
                 const fileItem = {
-                    id: row.id,
-                    metadata: metadata
+                    id: item.name,
+                    metadata: item.metadata || {}
                 };
 
                 newIndex.files.push(fileItem);
@@ -630,9 +646,12 @@ export async function rebuildIndex(context, progressCallback = null) {
                 if (progressCallback && processedCount % 100 === 0) {
                     progressCallback(processedCount);
                 }
-            } catch (error) {
-                console.warn(`Failed to parse metadata for file ${row.id}:`, error);
             }
+
+            if (!cursor) break;
+            
+            // 添加协作点
+            await new Promise(resolve => setTimeout(resolve, 10));
         }
 
         // 按时间戳倒序排序
@@ -640,8 +659,8 @@ export async function rebuildIndex(context, progressCallback = null) {
 
         newIndex.totalCount = newIndex.files.length;
 
-        // 保存新索引元数据
-        const saveSuccess = await saveIndexMetadata(context, newIndex);
+        // 保存新索引（使用分块格式）
+        const saveSuccess = await saveChunkedIndex(context, newIndex);
         if (!saveSuccess) {
             console.error('Failed to save chunked index during rebuild');
             return {
@@ -677,65 +696,23 @@ export async function rebuildIndex(context, progressCallback = null) {
  */
 export async function getIndexInfo(context) {
     try {
-        // 直接从数据库读取文件信息，不依赖索引
-        const { env } = context;
-        const db = getDatabase(env);
+        const index = await getIndex(context);
 
-        let allFiles = [];
-        let cursor = null;
-
-        // 分批获取所有文件
-        while (true) {
-            const response = await db.listFiles({
-                limit: 1000,
-                cursor: cursor
-            });
-
-            if (!response || !response.keys || !Array.isArray(response.keys)) {
-                break;
-            }
-
-            for (const item of response.keys) {
-                // 跳过管理相关的键和分块数据
-                if (item.name.startsWith('manage@') || item.name.startsWith('chunk_')) {
-                    continue;
-                }
-
-                // 跳过没有元数据的文件
-                if (!item.metadata || !item.metadata.TimeStamp) {
-                    continue;
-                }
-
-                allFiles.push({
-                    id: item.name,
-                    metadata: item.metadata
-                });
-            }
-
-            cursor = response.cursor;
-            if (!cursor) break;
-        }
-
-        // 如果没有文件，返回空结果
-        if (allFiles.length === 0) {
+        // 检查索引是否成功获取
+        if (index.success === false) {
             return {
-                success: true,
-                totalFiles: 0,
-                lastUpdated: Date.now(),
-                channelStats: {},
-                directoryStats: {},
-                typeStats: {},
-                oldestFile: null,
-                newestFile: null
-            };
+                success: false,
+                error: 'Failed to retrieve index',
+                message: 'Index is not available or corrupted'
+            }
         }
 
         // 统计各渠道文件数量
         const channelStats = {};
         const directoryStats = {};
         const typeStats = {};
-
-        allFiles.forEach(file => {
+        
+        index.files.forEach(file => {
             // 渠道统计
             let channel = file.metadata.Channel || 'Telegraph';
             if (channel === 'TelegramNew') {
@@ -756,31 +733,15 @@ export async function getIndexInfo(context) {
             typeStats[listType] = (typeStats[listType] || 0) + 1;
         });
 
-        // 找到最新和最旧的文件
-        let oldestFile = null;
-        let newestFile = null;
-
-        if (allFiles.length > 0) {
-            // 按时间戳排序
-            const sortedFiles = [...allFiles].sort((a, b) => {
-                const timeA = a.metadata.TimeStamp || 0;
-                const timeB = b.metadata.TimeStamp || 0;
-                return timeA - timeB;
-            });
-
-            oldestFile = sortedFiles[0];
-            newestFile = sortedFiles[sortedFiles.length - 1];
-        }
-
         return {
             success: true,
-            totalFiles: allFiles.length,
-            lastUpdated: Date.now(),
+            totalFiles: index.totalCount,
+            lastUpdated: index.lastUpdated,
             channelStats,
             directoryStats,
             typeStats,
-            oldestFile,
-            newestFile
+            oldestFile: index.files[index.files.length - 1],
+            newestFile: index.files[0]
         };
     } catch (error) {
         console.error('Error getting index info:', error);
@@ -807,6 +768,7 @@ function generateOperationId() {
  */
 async function recordOperation(context, type, data) {
     const { env } = context;
+    const db = getDatabase(env);
 
     const operationId = generateOperationId();
     const operation = {
@@ -814,9 +776,9 @@ async function recordOperation(context, type, data) {
         timestamp: Date.now(),
         data
     };
-
-    const db = getDatabase(env);
-    await db.putIndexOperation(operationId, operation);
+    
+    const operationKey = OPERATION_KEY_PREFIX + operationId;
+    await db.put(operationKey, JSON.stringify(operation));
 
     return operationId;
 }
@@ -828,29 +790,59 @@ async function recordOperation(context, type, data) {
  */
 async function getAllPendingOperations(context, lastOperationId = null) {
     const { env } = context;
+    const db = getDatabase(env);
 
     const operations = [];
-    let cursor = null;
-    
-    try {
-        const db = getDatabase(env);
-        const allOperations = await db.listIndexOperations({
-            processed: false,
-            limit: 10000 // 获取所有未处理的操作
-        });
 
-        // 如果指定了lastOperationId，过滤已处理的操作
-        for (const operation of allOperations) {
-            if (lastOperationId && operation.id <= lastOperationId) {
-                continue;
+    let cursor = null;
+    const MAX_OPERATION_COUNT = 30; // 单次获取的最大操作数量
+    let isALL = true; // 是否获取了所有操作
+    let operationCount = 0;
+
+    try {
+        while (true) {
+            const response = await db.list({
+                prefix: OPERATION_KEY_PREFIX,
+                limit: KV_LIST_LIMIT,
+                cursor: cursor
+            });
+            
+            for (const item of response.keys) {
+                // 如果指定了lastOperationId，跳过已处理的操作
+                if (lastOperationId && item.name <= OPERATION_KEY_PREFIX + lastOperationId) {
+                    continue;
+                }
+                
+                if (operationCount >= MAX_OPERATION_COUNT) {
+                    isALL = false; // 达到最大操作数量，停止获取
+                    break;
+                }
+
+                try {
+                    const operationData = await db.get(item.name);
+                    if (operationData) {
+                        const operation = JSON.parse(operationData);
+                        operation.id = item.name.substring(OPERATION_KEY_PREFIX.length);
+                        operations.push(operation);
+                        operationCount++;
+                    }
+                } catch (error) {
+                    isALL = false;
+                    console.warn(`Failed to parse operation ${item.name}:`, error);
+                }
             }
-            operations.push(operation);
+            
+            cursor = response.cursor;
+            if (!cursor || operationCount >= MAX_OPERATION_COUNT) break;
         }
     } catch (error) {
         console.error('Error getting pending operations:', error);
     }
     
-    return operations;
+    return {
+        operations,
+        isAll: isALL,
+    }
 }
 
 /**
@@ -1015,32 +1007,45 @@ function applyBatchMoveOperation(index, data) {
 }
 
 /**
- * 清理已处理的操作记录
+ * 并发清理指定的原子操作记录
  * @param {Object} context - 上下文对象
  * @param {Array} operationIds - 要清理的操作ID数组
  * @param {number} concurrency - 并发数量，默认为10
  */
 async function cleanupOperations(context, operationIds, concurrency = 10) {
     const { env } = context;
+    const db = getDatabase(env);
 
     try {
         console.log(`Cleaning up ${operationIds.length} processed operations with concurrency ${concurrency}...`);
+        
+        let deletedCount = 0;
+        let errorCount = 0;
         
         // 创建删除任务数组
         const deleteTasks = operationIds.map(operationId => {
             const operationKey = OPERATION_KEY_PREFIX + operationId;
             return async () => {
                 try {
-                    await getDatabase(env).delete(operationKey);
+                    await db.delete(operationKey);
+                    deletedCount++;
                 } catch (error) {
                     console.error(`Error deleting operation ${operationId}:`, error);
+                    errorCount++;
                 }
             };
         });
         
         // 使用并发控制执行删除操作
         await promiseLimit(deleteTasks, concurrency);
-        console.log(`Successfully cleaned up ${operationIds.length} operations`);
+
+        console.log(`Successfully cleaned up ${deletedCount} operations, ${errorCount} operations failed.`);
+        return {
+            success: true,
+            deletedCount: deletedCount,
+            errorCount: errorCount,
+        };
+
     } catch (error) {
         console.error('Error cleaning up operations:', error);
     }
@@ -1052,7 +1057,8 @@ async function cleanupOperations(context, operationIds, concurrency = 10) {
  * @returns {Object} 删除结果 { success, deletedCount, errors?, totalFound? }
  */
 export async function deleteAllOperations(context) {
-    const { env } = context;
+    const { request, env } = context;
+    const db = getDatabase(env);
     
     try {
         console.log('Starting to delete all atomic operations...');
@@ -1064,18 +1070,12 @@ export async function deleteAllOperations(context) {
         
         // 首先收集所有操作键
         while (true) {
-            const response = await getDatabase(env).list({
+            const response = await db.list({
                 prefix: OPERATION_KEY_PREFIX,
                 limit: KV_LIST_LIMIT,
                 cursor: cursor
             });
-
-            // 检查响应格式
-            if (!response || !response.keys || !Array.isArray(response.keys)) {
-                console.error('Invalid response from database list in cleanupProcessedOperations:', response);
-                break;
-            }
-
+            
             for (const item of response.keys) {
                 allOperationIds.push(item.name.substring(OPERATION_KEY_PREFIX.length));
                 totalFound++;
@@ -1096,11 +1096,31 @@ export async function deleteAllOperations(context) {
         }
         
         console.log(`Found ${totalFound} atomic operations to delete`);
-        
-        // 批量删除原子操作
-        await cleanupOperations(context, allOperationIds);
 
-        console.log(`Delete all operations completed`);
+        // 限制单次删除的数量
+        const MAX_DELETE_BATCH = 40;
+        const toDeleteOperationIds = allOperationIds.slice(0, MAX_DELETE_BATCH);
+   
+        // 批量删除原子操作
+        const cleanupResult = await cleanupOperations(context, toDeleteOperationIds);
+
+        // 剩余未删除的操作，调用 delete-operations API 进行递归删除
+        if (allOperationIds.length > MAX_DELETE_BATCH || cleanupResult.errorCount > 0) {
+            console.warn(`Too many operations (${allOperationIds.length}), only deleting first ${cleanupResult.deletedCount}. The remaining operations will be deleted in subsequent calls.`);
+            // 复制请求头，用于鉴权
+            const headers = new Headers(request.headers);
+
+            const originUrl = new URL(request.url);
+            const deleteUrl = `${originUrl.protocol}//${originUrl.host}/api/manage/list?action=delete-operations`
+            
+            await fetch(deleteUrl, {
+                method: 'GET',
+                headers: headers
+            });
+
+        } else {
+            console.log(`Delete all operations completed`);
+        }
 
     } catch (error) {
         console.error('Error deleting all operations:', error);
@@ -1116,8 +1136,8 @@ export async function deleteAllOperations(context) {
 async function getIndex(context) {
     const { waitUntil } = context;
     try {
-        // 首先尝试加载索引
-        const index = await loadIndexFromDatabase(context);
+        // 首先尝试加载分块索引
+        const index = await loadChunkedIndex(context);
         if (index.success) {
             return index;
         } else {
@@ -1225,71 +1245,100 @@ async function promiseLimit(tasks, concurrency = BATCH_SIZE) {
 }
 
 /**
- * 保存分块索引到KV存储
+ * 保存分块索引到数据库
  * @param {Object} context - 上下文对象，包含 env
  * @param {Object} index - 完整的索引对象
  * @returns {Promise<boolean>} 是否保存成功
  */
-async function saveIndexMetadata(context, index) {
+async function saveChunkedIndex(context, index) {
     const { env } = context;
-
+    const db = getDatabase(env);
+    
     try {
-        const db = getDatabase(env);
-
-        // 保存索引元数据到index_metadata表
-        const stmt = db.db.prepare(`
-            INSERT OR REPLACE INTO index_metadata (key, last_updated, total_count, last_operation_id)
-            VALUES (?, ?, ?, ?)
-        `);
-
-        await stmt.bind(
-            'main_index',
-            index.lastUpdated,
-            index.totalCount,
-            index.lastOperationId
-        ).run();
-
-        console.log(`Saved index metadata: ${index.totalCount} total files, last updated: ${index.lastUpdated}`);
+        const files = index.files || [];
+        const chunks = [];
+        
+        // 将文件数组分块
+        for (let i = 0; i < files.length; i += INDEX_CHUNK_SIZE) {
+            const chunk = files.slice(i, i + INDEX_CHUNK_SIZE);
+            chunks.push(chunk);
+        }
+        
+        // 保存索引元数据
+        const metadata = {
+            lastUpdated: index.lastUpdated,
+            totalCount: index.totalCount,
+            lastOperationId: index.lastOperationId,
+            chunkCount: chunks.length,
+            chunkSize: INDEX_CHUNK_SIZE
+        };
+        
+        await db.put(INDEX_META_KEY, JSON.stringify(metadata));
+        
+        // 保存各个分块
+        const savePromises = chunks.map((chunk, chunkId) => {
+            const chunkKey = `${INDEX_KEY}_${chunkId}`;
+            return db.put(chunkKey, JSON.stringify(chunk));
+        });
+        
+        await Promise.all(savePromises);
+        
+        console.log(`Saved chunked index: ${chunks.length} chunks, ${files.length} total files`);
         return true;
-
+        
     } catch (error) {
-        console.error('Error saving index metadata:', error);
+        console.error('Error saving chunked index:', error);
         return false;
     }
 }
 
 /**
- * 从D1数据库加载索引
+ * 从数据库加载分块索引
  * @param {Object} context - 上下文对象，包含 env
  * @returns {Promise<Object>} 完整的索引对象
  */
-async function loadIndexFromDatabase(context) {
+async function loadChunkedIndex(context) {
     const { env } = context;
+    const db = getDatabase(env);
 
     try {
-        const db = getDatabase(env);
-
         // 首先获取元数据
-        const metadataStmt = db.db.prepare('SELECT * FROM index_metadata WHERE key = ?');
-        const metadata = await metadataStmt.bind('main_index').first();
-
-        if (!metadata) {
+        const metadataStr = await db.get(INDEX_META_KEY);
+        if (!metadataStr) {
             throw new Error('Index metadata not found');
         }
-        // 从files表直接查询所有文件
-        const filesStmt = db.db.prepare('SELECT id, metadata FROM files ORDER BY timestamp DESC');
-        const fileResults = await filesStmt.all();
-
-        const files = fileResults.map(row => ({
-            id: row.id,
-            metadata: JSON.parse(row.metadata || '{}')
-        }));
-
+        
+        const metadata = JSON.parse(metadataStr);
+        const files = [];
+        
+        // 并行加载所有分块
+        const loadPromises = [];
+        for (let chunkId = 0; chunkId < metadata.chunkCount; chunkId++) {
+            const chunkKey = `${INDEX_KEY}_${chunkId}`;
+            loadPromises.push(
+                db.get(chunkKey).then(chunkStr => {
+                    if (chunkStr) {
+                        return JSON.parse(chunkStr);
+                    }
+                    return [];
+                })
+            );
+        }
+        
+        const chunks = await Promise.all(loadPromises);
+        
+        // 合并所有分块
+        chunks.forEach(chunk => {
+            if (Array.isArray(chunk)) {
+                files.push(...chunk);
+            }
+        });
+        
         const index = {
             files,
-            lastUpdated: metadata.last_updated,
-            totalCount: metadata.total_count,
-            lastOperationId: metadata.last_operation_id,
+            lastUpdated: metadata.lastUpdated,
+            totalCount: metadata.totalCount,
+            lastOperationId: metadata.lastOperationId,
             success: true
         };
         
@@ -1317,12 +1366,13 @@ async function loadIndexFromDatabase(context) {
  */
 export async function clearChunkedIndex(context, onlyNonUsed = false) {
     const { env } = context;
+    const db = getDatabase(env);
     
     try {
         console.log('Starting chunked index cleanup...');
         
         // 获取元数据
-        const metadataStr = await getDatabase(env).get(INDEX_META_KEY);
+        const metadataStr = await db.get(INDEX_META_KEY);
         let chunkCount = 0;
         
         if (metadataStr) {
@@ -1331,7 +1381,7 @@ export async function clearChunkedIndex(context, onlyNonUsed = false) {
 
             if (!onlyNonUsed) {
                 // 删除元数据
-                await getDatabase(env).delete(INDEX_META_KEY).catch(() => {});
+                await db.delete(INDEX_META_KEY).catch(() => {});
             }
         }
 
@@ -1339,18 +1389,12 @@ export async function clearChunkedIndex(context, onlyNonUsed = false) {
         const recordedChunks = []; // 现有的索引分块键
         let cursor = null;
         while (true) {
-            const response = await getDatabase(env).list({
+            const response = await db.list({
                 prefix: INDEX_KEY,
                 limit: KV_LIST_LIMIT,
                 cursor: cursor
             });
-
-            // 检查响应格式
-            if (!response || !response.keys || !Array.isArray(response.keys)) {
-                console.error('Invalid response from database list in getIndexStorageStats:', response);
-                break;
-            }
-
+            
             for (const item of response.keys) {
                 recordedChunks.push(item.name);
             }
@@ -1375,13 +1419,13 @@ export async function clearChunkedIndex(context, onlyNonUsed = false) {
             }
 
             deletePromises.push(
-                getDatabase(env).delete(chunkKey).catch(() => {})
+                db.delete(chunkKey).catch(() => {})
             );
         }
 
         if (recordedChunks.includes(INDEX_KEY)) {
             deletePromises.push(
-                getDatabase(env).delete(INDEX_KEY).catch(() => {})
+                db.delete(INDEX_KEY).catch(() => {})
             );
         }
 
@@ -1403,10 +1447,11 @@ export async function clearChunkedIndex(context, onlyNonUsed = false) {
  */
 export async function getIndexStorageStats(context) {
     const { env } = context;
-    
+    const db = getDatabase(env);
+
     try {
         // 获取元数据
-        const metadataStr = await getDatabase(env).get(INDEX_META_KEY);
+        const metadataStr = await db.get(INDEX_META_KEY);
         if (!metadataStr) {
             return {
                 success: false,
@@ -1422,7 +1467,7 @@ export async function getIndexStorageStats(context) {
         for (let chunkId = 0; chunkId < metadata.chunkCount; chunkId++) {
             const chunkKey = `${INDEX_KEY}_${chunkId}`;
             chunkChecks.push(
-                getDatabase(env).get(chunkKey).then(data => ({
+                db.get(chunkKey).then(data => ({
                     chunkId,
                     exists: !!data,
                     size: data ? data.length : 0

@@ -2,6 +2,7 @@ import { S3Client, CopyObjectCommand, DeleteObjectCommand } from "@aws-sdk/clien
 import { purgeCFCache } from "../../../utils/purgeCache";
 import { moveFileInIndex, batchMoveFilesInIndex } from "../../../utils/indexManager.js";
 import { getDatabase } from '../../../utils/databaseAdapter.js';
+
 export async function onRequest(context) {
     const { request, env, params, waitUntil } = context;
 
@@ -124,8 +125,10 @@ export async function onRequest(context) {
 // 移动单个文件的核心函数
 async function moveFile(env, fileId, newFileId, cdnUrl, url) {
     try {
+        const db = getDatabase(env);
+
         // 读取图片信息
-        const img = await getDatabase(env).getWithMetadata(fileId);
+        const img = await db.getWithMetadata(fileId);
 
         // 如果是R2渠道的图片，需要移动R2中对应的图片
         if (img.metadata?.Channel === 'CloudflareR2') {
@@ -168,8 +171,8 @@ async function moveFile(env, fileId, newFileId, cdnUrl, url) {
         img.metadata.Folder = folderPath;
         
         // 更新KV存储
-        await getDatabase(env).put(newFileId, img.value, { metadata: img.metadata });
-        await getDatabase(env).delete(fileId);
+        await db.put(newFileId, img.value, { metadata: img.metadata });
+        await db.delete(fileId);
 
         // 清除CDN缓存
         await purgeCFCache(env, cdnUrl);

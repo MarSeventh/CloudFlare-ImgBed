@@ -3,8 +3,10 @@
  * 用于替代原有的KV存储操作
  */
 
-function D1Database(db) {
-    this.db = db;
+class D1Database {
+    constructor(db) {
+        this.db = db;
+    }
 }
 
 // ==================== 文件操作 ====================

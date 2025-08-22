@@ -214,6 +214,7 @@ async function processFileUpload(context, formdata = null) {
 // 上传到Cloudflare R2
 async function uploadFileToCloudflareR2(context, fullId, metadata, returnLink) {
     const { env, waitUntil, uploadConfig, formdata } = context;
+    const db = getDatabase(env);
 
     // 检查R2数据库是否配置
     if (typeof env.img_r2 == "undefined" || env.img_r2 == null || env.img_r2 == "") {
@@ -244,7 +245,6 @@ async function uploadFileToCloudflareR2(context, fullId, metadata, returnLink) {
 
     // 写入数据库
     try {
-        const db = getDatabase(env);
         await db.put(fullId, "", {
             metadata: metadata,
         });
@@ -271,6 +271,8 @@ async function uploadFileToCloudflareR2(context, fullId, metadata, returnLink) {
 // 上传到 S3（支持自定义端点）
 async function uploadFileToS3(context, fullId, metadata, returnLink) {
     const { env, waitUntil, uploadConfig, securityConfig, url, formdata } = context;
+    const db = getDatabase(env);
+
     const uploadModerate = securityConfig.upload.moderate;
 
     const s3Settings = uploadConfig.s3;
@@ -339,7 +341,6 @@ async function uploadFileToS3(context, fullId, metadata, returnLink) {
         // 图像审查
         if (uploadModerate && uploadModerate.enabled) {
             try {
-                const db = getDatabase(env);
                 await db.put(fullId, "", { metadata });
             } catch {
                 return createResponse("Error: Failed to write to KV database", { status: 500 });
@@ -352,7 +353,6 @@ async function uploadFileToS3(context, fullId, metadata, returnLink) {
 
         // 写入数据库
         try {
-            const db = getDatabase(env);
             await db.put(fullId, "", { metadata });
         } catch {
             return createResponse("Error: Failed to write to database", { status: 500 });
@@ -376,6 +376,7 @@ async function uploadFileToS3(context, fullId, metadata, returnLink) {
 // 上传到Telegram
 async function uploadFileToTelegram(context, fullId, metadata, fileExt, fileName, fileType, returnLink) {
     const { env, waitUntil, uploadConfig, url, formdata } = context;
+    const db = getDatabase(env);
 
     // 选择一个 Telegram 渠道上传，若负载均衡开启，则随机选择一个；否则选择第一个
     const tgSettings = uploadConfig.telegram;
@@ -469,7 +470,6 @@ async function uploadFileToTelegram(context, fullId, metadata, fileExt, fileName
             metadata.TgFileId = id;
             metadata.TgChatId = tgChatId;
             metadata.TgBotToken = tgBotToken;
-            const db = getDatabase(env);
             await db.put(fullId, "", {
                 metadata: metadata,
             });
@@ -491,6 +491,7 @@ async function uploadFileToTelegram(context, fullId, metadata, fileExt, fileName
 // 外链渠道
 async function uploadFileToExternal(context, fullId, metadata, returnLink) {
     const { env, waitUntil, formdata } = context;
+    const db = getDatabase(env);
 
     // 直接将外链写入metadata
     metadata.Channel = "External";
@@ -503,7 +504,6 @@ async function uploadFileToExternal(context, fullId, metadata, returnLink) {
     metadata.ExternalLink = extUrl;
     // 写入KV数据库
     try {
-        const db = getDatabase(env);
         await db.put(fullId, "", {
             metadata: metadata,
         });
