@@ -448,6 +448,7 @@ async function uploadFileToTelegram(context, fullId, metadata, fileExt, fileName
                 status: 200,
                 headers: { 
                     'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
                 }
             }
         );
