@@ -12,14 +12,14 @@ import { D1Database } from './d1Database.js';
  */
 export function createDatabaseAdapter(env) {
     // 检查是否配置了D1数据库
-    if (env.DB && typeof env.DB.prepare === 'function') {
+    if (env.img_d1 && typeof env.img_d1.prepare === 'function') {
         // 使用D1数据库
-        return new D1Database(env.DB);
+        return new D1Database(env.img_d1);
     } else if (env.img_url && typeof env.img_url.get === 'function') {
         // 回退到KV存储
         return new KVAdapter(env.img_url);
     } else {
-        console.error('No database configured. Please configure either D1 (env.DB) or KV (env.img_url)');
+        console.error('No database configured. Please configure either D1 (env.img_d1) or KV (env.img_url)');
         return null;
     }
 }
@@ -145,7 +145,7 @@ class KVAdapter {
 export function getDatabase(env) {
     var adapter = createDatabaseAdapter(env);
     if (!adapter) {
-        throw new Error('Database not configured. Please configure D1 database (env.DB) or KV storage (env.img_url).');
+        throw new Error('Database not configured. Please configure D1 database (env.img_d1) or KV storage (env.img_url).');
     }
     return adapter;
 }
@@ -156,7 +156,7 @@ export function getDatabase(env) {
  * @returns {Object} 配置信息
  */
 export function checkDatabaseConfig(env) {
-    var hasD1 = env.DB && typeof env.DB.prepare === 'function';
+    var hasD1 = env.img_d1 && typeof env.img_d1.prepare === 'function';
     var hasKV = env.img_url && typeof env.img_url.get === 'function';
 
     return {
