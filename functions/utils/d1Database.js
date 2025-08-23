@@ -1,6 +1,5 @@
 /**
  * D1 数据库操作工具类
- * 用于替代原有的KV存储操作
  */
 
 class D1Database {
@@ -319,7 +318,7 @@ D1Database.prototype.extractMetadataFields = function(metadata) {
 D1Database.prototype.put = function(key, value, options) {
     options = options || {};
 
-    if (key.startsWith('manage@sysConfig@') || key.startsWith('manage@')) {
+    if (key.startsWith('manage@sysConfig@')) {
         return this.putSetting(key, value);
     } else if (key.startsWith('manage@index@operation_')) {
         var operationId = key.replace('manage@index@operation_', '');
@@ -336,7 +335,7 @@ D1Database.prototype.put = function(key, value, options) {
 D1Database.prototype.get = function(key) {
     var self = this;
 
-    if (key.startsWith('manage@sysConfig@') || key.startsWith('manage@')) {
+    if (key.startsWith('manage@sysConfig@')) {
         return this.getSetting(key);
     } else if (key.startsWith('manage@index@operation_')) {
         var operationId = key.replace('manage@index@operation_', '');
@@ -356,7 +355,7 @@ D1Database.prototype.get = function(key) {
 D1Database.prototype.getWithMetadata = function(key) {
     var self = this;
 
-    if (key.startsWith('manage@sysConfig@') || key.startsWith('manage@')) {
+    if (key.startsWith('manage@sysConfig@')) {
         return this.getSetting(key).then(function(value) {
             return value ? { value: value, metadata: {} } : null;
         });
@@ -369,7 +368,7 @@ D1Database.prototype.getWithMetadata = function(key) {
  * 通用的delete方法
  */
 D1Database.prototype.delete = function(key) {
-    if (key.startsWith('manage@sysConfig@') || key.startsWith('manage@')) {
+    if (key.startsWith('manage@sysConfig@')) {
         return this.deleteSetting(key);
     } else if (key.startsWith('manage@index@operation_')) {
         var operationId = key.replace('manage@index@operation_', '');
@@ -387,7 +386,7 @@ D1Database.prototype.list = function(options) {
     var prefix = options.prefix || '';
     var self = this;
 
-    if (prefix.startsWith('manage@sysConfig@') || prefix.startsWith('manage@')) {
+    if (prefix.startsWith('manage@sysConfig@')) {
         return this.listSettings(options);
     } else if (prefix.startsWith('manage@index@operation_')) {
         return this.listIndexOperations(options).then(function(operations) {
