@@ -124,4 +124,3 @@ INSERT OR REPLACE INTO index_metadata (key, last_updated, total_count, last_oper
 VALUES ('main_index', 0, 0, NULL);
 
 -- 初始化完成
--- 数据库已准备就绪，可以开始迁移数据
