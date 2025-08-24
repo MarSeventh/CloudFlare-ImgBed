@@ -7,6 +7,7 @@ import { getDatabase } from '../utils/databaseAdapter.js';
 // 初始化分块上传
 export async function initializeChunkedUpload(context) {
     const { request, env, url } = context;
+    const db = getDatabase(env);
     
     try {
         // 解析表单数据
@@ -47,7 +48,6 @@ export async function initializeChunkedUpload(context) {
         };
         
         // 保存会话信息
-        const db = getDatabase(env);
         const sessionKey = `upload_session_${uploadId}`;
         await db.put(sessionKey, JSON.stringify(sessionInfo), {
             expirationTtl: 3600 // 1小时过期
@@ -76,6 +76,7 @@ export async function initializeChunkedUpload(context) {
 // 处理客户端分块上传
 export async function handleChunkUpload(context) {
     const { env, request, url, waitUntil } = context;
+    const db = getDatabase(env);
 
     // 解析表单数据
     const formdata = await request.formData();
@@ -93,7 +94,6 @@ export async function handleChunkUpload(context) {
             return createResponse('Error: Missing chunk upload parameters', { status: 400 });
         }
 
-        const db = getDatabase(env);
         // 验证上传会话
         const sessionKey = `upload_session_${uploadId}`;
         const sessionData = await db.get(sessionKey);
