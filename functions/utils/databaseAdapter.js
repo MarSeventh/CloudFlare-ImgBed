@@ -39,16 +39,19 @@ class KVAdapter {
         return await this.kv.put(key, value, options);
     }
 
-    async get(key) {
-        return await this.kv.get(key);
+    async get(key, options) {
+        options = options || {};
+        return await this.kv.get(key, options);
     }
 
-    async getWithMetadata(key) {
-        return await this.kv.getWithMetadata(key);
+    async getWithMetadata(key, options) {
+        options = options || {};
+        return await this.kv.getWithMetadata(key, options);
     }
 
-    async delete(key) {
-        return await this.kv.delete(key);
+    async delete(key, options) {
+        options = options || {};
+        return await this.kv.delete(key, options);
     }
 
     async list(options) {
@@ -61,53 +64,53 @@ class KVAdapter {
         return await this.put(fileId, value, options);
     }
 
-    async getFile(fileId) {
-        const result = await this.getWithMetadata(fileId);
+    async getFile(fileId, options) {
+        const result = await this.getWithMetadata(fileId, options);
         return result;
     }
 
-    async getFileWithMetadata(fileId) {
-        return await this.getWithMetadata(fileId);
+    async getFileWithMetadata(fileId, options) {
+        return await this.getWithMetadata(fileId, options);
     }
 
-    async deleteFile(fileId) {
-        return await this.delete(fileId);
+    async deleteFile(fileId, options) {
+        return await this.delete(fileId, options);
     }
 
     async listFiles(options) {
         return await this.list(options);
     }
 
-    async putSetting(key, value) {
-        return await this.put(key, value);
+    async putSetting(key, value, options) {
+        return await this.put(key, value, options);
     }
 
-    async getSetting(key) {
-        return await this.get(key);
+    async getSetting(key, options) {
+        return await this.get(key, options);
     }
 
-    async deleteSetting(key) {
-        return await this.delete(key);
+    async deleteSetting(key, options) {
+        return await this.delete(key, options);
     }
 
     async listSettings(options) {
         return await this.list(options);
     }
 
-    async putIndexOperation(operationId, operation) {
+    async putIndexOperation(operationId, operation, options) {
         const key = 'manage@index@operation_' + operationId;
-        return await this.put(key, JSON.stringify(operation));
+        return await this.put(key, JSON.stringify(operation), options);
     }
 
-    async getIndexOperation(operationId) {
+    async getIndexOperation(operationId, options) {
         const key = 'manage@index@operation_' + operationId;
-        const result = await this.get(key);
+        const result = await this.get(key, options);
         return result ? JSON.parse(result) : null;
     }
 
-    async deleteIndexOperation(operationId) {
+    async deleteIndexOperation(operationId, options) {
         const key = 'manage@index@operation_' + operationId;
-        return await this.delete(key);
+        return await this.delete(key, options);
     }
 
     async listIndexOperations(options) {
