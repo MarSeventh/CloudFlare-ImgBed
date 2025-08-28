@@ -71,6 +71,15 @@ export async function getOthersConfig(db, env) {
         fixed: false,
     }
 
+    // WebDAV
+    const kvWebDAV = settingsKV.webDAV || {}
+    settings.webDAV = {
+        enabled: kvWebDAV.enabled ?? false,
+        username: kvWebDAV.username || '',
+        password: kvWebDAV.password || '',
+        fixed: false,
+    }
+
 
     return settings;
 }
