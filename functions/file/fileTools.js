@@ -35,6 +35,8 @@ export function setCommonHeaders(headers, encodedFileName, fileType, Referer, ur
     headers.set('Content-Disposition', `inline; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
     headers.set('Access-Control-Allow-Origin', '*');
     headers.set('Accept-Ranges', 'bytes');
+
+    headers.append('Vary', 'Range');
     
     if (fileType) {
         headers.set('Content-Type', fileType);
@@ -77,19 +79,46 @@ export function handleHeadRequest(headers, etag = null) {
     });
 }
 
-export async function getFileContent(request, targetUrl, max_retries = 2) {
+export async function getFileContent(request: Request, targetUrl: string, max_retries = 2) {
     let retries = 0;
     while (retries <= max_retries) {
         try {
-            const response = await fetch(targetUrl, {
-                method: request.method,
-                headers: request.headers,
-                body: request.body,
+            // 复制请求头，确保 Range / If-None-Match 等关键头透传
+            const fwdHeaders = new Headers(request.headers);
+
+            // Range 兜底：有些运行时需要手动 set 一下
+            const range = request.headers.get("Range");
+            if (range) fwdHeaders.set("Range", range);
+
+            const upstreamReq = new Request(targetUrl, {
+                method: request.method === "HEAD" ? "HEAD" : "GET", // 只允许 GET/HEAD
+                headers: fwdHeaders,
+                redirect: "follow",
             });
+
+            const response = await fetch(upstreamReq);
+
             if (response.ok || response.status === 304) {
-                return response;
+                // 加关键头，避免缓存 200 全文件覆盖 Range
+                const headers = new Headers(response.headers);
+                headers.set("Vary", "Range");
+
+                // 如果是 Range 请求但上游返回 200，这里可以兜底转 206
+                if (range && response.status === 200) {
+                    headers.set("Accept-Ranges", "bytes");
+                    return new Response(response.body, {
+                        status: 206,
+                        headers,
+                    });
+                }
+
+                return new Response(response.body, {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers,
+                });
             } else if (response.status === 404) {
-                return new Response('Error: Image Not Found', { status: 404 });
+                return new Response("Error: Image Not Found", { status: 404 });
             } else {
                 retries++;
             }
@@ -99,6 +128,7 @@ export async function getFileContent(request, targetUrl, max_retries = 2) {
     }
     return null;
 }
+
 
 export function isTgChannel(imgRecord) {
     return imgRecord.metadata?.Channel === 'Telegram' || imgRecord.metadata?.Channel === 'TelegramNew';
