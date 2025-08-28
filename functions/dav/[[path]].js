@@ -207,30 +207,27 @@ async function handlePropfind(request, env) {
 async function fetchDirectoryContents(dir, env, request) {
     let allFiles = [];
     let allDirectories = [];
-    let start = 0;
-    const count = 100;
+    const count = -1; // Fetch all items
 
-    while (true) {
-        const listUrl = new URL(`/api/manage/list`, request.url);
-        listUrl.searchParams.set('dir', dir);
-        listUrl.searchParams.set('start', start);
-        listUrl.searchParams.set('count', count);
+    const listUrl = new URL(`/api/manage/list`, request.url);
+    listUrl.searchParams.set('dir', dir);
+    listUrl.searchParams.set('count', count);
 
-        const response = await fetch(listUrl.toString(), { headers: await getApiHeaders(env) });
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`API fetch error: Status ${response.status} - ${errorText}`);
-        }
-        const result = await response.json();
-        if (result.error) {
-            throw new Error(`API error: ${result.error} - ${result.message}`);
-        }
-
-        if (result.files && result.files.length > 0) allFiles = allFiles.concat(result.files);
-        if (result.directories && result.directories.length > 0) allDirectories = allDirectories.concat(result.directories);
-        if (!result.files || result.files.length < count) break;
-        start += count;
+    const response = await fetch(listUrl.toString(), { headers: await getApiHeaders(env) });
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API fetch error: Status ${response.status} - ${errorText}`);
     }
+    
+    const result = await response.json();
+    if (result.error) {
+        throw new Error(`API error: ${result.error} - ${result.message}`);
+    }
+
+    if (result.files && result.files.length > 0) allFiles = allFiles.concat(result.files);
+    if (result.directories && result.directories.length > 0) allDirectories = allDirectories.concat(result.directories);
+
+
     return { files: allFiles, directories: [...new Set(allDirectories)] };
 }
 
