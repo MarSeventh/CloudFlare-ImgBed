@@ -1,6 +1,6 @@
 <div align="center">
     <a href="https://github.com/MarSeventh/CloudFlare-ImgBed"><img width="80%" alt="logo" src="static/readme/banner.png"/></a>
-    <p><em>🗂️Open-source file hosting solution, supporting Docker and serverless deployment, supporting multiple storage channels such as Telegram Bot, Cloudflare R2, S3, etc.</em></p>
+    <p><em>🗂️Open-source file hosting solution, supporting Docker and serverless deployment, supporting multiple storage channels such as Telegram Bot, Cloudflare R2, S3, etc., supporting WebDAV protocol and various RESTful APIs.</em></p>
     <p>
         <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README.md">简体中文</a> | <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README_en.md">English</a> | <a
         href="https://cfbed.sanyue.de/en">Official Website</a>
@@ -102,110 +102,7 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 
 </details>
 
-# 4. WebDAV Bridge Service
-
-This project provides a powerful **WebDAV Bridge Cloudflare Worker** that allows you to access and manage hosted files through the standard WebDAV protocol.
-
-## 4.1 Features
-
-- 🔒 **Authentication**: Supports Basic Auth authentication with username/password
-- 📁 **Directory Browsing**: Complete directory structure display, supports both HTML pages and WebDAV clients
-- 📤 **File Upload**: Upload files to specified directories using PUT method
-- 🗑️ **File Deletion**: Support for deleting individual files or entire folders
-- 📥 **File Download**: Direct file downloads with automatic proxy to upstream storage
-- 🌐 **CORS Support**: Built-in CORS support ensuring proper web client access
-
-## 4.2 Supported WebDAV Methods
-
-| Method | Function | Description |
-|--------|----------|-------------|
-| `PROPFIND` | List directory contents | Get file and folder lists, supports WebDAV clients |
-| `GET` | Download file/browse directory | File downloads or HTML directory browsing pages |
-| `PUT` | Upload file | Upload files to specified paths and folders |
-| `DELETE` | Delete file/folder | Support for deleting individual files or entire directories |
-| `OPTIONS` | Protocol detection | Returns supported WebDAV methods and features |
-| `MKCOL` | Create directory | Create new folders (automatically supported) |
-
-## 4.3 Deployment Configuration
-
-### 4.3.1 Environment Variables
-
-Set the following environment variables in your Cloudflare Worker:
-
-```bash
-# WebDAV authentication credentials
-AUTH_USER=your_username          # WebDAV login username
-AUTH_PASS=your_password          # WebDAV login password
-
-# Upstream API configuration
-UPSTREAM_HOST=your-imgbed.domain.com  # Your image bed domain
-API_TOKEN=your_api_token         # API access token
-```
-
-### 4.3.2 Custom Domain Binding (Recommended)
-
-For a better user experience, it's highly recommended to bind a custom domain to your WebDAV Worker:
-
-1. **Prepare Domain**: Ensure you have an available domain that is hosted on Cloudflare
-2. **Add Custom Route**:
-   - Go to Cloudflare Workers console
-   - Select your WebDAV Worker
-   - Click the `Triggers` tab
-   - Click `Add Custom Domain`
-   - Enter your subdomain, e.g.: `webdav.yourdomain.com`
-   - Click `Add Domain`
-
-3. **SSL Certificate**: Cloudflare will automatically provide a free SSL certificate for your custom domain
-
-**Advantages of Using Custom Domain**:
-- 🌟 **Better Compatibility**: Avoid limitations some WebDAV clients have with `.workers.dev` domains
-- 🔒 **Enhanced Security**: Custom domains are generally more trusted by clients
-- 📱 **Mobile Friendly**: iOS/Android devices have better support for custom domains
-- 🎯 **Brand Consistency**: Use a unified domain system with your image hosting service
-
-## 4.4 Usage
-
-### Browser Access
-Access the Worker address directly in your browser and enter authentication credentials to browse file directories:
-```
-# Using custom domain (recommended)
-https://webdav.yourdomain.com/
-
-# Or using default Worker domain
-https://your-webdav-worker.your-subdomain.workers.dev/
-```
-
-### WebDAV Clients
-You can use any WebDAV-compatible client to connect:
-
-**Windows File Explorer**:
-1. Open "This PC"
-2. Right-click and select "Add a network location"
-3. Enter the WebDAV Worker address
-4. Enter username and password
-
-**macOS Finder**:
-1. Press `Cmd+K` in Finder
-2. Enter WebDAV address (custom domain recommended):
-   - `https://webdav.yourdomain.com` or
-   - `https://your-webdav-worker.your-subdomain.workers.dev`
-3. Enter authentication credentials
-
-**Third-party Clients**:
-- File managers like Cyberduck, WinSCP, FileZilla Pro
-- Mobile: FE File Explorer, Documents by Readdle, etc.
-
-## 4.5 Key Features
-
-- **Smart Path Handling**: Automatic path processing with support for Chinese characters and special characters
-- **Paginated Loading**: Large directories are automatically paginated for improved performance
-- **Error Handling**: Comprehensive error handling with user-friendly error messages
-- **Cache Optimization**: Proper browser caching utilization for improved access speed
-- **Secure & Reliable**: Based on Cloudflare Worker edge computing with global acceleration
-
-Through WebDAV Bridge, you can manage hosted files just like using a local folder, achieving a true "cloud drive" experience!
-
-# 5. Tips
+# 4. Tips
 
 - Frontend is open source, see [MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub).
 

@@ -1,6 +1,6 @@
 <div align="center">
     <a href="https://github.com/MarSeventh/CloudFlare-ImgBed"><img width="80%" alt="logo" src="static/readme/banner.png"/></a>
-    <p><em>🗂️开源文件托管解决方案，支持 Docker 和无服务器部署，支持 Telegram Bot 、 Cloudflare R2 、S3 等多种存储渠道</em></p>
+    <p><em>🗂️开源文件托管解决方案，支持 Docker 和无服务器部署，支持 Telegram Bot 、 Cloudflare R2 、S3 等多种存储渠道，支持 WebDAV 协议和多种 RESTful API</em></p>
     <p>
         <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README.md">简体中文</a> | <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README_en.md">English</a> | <a href="https://cfbed.sanyue.de">官方网站</a>
     </p>
@@ -111,115 +111,9 @@
 
 ![image-20250313204325002](static/readme/202503132043265.png)
 
-
-
 </details>
 
-
-# 4. WebDAV Bridge 桥接服务
-
-本项目提供了一个强大的 **WebDAV Bridge Cloudflare Worker**，让您可以通过标准的 WebDAV 协议访问和管理托管的文件。
-
-## 4.1 功能特性
-
-- 🔒 **身份验证**：支持基于用户名密码的 Basic Auth 认证
-- 📁 **目录浏览**：完整的目录结构展示，支持 HTML 页面和 WebDAV 客户端
-- 📤 **文件上传**：通过 PUT 方法上传文件到指定目录
-- 🗑️ **文件删除**：支持删除单个文件或整个文件夹
-- 📥 **文件下载**：直接下载文件，自动代理到上游存储
-- 🌐 **跨域支持**：内置 CORS 支持，确保 Web 客户端正常访问
-
-## 4.2 支持的 WebDAV 方法
-
-| 方法 | 功能 | 说明 |
-|------|------|------|
-| `PROPFIND` | 列出目录内容 | 获取文件和文件夹列表，支持 WebDAV 客户端 |
-| `GET` | 下载文件/浏览目录 | 文件下载或 HTML 目录浏览页面 |
-| `PUT` | 上传文件 | 上传文件到指定路径和文件夹 |
-| `DELETE` | 删除文件/文件夹 | 支持删除单个文件或整个目录 |
-| `OPTIONS` | 协议探测 | 返回支持的 WebDAV 方法和功能 |
-| `MKCOL` | 创建目录 | 创建新的文件夹（自动支持） |
-
-## 4.3 部署配置
-
-### 4.3.1 环境变量设置
-
-需要在 Cloudflare Worker 中设置以下环境变量：
-
-```bash
-# WebDAV 认证凭据
-AUTH_USER=your_username          # WebDAV 登录用户名
-AUTH_PASS=your_password          # WebDAV 登录密码
-
-# 上游 API 配置
-UPSTREAM_HOST=your-imgbed.domain.com  # 您的图床域名
-API_TOKEN=your_api_token         # API 访问令牌
-```
-
-### 4.3.2 自定义域名绑定（推荐）
-
-为了获得更好的使用体验，强烈建议为 WebDAV Worker 绑定自定义域名：
-
-1. **准备域名**：确保您有一个可用的域名，并且该域名已托管在 Cloudflare
-2. **添加自定义路由**：
-   - 进入 Cloudflare Workers 控制台
-   - 选择您的 WebDAV Worker
-   - 点击 `触发器` (Triggers) 标签
-   - 点击 `添加自定义域名`
-   - 输入您的子域名，如：`webdav.yourdomain.com`
-   - 点击 `添加域名`
-
-3. **SSL 证书**：Cloudflare 会自动为您的自定义域名提供免费 SSL 证书
-
-**使用自定义域名的优势**：
-- 🌟 **更好的兼容性**：避免某些 WebDAV 客户端对 `.workers.dev` 域名的限制
-- 🔒 **更高的安全性**：自定义域名通常更受客户端信任
-- 📱 **移动端友好**：iOS/Android 设备对自定义域名支持更好
-- 🎯 **品牌一致性**：与您的图床服务使用统一的域名体系
-
-## 4.4 使用方式
-
-### 浏览器访问
-直接在浏览器中访问 Worker 地址，输入认证信息后可以浏览文件目录：
-```
-# 使用自定义域名（推荐）
-https://webdav.yourdomain.com/
-
-# 或使用默认 Worker 域名
-https://your-webdav-worker.your-subdomain.workers.dev/
-```
-
-### WebDAV 客户端
-可以使用任何支持 WebDAV 的客户端连接：
-
-**Windows 资源管理器**：
-1. 打开"此电脑"
-2. 右键选择"添加网络位置"
-3. 输入 WebDAV Worker 地址
-4. 输入用户名和密码
-
-**macOS Finder**：
-1. 在 Finder 中按 `Cmd+K`
-2. 输入 WebDAV 地址（推荐使用自定义域名）：
-   - `https://webdav.yourdomain.com` 或
-   - `https://your-webdav-worker.your-subdomain.workers.dev`
-3. 输入认证信息
-
-**第三方客户端**：
-- Cyberduck、WinSCP、FileZilla Pro 等文件管理器
-- Mobile 端：FE File Explorer、Documents by Readdle 等
-
-## 4.5 特色功能
-
-- **智能路径处理**：自动处理文件路径，支持中文和特殊字符
-- **分页加载**：大目录自动分页加载，提升性能
-- **错误处理**：完善的错误处理和用户友好的错误信息
-- **缓存优化**：合理利用浏览器缓存，提升访问速度
-- **安全可靠**：基于 Cloudflare Worker 的边缘计算，全球加速
-
-通过 WebDAV Bridge，您可以像使用本地文件夹一样管理托管的文件，实现了真正的"云端硬盘"体验！
-
-# 5. Tips
+# 4. Tips
 
 - **前端开源**：参见[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)项目。
 
