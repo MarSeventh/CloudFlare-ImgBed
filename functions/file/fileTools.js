@@ -79,50 +79,54 @@ export function handleHeadRequest(headers, etag = null) {
     });
 }
 
-export async function getFileContent(request: Request, targetUrl: string, max_retries = 2) {
+export async function getFileContent(request, targetUrl, max_retries = 2) {
     let retries = 0;
     while (retries <= max_retries) {
         try {
-            // 复制请求头，确保 Range / If-None-Match 等关键头透传
+            // 复制请求头，确保 Range / If-None-Match 等关键头被透传
             const fwdHeaders = new Headers(request.headers);
 
-            // Range 兜底：有些运行时需要手动 set 一下
+            // 显式兜底：有些运行时需要手动 set 一下
             const range = request.headers.get("Range");
             if (range) fwdHeaders.set("Range", range);
 
+            // 只允许 GET/HEAD 转发
+            const method = request.method === "HEAD" ? "HEAD" : "GET";
+
             const upstreamReq = new Request(targetUrl, {
-                method: request.method === "HEAD" ? "HEAD" : "GET", // 只允许 GET/HEAD
+                method,
                 headers: fwdHeaders,
                 redirect: "follow",
             });
 
-            const response = await fetch(upstreamReq);
+            const upstreamRes = await fetch(upstreamReq);
 
-            if (response.ok || response.status === 304) {
-                // 加关键头，避免缓存 200 全文件覆盖 Range
-                const headers = new Headers(response.headers);
-                headers.set("Vary", "Range");
+            if (upstreamRes.ok || upstreamRes.status === 304) {
+                const headers = new Headers(upstreamRes.headers);
 
-                // 如果是 Range 请求但上游返回 200，这里可以兜底转 206
-                if (range && response.status === 200) {
+                // 关键：让缓存区分是否带 Range
+                headers.append("Vary", "Range");
+
+                // 如果是 Range 请求但上游仍返回 200，这里兜底改成 206
+                if (range && upstreamRes.status === 200) {
                     headers.set("Accept-Ranges", "bytes");
-                    return new Response(response.body, {
+                    return new Response(upstreamRes.body, {
                         status: 206,
                         headers,
                     });
                 }
 
-                return new Response(response.body, {
-                    status: response.status,
-                    statusText: response.statusText,
+                return new Response(upstreamRes.body, {
+                    status: upstreamRes.status,
+                    statusText: upstreamRes.statusText,
                     headers,
                 });
-            } else if (response.status === 404) {
+            } else if (upstreamRes.status === 404) {
                 return new Response("Error: Image Not Found", { status: 404 });
             } else {
                 retries++;
             }
-        } catch (error) {
+        } catch (_err) {
             retries++;
         }
     }
