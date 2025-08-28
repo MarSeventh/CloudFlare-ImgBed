@@ -175,7 +175,9 @@ async function handleTelegramChunkedFile(context, imgRecord, encodedFileName, fi
     const headers = new Headers();
     setCommonHeaders(headers, encodedFileName, fileType, Referer, url);
     headers.set('Content-Length', totalSize.toString());
-    
+
+    headers.append('Vary', 'Range');
+
     // 添加ETag支持
     const etag = `"${metadata.TimeStamp || Date.now()}-${totalSize}"`;
     headers.set('ETag', etag);
@@ -268,20 +270,27 @@ async function handleTelegramChunkedFile(context, imgRecord, encodedFileName, fi
             }
         });
         
-        // 设置Range相关头部
-        if (isRangeRequest) {
-            setRangeHeaders(headers, rangeStart, rangeEnd, totalSize);
-            
-            return new Response(stream, {
-                status: 206, // Partial Content
-                headers,
-            });
-        } else {
-            return new Response(stream, {
-                status: 200,
-                headers,
-            });
-        }
+// 设置Range相关头部
+if (isRangeRequest) {
+setRangeHeaders(headers, rangeStart, rangeEnd, totalSize);
+
+    // 明确告诉浏览器/CF：支持分段请求
+    headers.set('Accept-Ranges', 'bytes'); 
+
+    return new Response(stream, {
+        status: 206, // Partial Content
+        headers,
+    });
+} else {
+    // 关键：避免首个 200 整段被缓存，导致后续 Range 请求直接命中 200
+    headers.set('Cache-Control', 'no-store');  // 或 'max-age=0, must-revalidate'
+
+    return new Response(stream, {
+        status: 200,
+        headers,
+    });
+}
+
         
     } catch (error) {
         return new Response(`Error: Failed to reconstruct chunked file - ${error.message}`, { status: 500 });
