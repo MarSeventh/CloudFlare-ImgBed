@@ -35,6 +35,8 @@ export function setCommonHeaders(headers, encodedFileName, fileType, Referer, ur
     headers.set('Content-Disposition', `inline; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
     headers.set('Access-Control-Allow-Origin', '*');
     headers.set('Accept-Ranges', 'bytes');
+
+    headers.append('Vary', 'Range');
     
     if (fileType) {
         headers.set('Content-Type', fileType);
@@ -81,24 +83,56 @@ export async function getFileContent(request, targetUrl, max_retries = 2) {
     let retries = 0;
     while (retries <= max_retries) {
         try {
-            const response = await fetch(targetUrl, {
-                method: request.method,
-                headers: request.headers,
-                body: request.body,
+            // 复制请求头，确保 Range / If-None-Match 等关键头被透传
+            const fwdHeaders = new Headers(request.headers);
+
+            // 显式兜底：有些运行时需要手动 set 一下
+            const range = request.headers.get("Range");
+            if (range) fwdHeaders.set("Range", range);
+
+            // 只允许 GET/HEAD 转发
+            const method = request.method === "HEAD" ? "HEAD" : "GET";
+
+            const upstreamReq = new Request(targetUrl, {
+                method,
+                headers: fwdHeaders,
+                redirect: "follow",
             });
-            if (response.ok || response.status === 304) {
-                return response;
-            } else if (response.status === 404) {
-                return new Response('Error: Image Not Found', { status: 404 });
+
+            const upstreamRes = await fetch(upstreamReq);
+
+            if (upstreamRes.ok || upstreamRes.status === 304) {
+                const headers = new Headers(upstreamRes.headers);
+
+                // 关键：让缓存区分是否带 Range
+                headers.append("Vary", "Range");
+
+                // 如果是 Range 请求但上游仍返回 200，这里兜底改成 206
+                if (range && upstreamRes.status === 200) {
+                    headers.set("Accept-Ranges", "bytes");
+                    return new Response(upstreamRes.body, {
+                        status: 206,
+                        headers,
+                    });
+                }
+
+                return new Response(upstreamRes.body, {
+                    status: upstreamRes.status,
+                    statusText: upstreamRes.statusText,
+                    headers,
+                });
+            } else if (upstreamRes.status === 404) {
+                return new Response("Error: Image Not Found", { status: 404 });
             } else {
                 retries++;
             }
-        } catch (error) {
+        } catch (_err) {
             retries++;
         }
     }
     return null;
 }
+
 
 export function isTgChannel(imgRecord) {
     return imgRecord.metadata?.Channel === 'Telegram' || imgRecord.metadata?.Channel === 'TelegramNew';
