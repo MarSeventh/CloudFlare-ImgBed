@@ -30,7 +30,7 @@ export async function onRequest(context) {
 
     //change the metadata
     value.metadata.ListType = "Block"
-    await db.put(params.path,"",{metadata: value.metadata});
+    await db.put(params.path, value.value, {metadata: value.metadata});
     const info = JSON.stringify(value.metadata);
 
     // 清除CDN缓存
