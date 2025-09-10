@@ -43,9 +43,9 @@ export function setCommonHeaders(headers, encodedFileName, fileType, Referer, ur
     
     // 根据Referer设置CDN缓存策略
     if (Referer && Referer.includes(url.origin)) {
-        headers.set('Cache-Control', 'private, max-age=86400');
+        headers.set('Cache-Control', 'private, max-age=86400'); // 本地缓存 1天
     } else {
-        headers.set('Cache-Control', 'public, max-age=604800');
+        headers.set('Cache-Control', 'public, max-age=2592000'); // CDN缓存 30天
     }
 }
 
@@ -66,7 +66,7 @@ export function handleHeadRequest(headers, etag = null) {
     responseHeaders.set('Content-Disposition', headers.get('Content-Disposition') || 'inline');
     responseHeaders.set('Access-Control-Allow-Origin', headers.get('Access-Control-Allow-Origin') || '*');
     responseHeaders.set('Accept-Ranges', headers.get('Accept-Ranges') || 'bytes');
-    responseHeaders.set('Cache-Control', headers.get('Cache-Control') || 'public, max-age=604800');
+    responseHeaders.set('Cache-Control', headers.get('Cache-Control') || 'public, max-age=2592000');
     
     if (etag) {
         responseHeaders.set('ETag', etag);
