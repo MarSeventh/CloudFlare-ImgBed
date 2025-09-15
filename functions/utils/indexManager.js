@@ -509,7 +509,7 @@ export async function readIndex(context, options = {}) {
         // 渠道过滤
         if (channel) {
             filteredFiles = filteredFiles.filter(file => 
-                file.metadata.Channel.toLowerCase() === channel.toLowerCase()
+                file.metadata.Channel?.toLowerCase() === channel.toLowerCase()
             );
         }
 
