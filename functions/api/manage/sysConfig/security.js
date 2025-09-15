@@ -26,13 +26,20 @@ export async function onRequest(context) {
 
     // POST保存设置
     if (request.method === 'POST') {
+        const settings = await getSecurityConfig(db, env) // 先读取已有设置，再进行覆盖
+
         const body = await request.json()
-        const settings = body
+        const newSettings = body
+
+        // 覆盖设置，apiTokens不在这里修改
+        settings.auth = newSettings.auth || settings.auth
+        settings.upload = newSettings.upload || settings.upload
+        settings.access = newSettings.access || settings.access
 
         // 写入数据库
         await db.put('manage@sysConfig@security', JSON.stringify(settings))
 
-        return new Response(JSON.stringify(settings), {
+        return new Response('security settings saved', {
             headers: {
                 'content-type': 'application/json',
             },
