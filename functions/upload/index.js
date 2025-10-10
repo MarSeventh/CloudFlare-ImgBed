@@ -146,6 +146,7 @@ async function processFileUpload(context, formdata = null) {
         TimeStamp: time,
         Label: "None",
         Directory: normalizedFolder === '' ? '' : normalizedFolder + '/',
+        Tags: []
     };
 
     let fileExt = fileName.split('.').pop(); // 文件扩展名
