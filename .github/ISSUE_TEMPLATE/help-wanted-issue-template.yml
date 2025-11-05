@@ -1,0 +1,53 @@
+name: Help wanted issue template / 求助问题
+description: Help wanted template.
+title: '[Help Wanted]'
+labels: ['help wanted']
+body:
+  - type: checkboxes
+    id: self_check
+    attributes:
+      label: Self-check / 自查
+      description: Self-Check before submitting the Issue / 在提交Issue之前的自查
+      options:
+        - label: I have already read the document and checked my relative settings / 我已经仔细阅读文档并检查了有关设置
+          required: false
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirm / 确认
+      description: Please confirm / 请你确认
+      options:
+        - label: I have searched the Issue and found no related issues / 我已经搜索过Issue，没有找到相关问题
+          required: true
+        - label: I am using the latest source from this repository / 我使用的是来自此仓库的最新版代码
+          required: true
+        - label: I provided information which does not include sensitive information / 我提供的信息里不包含敏感信息
+          required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Problem Description / 问题描述
+      description: Describe your problem / 描述你的问题
+    validations:
+      required: true
+  - type: textarea
+    id: upload_method
+    attributes:
+      label: Upload Method / 上传方式
+      description: web or api / WEB 或 API 上传
+    validations:
+      required: true
+  - type: textarea
+    id: upload_channel
+    attributes:
+      label: Upload Channel / 上传渠道
+      description: Telegram, Cloudflare R2 etc / Telegram, Cloudflare R2 等
+    validations:
+      required: true
+  - type: textarea
+    id: additional_materials
+    attributes:
+      label: Additional Materials / 辅助材料
+      description: Upload interface request, response screenshots, environment variable settings screenshots, etc. as detailed as possible / 上传接口请求、响应截图，环境变量设置截图等，尽可能详细
+    validations:
+      required: false

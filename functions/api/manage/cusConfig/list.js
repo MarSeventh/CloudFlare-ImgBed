@@ -1,3 +1,5 @@
+import { readIndex } from "../../../utils/indexManager";
+
 export async function onRequest(context) {
     // Contents of context object
     const {
@@ -19,10 +21,10 @@ export async function onRequest(context) {
 
     let allRecords = [];
 
-    allRecords = await getAllRecords(env);
+    allRecords = await readIndex(context, { count: -1, includeSubdirFiles: true });
 
     // 按照 IP 分组
-    const dealedData = await dealByIP(allRecords);
+    const dealedData = await dealByIP(allRecords.files);
 
     // 按照分组中的count倒序排序
     dealedData.sort((a, b) => {
@@ -38,30 +40,6 @@ export async function onRequest(context) {
     
 }
 
-
-async function getAllRecords(env) {
-    let recordsFetched = 0;
-    let allRecords = [];
-    let cursor = null;
-
-    while (true) {
-        const limit = 1000; // 读取所需的最少数量
-        const response = await env.img_url.list({ limit, cursor });
-
-        // 过滤掉以 "manage@" 开头的 key
-        const filteredRecords = response.keys.filter(item => !item.name.startsWith("manage@"));
-
-        allRecords.push(...filteredRecords);
-        recordsFetched += filteredRecords.length;
-        cursor = response.cursor;
-
-        if (!cursor) {
-            break;
-        }
-    }
-
-    return allRecords;
-}
 
 async function dealByIP(data) {
     let dealedData = [];

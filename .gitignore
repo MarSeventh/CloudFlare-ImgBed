@@ -1,5 +1,4 @@
-node_modules/.bin/*
-node_modules/.mf/*
 .wrangler/*
 data/*
 node_modules
+.DS_Store

@@ -1,0 +1,61 @@
+name: Bug report / 错误报告
+description: Create a report to help us improve
+title: "[BUG]"
+labels: ["bug"]
+body:
+  - type: checkboxes
+    id: self_check
+    attributes:
+      label: Self-check / 自查
+      description: Self-Check before submitting the Issue / 在提交Issue之前的自查
+      options:
+        - label: I have already read the document and checked my relative settings / 我已经仔细阅读文档并检查了有关设置
+          required: false
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirm / 确认
+      description: Please confirm / 请你确认
+      options:
+        - label: I have searched the Issue and found no related issues / 我已经搜索过Issue，没有找到相关问题
+          required: true
+        - label: I am using the latest source from this repository / 我使用的是来自此仓库的最新版代码
+          required: true
+        - label: I provided information which does not include sensitive information / 我提供的信息里不包含敏感信息
+          required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: BUG Description / BUG 描述
+      description: Describe your BUG here / 在此描述你的BUG
+    validations:
+      required: true
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected Behavior / 预期行为
+      description: What you expect to happen / 你认为的预期行为
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction Steps / 复现步骤
+      description: How to reproduce / 如何复现
+    validations:
+      required: true
+  - type: textarea
+    id: debug
+    attributes:
+      label: Console Log / 控制台日志
+      description: F12 -> Console / 从 F12 -> 控制台 复制你觉得可能有帮助的日志
+    validations:
+      required: false
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Information / 附加信息
+      description: Any other information you think might be helpful to solve this BUG / 你觉得对解决此BUG有帮助的其它信息
+    validations:
+      required: false
+

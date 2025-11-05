@@ -1,3 +1,5 @@
+import { getDatabase } from '../../../utils/databaseAdapter.js';
+
 export async function onRequest(context) {
     // 页面设置相关，GET方法读取设置，POST方法保存设置
     const {
@@ -9,11 +11,11 @@ export async function onRequest(context) {
       data, // arbitrary space for passing data between middlewares
     } = context;
 
-    const kv = env.img_url
+    const db = getDatabase(env);
 
     // GET读取设置
     if (request.method === 'GET') {
-        const settings = await getPageConfig(kv, env)
+        const settings = await getPageConfig(db, env)
 
         return new Response(JSON.stringify(settings), {
             headers: {
@@ -26,8 +28,8 @@ export async function onRequest(context) {
     if (request.method === 'POST') {
         const body = await request.json()
         const settings = body
-        // 写入 KV
-        await kv.put('manage@sysConfig@page', JSON.stringify(settings))
+        // 写入数据库
+        await db.put('manage@sysConfig@page', JSON.stringify(settings))
 
         return new Response(JSON.stringify(settings), {
             headers: {
@@ -38,68 +40,126 @@ export async function onRequest(context) {
 
 }
 
-export async function getPageConfig(kv, env) {
+export async function getPageConfig(db, env) {
     const settings = {}
-    // 读取KV中的设置
-    const settingsStr = await kv.get('manage@sysConfig@page')
+    // 读取数据库中的设置
+    const settingsStr = await db.get('manage@sysConfig@page')
     const settingsKV = settingsStr ? JSON.parse(settingsStr) : {}
 
     const config = []
     settings.config = config
     config.push(
+        // 全局设置
         {
             id: 'siteTitle',
             label: '网站标题',
             placeholder: 'Sanyue ImgHub',
+            category: '全局设置',
         },
         {
             id: 'siteIcon',
             label: '网站图标',
+            category: '全局设置',
         },
         {
             id: 'ownerName',
             label: '图床名称',
             placeholder: 'Sanyue ImgHub',
+            category: '全局设置',
         },
         {
             id: 'logoUrl',
             label: '图床Logo',
-        },
-        {
-            id: 'loginBkImg',
-            label: '登录页背景图',
-            tooltip: '1.填写 bing 使用必应壁纸轮播 <br/> 2.填写 ["url1","url2"] 使用多张图片轮播 <br/> 3.填写 ["url"] 使用单张图片',
-        },
-        {
-            id: 'uploadBkImg',
-            label: '上传页背景图',
-            tooltip: '1.填写 bing 使用必应壁纸轮播 <br/> 2.填写 ["url1","url2"] 使用多张图片轮播 <br/> 3.填写 ["url"] 使用单张图片',
+            category: '全局设置',
         },
         {
             id: 'bkInterval',
             label: '背景切换间隔',
             placeholder: '3000',
             tooltip: '单位：毫秒 ms',
+            category: '全局设置',
         },
         {
             id: 'bkOpacity',
             label: '背景图透明度',
             placeholder: '1',
             tooltip: '0-1 之间的小数',
-        },
-        {
-            id: 'footerLink',
-            label: '页脚传送门链接',
-        },
-        {
-            id: 'disableFooter',
-            label: '隐藏页脚',
-            placeholder: 'false',
+            category: '全局设置',
         },
         {
             id: 'urlPrefix',
             label: '默认URL前缀',
-            tooltip: '自定义URL前缀，如：https://img.a.com/file/，留空则使用当前域名 <br/> 设置后将应用于上传和管理界面',
+            tooltip: '自定义URL前缀，如：https://img.a.com/file/，留空则使用当前域名 <br/> 设置后将应用于客户端和管理端',
+            category: '全局设置',
+        },
+        // 客户端设置
+        {
+            id: 'announcement',
+            label: '公告',
+            tooltip: '支持HTML标签',
+            category: '客户端设置',
+        },
+        {
+            id: 'defaultUploadChannel',
+            label: '默认上传渠道',
+            type: 'select',
+            options: [
+                { label: 'Telegram', value: 'telegram' },
+                { label: 'Cloudflare R2', value: 'cfr2' },
+                { label: 'S3', value: 's3' },
+            ],
+            placeholder: 'telegram',
+            category: '客户端设置',
+        },
+        {
+            id: 'defaultUploadFolder',
+            label: '默认上传目录',
+            placeholder: '/ 开头的合法目录，不能包含特殊字符， 默认为根目录',
+            category: '客户端设置',
+        },
+        {
+            id: 'defaultUploadNameType',
+            label: '默认命名方式',
+            type: 'select',
+            options: [
+                { label: '默认', value: 'default' },
+                { label: '仅前缀', value: 'index' },
+                { label: '仅原名', value: 'origin' },
+                { label: '短链接', value: 'short' },
+            ],
+            placeholder: 'default',
+            category: '客户端设置',
+        },
+        {
+            id: 'loginBkImg',
+            label: '登录页背景图',
+            tooltip: '1.填写 bing 使用必应壁纸轮播 <br/> 2.填写 ["url1","url2"] 使用多张图片轮播 <br/> 3.填写 ["url"] 使用单张图片',
+            category: '客户端设置',
+        },
+        {
+            id: 'uploadBkImg',
+            label: '上传页背景图',
+            tooltip: '1.填写 bing 使用必应壁纸轮播 <br/> 2.填写 ["url1","url2"] 使用多张图片轮播 <br/> 3.填写 ["url"] 使用单张图片',
+            category: '客户端设置',
+        },
+        {
+            id: 'footerLink',
+            label: '页脚传送门链接',
+            category: '客户端设置',
+        },
+        {
+            id: 'disableFooter',
+            label: '隐藏页脚',
+            type: 'boolean',
+            default: false,
+            category: '客户端设置',
+        },
+        // 管理端设置
+        {
+            id: 'adminLoginBkImg',
+            label: '登录页背景图',
+            tooltip: '1.填写 bing 使用必应壁纸轮播 <br/> 2.填写 ["url1","url2"] 使用多张图片轮播 <br/> 3.填写 ["url"] 使用单张图片',
+            category: '管理端设置',
         }
     )
 

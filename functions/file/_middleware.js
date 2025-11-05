@@ -1,3 +1,3 @@
-import { errorHandling, telemetryData } from '../utils/middleware';
+import { checkDatabaseConfig } from '../utils/middleware';
 
-export const onRequest = [errorHandling, telemetryData];
+export const onRequest = [checkDatabaseConfig];

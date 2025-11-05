@@ -1,10 +1,10 @@
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { fetchSecurityConfig } from "../utils/sysConfig";
+import { TelegramAPI } from "../utils/telegramAPI";
+import { setCommonHeaders, setRangeHeaders, handleHeadRequest, getFileContent, isTgChannel,
+            returnWithCheck, return404, isDomainAllowed } from './fileTools';
+import { getDatabase } from '../utils/databaseAdapter.js';
 
-let targetUrl = '';
-let securityConfig = {};
-let allowedDomains = null;
-let whiteListMode = false;
 
 export async function onRequest(context) {  // Contents of context object
     const {
@@ -16,49 +16,37 @@ export async function onRequest(context) {  // Contents of context object
         data, // arbitrary space for passing data between middlewares
     } = context;
 
+    // 解码文件ID
     let fileId = '';
     try {
-        // 解码params.path
         params.path = decodeURIComponent(params.path);
-        // 从path中提取文件ID
         fileId = params.path.split(',').join('/');
-
     } catch (e) {
         return new Response('Error: Decode Image ID Failed', { status: 400 });
     }
 
-    // 读取安全配置
-    securityConfig = await fetchSecurityConfig(env);
-    allowedDomains = securityConfig.access.allowedDomains;
-    whiteListMode = securityConfig.access.whiteListMode;
+    // 读取安全配置，解析必要参数
+    const securityConfig = await fetchSecurityConfig(env);
+    context.securityConfig = securityConfig;
     
     const url = new URL(request.url);
-    let Referer = request.headers.get('Referer')
-    if (Referer) {
-        try {
-            let refererUrl = new URL(Referer);
-            if (allowedDomains && allowedDomains.trim() !== '') {
-                const domains = allowedDomains.split(',');
-                let isAllowed = domains.some(domain => {
-                    let domainPattern = new RegExp(`(^|\\.)${domain.replace('.', '\\.')}$`); // Escape dot in domain
-                    return domainPattern.test(refererUrl.hostname);
-                });
-                if (!isAllowed) {
-                    return Response.redirect(new URL("/blockimg", request.url).href, 302); // Ensure URL is correctly formed
-                }
-            }
-        } catch (e) {
-            return Response.redirect(new URL("/blockimg", request.url).href, 302); // Ensure URL is correctly formed
-        }
+    context.url = url;
+
+    const Referer = request.headers.get('Referer')
+    context.Referer = Referer;
+
+    // 检查引用域名是否被允许
+    if (!isDomainAllowed(context)) {
+        return await returnBlockImg(url);
     }
-    // 检查是否配置了 KV 数据库
-    if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") {
-        return new Response('Error: Please configure KV database', { status: 500 });
-    }
-    const imgRecord = await env.img_url.getWithMetadata(fileId);
+    
+    // 从数据库中获取图片记录
+    const db = getDatabase(env);
+    const imgRecord = await db.getWithMetadata(fileId);
     if (!imgRecord) {
         return new Response('Error: Image Not Found', { status: 404 });
     }
+    
     // 如果metadata不存在，只可能是之前未设置KV，且存储在Telegraph上的图片
     if (!imgRecord.metadata) {
         imgRecord.metadata = {};
@@ -69,120 +57,54 @@ export async function onRequest(context) {  // Contents of context object
     const fileType = imgRecord.metadata?.FileType || null;
     
     // 检查文件可访问状态
-    let accessRes = await returnWithCheck(request, env, url, imgRecord);
+    let accessRes = await returnWithCheck(context, imgRecord);
     if (accessRes.status !== 200) {
         return accessRes; // 如果不可访问，直接返回
     }
     
-    // Cloudflare R2渠道
+    /* Cloudflare R2渠道 */
     if (imgRecord.metadata?.Channel === 'CloudflareR2') {
-        // 检查是否配置了R2
-        if (typeof env.img_r2 == "undefined" || env.img_r2 == null || env.img_r2 == "") {
-            return new Response('Error: Please configure R2 database', { status: 500 });
-        }
-        
-        const R2DataBase = env.img_r2;
-        const object = await R2DataBase.get(fileId);
-
-        if (object === null) {
-            return new Response('Error: Failed to fetch image', { status: 500 });
-        }
-
-        const headers = new Headers();
-        object.writeHttpMetadata(headers)
-        headers.set('Content-Disposition', `inline; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
-        headers.set('Access-Control-Allow-Origin', '*');
-        if (fileType) {
-            headers.set('Content-Type', fileType);
-        }
-        // 根据Referer设置CDN缓存策略，如果是从/或/dashboard等访问，则仅允许浏览器缓存；否则设置为public，缓存时间为7天
-        if (Referer && Referer.includes(url.origin)) {
-            headers.set('Cache-Control', 'private, max-age=86400');
-        } else {
-            headers.set('Cache-Control', 'public, max-age=604800');
-        }
-
-        // 返回图片
-        const newRes = new Response(object.body, {
-            status: 200,
-            headers,
-        });
-
-        return newRes;
+        return await handleR2File(context, fileId, encodedFileName, fileType);
     }
 
-    // S3渠道
+    /* S3渠道 */
     if (imgRecord.metadata?.Channel === "S3") {
-        const s3Client = new S3Client({
-            region: imgRecord.metadata?.S3Region || "auto", // 默认使用 auto 区域
-            endpoint: imgRecord.metadata?.S3Endpoint,
-            credentials: {
-                accessKeyId: imgRecord.metadata?.S3AccessKeyId,
-                secretAccessKey: imgRecord.metadata?.S3SecretAccessKey
-            }
-        });
-
-        const bucketName = imgRecord.metadata?.S3BucketName;
-        const key = imgRecord.metadata?.S3FileKey;
-
-        try {
-            const command = new GetObjectCommand({
-                Bucket: bucketName,
-                Key: key
-            });
-
-
-            const response = await s3Client.send(command);
-
-            // 设置响应头
-            const headers = new Headers();
-            headers.set("Content-Disposition", `inline; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
-            headers.set("Access-Control-Allow-Origin", "*");
-
-            if (fileType) {
-                headers.set("Content-Type", fileType);
-            }
-
-            // 根据Referer设置CDN缓存策略
-            if (Referer && Referer.includes(url.origin)) {
-                headers.set('Cache-Control', 'private, max-age=86400');
-            } else {
-                headers.set('Cache-Control', 'public, max-age=604800');
-            }
-
-            // 返回 S3 文件流
-            return new Response(response.Body, { status: 200, headers });
-
-        } catch (error) {
-            return new Response(`Error: Failed to fetch from S3 - ${error.message}`, { status: 500 });
-        }
+        return await handleS3File(context, imgRecord.metadata, encodedFileName, fileType);
     }
 
-    // 外链渠道
+    /* 外链渠道 */
     if (imgRecord.metadata?.Channel === 'External') {
         // 直接重定向到外链
         return Response.redirect(imgRecord.metadata?.ExternalLink, 302);
     }
-    
-    // Telegram及Telegraph渠道
-    let TgFileID = ''; // Tg的file_id
-    if (imgRecord.metadata?.Channel === 'Telegram') {
-        // id为file_id + ext
-        TgFileID = fileId.split('.')[0];
-    } else if (imgRecord.metadata?.Channel === 'TelegramNew') {
-        // id为unique_id + file_name
-        TgFileID = imgRecord.metadata?.TgFileId;
-        if (TgFileID === null) {
-            return new Response('Error: Failed to fetch image', { status: 500 });
-        }
-    } else {
-        // 旧版telegraph
-    }
+
+    /* Telegram及Telegraph渠道 */
+
     // 构建目标 URL
+    let targetUrl = '';
+
     if (isTgChannel(imgRecord)) {
+        let TgFileID = ''; // Tg的file_id
+
+        if (imgRecord.metadata?.Channel === 'Telegram') {
+            TgFileID = fileId.split('.')[0]; // id为file_id + ext
+        } else if (imgRecord.metadata?.Channel === 'TelegramNew') {
+            // 检查是否为分片文件
+            if (imgRecord.metadata?.IsChunked === true) {
+                return await handleTelegramChunkedFile(context, imgRecord, encodedFileName, fileType);
+            }
+            
+            TgFileID = imgRecord.metadata?.TgFileId;
+
+            if (TgFileID === null) {
+                return new Response('Error: Failed to fetch image', { status: 500 });
+            }
+        }
+
         // 获取TG图片真实地址
         const TgBotToken = imgRecord.metadata?.TgBotToken || env.TG_BOT_TOKEN;
-        const filePath = await getFilePath(TgBotToken, TgFileID);
+        const tgApi = new TelegramAPI(TgBotToken);
+        const filePath = await tgApi.getFilePath(TgFileID);
         if (filePath === null) {
             return new Response('Error: Failed to fetch image path', { status: 500 });
         }
@@ -190,188 +112,355 @@ export async function onRequest(context) {  // Contents of context object
     } else {
         targetUrl = 'https://telegra.ph/' + url.pathname + url.search;
     }
-    const response = await getFileContent(request);
-    if (response === null) {
-        return new Response('Error: Failed to fetch image', { status: 500 });
-    } else if (response.status === 404) {
-        return await return404(url);
-    }
+    
     try {
+        const response = await getFileContent(request, targetUrl);
+    
+        if (response === null) {
+            return new Response('Error: Failed to fetch image', { status: 500 });
+        } else if (response.status === 404) {
+            return await return404(url);
+        }
+
         const headers = new Headers(response.headers);
-        headers.set('Content-Disposition', `inline; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
-        headers.set('Access-Control-Allow-Origin', '*');
-        if (fileType) {
-            headers.set('Content-Type', fileType);
-        }
-        // 根据Referer设置CDN缓存策略，如果是从/或/dashboard等访问，则仅允许浏览器缓存；否则设置为public，缓存时间为7天
-        if (Referer && Referer.includes(url.origin)) {
-            headers.set('Cache-Control', 'private, max-age=86400');
-        } else {
-            headers.set('Cache-Control', 'public, max-age=604800');
-        }
+        setCommonHeaders(headers, encodedFileName, fileType, Referer, url);
+
         const newRes =  new Response(response.body, {
             status: response.status,
             statusText: response.statusText,
             headers,
         });
-        if (response.ok) {
-            return newRes;
-        }
+
         return newRes;
     } catch (error) {
         return new Response('Error: ' + error, { status: 500 });
     }
 }
 
-async function returnWithCheck(request, env, url, imgRecord) {
-    const response = new Response('good', { status: 200 });
 
-    // Referer header equal to the dashboard page or upload page
-    if (request.headers.get('Referer') && request.headers.get('Referer').includes(url.origin)) {
-        //show the image
-        return response;
+// 处理 Telegram 渠道分片文件读取
+async function handleTelegramChunkedFile(context, imgRecord, encodedFileName, fileType) {
+    const { env, request, url, Referer } = context;
+
+    const metadata = imgRecord.metadata;
+    const TgBotToken = metadata.TgBotToken || env.TG_BOT_TOKEN;
+    
+    // 从KV的value中读取分片信息
+    let chunks = [];
+    try {
+        if (imgRecord.value) {
+            chunks = JSON.parse(imgRecord.value);
+            // 确保分片按索引排序
+            chunks.sort((a, b) => a.index - b.index);
+        }
+    } catch (parseError) {
+        console.error('Failed to parse chunks data:', parseError);
+        return new Response('Error: Invalid chunks data', { status: 500 });
     }
-
-    if (typeof env.img_url == "undefined" || env.img_url == null || env.img_url == "") {
-    } else {
-        //check the record from kv
-        const record = imgRecord;
-        if (record.metadata === null) {
-        } else {
-            //if the record is not null, redirect to the image
-            if (record.metadata.ListType == "White") {
-                return response;
-            } else if (record.metadata.ListType == "Block") {
-                return await returnBlockImg(url);
-            } else if (record.metadata.Label == "adult") {
-                return await returnBlockImg(url);
+    
+    if (chunks.length === 0) {
+        return new Response('Error: No chunks found for this file', { status: 500 });
+    }
+    
+    // 验证分片完整性
+    const expectedChunks = metadata.TotalChunks || chunks.length;
+    if (chunks.length !== expectedChunks) {
+        return new Response(`Error: Missing chunks, expected ${expectedChunks}, got ${chunks.length}`, { status: 500 });
+    }
+    
+    // 计算文件总大小
+    const totalSize = chunks.reduce((total, chunk) => total + (chunk.size || 0), 0);
+    
+    // 构建响应头
+    const headers = new Headers();
+    setCommonHeaders(headers, encodedFileName, fileType, Referer, url);
+    headers.set('Content-Length', totalSize.toString());
+    
+    // 添加ETag支持
+    const etag = `"${metadata.TimeStamp || Date.now()}-${totalSize}"`;
+    headers.set('ETag', etag);
+    
+    // 检查If-None-Match头（304缓存）
+    const ifNoneMatch = request.headers.get('If-None-Match');
+    if (ifNoneMatch && ifNoneMatch === etag) {
+        return new Response(null, {
+            status: 304,
+            headers: {
+                'ETag': etag,
+                'Cache-Control': headers.get('Cache-Control'),
+                'Accept-Ranges': 'bytes'
             }
-            //check if the env variables WhiteList_Mode are set
-            if (whiteListMode) {
-                //if the env variables WhiteList_Mode are set, redirect to the image
-                return await returnWhiteListImg(url);
-            } else {
-                //if the env variables WhiteList_Mode are not set, redirect to the image
-                return response;
+        });
+    }
+    
+    // 检查Range请求头
+    const range = request.headers.get('Range');
+    let rangeStart = 0;
+    let rangeEnd = totalSize - 1;
+    let isRangeRequest = false;
+    
+    if (range) {
+        const matches = range.match(/bytes=(\d+)-(\d*)/);
+        if (matches) {
+            rangeStart = parseInt(matches[1]);
+            rangeEnd = matches[2] ? parseInt(matches[2]) : totalSize - 1;
+            isRangeRequest = true;
+            
+            // 验证范围有效性
+            if (rangeStart >= totalSize || rangeEnd >= totalSize || rangeStart > rangeEnd) {
+                return new Response('Range Not Satisfiable', { status: 416 });
             }
         }
     }
-    // other cases
-    return response;
+    
+    // 处理HEAD请求
+    if (request.method === 'HEAD') {
+        return handleHeadRequest(headers, etag);
+    }
+    
+    try {
+        // 创建支持Range请求的流
+        const stream = new ReadableStream({
+            async start(controller) {
+                try {
+                    let currentPosition = 0;
+                    
+                    for (let i = 0; i < chunks.length; i++) {
+                        const chunk = chunks[i];
+                        const chunkSize = chunk.size || 0;
+                        
+                        // 如果当前分片完全在请求范围之前，跳过
+                        if (currentPosition + chunkSize <= rangeStart) {
+                            currentPosition += chunkSize;
+                            continue;
+                        }
+                        
+                        // 如果当前分片完全在请求范围之后，结束
+                        if (currentPosition > rangeEnd) {
+                            break;
+                        }
+                        
+                        // 获取分片数据
+                        const chunkData = await fetchTelegramChunkWithRetry(TgBotToken, chunk, 3);
+                        if (!chunkData) {
+                            throw new Error(`Failed to fetch chunk ${chunk.index} after retries`);
+                        }
+                        
+                        // 计算在当前分片中的起始和结束位置
+                        const chunkStart = Math.max(0, rangeStart - currentPosition);
+                        const chunkEnd = Math.min(chunkSize, rangeEnd - currentPosition + 1);
+                        
+                        // 如果需要部分分片数据
+                        if (chunkStart > 0 || chunkEnd < chunkSize) {
+                            const partialData = chunkData.slice(chunkStart, chunkEnd);
+                            controller.enqueue(partialData);
+                        } else {
+                            controller.enqueue(chunkData);
+                        }
+                        
+                        currentPosition += chunkSize;
+                    }
+                    
+                    controller.close();
+                } catch (error) {
+                    controller.error(error);
+                }
+            }
+        });
+        
+        // 设置Range相关头部
+        if (isRangeRequest) {
+            setRangeHeaders(headers, rangeStart, rangeEnd, totalSize);
+            
+            return new Response(stream, {
+                status: 206, // Partial Content
+                headers,
+            });
+        } else {
+            headers.set('Cache-Control', 'private, max-age=86400'); // CDN 不缓存完整文件，避免 CDN 不支持 Range 请求
+            
+            return new Response(stream, {
+                status: 200,
+                headers,
+            });
+        }
+        
+    } catch (error) {
+        return new Response(`Error: Failed to reconstruct chunked file - ${error.message}`, { status: 500 });
+    }
 }
 
-async function getFileContent(request, max_retries = 2) {
-    let retries = 0;
-    while (retries <= max_retries) {
+// 带重试机制的Telegram分片获取函数
+async function fetchTelegramChunkWithRetry(botToken, chunk, maxRetries = 3) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
-            const response = await fetch(targetUrl, {
-                method: request.method,
-                headers: request.headers,
-                body: request.body,
-            });
-            if (response.ok || response.status === 304) {
-                return response;
-            } else if (response.status === 404) {
-                return new Response('Error: Image Not Found', { status: 404 });
-            } else {
-                retries++;
+            const tgApi = new TelegramAPI(botToken);
+
+            const response = await tgApi.getFileContent(chunk.fileId);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
+            
+            // 验证分片大小是否匹配
+            const chunkData = await response.arrayBuffer();
+            const actualSize = chunkData.byteLength;
+            
+            // 如果有期望大小且不匹配，抛出错误
+            if (chunk.size && actualSize !== chunk.size) {
+                console.warn(`Chunk ${chunk.index} size mismatch: expected ${chunk.size}, got ${actualSize}`);
+            }
+            
+            return new Uint8Array(chunkData);
+            
         } catch (error) {
-            retries++;
+            console.warn(`Chunk ${chunk.index} fetch attempt ${attempt + 1} failed:`, error.message);
+            
+            if (attempt === maxRetries - 1) {
+                return null; // 最后一次尝试也失败了
+            }
+            
+            // 重试前等待一段时间
+            await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
         }
     }
+    
     return null;
 }
 
-async function getFilePath(bot_token, file_id) {
+// 处理R2文件读取
+async function handleR2File(context, fileId, encodedFileName, fileType) {
+    const { env, request, url, Referer } = context;
+
     try {
-        const url = `https://api.telegram.org/bot${bot_token}/getFile?file_id=${file_id}`;
-        const res = await fetch(url, {
-          method: 'GET',
-          headers: {
-            "User-Agent": " Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome"
-          },
-        })
-    
-        let responseData = await res.json();
-        if (responseData.ok) {
-          const file_path = responseData.result.file_path
-          return file_path
-        } else {
-          return null;
+        // 检查是否配置了R2
+        if (typeof env.img_r2 == "undefined" || env.img_r2 == null || env.img_r2 == "") {
+            return new Response('Error: Please configure R2 database', { status: 500 });
         }
-      } catch (error) {
-        return null;
-      }
-}
+        
+        const R2DataBase = env.img_r2;
+        
+        // 检查Range请求头
+        const range = request.headers.get('Range');
+        let object;
+        
+        if (range) {
+            // 处理Range请求
+            const matches = range.match(/bytes=(\d+)-(\d*)/);
+            if (matches) {
+                const start = parseInt(matches[1]);
+                const end = matches[2] ? parseInt(matches[2]) : undefined;
 
-function isTgChannel(imgRecord) {
-    return imgRecord.metadata?.Channel === 'Telegram' || imgRecord.metadata?.Channel === 'TelegramNew';
-}
-
-async function return404(url) {
-    const Img404 = await fetch(url.origin + "/static/404.png");
-    if (!Img404.ok) {
-        return new Response('Error: Image Not Found',
-            {
-                status: 404,
-                headers: {
-                    "Cache-Control": "public, max-age=86400"
+                const rangeOptions = { 
+                    range: {
+                        offset: start
+                    }
+                };
+                if (end !== undefined) {
+                    rangeOptions.range.length = end - start + 1;
                 }
+                
+                object = await R2DataBase.get(fileId, rangeOptions);
+            } else {
+                object = await R2DataBase.get(fileId);
             }
-        );
-    } else {
-        return new Response(Img404.body, {
-            status: 404,
-            headers: {
-                "Content-Type": "image/png",
-                "Content-Disposition": "inline",
-                "Cache-Control": "public, max-age=86400",
-            },
+        } else {
+            object = await R2DataBase.get(fileId);
+        }
+
+        if (object === null) {
+            return new Response('Error: Failed to fetch file', { status: 500 });
+        }
+
+        const headers = new Headers();
+        object.writeHttpMetadata(headers);
+        setCommonHeaders(headers, encodedFileName, fileType, Referer, url);
+        
+        // 处理HEAD请求
+        if (request.method === 'HEAD') {
+            return handleHeadRequest(headers);
+        }
+        
+        // 如果是Range请求，设置相应的状态码和头
+        if (range && object.range) {
+            headers.set('Content-Range', `bytes ${object.range.offset}-${object.range.offset + object.range.length - 1}/${object.size}`);
+            headers.set('Content-Length', object.range.length.toString());
+            
+            return new Response(object.body, {
+                status: 206, // Partial Content
+                headers,
+            });
+        }
+
+        // 正常请求
+        return new Response(object.body, {
+            status: 200,
+            headers,
         });
+    } catch (error) {
+        return new Response(`Error: Failed to fetch from R2 - ${error.message}`, { status: 500 });
     }
 }
 
-async function returnBlockImg(url) {
-    const blockImg = await fetch(url.origin + "/static/BlockImg.png");
-    if (!blockImg.ok) {
-        return new Response(null, {
-            status: 302,
-            headers: {
-                "Location": url.origin + "/blockimg",
-                "Cache-Control": "public, max-age=86400"
-            }
-        })
-    } else {
-        return new Response(blockImg.body, {
-            status: 403,
-            headers: {
-                "Content-Type": "image/png",
-                "Content-Disposition": "inline",
-                "Cache-Control": "public, max-age=86400",
-            },
-        });
-    }
-}
+// 处理S3文件读取
+async function handleS3File(context, metadata, encodedFileName, fileType) {
+    const { Referer, url, request } = context;
 
-async function returnWhiteListImg(url) {
-    const WhiteListImg = await fetch(url.origin + "/static/WhiteListOn.png");
-    if (!WhiteListImg.ok) {
-        return new Response(null, {
-            status: 302,
-            headers: {
-                "Location": url.origin + "/whiteliston",
-                "Cache-Control": "public, max-age=86400"
-            }
-        })
-    } else {
-        return new Response(WhiteListImg.body, {
-            status: 403,
-            headers: {
-                "Content-Type": "image/png",
-                "Content-Disposition": "inline",
-                "Cache-Control": "public, max-age=86400",
-            },
+    const s3Client = new S3Client({
+        region: metadata?.S3Region || "auto",
+        endpoint: metadata?.S3Endpoint,
+        credentials: {
+            accessKeyId: metadata?.S3AccessKeyId,
+            secretAccessKey: metadata?.S3SecretAccessKey
+        },
+        forcePathStyle: metadata?.S3PathStyle || false
+    });
+
+    const bucketName = metadata?.S3BucketName;
+    const key = metadata?.S3FileKey;
+
+    try {
+        // 检查Range请求头
+        const range = request.headers.get('Range');
+        const commandParams = {
+            Bucket: bucketName,
+            Key: key
+        };
+        
+        if (range) {
+            // 添加Range参数用于部分内容请求
+            commandParams.Range = range;
+        }
+        
+        const command = new GetObjectCommand(commandParams);
+        const response = await s3Client.send(command);
+
+        // 设置响应头
+        const headers = new Headers();
+        setCommonHeaders(headers, encodedFileName, fileType, Referer, url);
+
+        // 设置Content-Length和Content-Range头
+        if (response.ContentLength) {
+            headers.set('Content-Length', response.ContentLength.toString());
+        }
+        
+        if (response.ContentRange) {
+            headers.set('Content-Range', response.ContentRange);
+        }
+        
+        // 处理HEAD请求
+        if (request.method === 'HEAD') {
+            return handleHeadRequest(headers);
+        }
+
+        // 返回响应，支持流式传输
+        const statusCode = range ? 206 : 200; // Range请求返回206 Partial Content
+        return new Response(response.Body, { 
+            status: statusCode, 
+            headers 
         });
+
+    } catch (error) {
+        return new Response(`Error: Failed to fetch from S3 - ${error.message}`, { status: 500 });
     }
 }

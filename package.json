@@ -2,7 +2,7 @@
   "scripts": {
     "ci-test": "concurrently --kill-others \"npm start\" \"wait-on http://localhost:8080 && mocha\"",
     "test": "mocha",
-    "start": "npx wrangler pages dev ./ --kv \"img_url\" --r2 \"img_r2\" --port 8080 --persist-to ./data"
+    "start": "npx wrangler pages dev ./ --kv \"img_url\" --r2 \"img_r2\" --ip 0.0.0.0 --port 8080 --persist-to ./data"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.726.1",
@@ -14,6 +14,6 @@
     "concurrently": "^8.2.2",
     "mocha": "^10.6.0",
     "wait-on": "^7.2.0",
-    "wrangler": "^3.66.0"
+    "wrangler": "^4.24.0"
   }
 }

@@ -1,12 +1,10 @@
 import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { purgeCFCache } from "../../../utils/purgeCache";
+import { removeFileFromIndex, batchRemoveFilesFromIndex } from "../../../utils/indexManager.js";
+import { getDatabase } from '../../../utils/databaseAdapter.js';
 
 export async function onRequest(context) {
-    const {
-        request,
-        env,
-        params,
-    } = context;
+    const { request, env, params, waitUntil } = context;
 
     const url = new URL(request.url);
 
@@ -56,6 +54,10 @@ export async function onRequest(context) {
                 }
             }
 
+            // 批量从索引中删除文件
+            if (deletedFiles.length > 0) {
+                waitUntil(batchRemoveFilesFromIndex(context, deletedFiles));
+            }
 
             // 返回处理结果
             return new Response(JSON.stringify({
@@ -82,6 +84,9 @@ export async function onRequest(context) {
         const success = await deleteFile(env, fileId, cdnUrl, url);
         if (!success) {
             throw new Error('Delete file failed');
+        } else {
+            // 从索引中删除文件
+            waitUntil(removeFileFromIndex(context, fileId));
         }
 
         return new Response(JSON.stringify({
@@ -100,7 +105,8 @@ export async function onRequest(context) {
 async function deleteFile(env, fileId, cdnUrl, url) {
     try {
         // 读取图片信息
-        const img = await env.img_url.getWithMetadata(fileId);
+        const db = getDatabase(env);
+        const img = await db.getWithMetadata(fileId);
 
         // 如果是R2渠道的图片，需要删除R2中对应的图片
         if (img.metadata?.Channel === 'CloudflareR2') {
@@ -110,14 +116,11 @@ async function deleteFile(env, fileId, cdnUrl, url) {
 
         // S3 渠道的图片，需要删除S3中对应的图片
         if (img.metadata?.Channel === 'S3') {
-            const success = await deleteS3File(img);
-            if (!success) {
-                throw new Error('S3 Delete Failed');
-            }
+            await deleteS3File(img);
         }
 
-        // 删除KV存储中的记录
-        await env.img_url.delete(fileId);
+        // 删除数据库中的记录
+        await db.delete(fileId);
 
         // 清除CDN缓存
         await purgeCFCache(env, cdnUrl);
@@ -151,6 +154,7 @@ async function deleteS3File(img) {
             accessKeyId: img.metadata?.S3AccessKeyId,
             secretAccessKey: img.metadata?.S3SecretAccessKey
         },
+        forcePathStyle: img.metadata?.S3PathStyle || false // 是否启用路径风格
     });
 
     const bucketName = img.metadata?.S3BucketName;
