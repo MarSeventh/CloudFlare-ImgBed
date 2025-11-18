@@ -1,5 +1,5 @@
-import { getDatabase } from "../../../utils/databaseAdapter.js";
-import { extractUniqueTags, filterTagsByPrefix } from "../../../utils/tagHelpers.js";
+import { readIndex } from "../../../utils/indexManager.js";
+import { filterTagsByPrefix } from "../../../utils/tagHelpers.js";
 
 /**
  * Tag Autocomplete API
@@ -9,7 +9,7 @@ import { extractUniqueTags, filterTagsByPrefix } from "../../../utils/tagHelpers
  * Returns all tags matching the given prefix, useful for autocomplete functionality
  */
 export async function onRequest(context) {
-    const { request, env } = context;
+    const { request } = context;
 
     const url = new URL(request.url);
 
@@ -22,8 +22,6 @@ export async function onRequest(context) {
             headers: { 'Content-Type': 'application/json' }
         });
     }
-
-    const db = getDatabase(env);
 
     try {
         // Get prefix from query parameters
@@ -41,37 +39,33 @@ export async function onRequest(context) {
             });
         }
 
-        // Get all files from database
-        const allTags = new Set();
-        let cursor = null;
+        // Read from index (only first 1000 files)
+        const result = await readIndex(context, {
+            start: 0,
+            count: 1000,
+            includeSubdirFiles: true
+        });
 
-        while (true) {
-            const response = await db.list({
-                limit: 1000,
-                cursor: cursor
+        if (!result.success) {
+            return new Response(JSON.stringify({
+                error: 'Failed to read index',
+                message: 'Index not available'
+            }), {
+                status: 500,
+                headers: { 'Content-Type': 'application/json' }
             });
+        }
 
-            for (const item of response.keys) {
-                // Skip non-file entries
-                if (item.name.startsWith('manage@') || item.name.startsWith('chunk_')) {
-                    continue;
-                }
-
-                // Extract tags from metadata
-                if (item.metadata && Array.isArray(item.metadata.Tags)) {
-                    item.metadata.Tags.forEach(tag => {
-                        if (tag && typeof tag === 'string') {
-                            allTags.add(tag.toLowerCase().trim());
-                        }
-                    });
-                }
+        // Extract unique tags from files
+        const allTags = new Set();
+        for (const file of result.files) {
+            if (file.metadata && Array.isArray(file.metadata.Tags)) {
+                file.metadata.Tags.forEach(tag => {
+                    if (tag && typeof tag === 'string') {
+                        allTags.add(tag.toLowerCase().trim());
+                    }
+                });
             }
-
-            cursor = response.cursor;
-            if (!cursor) break;
-
-            // Limit iterations for performance
-            if (allTags.size > 10000) break;
         }
 
         // Convert to array and sort
