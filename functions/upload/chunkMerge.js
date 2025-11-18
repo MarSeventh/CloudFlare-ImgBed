@@ -217,6 +217,7 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
             TimeStamp: Date.now(),
             Label: "None",
             Directory: normalizedFolder === '' ? '' : normalizedFolder + '/',
+            Tags: []
         };
 
         // 更新进度

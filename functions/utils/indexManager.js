@@ -38,6 +38,7 @@
  */
 
 import { getDatabase } from './databaseAdapter.js';
+import { parseSearchQuery, matchesTags } from './tagHelpers.js';
 
 const INDEX_KEY = 'manage@index';
 const INDEX_META_KEY = 'manage@index@meta'; // 索引元数据键
@@ -520,12 +521,32 @@ export async function readIndex(context, options = {}) {
             );
         }
 
-        // 搜索过滤
+        // 搜索过滤（支持标签和关键字混合搜索）
         if (search) {
-            const searchLower = search.toLowerCase();
+            // 解析搜索查询，提取标签和关键字
+            const { keywords, tags } = parseSearchQuery(search);
+
             filteredFiles = filteredFiles.filter(file => {
-                return file.metadata.FileName?.toLowerCase().includes(searchLower) ||
-                    file.id.toLowerCase().includes(searchLower);
+                // 标签过滤（必须包含所有指定的标签）
+                if (tags.length > 0) {
+                    const fileTags = file.metadata.Tags || [];
+                    if (!matchesTags(fileTags, tags)) {
+                        return false;
+                    }
+                }
+
+                // 关键字过滤（匹配文件名或文件ID）
+                if (keywords) {
+                    const keywordsLower = keywords.toLowerCase();
+                    const matchesKeyword =
+                        file.metadata.FileName?.toLowerCase().includes(keywordsLower) ||
+                        file.id.toLowerCase().includes(keywordsLower);
+                    if (!matchesKeyword) {
+                        return false;
+                    }
+                }
+
+                return true;
             });
         }
 
