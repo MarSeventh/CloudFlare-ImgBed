@@ -83,18 +83,21 @@ export function parseSearchQuery(searchString) {
         return { keywords: '', tags: [] };
     }
 
-    const tagRegex = /#([\w\u4e00-\u9fa5\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af-]+)/g;
     const tags = [];
-    let match;
 
-    while ((match = tagRegex.exec(searchString)) !== null) {
-        tags.push(match[1].toLowerCase());
-    }
+    const tagRegex = /#([\w\u4e00-\u9fa5\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af\.\+\-]+)/g;
 
-    // Remove tags from search string to get keywords
-    const keywords = searchString.replace(/#[\w\u4e00-\u9fa5\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af-]+/g, '').trim();
+    const keywords = searchString.replace(tagRegex, (match, tagContent) => {
+        tags.push(tagContent.toLowerCase()); // 收集 tag
+        return ' '; // 用一个空格替换 tag，避免粘连，稍后统一清洗
+    })
+    .replace(/\s+/g, ' ') // 将中间所有的连续空格合并为一个
+    .trim();
 
-    return { keywords, tags: normalizeTags(tags) };
+    return { 
+        keywords, 
+        tags: normalizeTags(tags)
+    };
 }
 
 /**

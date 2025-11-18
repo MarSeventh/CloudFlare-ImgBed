@@ -16,11 +16,17 @@ export async function onRequest(context) {
     let channel = url.searchParams.get('channel') || '';
     let listType = url.searchParams.get('listType') || '';
     let action = url.searchParams.get('action') || '';
+    let includeTags = url.searchParams.get('includeTags') || '';
+    let excludeTags = url.searchParams.get('excludeTags') || '';
 
     // 处理搜索关键字
     if (search) {
         search = decodeURIComponent(search).trim();
     }
+
+    // 处理标签参数
+    const includeTagsArray = includeTags ? includeTags.split(',').map(t => t.trim()).filter(t => t) : [];
+    const excludeTagsArray = excludeTags ? excludeTags.split(',').map(t => t.trim()).filter(t => t) : [];
 
     // 处理目录参数
     if (dir.startsWith('/')) {
@@ -83,6 +89,8 @@ export async function onRequest(context) {
                 directory: dir,
                 channel,
                 listType,
+                includeTags: includeTagsArray,
+                excludeTags: excludeTagsArray,
                 countOnly: true
             });
             
@@ -102,6 +110,8 @@ export async function onRequest(context) {
             count,
             channel,
             listType,
+            includeTags: includeTagsArray,
+            excludeTags: excludeTagsArray,
             includeSubdirFiles: recursive,
         });
 
