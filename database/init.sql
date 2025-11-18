@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS files (
     tg_chat_id TEXT,
     tg_bot_token TEXT,
     is_chunked BOOLEAN DEFAULT FALSE,
+    tags TEXT, 
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -85,6 +86,7 @@ CREATE INDEX IF NOT EXISTS idx_files_channel ON files(channel);
 CREATE INDEX IF NOT EXISTS idx_files_file_type ON files(file_type);
 CREATE INDEX IF NOT EXISTS idx_files_upload_ip ON files(upload_ip);
 CREATE INDEX IF NOT EXISTS idx_files_created_at ON files(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_files_tags ON files(tags);
 
 CREATE INDEX IF NOT EXISTS idx_settings_category ON settings(category);
 
