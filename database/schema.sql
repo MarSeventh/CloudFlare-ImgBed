@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS files (
     tg_chat_id TEXT,                      -- Telegram聊天ID (从metadata中提取)
     tg_bot_token TEXT,                    -- Telegram Bot Token (从metadata中提取)
     is_chunked BOOLEAN DEFAULT FALSE,     -- 是否为分块文件
+    tags TEXT,                            -- 标签 (从metadata中提取，JSON数组格式)
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -32,6 +33,7 @@ CREATE INDEX IF NOT EXISTS idx_files_channel ON files(channel);
 CREATE INDEX IF NOT EXISTS idx_files_file_type ON files(file_type);
 CREATE INDEX IF NOT EXISTS idx_files_upload_ip ON files(upload_ip);
 CREATE INDEX IF NOT EXISTS idx_files_created_at ON files(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_files_tags ON files(tags);
 
 -- 2. 系统配置表 - 存储各种系统配置
 CREATE TABLE IF NOT EXISTS settings (
