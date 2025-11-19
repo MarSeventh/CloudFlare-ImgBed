@@ -38,6 +38,7 @@
  */
 
 import { getDatabase } from './databaseAdapter.js';
+import { matchesTags } from './tagHelpers.js';
 
 const INDEX_KEY = 'manage@index';
 const INDEX_META_KEY = 'manage@index@meta'; // 索引元数据键
@@ -465,6 +466,8 @@ export async function mergeOperationsToIndex(context, options = {}) {
  * @param {number} options.count - 返回数量，-1 表示返回所有
  * @param {string} options.channel - 渠道过滤
  * @param {string} options.listType - 列表类型过滤
+ * @param {Array<string>} options.includeTags - 必须包含的标签数组
+ * @param {Array<string>} options.excludeTags - 必须排除的标签数组
  * @param {boolean} options.countOnly - 仅返回总数
  * @param {boolean} options.includeSubdirFiles - 是否包含子目录下的文件
  */
@@ -477,6 +480,8 @@ export async function readIndex(context, options = {}) {
             count = 50,
             channel = '',
             listType = '',
+            includeTags = [],
+            excludeTags = [],
             countOnly = false,
             includeSubdirFiles = false
         } = options;
@@ -520,12 +525,43 @@ export async function readIndex(context, options = {}) {
             );
         }
 
-        // 搜索过滤
+        // 标签过滤（独立于搜索关键字）
+        if (includeTags.length > 0 || excludeTags.length > 0) {
+            filteredFiles = filteredFiles.filter(file => {
+                const fileTags = (file.metadata.Tags || []).map(t => t.toLowerCase());
+
+                // 检查必须包含的标签
+                if (includeTags.length > 0) {
+                    const hasAllIncludeTags = includeTags.every(tag => 
+                        fileTags.includes(tag.toLowerCase())
+                    );
+                    if (!hasAllIncludeTags) {
+                        return false;
+                    }
+                }
+
+                // 检查必须排除的标签
+                if (excludeTags.length > 0) {
+                    const hasAnyExcludeTag = excludeTags.some(tag => 
+                        fileTags.includes(tag.toLowerCase())
+                    );
+                    if (hasAnyExcludeTag) {
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+        }
+
+        // 搜索过滤（仅关键字）
         if (search) {
             const searchLower = search.toLowerCase();
             filteredFiles = filteredFiles.filter(file => {
-                return file.metadata.FileName?.toLowerCase().includes(searchLower) ||
+                const matchesKeyword =
+                    file.metadata.FileName?.toLowerCase().includes(searchLower) ||
                     file.id.toLowerCase().includes(searchLower);
+                return matchesKeyword;
             });
         }
 
