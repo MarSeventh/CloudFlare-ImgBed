@@ -76,7 +76,10 @@ async function handleGetTags(db, fileId) {
                 fileId: fileId
             }), {
                 status: 404,
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-store'
+                }
             });
         }
 
@@ -88,7 +91,10 @@ async function handleGetTags(db, fileId) {
             tags: tags
         }), {
             status: 200,
-            headers: { 'Content-Type': 'application/json' }
+            headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-store'
+            }
         });
     } catch (error) {
         throw new Error(`Failed to get tags: ${error.message}`);
