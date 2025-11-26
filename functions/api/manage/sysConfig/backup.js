@@ -3,21 +3,21 @@ import { getDatabase } from '../../../utils/databaseAdapter.js';
 
 export async function onRequest(context) {
     const { request, env } = context;
-    
+
     try {
         const url = new URL(request.url);
         const action = url.searchParams.get('action');
 
         switch (action) {
-        case 'backup':
-            return await handleBackup(context);
-        case 'restore':
-            return await handleRestore(request, env);
-        default:
-            return new Response(JSON.stringify({ error: '不支持的操作' }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json' }
-            });
+            case 'backup':
+                return await handleBackup(context);
+            case 'restore':
+                return await handleRestore(request, env);
+            default:
+                return new Response(JSON.stringify({ error: '不支持的操作' }), {
+                    status: 400,
+                    headers: { 'Content-Type': 'application/json' }
+                });
         }
     } catch (error) {
         console.error('备份操作错误:', error);
@@ -36,7 +36,7 @@ async function handleBackup(context) {
 
         const backupData = {
             timestamp: Date.now(),
-            version: '2.0.2',
+            version: '2.2.5',
             data: {
                 fileCount: 0,
                 files: {},
@@ -45,7 +45,7 @@ async function handleBackup(context) {
         };
 
         // 首先从索引中读取所有文件信息
-        const indexResult = await readIndex(context, { 
+        const indexResult = await readIndex(context, {
             count: -1,  // 获取所有文件
             start: 0,
             includeSubdirFiles: true  // 包含子目录下的文件
@@ -56,7 +56,7 @@ async function handleBackup(context) {
         for (const file of indexResult.files) {
             const fileId = file.id;
             const metadata = file.metadata;
-            
+
             // 对于TelegramNew渠道且IsChunked为true的文件，需要从数据库读取其值
             if (metadata.Channel === 'TelegramNew' && metadata.IsChunked === true) {
                 try {
@@ -95,7 +95,7 @@ async function handleBackup(context) {
         }
 
         const backupJson = JSON.stringify(backupData, null, 2);
-        
+
         return new Response(backupJson, {
             status: 200,
             headers: {
@@ -114,7 +114,7 @@ async function handleRestore(request, env) {
         const db = getDatabase(env);
 
         const contentType = request.headers.get('content-type');
-        
+
         if (!contentType || !contentType.includes('application/json')) {
             return new Response(JSON.stringify({ error: '请上传JSON格式的备份文件' }), {
                 status: 400,
@@ -123,7 +123,7 @@ async function handleRestore(request, env) {
         }
 
         const backupData = await request.json();
-        
+
         // 验证备份文件格式
         if (!backupData.data || !backupData.data.files || !backupData.data.settings) {
             return new Response(JSON.stringify({ error: '备份文件格式无效' }), {
@@ -165,7 +165,7 @@ async function handleRestore(request, env) {
             }
         }
 
-        return new Response(JSON.stringify({ 
+        return new Response(JSON.stringify({
             success: true,
             message: '恢复完成',
             stats: {
