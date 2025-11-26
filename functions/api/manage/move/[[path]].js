@@ -32,7 +32,7 @@ export async function onRequest(context) {
             while (folderQueue.length > 0) {
                 const currentFolder = folderQueue.shift();
                 const curFolderName = currentFolder.path.split('/').pop();
-                
+
                 // 获取指定目录下的所有文件
                 const listUrl = new URL(`${url.origin}/api/manage/list?count=-1&dir=${currentFolder.path}`);
                 const listRequest = new Request(listUrl, request);
@@ -166,10 +166,10 @@ async function moveFile(env, fileId, newFileId, cdnUrl, url) {
             throw new Error('Unsupported Channel');
         }
 
-        // 更新文件夹信息
-        const folderPath = newFileId.split('/').slice(0, -1).join('/');
-        img.metadata.Folder = folderPath;
-        
+        // 更新文件夹信息，根目录为空，否则为 aaa/123/ 的格式
+        const DirectoryPath = newFileId.split('/').slice(0, -1).join('/') === '' ? '' : newFileId.split('/').slice(0, -1).join('/') + '/';
+        img.metadata.Directory = DirectoryPath;
+
         // 更新KV存储
         await db.put(newFileId, img.value, { metadata: img.metadata });
         await db.delete(fileId);
@@ -183,7 +183,7 @@ async function moveFile(env, fileId, newFileId, cdnUrl, url) {
             const nullResponse = new Response(null, {
                 headers: { 'Cache-Control': 'max-age=0' },
             });
-            
+
             const normalizedFolder = fileId.split('/').slice(0, -1).join('/');
             const normalizedDist = newFileId.split('/').slice(0, -1).join('/');
             await cache.put(`${url.origin}/api/randomFileList?dir=${normalizedFolder}`, nullResponse);
