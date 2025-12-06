@@ -422,10 +422,10 @@ async function uploadFileToTelegram(context, fullId, metadata, fileExt, fileName
         ? fileTypeMap[Object.keys(fileTypeMap).find(key => fileType.startsWith(key))]
         : defaultType;
 
-    // GIF 发送接口特殊处理
+    // GIF ICO 等发送接口特殊处理
     if (fileType === 'image/gif' || fileType === 'image/webp' || fileExt === 'gif' || fileExt === 'webp') {
         sendFunction = { 'url': 'sendAnimation', 'type': 'animation' };
-    }else if (fileType === 'image/svg+xml' || fileType === 'image/x-icon') {
+    } else if (fileType === 'image/svg+xml' || fileType === 'image/x-icon') {
         sendFunction = { 'url': 'sendDocument', 'type': 'document' };
     }
 
