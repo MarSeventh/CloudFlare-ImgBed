@@ -406,7 +406,7 @@ async function uploadFileToTelegram(context, fullId, metadata, fileExt, fileName
         const newFileName = fileName.replace(/\.webp$/, '.jpeg');
         const newFile = new File([formdata.get('file')], newFileName, { type: fileType });
         formdata.set('file', newFile);
-    }
+    } 
 
     // 选择对应的发送接口
     const fileTypeMap = {
@@ -422,9 +422,11 @@ async function uploadFileToTelegram(context, fullId, metadata, fileExt, fileName
         ? fileTypeMap[Object.keys(fileTypeMap).find(key => fileType.startsWith(key))]
         : defaultType;
 
-    // GIF 发送接口特殊处理
+    // GIF ICO 等发送接口特殊处理
     if (fileType === 'image/gif' || fileType === 'image/webp' || fileExt === 'gif' || fileExt === 'webp') {
         sendFunction = { 'url': 'sendAnimation', 'type': 'animation' };
+    } else if (fileType === 'image/svg+xml' || fileType === 'image/x-icon') {
+        sendFunction = { 'url': 'sendDocument', 'type': 'document' };
     }
 
     // 根据服务端压缩设置处理接口：从参数中获取serverCompress，如果为false，则使用sendDocument接口
@@ -477,6 +479,7 @@ async function uploadFileToTelegram(context, fullId, metadata, fileExt, fileName
         waitUntil(endUpload(context, fullId, metadata));
 
     } catch (error) {
+        console.log('Telegram upload error:', error.message);
         res = createResponse('upload error, check your environment params about telegram channel!', { status: 400 });
     } finally {
         return res;
