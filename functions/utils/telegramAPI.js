@@ -36,8 +36,8 @@ export class TelegramAPI {
             headers: this.defaultHeaders,
             body: formData
         });
-
-        if (!response.ok) {
+        console.log('Telegram API response:', response.status,  response.statusText);
+        if (!response.ok) {            
             throw new Error(`Telegram API error: ${response.statusText}`);
         }
 
