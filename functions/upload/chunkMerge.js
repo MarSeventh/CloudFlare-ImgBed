@@ -78,11 +78,10 @@ export async function handleChunkMerge(context) {
 
 // 开始合并处理
 async function startMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel) {
-    const { env, url, waitUntil } = context;
-    const db = getDatabase(env);
+    const { env } = context;
 
     try {
-        // 创建合并任务状态记录
+        // 合并任务状态输出
         const mergeStatus = {
             uploadId,
             status: 'processing',
@@ -94,15 +93,10 @@ async function startMerge(context, uploadId, totalChunks, originalFileName, orig
             createdAt: Date.now(),
             message: 'Starting merge process...'
         };
-
-        // 存储合并状态
-        const statusKey = `merge_status_${uploadId}`;
-        await db.put(statusKey, JSON.stringify(mergeStatus), {
-            expirationTtl: 3600 // 1小时过期
-        });
+        console.log(`Merge status: ${JSON.stringify(mergeStatus)}`);
 
         // 同步执行合并
-        const result = await handleChannelBasedMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel, statusKey);
+        const result = await handleChannelBasedMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel);
 
         if (result.success) {
             // 清理临时分块数据
@@ -136,9 +130,8 @@ async function startMerge(context, uploadId, totalChunks, originalFileName, orig
 }
 
 // 基于渠道的合并处理
-async function handleChannelBasedMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel, statusKey = null) {
-    const { request, env, url, waitUntil } = context;
-    const db = getDatabase(env);
+async function handleChannelBasedMerge(context, uploadId, totalChunks, originalFileName, originalFileType, uploadChannel) {
+    const { request, env, url } = context;
 
     try {
         // 获得上传IP
