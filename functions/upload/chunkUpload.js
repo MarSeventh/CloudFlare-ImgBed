@@ -997,8 +997,7 @@ export async function forceCleanupUpload(context, uploadId, totalChunks) {
         // 清理相关的键
         const keysToCleanup = [
             `upload_session_${uploadId}`,
-            `multipart_${uploadId}`,
-            `merge_status_${uploadId}`
+            `multipart_${uploadId}`
         ];
 
         keysToCleanup.forEach(key => {
