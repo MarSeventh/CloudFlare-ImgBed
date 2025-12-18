@@ -119,9 +119,8 @@ export async function moderateContent(env, url) {
     }
 
     // nsfw 渠道 和 默认渠道
-    if (uploadModerate.channel === 'nsfwjs' || uploadModerate.channel === 'default') {
-        const defaultApiPath = 'https://nsfwjs.1314883.xyz';
-        const nsfwApiPath = uploadModerate.channel === 'default' ? defaultApiPath : securityConfig.upload.moderate.nsfwApiPath;
+    if (uploadModerate.channel === 'nsfwjs') {
+        const nsfwApiPath = securityConfig.upload.moderate.nsfwApiPath;
 
         try {
             const fetchResponse = await fetch(`${nsfwApiPath}?url=${encodeURIComponent(url)}`);
