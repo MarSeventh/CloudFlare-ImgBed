@@ -71,8 +71,8 @@ export async function getSecurityConfig(db, env) {
     const kvUpload = settingsKV.upload || {}
     const upload = {
         moderate: {
-            enabled: kvUpload.moderate?.enabled ?? true,
-            channel: kvUpload.moderate?.channel || 'default', // [default, moderatecontent.com, nsfwjs]
+            enabled: kvUpload.moderate?.enabled ?? false,
+            channel: kvUpload.moderate?.channel || 'moderatecontent.com', // [moderatecontent.com, nsfwjs]
             moderateContentApiKey: kvUpload.moderate?.moderateContentApiKey || kvUpload.moderate?.apiKey || env.ModerateContentApiKey || '',
             nsfwApiPath: kvUpload.moderate?.nsfwApiPath || '',
         }
