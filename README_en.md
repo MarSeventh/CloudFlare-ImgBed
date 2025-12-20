@@ -92,7 +92,7 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 <details>
     <summary>Other page screenshots</summary>
 
-![image-20250313204308225](static/readme/202503132043466.png)
+![image-20250313204308225](static/readme/dashboard.png)
 
 ![image-20250314152355339](static/readme/202503141524797.png)
 
