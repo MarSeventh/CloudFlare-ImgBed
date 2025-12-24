@@ -4,7 +4,7 @@
     <p>
         <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README.md">简体中文</a> | <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README_en.md">English</a> | <a href="https://cfbed.sanyue.de">官方网站</a>
     </p>
-    <div>
+    <p align="center">
         <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/LICENSE">
         <img src="https://img.shields.io/github/license/MarSeventh/CloudFlare-ImgBed" alt="License" />
         </a>
@@ -26,8 +26,14 @@
         <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/network/members">
           <img src="https://img.shields.io/github/forks/MarSeventh/CloudFlare-ImgBed" alt="Forks" />
         </a>
-    </div>
+    </P>
+    <p align="center">
+      <a href="https://trendshift.io/repositories/14324" target="_blank">
+        <img src="https://trendshift.io/api/badge/repositories/14324" alt="GitHub Trending" height="80">
+      </a>
+    </p>
 </div>
+
 
 
 
