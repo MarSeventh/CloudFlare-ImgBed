@@ -7,10 +7,11 @@ import { getDatabase } from '../utils/databaseAdapter.js';
 export function createResponse(body, options = {}) {
     const defaultHeaders = {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, GET',
+        'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization, authCode',
+        'Access-Control-Max-Age': '86400',
     };
-    
+
     return new Response(body, {
         ...options,
         headers: {
@@ -36,11 +37,11 @@ export async function getIPAddress(ip) {
     try {
         const ipInfo = await fetch(`https://apimobile.meituan.com/locate/v2/ip/loc?rgeo=true&ip=${ip}`);
         const ipData = await ipInfo.json();
-        
+
         if (ipInfo.ok && ipData.data) {
             const lng = ipData.data?.lng || 0;
             const lat = ipData.data?.lat || 0;
-            
+
             // 读取具体地址
             const addressInfo = await fetch(`https://apimobile.meituan.com/group/v1/city/latlng/${lat},${lng}?tag=0`);
             const addressData = await addressInfo.json();
@@ -72,11 +73,11 @@ export function sanitizeFileName(fileName) {
 
 // 检查文件扩展名是否有效
 export function isExtValid(fileExt) {
-    return ['jpeg', 'jpg', 'png', 'gif', 'webp', 
-    'mp4', 'mp3', 'ogg',
-    'mp3', 'wav', 'flac', 'aac', 'opus',
-    'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'pdf', 
-    'txt', 'md', 'json', 'xml', 'html', 'css', 'js', 'ts', 'go', 'java', 'php', 'py', 'rb', 'sh', 'bat', 'cmd', 'ps1', 'psm1', 'psd', 'ai', 'sketch', 'fig', 'svg', 'eps', 'zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'apk', 'exe', 'msi', 'dmg', 'iso', 'torrent', 'webp', 'ico', 'svg', 'ttf', 'otf', 'woff', 'woff2', 'eot', 'apk', 'crx', 'xpi', 'deb', 'rpm', 'jar', 'war', 'ear', 'img', 'iso', 'vdi', 'ova', 'ovf', 'qcow2', 'vmdk', 'vhd', 'vhdx', 'pvm', 'dsk', 'hdd', 'bin', 'cue', 'mds', 'mdf', 'nrg', 'ccd', 'cif', 'c2d', 'daa', 'b6t', 'b5t', 'bwt', 'isz', 'isz', 'cdi', 'flp', 'uif', 'xdi', 'sdi'
+    return ['jpeg', 'jpg', 'png', 'gif', 'webp',
+        'mp4', 'mp3', 'ogg',
+        'mp3', 'wav', 'flac', 'aac', 'opus',
+        'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'pdf',
+        'txt', 'md', 'json', 'xml', 'html', 'css', 'js', 'ts', 'go', 'java', 'php', 'py', 'rb', 'sh', 'bat', 'cmd', 'ps1', 'psm1', 'psd', 'ai', 'sketch', 'fig', 'svg', 'eps', 'zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'apk', 'exe', 'msi', 'dmg', 'iso', 'torrent', 'webp', 'ico', 'svg', 'ttf', 'otf', 'woff', 'woff2', 'eot', 'apk', 'crx', 'xpi', 'deb', 'rpm', 'jar', 'war', 'ear', 'img', 'iso', 'vdi', 'ova', 'ovf', 'qcow2', 'vmdk', 'vhd', 'vhdx', 'pvm', 'dsk', 'hdd', 'bin', 'cue', 'mds', 'mdf', 'nrg', 'ccd', 'cif', 'c2d', 'daa', 'b6t', 'b5t', 'bwt', 'isz', 'isz', 'cdi', 'flp', 'uif', 'xdi', 'sdi'
     ].includes(fileExt);
 }
 
@@ -141,7 +142,7 @@ export async function moderateContent(env, url) {
             console.error('Moderate Error:', error);
             // 将不带审查的图片写入数据库
             label = "None";
-        } 
+        }
 
         return label;
     }
@@ -184,7 +185,7 @@ export async function endUpload(context, fileId, metadata) {
     const cdnUrl = `https://${url.hostname}/file/${fileId}`;
     const normalizedFolder = (url.searchParams.get('uploadFolder') || '').replace(/^\/+/, '').replace(/\/{2,}/g, '/').replace(/\/$/, '');
     await purgeCDNCache(env, cdnUrl, url, normalizedFolder);
-    
+
     // 更新文件索引
     await addFileToIndex(context, fileId, metadata);
 }
@@ -196,7 +197,7 @@ export function getUploadIp(request) {
     if (!ip) {
         return null;
     }
-    
+
     // 处理多个IP地址的情况
     const ips = ip.split(',').map(i => i.trim());
 
@@ -238,10 +239,10 @@ export async function buildUniqueFileId(context, fileName, fileType = 'applicati
 
     const nameType = url.searchParams.get('uploadNameType') || 'default';
     const uploadFolder = url.searchParams.get('uploadFolder') || '';
-    const normalizedFolder = uploadFolder 
-        ? uploadFolder.replace(/^\/+/, '').replace(/\/{2,}/g, '/').replace(/\/$/, '') 
+    const normalizedFolder = uploadFolder
+        ? uploadFolder.replace(/^\/+/, '').replace(/\/{2,}/g, '/').replace(/\/$/, '')
         : '';
-    
+
     if (!isExtValid(fileExt)) {
         fileExt = fileType.split('/').pop();
         if (fileExt === fileType || fileExt === '' || fileExt === null || fileExt === undefined) {
@@ -254,7 +255,7 @@ export async function buildUniqueFileId(context, fileName, fileType = 'applicati
 
     const unique_index = Date.now() + Math.floor(Math.random() * 10000);
     let baseId = '';
-    
+
     // 根据命名方式构建基础ID
     if (nameType === 'index') {
         baseId = normalizedFolder ? `${normalizedFolder}/${unique_index}.${fileExt}` : `${unique_index}.${fileExt}`;
@@ -272,44 +273,44 @@ export async function buildUniqueFileId(context, fileName, fileType = 'applicati
     } else {
         baseId = normalizedFolder ? `${normalizedFolder}/${unique_index}_${fileName}` : `${unique_index}_${fileName}`;
     }
-    
+
     // 检查基础ID是否已存在
     if (await db.get(baseId) === null) {
         return baseId;
     }
-    
+
     // 如果已存在，在文件名后面加上递增编号
     let counter = 1;
     while (true) {
         let duplicateId;
-        
+
         if (nameType === 'index') {
             const baseName = unique_index;
-            duplicateId = normalizedFolder ? 
-                `${normalizedFolder}/${baseName}(${counter}).${fileExt}` : 
+            duplicateId = normalizedFolder ?
+                `${normalizedFolder}/${baseName}(${counter}).${fileExt}` :
                 `${baseName}(${counter}).${fileExt}`;
         } else if (nameType === 'origin') {
             const nameWithoutExt = fileName.substring(0, fileName.lastIndexOf('.'));
             const ext = fileName.substring(fileName.lastIndexOf('.'));
-            duplicateId = normalizedFolder ? 
-                `${normalizedFolder}/${nameWithoutExt}(${counter})${ext}` : 
+            duplicateId = normalizedFolder ?
+                `${normalizedFolder}/${nameWithoutExt}(${counter})${ext}` :
                 `${nameWithoutExt}(${counter})${ext}`;
         } else {
             const baseName = `${unique_index}_${fileName}`;
             const nameWithoutExt = baseName.substring(0, baseName.lastIndexOf('.'));
             const ext = baseName.substring(baseName.lastIndexOf('.'));
-            duplicateId = normalizedFolder ? 
-                `${normalizedFolder}/${nameWithoutExt}(${counter})${ext}` : 
+            duplicateId = normalizedFolder ?
+                `${normalizedFolder}/${nameWithoutExt}(${counter})${ext}` :
                 `${nameWithoutExt}(${counter})${ext}`;
         }
-        
+
         // 检查新ID是否已存在
         if (await db.get(duplicateId) === null) {
             return duplicateId;
         }
-        
+
         counter++;
-        
+
         // 防止无限循环，最多尝试1000次
         if (counter > 1000) {
             throw new Error('无法生成唯一的文件ID');
@@ -322,7 +323,7 @@ export function selectConsistentChannel(channels, uploadId, loadBalanceEnabled) 
     if (!loadBalanceEnabled || !channels || channels.length === 0) {
         return channels[0];
     }
-    
+
     // 使用uploadId的哈希值来选择渠道，确保相同uploadId总是选择相同渠道
     let hash = 0;
     for (let i = 0; i < uploadId.length; i++) {
@@ -330,7 +331,7 @@ export function selectConsistentChannel(channels, uploadId, loadBalanceEnabled) 
         hash = ((hash << 5) - hash) + char;
         hash = hash & hash; // 转换为32位整数
     }
-    
+
     const index = Math.abs(hash) % channels.length;
     return channels[index];
 }
