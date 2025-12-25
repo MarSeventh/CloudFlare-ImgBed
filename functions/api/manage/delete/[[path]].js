@@ -3,6 +3,14 @@ import { purgeCFCache } from "../../../utils/purgeCache";
 import { removeFileFromIndex, batchRemoveFilesFromIndex } from "../../../utils/indexManager.js";
 import { getDatabase } from '../../../utils/databaseAdapter.js';
 
+// CORS 跨域响应头
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '86400',
+};
+
 export async function onRequest(context) {
     const { request, env, params, waitUntil } = context;
 
@@ -23,7 +31,7 @@ export async function onRequest(context) {
 
             while (folderQueue.length > 0) {
                 const currentFolder = folderQueue.shift();
-                
+
                 // 获取指定目录下的所有文件
                 const listUrl = new URL(`${url.origin}/api/manage/list?count=-1&dir=${currentFolder.path}`);
                 const listRequest = new Request(listUrl, request);
@@ -59,18 +67,22 @@ export async function onRequest(context) {
                 waitUntil(batchRemoveFilesFromIndex(context, deletedFiles));
             }
 
-            // 返回处理结果
             return new Response(JSON.stringify({
                 success: true,
                 deleted: deletedFiles,
                 failed: failedFiles
-            }));
+            }), {
+                headers: { 'Content-Type': 'application/json', ...corsHeaders }
+            });
 
         } catch (e) {
             return new Response(JSON.stringify({
                 success: false,
                 error: e.message
-            }), { status: 400 });
+            }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json', ...corsHeaders }
+            });
         }
     }
 
@@ -92,12 +104,17 @@ export async function onRequest(context) {
         return new Response(JSON.stringify({
             success: true,
             fileId: fileId
-        }));
+        }), {
+            headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
     } catch (e) {
         return new Response(JSON.stringify({
             success: false,
             error: e.message
-        }), { status: 400 });
+        }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
     }
 }
 
@@ -131,7 +148,7 @@ async function deleteFile(env, fileId, cdnUrl, url) {
             const nullResponse = new Response(null, {
                 headers: { 'Cache-Control': 'max-age=0' },
             });
-            
+
             const normalizedFolder = fileId.split('/').slice(0, -1).join('/');
             await cache.put(`${url.origin}/api/randomFileList?dir=${normalizedFolder}`, nullResponse);
         } catch (error) {

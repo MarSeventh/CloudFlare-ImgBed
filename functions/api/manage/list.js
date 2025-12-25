@@ -1,6 +1,16 @@
-import { readIndex, mergeOperationsToIndex, deleteAllOperations, rebuildIndex,
-    getIndexInfo, getIndexStorageStats } from '../../utils/indexManager.js';
+import {
+    readIndex, mergeOperationsToIndex, deleteAllOperations, rebuildIndex,
+    getIndexInfo, getIndexStorageStats
+} from '../../utils/indexManager.js';
 import { getDatabase } from '../../utils/databaseAdapter.js';
+
+// CORS 跨域响应头
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '86400',
+};
 
 export async function onRequest(context) {
     const { request, waitUntil } = context;
@@ -44,7 +54,7 @@ export async function onRequest(context) {
             }));
 
             return new Response('Index rebuilt asynchronously', {
-                headers: { "Content-Type": "text/plain" }
+                headers: { "Content-Type": "text/plain", ...corsHeaders }
             });
         }
 
@@ -53,7 +63,7 @@ export async function onRequest(context) {
             waitUntil(mergeOperationsToIndex(context));
 
             return new Response('Operations merged into index asynchronously', {
-                headers: { "Content-Type": "text/plain" }
+                headers: { "Content-Type": "text/plain", ...corsHeaders }
             });
         }
 
@@ -62,7 +72,7 @@ export async function onRequest(context) {
             waitUntil(deleteAllOperations(context));
 
             return new Response('All operations deleted asynchronously', {
-                headers: { "Content-Type": "text/plain" }
+                headers: { "Content-Type": "text/plain", ...corsHeaders }
             });
         }
 
@@ -70,7 +80,7 @@ export async function onRequest(context) {
         if (action === 'index-storage-stats') {
             const stats = await getIndexStorageStats(context);
             return new Response(JSON.stringify(stats), {
-                headers: { "Content-Type": "application/json" }
+                headers: { "Content-Type": "application/json", ...corsHeaders }
             });
         }
 
@@ -78,7 +88,7 @@ export async function onRequest(context) {
         if (action === 'info') {
             const info = await getIndexInfo(context);
             return new Response(JSON.stringify(info), {
-                headers: { "Content-Type": "application/json" }
+                headers: { "Content-Type": "application/json", ...corsHeaders }
             });
         }
 
@@ -93,12 +103,12 @@ export async function onRequest(context) {
                 excludeTags: excludeTagsArray,
                 countOnly: true
             });
-            
-            return new Response(JSON.stringify({ 
+
+            return new Response(JSON.stringify({
                 sum: result.totalCount,
-                indexLastUpdated: result.indexLastUpdated 
+                indexLastUpdated: result.indexLastUpdated
             }), {
-                headers: { "Content-Type": "application/json" }
+                headers: { "Content-Type": "application/json", ...corsHeaders }
             });
         }
 
@@ -118,7 +128,7 @@ export async function onRequest(context) {
         // 索引读取失败，直接从 KV 中获取所有文件记录
         if (!result.success) {
             const dbRecords = await getAllFileRecords(context.env, dir);
-            
+
             return new Response(JSON.stringify({
                 files: dbRecords.files,
                 directories: dbRecords.directories,
@@ -127,7 +137,7 @@ export async function onRequest(context) {
                 indexLastUpdated: Date.now(),
                 isIndexedResponse: false // 标记这是来自 KV 的响应
             }), {
-                headers: { "Content-Type": "application/json" }
+                headers: { "Content-Type": "application/json", ...corsHeaders }
             });
         }
 
@@ -145,7 +155,7 @@ export async function onRequest(context) {
             indexLastUpdated: result.indexLastUpdated,
             isIndexedResponse: true // 标记这是来自索引的响应
         }), {
-            headers: { "Content-Type": "application/json" }
+            headers: { "Content-Type": "application/json", ...corsHeaders }
         });
 
     } catch (error) {
@@ -155,7 +165,7 @@ export async function onRequest(context) {
             message: error.message
         }), {
             status: 500,
-            headers: { "Content-Type": "application/json" }
+            headers: { "Content-Type": "application/json", ...corsHeaders }
         });
     }
 }
@@ -197,7 +207,7 @@ async function getAllFileRecords(env, dir) {
             }
 
             if (!cursor) break;
-            
+
             // 添加协作点
             await new Promise(resolve => setTimeout(resolve, 10));
         }
