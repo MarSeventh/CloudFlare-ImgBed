@@ -84,31 +84,48 @@ function BadRequestException(reason) {
 function extractRequiredPermission(pathname) {
   // 提取路径中的关键部分
   const pathParts = pathname.toLowerCase().split('/');
-  
+
   // 检查是否包含delete路径
   if (pathParts.includes('delete')) {
     return 'delete';
   }
-  
+
   // 检查是否包含list路径
   if (pathParts.includes('list')) {
     return 'list';
   }
-  
+
   // 其他情况返回null
   return null;
 }
 
+// CORS 跨域响应头
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, DELETE, PUT, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Max-Age': '86400',
+};
+
 async function authentication(context) {
+  // OPTIONS 预检请求不需要鉴权，直接返回 CORS 响应
+  // 这是安全的，因为 OPTIONS 请求只是预检请求，不会执行任何实际操作
+  if (context.request.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders
+    });
+  }
+
   // 读取安全配置
   securityConfig = await fetchSecurityConfig(context.env);
   basicUser = securityConfig.auth.admin.adminUsername
   basicPass = securityConfig.auth.admin.adminPassword
 
-  if(typeof basicUser == "undefined" || basicUser == null || basicUser == ""){
+  if (typeof basicUser == "undefined" || basicUser == null || basicUser == "") {
     // 无需身份验证
     return context.next();
-  }else{
+  } else {
 
     if (context.request.headers.has('Authorization')) {
       // 首先尝试使用API Token验证
@@ -123,29 +140,29 @@ async function authentication(context) {
         // Token验证通过，继续处理请求
         return context.next();
       }
-      
+
       // 回退到使用传统身份认证方式
-      const { user, pass } = basicAuthentication(context.request);                         
+      const { user, pass } = basicAuthentication(context.request);
       if (basicUser !== user || basicPass !== pass) {
         return UnauthorizedException('Invalid credentials.');
-      }else{
+      } else {
         return context.next();
       }
-        
+
     } else {
       // 要求客户端进行基本认证
       return new Response('You need to login.', {
         status: 401,
         headers: {
-        // Prompts the user for credentials.
-        'WWW-Authenticate': 'Basic realm="my scope", charset="UTF-8"',
-        // 'WWW-Authenticate': 'None',
+          // Prompts the user for credentials.
+          'WWW-Authenticate': 'Basic realm="my scope", charset="UTF-8"',
+          // 'WWW-Authenticate': 'None',
         },
       });
     }
 
-  }  
-  
+  }
+
 }
 
 export const onRequest = [checkDatabaseConfig, errorHandling, authentication];
