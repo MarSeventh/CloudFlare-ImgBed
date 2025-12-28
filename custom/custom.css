@@ -1,0 +1,142 @@
+/* ========================================
+   CloudFlare ImgBed - 自定义样式
+   ======================================== */
+
+/* 1. 全局样式优化 */
+:root {
+  /* 自定义配色方案 - 现代渐变蓝紫色主题 */
+  --custom-primary: #667eea;
+  --custom-primary-light: #764ba2;
+  --custom-accent: #f093fb;
+  --custom-bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --custom-shadow: 0 10px 40px rgba(102, 126, 234, 0.2);
+  --custom-shadow-hover: 0 15px 50px rgba(102, 126, 234, 0.3);
+  --custom-border-radius: 16px;
+  --custom-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 2. 页面背景美化 */
+body {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  background-attachment: fixed !important;
+  position: relative;
+}
+
+/* 添加动态背景效果 */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+#app {
+  position: relative;
+  z-index: 1;
+}
+
+/* 3. 卡片容器美化 */
+.el-card,
+.card,
+[class*="card"] {
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(20px) !important;
+  border-radius: var(--custom-border-radius) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  box-shadow: var(--custom-shadow) !important;
+  transition: var(--custom-transition) !important;
+}
+
+.el-card:hover,
+.card:hover {
+  transform: translateY(-5px) !important;
+  box-shadow: var(--custom-shadow-hover) !important;
+}
+
+/* 4. 按钮美化 */
+.el-button--primary,
+button[type="submit"],
+.btn-primary {
+  background: var(--custom-bg-gradient) !important;
+  border: none !important;
+  border-radius: 12px !important;
+  padding: 12px 28px !important;
+  font-weight: 600 !important;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4) !important;
+  transition: var(--custom-transition) !important;
+}
+
+.el-button--primary:hover,
+button[type="submit"]:hover,
+.btn-primary:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6) !important;
+}
+
+/* 5. 输入框美化 */
+.el-input__inner,
+input[type="text"],
+input[type="password"],
+textarea {
+  border-radius: 12px !important;
+  border: 2px solid rgba(102, 126, 234, 0.2) !important;
+  transition: var(--custom-transition) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+}
+
+.el-input__inner:focus,
+input:focus,
+textarea:focus {
+  border-color: var(--custom-primary) !important;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
+}
+
+/* 6. 导航栏美化 */
+.el-menu,
+nav,
+header {
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(20px) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* 7. 图片预览优化 */
+.el-image,
+img {
+  border-radius: 12px !important;
+  transition: var(--custom-transition) !important;
+}
+
+.el-image:hover,
+img:hover {
+  transform: scale(1.02) !important;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* 8. 滚动条美化 */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--custom-bg-gradient);
+  border-radius: 10px;
+  transition: var(--custom-transition);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+}
