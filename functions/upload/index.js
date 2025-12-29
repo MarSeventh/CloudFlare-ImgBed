@@ -232,7 +232,7 @@ async function uploadFileToCloudflareR2(context, fullId, metadata, returnLink) {
 
     // 更新metadata
     metadata.Channel = "CloudflareR2";
-    metadata.ChannelName = "R2_env";
+    metadata.ChannelName = r2Channel.name || "R2_env";
 
     // 图像审查，采用R2的publicUrl
     const R2PublicUrl = r2Channel.publicUrl;
@@ -394,7 +394,7 @@ async function uploadFileToTelegram(context, fullId, metadata, fileExt, fileName
 
     if (fileSize > CHUNK_SIZE) {
         // 大文件分片上传
-        return await uploadLargeFileToTelegram(env, file, fullId, metadata, fileName, fileType, url, returnLink, tgBotToken, tgChatId, tgChannel);
+        return await uploadLargeFileToTelegram(context, file, fullId, metadata, fileName, fileType, returnLink, tgBotToken, tgChatId, tgChannel);
     }
 
     // 由于TG会把gif后缀的文件转为视频，所以需要修改后缀名绕过限制

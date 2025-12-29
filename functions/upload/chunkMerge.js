@@ -257,7 +257,10 @@ async function mergeR2ChunksInfo(context, uploadId, completedChunks, metadata) {
         // 使用multipart info中的finalFileId更新metadata
         const finalFileId = multipartInfo.key;
         metadata.Channel = "CloudflareR2";
-        metadata.ChannelName = "R2_env";
+        // 从 R2 设置中获取渠道名称
+        const r2Settings = context.uploadConfig.cfr2;
+        const r2ChannelName = r2Settings.channels?.[0]?.name || "R2_env";
+        metadata.ChannelName = r2ChannelName;
         metadata.FileSize = (totalSize / 1024 / 1024).toFixed(2);
 
         // 清理multipart info

@@ -2,6 +2,7 @@ import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { purgeCFCache } from "../../../utils/purgeCache";
 import { removeFileFromIndex, batchRemoveFilesFromIndex } from "../../../utils/indexManager.js";
 import { getDatabase } from '../../../utils/databaseAdapter.js';
+import { updateQuotaCounter } from '../../../upload/uploadTools.js';
 
 // CORS 跨域响应头
 const corsHeaders = {
@@ -125,6 +126,12 @@ async function deleteFile(env, fileId, cdnUrl, url) {
         const db = getDatabase(env);
         const img = await db.getWithMetadata(fileId);
 
+        // 如果文件记录不存在，直接返回成功（幂等删除）
+        if (!img) {
+            console.warn(`File ${fileId} not found in database, skipping delete`);
+            return true;
+        }
+
         // 如果是R2渠道的图片，需要删除R2中对应的图片
         if (img.metadata?.Channel === 'CloudflareR2') {
             const R2DataBase = env.img_r2;
@@ -134,6 +141,11 @@ async function deleteFile(env, fileId, cdnUrl, url) {
         // S3 渠道的图片，需要删除S3中对应的图片
         if (img.metadata?.Channel === 'S3') {
             await deleteS3File(img);
+        }
+
+        // 更新容量计数器（在删除记录之前）
+        if (img.metadata?.ChannelName && img.metadata?.FileSize) {
+            await updateQuotaCounter(env, img.metadata.ChannelName, img.metadata.FileSize, 'subtract');
         }
 
         // 删除数据库中的记录
