@@ -5,7 +5,7 @@
  */
 
 import { getDatabase } from '../../utils/databaseAdapter.js';
-import { getIndexInfo } from '../../utils/indexManager.js';
+import { readIndex } from '../../utils/indexManager.js';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -76,27 +76,35 @@ async function recalculateQuota(context) {
     try {
         const db = getDatabase(env);
 
-        // 获取索引信息，包含所有文件
-        const indexInfo = await getIndexInfo(context);
+        // 使用 readIndex 获取所有文件（count=-1 表示获取全部）
+        const indexResult = await readIndex(context, { count: -1 });
 
-        if (!indexInfo || !indexInfo.success) {
+        if (!indexResult || !indexResult.success) {
             return new Response(JSON.stringify({
                 success: false,
-                error: 'Failed to get index info'
+                error: 'Failed to get index: ' + (indexResult?.error || 'Unknown error')
             }), {
                 status: 500,
                 headers: { 'Content-Type': 'application/json', ...corsHeaders }
             });
         }
 
-        // 从索引中重新计算各渠道容量
+        const allFiles = indexResult.files || [];
+
+        // 使用 Map 按文件 ID 去重，防止重复计算
+        const uniqueFiles = new Map();
+        for (const file of allFiles) {
+            if (file.id && !uniqueFiles.has(file.id)) {
+                uniqueFiles.set(file.id, file);
+            }
+        }
+
+        // 从去重后的文件列表重新计算各渠道容量
         const channelStats = {};
 
-        // 需要遍历索引中的所有文件
-        const allFiles = await getAllFilesFromIndex(context);
-
-        for (const file of allFiles) {
+        for (const file of uniqueFiles.values()) {
             const channelName = file.metadata?.ChannelName;
+            // FileSize 已经是 MB 单位
             const fileSize = parseFloat(file.metadata?.FileSize) || 0;
 
             if (channelName) {
@@ -124,7 +132,8 @@ async function recalculateQuota(context) {
         return new Response(JSON.stringify({
             success: true,
             message: 'Quota recalculated successfully',
-            channelStats
+            channelStats,
+            totalUniqueFiles: uniqueFiles.size
         }), {
             headers: { 'Content-Type': 'application/json', ...corsHeaders }
         });
@@ -137,39 +146,4 @@ async function recalculateQuota(context) {
             headers: { 'Content-Type': 'application/json', ...corsHeaders }
         });
     }
-}
-
-// 从索引获取所有文件
-async function getAllFilesFromIndex(context) {
-    const { env } = context;
-    const db = getDatabase(env);
-
-    const allFiles = [];
-
-    // 读取索引元数据
-    const metaData = await db.get('manage@index@meta');
-    if (!metaData) {
-        // 没有索引元数据，尝试读取旧格式索引
-        const oldIndex = await db.get('manage@index');
-        if (oldIndex) {
-            const index = JSON.parse(oldIndex);
-            return index.files || [];
-        }
-        return [];
-    }
-
-    const meta = JSON.parse(metaData);
-    const chunkCount = meta.chunkCount || 1;
-
-    // 读取所有分块
-    for (let i = 0; i < chunkCount; i++) {
-        const chunkKey = `manage@index_${i}`;
-        const chunkData = await db.get(chunkKey);
-        if (chunkData) {
-            const chunk = JSON.parse(chunkData);
-            allFiles.push(...chunk);
-        }
-    }
-
-    return allFiles;
 }
