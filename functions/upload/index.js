@@ -20,7 +20,7 @@ export async function onRequest(context) {  // Contents of context object
 
     // 读取各项配置，存入 context
     const securityConfig = await fetchSecurityConfig(env);
-    const uploadConfig = await fetchUploadConfig(env);
+    const uploadConfig = await fetchUploadConfig(env, context);
 
     context.securityConfig = securityConfig;
     context.uploadConfig = uploadConfig;

@@ -785,6 +785,46 @@ export async function getIndexInfo(context) {
     }
 }
 
+/**
+ * 获取索引元数据（轻量级，只读取 meta，不读取整个索引）
+ * 用于容量检查等场景，避免读取整个索引
+ * @param {Object} context - 上下文对象
+ * @returns {Object} 索引元数据，包含 totalCount, totalSizeMB, channelStats 等
+ */
+export async function getIndexMeta(context) {
+    const { env } = context;
+    const db = getDatabase(env);
+
+    try {
+        const metadataStr = await db.get(INDEX_META_KEY);
+        if (!metadataStr) {
+            return {
+                success: false,
+                totalCount: 0,
+                totalSizeMB: 0,
+                channelStats: {}
+            };
+        }
+
+        const metadata = JSON.parse(metadataStr);
+        return {
+            success: true,
+            totalCount: metadata.totalCount || 0,
+            totalSizeMB: metadata.totalSizeMB || 0,
+            channelStats: metadata.channelStats || {},
+            lastUpdated: metadata.lastUpdated
+        };
+    } catch (error) {
+        console.error('Error getting index meta:', error);
+        return {
+            success: false,
+            totalCount: 0,
+            totalSizeMB: 0,
+            channelStats: {}
+        };
+    }
+}
+
 /* ============= 原子操作相关函数 ============= */
 
 /**
@@ -1300,10 +1340,31 @@ async function saveChunkedIndex(context, index) {
             chunks.push(chunk);
         }
         
-        // 保存索引元数据
+        // 计算各渠道容量统计
+        const channelStats = {};
+        let totalSizeMB = 0;
+        
+        for (const file of files) {
+            const channelName = file.metadata?.ChannelName;
+            const fileSize = parseFloat(file.metadata?.FileSize) || 0;
+            
+            totalSizeMB += fileSize;
+            
+            if (channelName) {
+                if (!channelStats[channelName]) {
+                    channelStats[channelName] = { usedMB: 0, fileCount: 0 };
+                }
+                channelStats[channelName].usedMB += fileSize;
+                channelStats[channelName].fileCount += 1;
+            }
+        }
+        
+        // 保存索引元数据（包含容量统计）
         const metadata = {
             lastUpdated: index.lastUpdated,
             totalCount: index.totalCount,
+            totalSizeMB: Math.round(totalSizeMB * 100) / 100,
+            channelStats,
             lastOperationId: index.lastOperationId,
             chunkCount: chunks.length,
             chunkSize: INDEX_CHUNK_SIZE
@@ -1319,7 +1380,7 @@ async function saveChunkedIndex(context, index) {
         
         await Promise.all(savePromises);
         
-        console.log(`Saved chunked index: ${chunks.length} chunks, ${files.length} total files`);
+        console.log(`Saved chunked index: ${chunks.length} chunks, ${files.length} total files, ${totalSizeMB.toFixed(2)} MB`);
         return true;
         
     } catch (error) {
