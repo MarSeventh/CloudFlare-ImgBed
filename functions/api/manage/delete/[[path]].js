@@ -2,7 +2,6 @@ import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { purgeCFCache } from "../../../utils/purgeCache";
 import { removeFileFromIndex, batchRemoveFilesFromIndex } from "../../../utils/indexManager.js";
 import { getDatabase } from '../../../utils/databaseAdapter.js';
-import { updateQuotaCounter } from '../../../upload/uploadTools.js';
 
 // CORS 跨域响应头
 const corsHeaders = {
@@ -143,12 +142,8 @@ async function deleteFile(env, fileId, cdnUrl, url) {
             await deleteS3File(img);
         }
 
-        // 更新容量计数器（在删除记录之前）
-        if (img.metadata?.ChannelName && img.metadata?.FileSize) {
-            await updateQuotaCounter(env, img.metadata.ChannelName, img.metadata.FileSize, 'subtract');
-        }
-
         // 删除数据库中的记录
+        // 注意：容量统计现在由索引自动维护，删除文件后索引更新时会自动重新计算
         await db.delete(fileId);
 
         // 清除CDN缓存

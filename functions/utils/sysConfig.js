@@ -3,14 +3,19 @@ import { getSecurityConfig } from '../api/manage/sysConfig/security';
 import { getPageConfig } from '../api/manage/sysConfig/page';
 import { getOthersConfig } from '../api/manage/sysConfig/others';
 import { getDatabase } from './databaseAdapter.js';
+import { getIndexMeta } from './indexManager.js';
 
 /**
  * 根据容量限制过滤渠道
- * @param {Object} db - 数据库实例
+ * @param {Object} context - 上下文对象（包含 env）
  * @param {Array} channels - 渠道列表
  * @returns {Array} 过滤后的渠道列表
  */
-async function filterChannelsByQuota(db, channels) {
+async function filterChannelsByQuota(context, channels) {
+    // 获取索引元数据（只需 1 次读取）
+    const indexMeta = await getIndexMeta(context);
+    const channelStats = indexMeta.channelStats || {};
+
     const result = [];
     for (const channel of channels) {
         // 未启用容量限制，直接通过
@@ -20,11 +25,10 @@ async function filterChannelsByQuota(db, channels) {
         }
 
         try {
-            const quotaKey = `manage@quota@${channel.name}`;
-            const quotaData = await db.get(quotaKey);
-            const quota = quotaData ? JSON.parse(quotaData) : { usedMB: 0, fileCount: 0 };
+            // 从索引元数据中获取该渠道的容量统计
+            const stats = channelStats[channel.name] || { usedMB: 0, fileCount: 0 };
 
-            const usedGB = quota.usedMB / 1024;
+            const usedGB = stats.usedMB / 1024;
             const limitGB = channel.quota.limitGB;
             const threshold = channel.quota.threshold || 95;
 
@@ -43,7 +47,7 @@ async function filterChannelsByQuota(db, channels) {
     return result;
 }
 
-export async function fetchUploadConfig(env) {
+export async function fetchUploadConfig(env, context = null) {
     try {
         const db = getDatabase(env);
         const settings = await getUploadConfig(db, env);
@@ -53,8 +57,11 @@ export async function fetchUploadConfig(env) {
         settings.s3.channels = settings.s3.channels.filter((channel) => channel.enabled);
 
         // 根据容量限制过滤渠道（仅 R2 和 S3）
-        settings.cfr2.channels = await filterChannelsByQuota(db, settings.cfr2.channels);
-        settings.s3.channels = await filterChannelsByQuota(db, settings.s3.channels);
+        // 需要 context 来调用 getIndexMeta
+        if (context) {
+            settings.cfr2.channels = await filterChannelsByQuota(context, settings.cfr2.channels);
+            settings.s3.channels = await filterChannelsByQuota(context, settings.s3.channels);
+        }
 
         return settings;
     } catch (error) {
