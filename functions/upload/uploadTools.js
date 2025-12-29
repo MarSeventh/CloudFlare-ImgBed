@@ -191,39 +191,6 @@ export async function endUpload(context, fileId, metadata) {
     await addFileToIndex(context, fileId, metadata);
 }
 
-/**
- * 更新渠道容量计数器
- * @param {Object} env - 环境变量
- * @param {string} channelName - 渠道名称
- * @param {string|number} fileSizeMB - 文件大小(MB)
- * @param {string} operation - 操作类型: 'add' 或 'subtract'
- */
-export async function updateQuotaCounter(env, channelName, fileSizeMB, operation) {
-    if (!channelName) return;
-
-    try {
-        const db = getDatabase(env);
-        const quotaKey = `manage@quota@${channelName}`;
-        const quotaData = await db.get(quotaKey);
-        const quota = quotaData ? JSON.parse(quotaData) : { usedMB: 0, fileCount: 0 };
-
-        const sizeMB = parseFloat(fileSizeMB) || 0;
-
-        if (operation === 'add') {
-            quota.usedMB += sizeMB;
-            quota.fileCount += 1;
-        } else if (operation === 'subtract') {
-            quota.usedMB = Math.max(0, quota.usedMB - sizeMB);
-            quota.fileCount = Math.max(0, quota.fileCount - 1);
-        }
-
-        quota.lastUpdated = Date.now();
-        await db.put(quotaKey, JSON.stringify(quota));
-    } catch (error) {
-        console.error(`Failed to update quota counter for ${channelName}:`, error);
-    }
-}
-
 // 从 request 中解析 ip 地址
 export function getUploadIp(request) {
     const ip = request.headers.get("cf-connecting-ip") || request.headers.get("x-real-ip") || request.headers.get("x-forwarded-for") || request.headers.get("x-client-ip") || request.headers.get("x-host") || request.headers.get("x-originating-ip") || request.headers.get("x-cluster-client-ip") || request.headers.get("forwarded-for") || request.headers.get("forwarded") || request.headers.get("via") || request.headers.get("requester") || request.headers.get("true-client-ip") || request.headers.get("client-ip") || request.headers.get("x-remote-ip") || request.headers.get("x-originating-ip") || request.headers.get("fastly-client-ip") || request.headers.get("akamai-origin-hop") || request.headers.get("x-remote-addr") || request.headers.get("x-remote-host") || request.headers.get("x-client-ips")
