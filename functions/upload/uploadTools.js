@@ -177,7 +177,7 @@ export async function purgeCDNCache(env, cdnUrl, url, normalizedFolder) {
     }
 }
 
-// 结束上传：清除缓存，维护索引
+// 结束上传：清除缓存，维护索引，更新容量计数
 export async function endUpload(context, fileId, metadata) {
     const { env, url } = context;
 
@@ -188,6 +188,44 @@ export async function endUpload(context, fileId, metadata) {
 
     // 更新文件索引
     await addFileToIndex(context, fileId, metadata);
+
+    // 更新容量计数器
+    if (metadata.ChannelName && metadata.FileSize) {
+        await updateQuotaCounter(env, metadata.ChannelName, metadata.FileSize, 'add');
+    }
+}
+
+/**
+ * 更新渠道容量计数器
+ * @param {Object} env - 环境变量
+ * @param {string} channelName - 渠道名称
+ * @param {string|number} fileSizeMB - 文件大小(MB)
+ * @param {string} operation - 操作类型: 'add' 或 'subtract'
+ */
+export async function updateQuotaCounter(env, channelName, fileSizeMB, operation) {
+    if (!channelName) return;
+
+    try {
+        const db = getDatabase(env);
+        const quotaKey = `manage@quota@${channelName}`;
+        const quotaData = await db.get(quotaKey);
+        const quota = quotaData ? JSON.parse(quotaData) : { usedMB: 0, fileCount: 0 };
+
+        const sizeMB = parseFloat(fileSizeMB) || 0;
+
+        if (operation === 'add') {
+            quota.usedMB += sizeMB;
+            quota.fileCount += 1;
+        } else if (operation === 'subtract') {
+            quota.usedMB = Math.max(0, quota.usedMB - sizeMB);
+            quota.fileCount = Math.max(0, quota.fileCount - 1);
+        }
+
+        quota.lastUpdated = Date.now();
+        await db.put(quotaKey, JSON.stringify(quota));
+    } catch (error) {
+        console.error(`Failed to update quota counter for ${channelName}:`, error);
+    }
 }
 
 // 从 request 中解析 ip 地址
