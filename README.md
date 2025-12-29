@@ -108,6 +108,7 @@
 
 <details>
     <summary>其他页面效果展示</summary>
+
 ![image-20250313204138886](static/readme/uploading.png)
 
 ![image-20250313204308225](static/readme/dashboard.png)
