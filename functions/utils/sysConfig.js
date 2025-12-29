@@ -12,6 +12,12 @@ import { getIndexMeta } from './indexManager.js';
  * @returns {Array} 过滤后的渠道列表
  */
 async function filterChannelsByQuota(context, channels) {
+    // 先检查是否有任何渠道启用了容量限制，如果都没启用则跳过 KV 读取
+    const hasQuotaEnabled = channels.some(ch => ch.quota?.enabled && ch.quota?.limitGB);
+    if (!hasQuotaEnabled) {
+        return channels; // 无需读取 KV，直接返回所有渠道
+    }
+
     // 获取索引元数据（只需 1 次读取）
     const indexMeta = await getIndexMeta(context);
     const channelStats = indexMeta.channelStats || {};
