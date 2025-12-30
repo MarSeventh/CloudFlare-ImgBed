@@ -172,10 +172,53 @@ export async function getUploadConfig(db, env) {
     s3.loadBalance = s3LoadBalance
 
 
+    // =====================读取 Discord 渠道配置=====================
+    const discord = {}
+    const discordChannels = []
+    discord.channels = discordChannels
+    
+    // 从环境变量读取 Discord 配置
+    if (env.DISCORD_BOT_TOKEN) {
+        discordChannels.push({
+            id: 1,
+            name: 'Discord_env',
+            type: 'discord',
+            savePath: 'environment variable',
+            botToken: env.DISCORD_BOT_TOKEN,
+            channelId: env.DISCORD_CHANNEL_ID,
+            proxyUrl: env.DISCORD_PROXY_URL || '',  // 可选的代理 URL
+            enabled: true,
+            fixed: true,
+        })
+    }
+    
+    for (const dc of settingsKV.discord?.channels || []) {
+        // 如果 savePath 是 environment variable，修改可变参数
+        if (dc.savePath === 'environment variable') {
+            // 如果环境变量未删除，进行覆盖操作
+            if (discordChannels[0]) {
+                discordChannels[0].enabled = dc.enabled
+                discordChannels[0].proxyUrl = dc.proxyUrl
+            }
+            continue
+        }
+        // id 自增
+        dc.id = discordChannels.length + 1
+        discordChannels.push(dc)
+    }
+
+    // 负载均衡
+    const discordLoadBalance = settingsKV.discord?.loadBalance || {
+        enabled: false,
+        channels: [],
+    }
+    discord.loadBalance = discordLoadBalance
+
 
     settings.telegram = telegram
     settings.cfr2 = cfr2
     settings.s3 = s3
+    settings.discord = discord
 
     return settings;
 }
