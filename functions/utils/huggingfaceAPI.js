@@ -70,7 +70,7 @@ export class HuggingFaceAPI {
     }
 
     /**
-     * 上传文件到仓库（直接上传二进制文件）
+     * 上传文件到仓库（使用 multipart form upload）
      * @param {File|Blob} file - 要上传的文件
      * @param {string} filePath - 存储路径（如 images/xxx.jpg）
      * @param {string} commitMessage - 提交信息
@@ -84,19 +84,25 @@ export class HuggingFaceAPI {
                 throw new Error('Failed to create or access repository');
             }
 
-            // 直接使用二进制上传 API
-            // https://huggingface.co/api/datasets/{repo_id}/upload/{revision}/{path_in_repo}
+            // 使用 multipart form 上传 API
+            // POST https://huggingface.co/api/datasets/{repo_id}/upload/main/{path_in_repo}
             const uploadUrl = `${this.baseURL}/api/datasets/${this.repo}/upload/main/${filePath}`;
             
             console.log('Upload URL:', uploadUrl);
+            console.log('File path:', filePath);
+            console.log('File size:', file.size);
+
+            // 创建 FormData，使用 multipart/form-data 上传
+            const formData = new FormData();
+            formData.append('file', file, filePath.split('/').pop());
 
             const response = await fetch(uploadUrl, {
                 method: 'POST',
                 headers: {
-                    ...this.defaultHeaders,
-                    'Content-Type': file.type || 'application/octet-stream'
+                    'Authorization': `Bearer ${this.token}`
+                    // 不设置 Content-Type，让浏览器自动设置 multipart/form-data boundary
                 },
-                body: file  // 直接传文件，不转 base64
+                body: formData
             });
 
             if (!response.ok) {
