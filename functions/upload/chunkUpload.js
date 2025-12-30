@@ -1123,7 +1123,7 @@ export async function uploadLargeFileToTelegram(context, file, fullId, metadata,
     const { env, waitUntil } = context;
     const db = getDatabase(env);
 
-    const CHUNK_SIZE = 20 * 1024 * 1024; // 20MB
+    const CHUNK_SIZE = 16 * 1024 * 1024; // 16MB (TG Bot getFile download limit: 20MB, leave 4MB safety margin)
     const fileSize = file.size;
     const totalChunks = Math.ceil(fileSize / CHUNK_SIZE);
 
