@@ -650,35 +650,53 @@ async function uploadFileToHuggingFace(context, fullId, metadata, returnLink) {
     const { env, waitUntil, uploadConfig, formdata } = context;
     const db = getDatabase(env);
 
+    console.log('=== HuggingFace Upload Start ===');
+
     // 获取 HuggingFace 渠道配置
     const hfSettings = uploadConfig.huggingface;
+    console.log('HuggingFace settings:', hfSettings ? 'found' : 'not found');
+    
     if (!hfSettings || !hfSettings.channels || hfSettings.channels.length === 0) {
+        console.log('Error: No HuggingFace channel configured');
         return createResponse('Error: No HuggingFace channel configured', { status: 400 });
     }
 
     // 选择渠道（支持负载均衡）
     const hfChannels = hfSettings.channels;
+    console.log('HuggingFace channels count:', hfChannels.length);
+    
     const hfChannel = hfSettings.loadBalance?.enabled
         ? hfChannels[Math.floor(Math.random() * hfChannels.length)]
         : hfChannels[0];
 
+    console.log('Selected channel:', hfChannel?.name, 'repo:', hfChannel?.repo);
+
     if (!hfChannel || !hfChannel.token || !hfChannel.repo) {
+        console.log('Error: HuggingFace channel not properly configured', { 
+            hasChannel: !!hfChannel, 
+            hasToken: !!hfChannel?.token, 
+            hasRepo: !!hfChannel?.repo 
+        });
         return createResponse('Error: HuggingFace channel not properly configured', { status: 400 });
     }
 
     const file = formdata.get('file');
     const fileName = metadata.FileName;
+    console.log('File to upload:', fileName, 'size:', file?.size);
 
     // 构建文件路径：images/年月/文件名
     const now = new Date();
     const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
     const hfFilePath = `images/${yearMonth}/${fullId}`;
+    console.log('HuggingFace file path:', hfFilePath);
 
     const huggingfaceAPI = new HuggingFaceAPI(hfChannel.token, hfChannel.repo, hfChannel.isPrivate || false);
 
     try {
         // 上传文件到 HuggingFace
+        console.log('Starting HuggingFace upload...');
         const result = await huggingfaceAPI.uploadFile(file, hfFilePath, `Upload ${fileName}`);
+        console.log('HuggingFace upload result:', result);
 
         if (!result.success) {
             throw new Error('Failed to upload file to HuggingFace');
