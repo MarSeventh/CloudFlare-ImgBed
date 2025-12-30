@@ -217,10 +217,54 @@ export async function getUploadConfig(db, env) {
     discord.loadBalance = discordLoadBalance
 
 
+    // =====================读取 HuggingFace 渠道配置=====================
+    const huggingface = {}
+    const huggingfaceChannels = []
+    huggingface.channels = huggingfaceChannels
+    
+    // 从环境变量读取 HuggingFace 配置
+    if (env.HF_TOKEN) {
+        huggingfaceChannels.push({
+            id: 1,
+            name: 'HuggingFace_env',
+            type: 'huggingface',
+            savePath: 'environment variable',
+            token: env.HF_TOKEN,
+            repo: env.HF_REPO,
+            isPrivate: env.HF_PRIVATE === 'true',
+            enabled: true,
+            fixed: true,
+        })
+    }
+    
+    for (const hf of settingsKV.huggingface?.channels || []) {
+        // 如果 savePath 是 environment variable，修改可变参数
+        if (hf.savePath === 'environment variable') {
+            // 如果环境变量未删除，进行覆盖操作
+            if (huggingfaceChannels[0]) {
+                huggingfaceChannels[0].enabled = hf.enabled
+                huggingfaceChannels[0].isPrivate = hf.isPrivate
+            }
+            continue
+        }
+        // id 自增
+        hf.id = huggingfaceChannels.length + 1
+        huggingfaceChannels.push(hf)
+    }
+
+    // 负载均衡
+    const huggingfaceLoadBalance = settingsKV.huggingface?.loadBalance || {
+        enabled: false,
+        channels: [],
+    }
+    huggingface.loadBalance = huggingfaceLoadBalance
+
+
     settings.telegram = telegram
     settings.cfr2 = cfr2
     settings.s3 = s3
     settings.discord = discord
+    settings.huggingface = huggingface
 
     return settings;
 }

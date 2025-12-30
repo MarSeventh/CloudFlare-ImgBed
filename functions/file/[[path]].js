@@ -2,6 +2,7 @@ import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { fetchSecurityConfig } from "../utils/sysConfig";
 import { TelegramAPI } from "../utils/telegramAPI";
 import { DiscordAPI } from "../utils/discordAPI";
+import { HuggingFaceAPI } from "../utils/huggingfaceAPI";
 import { setCommonHeaders, setRangeHeaders, handleHeadRequest, getFileContent, isTgChannel,
             returnWithCheck, return404, isDomainAllowed } from './fileTools';
 import { getDatabase } from '../utils/databaseAdapter.js';
@@ -76,6 +77,11 @@ export async function onRequest(context) {  // Contents of context object
     /* Discord 渠道 */
     if (imgRecord.metadata?.Channel === 'Discord') {
         return await handleDiscordFile(context, imgRecord.metadata, encodedFileName, fileType);
+    }
+
+    /* HuggingFace 渠道 */
+    if (imgRecord.metadata?.Channel === 'HuggingFace') {
+        return await handleHuggingFaceFile(context, imgRecord.metadata, encodedFileName, fileType);
     }
 
     /* 外链渠道 */
@@ -537,5 +543,75 @@ async function handleDiscordFile(context, metadata, encodedFileName, fileType) {
 
     } catch (error) {
         return new Response(`Error: Failed to fetch from Discord - ${error.message}`, { status: 500 });
+    }
+}
+
+
+// 处理 HuggingFace 文件读取
+async function handleHuggingFaceFile(context, metadata, encodedFileName, fileType) {
+    const { request, url, Referer } = context;
+
+    try {
+        const hfRepo = metadata.HfRepo;
+        const hfFilePath = metadata.HfFilePath;
+        const hfToken = metadata.HfToken;
+        const hfIsPrivate = metadata.HfIsPrivate || false;
+
+        if (!hfRepo || !hfFilePath) {
+            return new Response('Error: HuggingFace file info not found', { status: 500 });
+        }
+
+        // 构建文件 URL
+        const fileUrl = metadata.HfFileUrl || `https://huggingface.co/datasets/${hfRepo}/resolve/main/${hfFilePath}`;
+
+        // 处理 HEAD 请求
+        if (request.method === 'HEAD') {
+            const headers = new Headers();
+            setCommonHeaders(headers, encodedFileName, fileType, Referer, url);
+            return handleHeadRequest(headers);
+        }
+
+        // 构建请求头
+        const fetchHeaders = {};
+        
+        // 私有仓库需要 Authorization
+        if (hfIsPrivate && hfToken) {
+            fetchHeaders['Authorization'] = `Bearer ${hfToken}`;
+        }
+
+        // 支持 Range 请求
+        const range = request.headers.get('Range');
+        if (range) {
+            fetchHeaders['Range'] = range;
+        }
+
+        const response = await fetch(fileUrl, {
+            method: 'GET',
+            headers: fetchHeaders
+        });
+
+        if (!response.ok && response.status !== 206) {
+            return new Response(`Error: Failed to fetch from HuggingFace - ${response.status}`, { status: response.status });
+        }
+
+        // 构建响应头
+        const headers = new Headers();
+        setCommonHeaders(headers, encodedFileName, fileType, Referer, url);
+
+        // 复制相关头部
+        if (response.headers.get('Content-Length')) {
+            headers.set('Content-Length', response.headers.get('Content-Length'));
+        }
+        if (response.headers.get('Content-Range')) {
+            headers.set('Content-Range', response.headers.get('Content-Range'));
+        }
+
+        return new Response(response.body, {
+            status: response.status,
+            headers
+        });
+
+    } catch (error) {
+        return new Response(`Error: Failed to fetch from HuggingFace - ${error.message}`, { status: 500 });
     }
 }

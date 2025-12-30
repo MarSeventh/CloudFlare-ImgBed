@@ -8,6 +8,7 @@ import { initializeChunkedUpload, handleChunkUpload, uploadLargeFileToTelegram, 
 import { handleChunkMerge } from "./chunkMerge";
 import { TelegramAPI } from "../utils/telegramAPI";
 import { DiscordAPI } from "../utils/discordAPI";
+import { HuggingFaceAPI } from "../utils/huggingfaceAPI";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getDatabase } from '../utils/databaseAdapter.js';
 
@@ -105,6 +106,9 @@ async function processFileUpload(context, formdata = null) {
         case 'discord':
             uploadChannel = 'Discord';
             break;
+        case 'huggingface':
+            uploadChannel = 'HuggingFace';
+            break;
         case 'external':
             uploadChannel = 'External';
             break;
@@ -195,6 +199,14 @@ async function processFileUpload(context, formdata = null) {
     } else if (uploadChannel === 'Discord') {
         // ---------------------Discord 渠道------------------
         const res = await uploadFileToDiscord(context, fullId, metadata, returnLink);
+        if (res.status === 200 || !autoRetry) {
+            return res;
+        } else {
+            err = await res.text();
+        }
+    } else if (uploadChannel === 'HuggingFace') {
+        // ---------------------HuggingFace 渠道------------------
+        const res = await uploadFileToHuggingFace(context, fullId, metadata, returnLink);
         if (res.status === 200 || !autoRetry) {
             return res;
         } else {
@@ -633,12 +645,96 @@ async function uploadFileToDiscord(context, fullId, metadata, returnLink) {
 }
 
 
+// 上传到 HuggingFace
+async function uploadFileToHuggingFace(context, fullId, metadata, returnLink) {
+    const { env, waitUntil, uploadConfig, formdata } = context;
+    const db = getDatabase(env);
+
+    // 获取 HuggingFace 渠道配置
+    const hfSettings = uploadConfig.huggingface;
+    if (!hfSettings || !hfSettings.channels || hfSettings.channels.length === 0) {
+        return createResponse('Error: No HuggingFace channel configured', { status: 400 });
+    }
+
+    // 选择渠道（支持负载均衡）
+    const hfChannels = hfSettings.channels;
+    const hfChannel = hfSettings.loadBalance?.enabled
+        ? hfChannels[Math.floor(Math.random() * hfChannels.length)]
+        : hfChannels[0];
+
+    if (!hfChannel || !hfChannel.token || !hfChannel.repo) {
+        return createResponse('Error: HuggingFace channel not properly configured', { status: 400 });
+    }
+
+    const file = formdata.get('file');
+    const fileName = metadata.FileName;
+
+    // 构建文件路径：images/年月/文件名
+    const now = new Date();
+    const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const hfFilePath = `images/${yearMonth}/${fullId}`;
+
+    const huggingfaceAPI = new HuggingFaceAPI(hfChannel.token, hfChannel.repo, hfChannel.isPrivate || false);
+
+    try {
+        // 上传文件到 HuggingFace
+        const result = await huggingfaceAPI.uploadFile(file, hfFilePath, `Upload ${fileName}`);
+
+        if (!result.success) {
+            throw new Error('Failed to upload file to HuggingFace');
+        }
+
+        // 更新 metadata
+        metadata.Channel = "HuggingFace";
+        metadata.ChannelName = hfChannel.name || "HuggingFace_env";
+        metadata.FileSize = (file.size / 1024 / 1024).toFixed(2);
+        metadata.HfRepo = hfChannel.repo;
+        metadata.HfFilePath = hfFilePath;
+        metadata.HfToken = hfChannel.token;
+        metadata.HfIsPrivate = hfChannel.isPrivate || false;
+        metadata.HfFileUrl = result.fileUrl;
+
+        // 图像审查（公开仓库直接访问，私有仓库需要代理）
+        let moderateUrl = result.fileUrl;
+        if (!hfChannel.isPrivate) {
+            metadata.Label = await moderateContent(env, moderateUrl);
+        } else {
+            // 私有仓库暂不支持图像审查，标记为 None
+            metadata.Label = "None";
+        }
+
+        // 写入 KV 数据库
+        try {
+            await db.put(fullId, "", { metadata });
+        } catch (error) {
+            return createResponse('Error: Failed to write to KV database', { status: 500 });
+        }
+
+        // 结束上传
+        waitUntil(endUpload(context, fullId, metadata));
+
+        // 返回成功响应
+        return createResponse(
+            JSON.stringify([{ 'src': returnLink }]),
+            {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            }
+        );
+
+    } catch (error) {
+        console.error('HuggingFace upload error:', error.message);
+        return createResponse(`Error: HuggingFace upload failed - ${error.message}`, { status: 500 });
+    }
+}
+
+
 // 自动切换渠道重试
 async function tryRetry(err, context, uploadChannel, fullId, metadata, fileExt, fileName, fileType, returnLink) {
     const { env, url, formdata } = context;
 
     // 渠道列表（Discord 因为有 10MB 限制，放在最后尝试）
-    const channelList = ['CloudflareR2', 'TelegramNew', 'S3', 'Discord'];
+    const channelList = ['CloudflareR2', 'TelegramNew', 'S3', 'HuggingFace', 'Discord'];
     const errMessages = {};
     errMessages[uploadChannel] = 'Error: ' + uploadChannel + err;
 
@@ -651,6 +747,8 @@ async function tryRetry(err, context, uploadChannel, fullId, metadata, fileExt, 
                 res = await uploadFileToTelegram(context, fullId, metadata, fileExt, fileName, fileType, returnLink);
             } else if (channelList[i] === 'S3') {
                 res = await uploadFileToS3(context, fullId, metadata, returnLink);
+            } else if (channelList[i] === 'HuggingFace') {
+                res = await uploadFileToHuggingFace(context, fullId, metadata, returnLink);
             } else if (channelList[i] === 'Discord') {
                 res = await uploadFileToDiscord(context, fullId, metadata, returnLink);
             }

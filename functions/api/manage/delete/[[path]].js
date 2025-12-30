@@ -3,6 +3,7 @@ import { purgeCFCache } from "../../../utils/purgeCache";
 import { removeFileFromIndex, batchRemoveFilesFromIndex } from "../../../utils/indexManager.js";
 import { getDatabase } from '../../../utils/databaseAdapter.js';
 import { DiscordAPI } from '../../../utils/discordAPI.js';
+import { HuggingFaceAPI } from '../../../utils/huggingfaceAPI.js';
 
 // CORS 跨域响应头
 const corsHeaders = {
@@ -148,6 +149,11 @@ async function deleteFile(env, fileId, cdnUrl, url) {
             await deleteDiscordFile(img);
         }
 
+        // HuggingFace 渠道的图片，需要删除 HuggingFace 中对应的文件
+        if (img.metadata?.Channel === 'HuggingFace') {
+            await deleteHuggingFaceFile(img);
+        }
+
         // 删除数据库中的记录
         // 注意：容量统计现在由索引自动维护，删除文件后索引更新时会自动重新计算
         await db.delete(fileId);
@@ -222,6 +228,32 @@ async function deleteDiscordFile(img) {
         return success;
     } catch (error) {
         console.error("Discord Delete Failed:", error);
+        return false;
+    }
+}
+
+
+// 删除 HuggingFace 渠道的图片
+async function deleteHuggingFaceFile(img) {
+    const token = img.metadata?.HfToken;
+    const repo = img.metadata?.HfRepo;
+    const filePath = img.metadata?.HfFilePath;
+    const isPrivate = img.metadata?.HfIsPrivate || false;
+
+    if (!token || !repo || !filePath) {
+        console.warn('HuggingFace file missing required metadata for deletion');
+        return false;
+    }
+
+    try {
+        const huggingfaceAPI = new HuggingFaceAPI(token, repo, isPrivate);
+        const success = await huggingfaceAPI.deleteFile(filePath, `Delete ${filePath}`);
+        if (!success) {
+            console.error('HuggingFace Delete Failed: API returned false');
+        }
+        return success;
+    } catch (error) {
+        console.error("HuggingFace Delete Failed:", error);
         return false;
     }
 }
