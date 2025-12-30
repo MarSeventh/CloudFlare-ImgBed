@@ -7,6 +7,7 @@ import {
 import { initializeChunkedUpload, handleChunkUpload, uploadLargeFileToTelegram, handleCleanupRequest } from "./chunkUpload";
 import { handleChunkMerge } from "./chunkMerge";
 import { TelegramAPI } from "../utils/telegramAPI";
+import { DiscordAPI } from "../utils/discordAPI";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getDatabase } from '../utils/databaseAdapter.js';
 
@@ -101,6 +102,9 @@ async function processFileUpload(context, formdata = null) {
         case 's3':
             uploadChannel = 'S3';
             break;
+        case 'discord':
+            uploadChannel = 'Discord';
+            break;
         case 'external':
             uploadChannel = 'External';
             break;
@@ -183,6 +187,14 @@ async function processFileUpload(context, formdata = null) {
     } else if (uploadChannel === 'S3') {
         // ---------------------S3 渠道------------------
         const res = await uploadFileToS3(context, fullId, metadata, returnLink);
+        if (res.status === 200 || !autoRetry) {
+            return res;
+        } else {
+            err = await res.text();
+        }
+    } else if (uploadChannel === 'Discord') {
+        // ---------------------Discord 渠道------------------
+        const res = await uploadFileToDiscord(context, fullId, metadata, returnLink);
         if (res.status === 200 || !autoRetry) {
             return res;
         } else {
@@ -529,12 +541,102 @@ async function uploadFileToExternal(context, fullId, metadata, returnLink) {
     );
 }
 
+
+// 上传到 Discord
+async function uploadFileToDiscord(context, fullId, metadata, returnLink) {
+    const { env, waitUntil, uploadConfig, formdata } = context;
+    const db = getDatabase(env);
+
+    // 获取 Discord 渠道配置
+    const discordSettings = uploadConfig.discord;
+    if (!discordSettings || !discordSettings.channels || discordSettings.channels.length === 0) {
+        return createResponse('Error: No Discord channel configured', { status: 400 });
+    }
+
+    // 选择渠道（支持负载均衡）
+    const discordChannels = discordSettings.channels;
+    const discordChannel = discordSettings.loadBalance?.enabled
+        ? discordChannels[Math.floor(Math.random() * discordChannels.length)]
+        : discordChannels[0];
+
+    if (!discordChannel || !discordChannel.botToken || !discordChannel.channelId) {
+        return createResponse('Error: Discord channel not properly configured', { status: 400 });
+    }
+
+    const file = formdata.get('file');
+    const fileSize = file.size;
+    const fileName = metadata.FileName;
+
+    // Discord 免费用户限制 10MB，超过则返回错误让其他渠道处理
+    const DISCORD_MAX_SIZE = 10 * 1024 * 1024; // 10MB
+    if (fileSize > DISCORD_MAX_SIZE) {
+        return createResponse('Error: File size exceeds Discord limit (10MB), please use another channel', { status: 413 });
+    }
+
+    const discordAPI = new DiscordAPI(discordChannel.botToken);
+
+    try {
+        // 上传文件到 Discord
+        const response = await discordAPI.sendFile(file, discordChannel.channelId, fileName);
+        const fileInfo = discordAPI.getFileInfo(response);
+
+        if (!fileInfo) {
+            throw new Error('Failed to get file info from Discord response');
+        }
+
+        // 更新 metadata
+        metadata.Channel = "Discord";
+        metadata.ChannelName = discordChannel.name || "Discord_env";
+        metadata.FileSize = (fileInfo.file_size / 1024 / 1024).toFixed(2);
+        metadata.DiscordMessageId = fileInfo.message_id;
+        metadata.DiscordChannelId = discordChannel.channelId;
+        metadata.DiscordBotToken = discordChannel.botToken;
+        metadata.DiscordAttachmentUrl = fileInfo.url;
+        
+        // 如果配置了代理 URL，保存代理信息
+        if (discordChannel.proxyUrl) {
+            metadata.DiscordProxyUrl = discordChannel.proxyUrl;
+        }
+
+        // 图像审查（使用 Discord CDN URL 或代理 URL）
+        let moderateUrl = fileInfo.url;
+        if (discordChannel.proxyUrl) {
+            moderateUrl = fileInfo.url.replace('https://cdn.discordapp.com', `https://${discordChannel.proxyUrl}`);
+        }
+        metadata.Label = await moderateContent(env, moderateUrl);
+
+        // 写入 KV 数据库
+        try {
+            await db.put(fullId, "", { metadata });
+        } catch (error) {
+            return createResponse('Error: Failed to write to KV database', { status: 500 });
+        }
+
+        // 结束上传
+        waitUntil(endUpload(context, fullId, metadata));
+
+        // 返回成功响应
+        return createResponse(
+            JSON.stringify([{ 'src': returnLink }]),
+            {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            }
+        );
+
+    } catch (error) {
+        console.error('Discord upload error:', error.message);
+        return createResponse(`Error: Discord upload failed - ${error.message}`, { status: 500 });
+    }
+}
+
+
 // 自动切换渠道重试
 async function tryRetry(err, context, uploadChannel, fullId, metadata, fileExt, fileName, fileType, returnLink) {
     const { env, url, formdata } = context;
 
-    // 渠道列表
-    const channelList = ['CloudflareR2', 'TelegramNew', 'S3'];
+    // 渠道列表（Discord 因为有 10MB 限制，放在最后尝试）
+    const channelList = ['CloudflareR2', 'TelegramNew', 'S3', 'Discord'];
     const errMessages = {};
     errMessages[uploadChannel] = 'Error: ' + uploadChannel + err;
 
@@ -547,11 +649,13 @@ async function tryRetry(err, context, uploadChannel, fullId, metadata, fileExt, 
                 res = await uploadFileToTelegram(context, fullId, metadata, fileExt, fileName, fileType, returnLink);
             } else if (channelList[i] === 'S3') {
                 res = await uploadFileToS3(context, fullId, metadata, returnLink);
+            } else if (channelList[i] === 'Discord') {
+                res = await uploadFileToDiscord(context, fullId, metadata, returnLink);
             }
 
-            if (res.status === 200) {
+            if (res && res.status === 200) {
                 return res;
-            } else {
+            } else if (res) {
                 errMessages[channelList[i]] = 'Error: ' + channelList[i] + await res.text();
             }
         }

@@ -1,6 +1,7 @@
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { fetchSecurityConfig } from "../utils/sysConfig";
 import { TelegramAPI } from "../utils/telegramAPI";
+import { DiscordAPI } from "../utils/discordAPI";
 import { setCommonHeaders, setRangeHeaders, handleHeadRequest, getFileContent, isTgChannel,
             returnWithCheck, return404, isDomainAllowed } from './fileTools';
 import { getDatabase } from '../utils/databaseAdapter.js';
@@ -70,6 +71,11 @@ export async function onRequest(context) {  // Contents of context object
     /* S3渠道 */
     if (imgRecord.metadata?.Channel === "S3") {
         return await handleS3File(context, imgRecord.metadata, encodedFileName, fileType);
+    }
+
+    /* Discord 渠道 */
+    if (imgRecord.metadata?.Channel === 'Discord') {
+        return await handleDiscordFile(context, imgRecord.metadata, encodedFileName, fileType);
     }
 
     /* 外链渠道 */
@@ -462,5 +468,74 @@ async function handleS3File(context, metadata, encodedFileName, fileType) {
 
     } catch (error) {
         return new Response(`Error: Failed to fetch from S3 - ${error.message}`, { status: 500 });
+    }
+}
+
+
+// 处理 Discord 文件读取
+async function handleDiscordFile(context, metadata, encodedFileName, fileType) {
+    const { env, request, url, Referer } = context;
+
+    try {
+        // 优先使用存储的附件 URL
+        let fileUrl = metadata.DiscordAttachmentUrl;
+
+        // 如果没有存储 URL，尝试通过 API 获取
+        if (!fileUrl && metadata.DiscordMessageId && metadata.DiscordChannelId && metadata.DiscordBotToken) {
+            const discordAPI = new DiscordAPI(metadata.DiscordBotToken);
+            fileUrl = await discordAPI.getFileURL(metadata.DiscordChannelId, metadata.DiscordMessageId);
+        }
+
+        if (!fileUrl) {
+            return new Response('Error: Discord file URL not found', { status: 500 });
+        }
+
+        // 如果配置了代理 URL，替换 Discord CDN 域名
+        if (metadata.DiscordProxyUrl) {
+            fileUrl = fileUrl.replace('https://cdn.discordapp.com', `https://${metadata.DiscordProxyUrl}`);
+        }
+
+        // 处理 HEAD 请求
+        if (request.method === 'HEAD') {
+            const headers = new Headers();
+            setCommonHeaders(headers, encodedFileName, fileType, Referer, url);
+            return handleHeadRequest(headers);
+        }
+
+        // 获取文件内容（支持 Range 请求）
+        const fetchHeaders = {};
+        const range = request.headers.get('Range');
+        if (range) {
+            fetchHeaders['Range'] = range;
+        }
+
+        const response = await fetch(fileUrl, {
+            method: 'GET',
+            headers: fetchHeaders
+        });
+
+        if (!response.ok && response.status !== 206) {
+            return new Response(`Error: Failed to fetch from Discord - ${response.status}`, { status: response.status });
+        }
+
+        // 构建响应头
+        const headers = new Headers();
+        setCommonHeaders(headers, encodedFileName, fileType, Referer, url);
+
+        // 复制相关头部
+        if (response.headers.get('Content-Length')) {
+            headers.set('Content-Length', response.headers.get('Content-Length'));
+        }
+        if (response.headers.get('Content-Range')) {
+            headers.set('Content-Range', response.headers.get('Content-Range'));
+        }
+
+        return new Response(response.body, {
+            status: response.status,
+            headers
+        });
+
+    } catch (error) {
+        return new Response(`Error: Failed to fetch from Discord - ${error.message}`, { status: 500 });
     }
 }
