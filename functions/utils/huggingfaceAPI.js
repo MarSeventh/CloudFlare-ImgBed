@@ -69,7 +69,7 @@ export class HuggingFaceAPI {
     }
 
     /**
-     * 上传文件到仓库
+     * 上传文件到仓库（使用 LFS 方式）
      * @param {File|Blob} file - 要上传的文件
      * @param {string} filePath - 存储路径（如 images/xxx.jpg）
      * @param {string} commitMessage - 提交信息
@@ -78,43 +78,104 @@ export class HuggingFaceAPI {
     async uploadFile(file, filePath, commitMessage = 'Upload file') {
         try {
             // 确保仓库存在
-            await this.createRepoIfNotExists();
+            const repoCreated = await this.createRepoIfNotExists();
+            if (!repoCreated) {
+                throw new Error('Failed to create or access repository');
+            }
 
-            // 将文件转换为 base64
+            // 获取文件内容
             const arrayBuffer = await file.arrayBuffer();
-            const base64Content = this.arrayBufferToBase64(arrayBuffer);
+            const fileBytes = new Uint8Array(arrayBuffer);
+            
+            // 计算文件 SHA256
+            const hashBuffer = await crypto.subtle.digest('SHA-256', fileBytes);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const sha256 = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-            // 使用 commit API 上传文件
-            const response = await fetch(`${this.apiURL}/datasets/${this.repo}/commit/main`, {
+            // 步骤1: 预上传请求，获取上传 URL
+            const preuploadResponse = await fetch(`${this.baseURL}/api/datasets/${this.repo}/preupload/main`, {
                 method: 'POST',
                 headers: {
                     ...this.defaultHeaders,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    summary: commitMessage,
-                    operations: [{
-                        op: 'addOrUpdate',
+                    files: [{
                         path: filePath,
-                        content: base64Content,
-                        encoding: 'base64'
+                        size: file.size,
+                        sample: this.arrayBufferToBase64(fileBytes.slice(0, 512))
                     }]
                 })
             });
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(`HuggingFace upload error: ${response.status} - ${errorData.error || response.statusText}`);
+            if (!preuploadResponse.ok) {
+                const errorText = await preuploadResponse.text();
+                console.error('Preupload failed:', preuploadResponse.status, errorText);
+                throw new Error(`Preupload failed: ${preuploadResponse.status}`);
             }
 
-            const result = await response.json();
+            const preuploadData = await preuploadResponse.json();
+            console.log('Preupload response:', JSON.stringify(preuploadData));
+
+            // 步骤2: 如果需要上传到 LFS，执行 LFS 上传
+            if (preuploadData.files && preuploadData.files[0]?.uploadUrl) {
+                const uploadUrl = preuploadData.files[0].uploadUrl;
+                const uploadHeaders = preuploadData.files[0].uploadHeaders || {};
+
+                const lfsUploadResponse = await fetch(uploadUrl, {
+                    method: 'PUT',
+                    headers: {
+                        ...uploadHeaders,
+                        'Content-Type': 'application/octet-stream'
+                    },
+                    body: fileBytes
+                });
+
+                if (!lfsUploadResponse.ok) {
+                    const errorText = await lfsUploadResponse.text();
+                    console.error('LFS upload failed:', lfsUploadResponse.status, errorText);
+                    throw new Error(`LFS upload failed: ${lfsUploadResponse.status}`);
+                }
+            }
+
+            // 步骤3: 提交文件
+            const commitPayload = {
+                summary: commitMessage,
+                files: [{
+                    path: filePath,
+                    size: file.size,
+                    sha256: sha256
+                }]
+            };
+
+            // 如果是 LFS 文件，添加 LFS 信息
+            if (preuploadData.files && preuploadData.files[0]?.lfs) {
+                commitPayload.files[0].lfs = preuploadData.files[0].lfs;
+            }
+
+            const commitResponse = await fetch(`${this.baseURL}/api/datasets/${this.repo}/commit/main`, {
+                method: 'POST',
+                headers: {
+                    ...this.defaultHeaders,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(commitPayload)
+            });
+
+            if (!commitResponse.ok) {
+                const errorText = await commitResponse.text();
+                console.error('Commit failed:', commitResponse.status, errorText);
+                throw new Error(`Commit failed: ${commitResponse.status} - ${errorText}`);
+            }
+
+            const result = await commitResponse.json();
             
             // 构建文件 URL
             const fileUrl = `${this.baseURL}/datasets/${this.repo}/resolve/main/${filePath}`;
 
             return {
                 success: true,
-                commitId: result.commitId || result.oid,
+                commitId: result.commitOid || result.commitId,
                 filePath: filePath,
                 fileUrl: fileUrl,
                 fileSize: file.size
@@ -141,10 +202,7 @@ export class HuggingFaceAPI {
                 },
                 body: JSON.stringify({
                     summary: commitMessage,
-                    operations: [{
-                        op: 'delete',
-                        path: filePath
-                    }]
+                    deletedFiles: [filePath]
                 })
             });
 
@@ -205,11 +263,11 @@ export class HuggingFaceAPI {
 
     /**
      * ArrayBuffer 转 Base64
-     * @param {ArrayBuffer} buffer
+     * @param {ArrayBuffer|Uint8Array} buffer
      * @returns {string}
      */
     arrayBufferToBase64(buffer) {
-        const bytes = new Uint8Array(buffer);
+        const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
         let binary = '';
         for (let i = 0; i < bytes.byteLength; i++) {
             binary += String.fromCharCode(bytes[i]);
