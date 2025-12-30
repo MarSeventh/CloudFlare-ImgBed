@@ -1,20 +1,35 @@
 /**
  * Hugging Face Hub API 封装类
- * 用于上传文件到 Hugging Face Dataset 仓库并获取文件
+ * 使用官方 @huggingface/hub SDK 上传文件
  * 
- * 参考文档：
- * - https://huggingface.co/docs/huggingface_hub/guides/upload
- * - https://huggingface.co/docs/huggingface.js/hub/README
- * 
- * 注意：为了避免 Cloudflare Workers 的 CPU 限制，
- * 本实现直接上传原始文件，不做任何编码转换。
+ * 注意：HuggingFace 现在强制要求二进制文件通过 LFS/Xet 协议上传
+ * SDK 会自动处理这个复杂流程
  */
+
 export class HuggingFaceAPI {
     constructor(token, repo, isPrivate = false) {
         this.token = token;
         this.repo = repo;  // 格式: username/repo-name
         this.isPrivate = isPrivate;
         this.baseURL = 'https://huggingface.co';
+        this.hub = null;
+    }
+
+    /**
+     * 动态加载 HuggingFace Hub SDK
+     */
+    async loadSDK() {
+        if (!this.hub) {
+            try {
+                // 使用 esm.sh 导入官方 SDK
+                this.hub = await import('https://esm.sh/@huggingface/hub@0.23.0');
+                console.log('HuggingFace Hub SDK loaded successfully');
+            } catch (error) {
+                console.error('Failed to load HuggingFace Hub SDK:', error.message);
+                throw new Error('Failed to load HuggingFace Hub SDK: ' + error.message);
+            }
+        }
+        return this.hub;
     }
 
     /**
@@ -82,7 +97,7 @@ export class HuggingFaceAPI {
 
     /**
      * 上传文件到仓库
-     * 使用 HuggingFace 的 commit API (NDJSON 格式)
+     * 使用官方 @huggingface/hub SDK
      * 
      * @param {File|Blob} file - 要上传的文件
      * @param {string} filePath - 存储路径（如 images/xxx.jpg）
@@ -103,57 +118,26 @@ export class HuggingFaceAPI {
             console.log('File size:', file.size);
             console.log('File type:', file.type);
 
-            // HuggingFace commit API 使用 NDJSON 格式
-            // POST /api/datasets/{repo_id}/commit/{revision}
-            // Content-Type: application/x-ndjson
-            const commitUrl = `${this.baseURL}/api/datasets/${this.repo}/commit/main`;
-            console.log('Commit URL:', commitUrl);
+            // 加载 SDK
+            const hub = await this.loadSDK();
 
-            // 读取文件内容并转为 base64
-            const arrayBuffer = await file.arrayBuffer();
-            const base64Content = this.arrayBufferToBase64(arrayBuffer);
-
-            // 构建 NDJSON body
-            // 第一行: header (包含 summary)
-            // 第二行: file (包含文件内容)
-            const header = JSON.stringify({
-                key: 'header',
-                value: {
-                    summary: commitMessage,
-                    description: ''
-                }
-            });
-
-            const fileData = JSON.stringify({
-                key: 'file',
-                value: {
+            // 使用官方 SDK 上传文件
+            // SDK 会自动处理 LFS 协议
+            console.log('Calling uploadFiles...');
+            const result = await hub.uploadFiles({
+                repo: { type: 'dataset', name: this.repo },
+                accessToken: this.token,
+                files: [{
                     path: filePath,
-                    content: base64Content,
-                    encoding: 'base64'
-                }
+                    content: file
+                }],
+                commitTitle: commitMessage,
+                // 禁用 Xet 协议，使用标准 LFS（Cloudflare Workers 兼容性更好）
+                useXet: false,
+                // 禁用 Web Workers（Cloudflare Workers 不支持）
+                useWebWorkers: false
             });
 
-            // NDJSON: 每行一个 JSON 对象，用换行符分隔
-            const body = header + '\n' + fileData;
-
-            const response = await fetch(commitUrl, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                    'Content-Type': 'application/x-ndjson'
-                },
-                body: body
-            });
-
-            console.log('Upload response status:', response.status);
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Upload failed:', response.status, errorText);
-                throw new Error(`Upload failed: ${response.status} - ${errorText}`);
-            }
-
-            const result = await response.json().catch(() => ({}));
             console.log('Upload result:', JSON.stringify(result));
 
             // 构建文件 URL
@@ -161,30 +145,16 @@ export class HuggingFaceAPI {
 
             return {
                 success: true,
-                commitId: result.commitOid || result.oid || 'uploaded',
+                commitId: result?.commit?.oid || 'uploaded',
                 filePath: filePath,
                 fileUrl: fileUrl,
                 fileSize: file.size
             };
         } catch (error) {
             console.error('HuggingFace upload error:', error.message);
+            console.error('Error stack:', error.stack);
             throw error;
         }
-    }
-
-    /**
-     * ArrayBuffer 转 Base64
-     * 使用分块处理避免栈溢出
-     */
-    arrayBufferToBase64(buffer) {
-        const bytes = new Uint8Array(buffer);
-        let binary = '';
-        const chunkSize = 32768; // 32KB chunks
-        for (let i = 0; i < bytes.length; i += chunkSize) {
-            const chunk = bytes.slice(i, Math.min(i + chunkSize, bytes.length));
-            binary += String.fromCharCode.apply(null, chunk);
-        }
-        return btoa(binary);
     }
 
     /**
@@ -195,21 +165,14 @@ export class HuggingFaceAPI {
      */
     async deleteFile(filePath, commitMessage = 'Delete file') {
         try {
-            // 使用 DELETE 请求删除文件
-            const deleteUrl = `${this.baseURL}/api/datasets/${this.repo}/delete/main/${filePath}`;
+            const hub = await this.loadSDK();
             
-            const response = await fetch(deleteUrl, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                }
+            await hub.deleteFile({
+                repo: { type: 'dataset', name: this.repo },
+                accessToken: this.token,
+                path: filePath,
+                commitTitle: commitMessage
             });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('HuggingFace delete error:', response.status, errorText);
-                return false;
-            }
 
             return true;
         } catch (error) {
