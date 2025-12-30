@@ -82,7 +82,7 @@ export class HuggingFaceAPI {
 
     /**
      * 上传文件到仓库
-     * 使用 HuggingFace 的 commit API 上传文件
+     * 使用 HuggingFace 的 commit API (NDJSON 格式)
      * 
      * @param {File|Blob} file - 要上传的文件
      * @param {string} filePath - 存储路径（如 images/xxx.jpg）
@@ -103,36 +103,46 @@ export class HuggingFaceAPI {
             console.log('File size:', file.size);
             console.log('File type:', file.type);
 
-            // 使用 multipart/form-data 上传到 commit 端点
-            // POST https://huggingface.co/api/datasets/{repo_id}/commit/main
+            // HuggingFace commit API 使用 NDJSON 格式
+            // POST /api/datasets/{repo_id}/commit/{revision}
+            // Content-Type: application/x-ndjson
             const commitUrl = `${this.baseURL}/api/datasets/${this.repo}/commit/main`;
             console.log('Commit URL:', commitUrl);
 
-            // 构建 multipart form data
-            // HuggingFace commit API 需要特定格式
-            const formData = new FormData();
-            
-            // 直接添加字符串字段
-            formData.append('summary', commitMessage);
-            formData.append('description', '');
-            
-            // 添加文件操作描述 - 作为字符串
-            const operations = JSON.stringify([{
-                key: 'file-0',
-                path: filePath
-            }]);
-            formData.append('operations', operations);
-            
-            // 添加文件，key 必须与 operations 中的 key 匹配
-            formData.append('file-0', file, filePath.split('/').pop());
+            // 读取文件内容并转为 base64
+            const arrayBuffer = await file.arrayBuffer();
+            const base64Content = this.arrayBufferToBase64(arrayBuffer);
+
+            // 构建 NDJSON body
+            // 第一行: header (包含 summary)
+            // 第二行: file (包含文件内容)
+            const header = JSON.stringify({
+                key: 'header',
+                value: {
+                    summary: commitMessage,
+                    description: ''
+                }
+            });
+
+            const fileData = JSON.stringify({
+                key: 'file',
+                value: {
+                    path: filePath,
+                    content: base64Content,
+                    encoding: 'base64'
+                }
+            });
+
+            // NDJSON: 每行一个 JSON 对象，用换行符分隔
+            const body = header + '\n' + fileData;
 
             const response = await fetch(commitUrl, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${this.token}`
-                    // 不设置 Content-Type，让浏览器自动设置 multipart boundary
+                    'Authorization': `Bearer ${this.token}`,
+                    'Content-Type': 'application/x-ndjson'
                 },
-                body: formData
+                body: body
             });
 
             console.log('Upload response status:', response.status);
@@ -160,6 +170,21 @@ export class HuggingFaceAPI {
             console.error('HuggingFace upload error:', error.message);
             throw error;
         }
+    }
+
+    /**
+     * ArrayBuffer 转 Base64
+     * 使用分块处理避免栈溢出
+     */
+    arrayBufferToBase64(buffer) {
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        const chunkSize = 32768; // 32KB chunks
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+            const chunk = bytes.slice(i, Math.min(i + chunkSize, bytes.length));
+            binary += String.fromCharCode.apply(null, chunk);
+        }
+        return btoa(binary);
     }
 
     /**
