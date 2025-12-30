@@ -1,6 +1,8 @@
 /**
  * Hugging Face Hub API 封装类
  * 用于上传文件到 Hugging Face 仓库并获取文件
+ * 
+ * 参考文档: https://huggingface.co/docs/huggingface_hub/guides/upload
  */
 export class HuggingFaceAPI {
     constructor(token, repo, isPrivate = false) {
@@ -23,6 +25,7 @@ export class HuggingFaceAPI {
                 method: 'GET',
                 headers: this.defaultHeaders
             });
+            console.log('Check repo exists:', this.repo, 'status:', response.status);
             return response.ok;
         } catch (error) {
             console.error('Error checking repo existence:', error.message);
@@ -38,9 +41,11 @@ export class HuggingFaceAPI {
         try {
             const exists = await this.repoExists();
             if (exists) {
+                console.log('Repo already exists:', this.repo);
                 return true;
             }
 
+            console.log('Creating repo:', this.repo);
             const response = await fetch(`${this.baseURL}/api/repos/create`, {
                 method: 'POST',
                 headers: {
@@ -55,13 +60,13 @@ export class HuggingFaceAPI {
             });
 
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                console.error('Create repo failed:', response.status, errorData);
+                const errorText = await response.text();
+                console.error('Create repo failed:', response.status, errorText);
                 // 如果是 409 冲突，说明仓库已存在
                 if (response.status === 409) {
                     return true;
                 }
-                throw new Error(`Failed to create repo: ${response.status}`);
+                throw new Error(`Failed to create repo: ${response.status} - ${errorText}`);
             }
 
             console.log(`Created HuggingFace repo: ${this.repo}`);
@@ -73,7 +78,8 @@ export class HuggingFaceAPI {
     }
 
     /**
-     * 上传文件到仓库（使用简单上传 API）
+     * 上传文件到仓库
+     * 使用 HuggingFace Hub 的 commit API
      * @param {File|Blob} file - 要上传的文件
      * @param {string} filePath - 存储路径（如 images/xxx.jpg）
      * @param {string} commitMessage - 提交信息
@@ -87,31 +93,54 @@ export class HuggingFaceAPI {
                 throw new Error('Failed to create or access repository');
             }
 
-            // 使用简单的文件上传 API
-            // PUT https://huggingface.co/api/datasets/{repo}/upload/main/{path}
-            const uploadUrl = `${this.baseURL}/api/datasets/${this.repo}/upload/main/${filePath}`;
+            // 获取文件内容
+            const arrayBuffer = await file.arrayBuffer();
+            const fileBytes = new Uint8Array(arrayBuffer);
+            const base64Content = this.uint8ArrayToBase64(fileBytes);
             
-            const response = await fetch(uploadUrl, {
-                method: 'PUT',
+            console.log('Uploading file:', filePath, 'size:', file.size, 'bytes');
+
+            // 使用 commit API 上传文件
+            // POST /api/datasets/{repo_id}/commit/{revision}
+            const commitUrl = `${this.baseURL}/api/datasets/${this.repo}/commit/main`;
+            
+            const commitPayload = {
+                summary: commitMessage,
+                description: '',
+                files: [{
+                    path: filePath,
+                    encoding: 'base64',
+                    content: base64Content
+                }]
+            };
+
+            console.log('Commit URL:', commitUrl);
+            console.log('Commit payload size:', JSON.stringify(commitPayload).length);
+
+            const response = await fetch(commitUrl, {
+                method: 'POST',
                 headers: {
                     ...this.defaultHeaders,
-                    'Content-Type': file.type || 'application/octet-stream',
-                    'x-commit-message': commitMessage
+                    'Content-Type': 'application/json'
                 },
-                body: file
+                body: JSON.stringify(commitPayload)
             });
 
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error('Upload failed:', response.status, errorText);
-                throw new Error(`Upload failed: ${response.status} - ${errorText}`);
+                console.error('Commit failed:', response.status, errorText);
+                throw new Error(`Commit failed: ${response.status} - ${errorText}`);
             }
 
+            const result = await response.json();
+            console.log('Commit result:', JSON.stringify(result));
+            
             // 构建文件 URL
             const fileUrl = `${this.baseURL}/datasets/${this.repo}/resolve/main/${filePath}`;
 
             return {
                 success: true,
+                commitId: result.commitOid || result.commitId || result.oid,
                 filePath: filePath,
                 fileUrl: fileUrl,
                 fileSize: file.size
@@ -130,8 +159,9 @@ export class HuggingFaceAPI {
      */
     async deleteFile(filePath, commitMessage = 'Delete file') {
         try {
-            // 使用 commit API 删除文件
-            const response = await fetch(`${this.baseURL}/api/datasets/${this.repo}/commit/main`, {
+            const commitUrl = `${this.baseURL}/api/datasets/${this.repo}/commit/main`;
+            
+            const response = await fetch(commitUrl, {
                 method: 'POST',
                 headers: {
                     ...this.defaultHeaders,
@@ -196,5 +226,19 @@ export class HuggingFaceAPI {
         } catch (error) {
             return false;
         }
+    }
+
+    /**
+     * Uint8Array 转 Base64
+     * @param {Uint8Array} bytes
+     * @returns {string}
+     */
+    uint8ArrayToBase64(bytes) {
+        let binary = '';
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return btoa(binary);
     }
 }
