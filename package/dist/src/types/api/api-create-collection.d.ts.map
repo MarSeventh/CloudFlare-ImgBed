@@ -1,0 +1,1 @@
+{"version":3,"file":"api-create-collection.d.ts","sourceRoot":"","sources":["../../../../src/types/api/api-create-collection.ts"],"names":[],"mappings":"AAAA,MAAM,WAAW,0BAA0B;IAC1C;;OAEG;IACH,KAAK,EAAE,MAAM,CAAC;IACd;;OAEG;IACH,SAAS,EAAE,MAAM,CAAC;IAClB;;OAEG;IACH,WAAW,CAAC,EAAE,MAAM,CAAC;IACrB;;;OAGG;IACH,OAAO,CAAC,EAAE,OAAO,CAAC;CAClB"}

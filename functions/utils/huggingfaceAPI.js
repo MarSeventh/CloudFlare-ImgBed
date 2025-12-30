@@ -4,6 +4,8 @@
  * 
  * HuggingFace 要求二进制文件通过 LFS 协议上传
  * 流程：preupload -> LFS batch -> upload to LFS storage -> commit
+ * 
+ * 优化：SHA256 可由前端预计算传入，避免后端 CPU 超时
  */
 
 export class HuggingFaceAPI {
@@ -15,7 +17,7 @@ export class HuggingFaceAPI {
     }
 
     /**
-     * 计算文件的 SHA256 哈希
+     * 计算文件的 SHA256 哈希（仅在未提供预计算哈希时使用）
      * @param {Blob} blob 
      * @returns {Promise<string>} hex string
      */
@@ -265,8 +267,12 @@ export class HuggingFaceAPI {
 
     /**
      * 上传文件（完整流程）
+     * @param {File|Blob} file - 要上传的文件
+     * @param {string} filePath - 存储路径
+     * @param {string} commitMessage - 提交信息
+     * @param {string} precomputedSha256 - 前端预计算的 SHA256（可选，传入可避免后端计算）
      */
-    async uploadFile(file, filePath, commitMessage = 'Upload file') {
+    async uploadFile(file, filePath, commitMessage = 'Upload file', precomputedSha256 = null) {
         try {
             // 确保仓库存在
             if (!await this.createRepoIfNotExists()) {
@@ -278,10 +284,16 @@ export class HuggingFaceAPI {
             console.log('Path:', filePath);
             console.log('Size:', file.size);
 
-            // 1. 计算 SHA256
-            console.log('Computing SHA256...');
-            const oid = await this.sha256(file);
-            console.log('SHA256:', oid);
+            // 1. 使用预计算的 SHA256 或在后端计算
+            let oid;
+            if (precomputedSha256) {
+                console.log('Using precomputed SHA256:', precomputedSha256);
+                oid = precomputedSha256;
+            } else {
+                console.log('Computing SHA256 on server (may timeout for large files)...');
+                oid = await this.sha256(file);
+                console.log('SHA256:', oid);
+            }
 
             // 2. 获取文件样本（前512字节的base64）
             const sampleBytes = new Uint8Array(await file.slice(0, 512).arrayBuffer());
