@@ -1,6 +1,13 @@
 /**
  * Hugging Face Hub API 封装类
- * 用于上传文件到 Hugging Face 仓库并获取文件
+ * 用于上传文件到 Hugging Face Dataset 仓库并获取文件
+ * 
+ * 参考文档：
+ * - https://huggingface.co/docs/huggingface_hub/guides/upload
+ * - https://huggingface.co/docs/huggingface.js/hub/README
+ * 
+ * 注意：为了避免 Cloudflare Workers 的 CPU 限制，
+ * 本实现直接上传原始文件，不做任何编码转换。
  */
 export class HuggingFaceAPI {
     constructor(token, repo, isPrivate = false) {
@@ -8,9 +15,6 @@ export class HuggingFaceAPI {
         this.repo = repo;  // 格式: username/repo-name
         this.isPrivate = isPrivate;
         this.baseURL = 'https://huggingface.co';
-        this.defaultHeaders = {
-            'Authorization': `Bearer ${this.token}`,
-        };
     }
 
     /**
@@ -21,7 +25,9 @@ export class HuggingFaceAPI {
         try {
             const response = await fetch(`${this.baseURL}/api/datasets/${this.repo}`, {
                 method: 'GET',
-                headers: this.defaultHeaders
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
             });
             return response.ok;
         } catch (error) {
@@ -38,13 +44,15 @@ export class HuggingFaceAPI {
         try {
             const exists = await this.repoExists();
             if (exists) {
+                console.log('Repository already exists:', this.repo);
                 return true;
             }
 
+            console.log('Creating repository:', this.repo);
             const response = await fetch(`${this.baseURL}/api/repos/create`, {
                 method: 'POST',
                 headers: {
-                    ...this.defaultHeaders,
+                    'Authorization': `Bearer ${this.token}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
@@ -56,12 +64,15 @@ export class HuggingFaceAPI {
 
             if (!response.ok) {
                 if (response.status === 409) {
-                    return true; // 仓库已存在
+                    console.log('Repository already exists (409)');
+                    return true;
                 }
                 const errorText = await response.text();
+                console.error('Failed to create repo:', response.status, errorText);
                 throw new Error(`Failed to create repo: ${response.status} - ${errorText}`);
             }
 
+            console.log('Repository created successfully');
             return true;
         } catch (error) {
             console.error('Error creating repo:', error.message);
@@ -70,7 +81,9 @@ export class HuggingFaceAPI {
     }
 
     /**
-     * 上传文件到仓库（使用 multipart form upload）
+     * 上传文件到仓库
+     * 直接使用 PUT 请求上传文件，不做任何编码转换
+     * 
      * @param {File|Blob} file - 要上传的文件
      * @param {string} filePath - 存储路径（如 images/xxx.jpg）
      * @param {string} commitMessage - 提交信息
@@ -84,26 +97,28 @@ export class HuggingFaceAPI {
                 throw new Error('Failed to create or access repository');
             }
 
-            // 使用 multipart form 上传 API
-            // POST https://huggingface.co/api/datasets/{repo_id}/upload/main/{path_in_repo}
-            const uploadUrl = `${this.baseURL}/api/datasets/${this.repo}/upload/main/${filePath}`;
-            
-            console.log('Upload URL:', uploadUrl);
+            console.log('=== HuggingFace Upload ===');
+            console.log('Repo:', this.repo);
             console.log('File path:', filePath);
             console.log('File size:', file.size);
+            console.log('File type:', file.type);
 
-            // 创建 FormData，使用 multipart/form-data 上传
-            const formData = new FormData();
-            formData.append('file', file, filePath.split('/').pop());
+            // 使用 HuggingFace 的文件上传 API
+            // PUT /api/datasets/{repo_id}/upload/main/{path_in_repo}
+            const uploadUrl = `${this.baseURL}/api/datasets/${this.repo}/upload/main/${filePath}`;
+            console.log('Upload URL:', uploadUrl);
 
+            // 直接 PUT 文件内容，不做任何转换
             const response = await fetch(uploadUrl, {
-                method: 'POST',
+                method: 'PUT',
                 headers: {
-                    'Authorization': `Bearer ${this.token}`
-                    // 不设置 Content-Type，让浏览器自动设置 multipart/form-data boundary
+                    'Authorization': `Bearer ${this.token}`,
+                    'Content-Type': file.type || 'application/octet-stream'
                 },
-                body: formData
+                body: file  // 直接传递 File/Blob 对象
             });
+
+            console.log('Upload response status:', response.status);
 
             if (!response.ok) {
                 const errorText = await response.text();
@@ -113,13 +128,13 @@ export class HuggingFaceAPI {
 
             const result = await response.json().catch(() => ({}));
             console.log('Upload result:', JSON.stringify(result));
-            
+
             // 构建文件 URL
             const fileUrl = `${this.baseURL}/datasets/${this.repo}/resolve/main/${filePath}`;
 
             return {
                 success: true,
-                commitId: result.commitOid || result.commitId || result.oid,
+                commitId: result.commitOid || result.oid || 'uploaded',
                 filePath: filePath,
                 fileUrl: fileUrl,
                 fileSize: file.size
@@ -138,18 +153,14 @@ export class HuggingFaceAPI {
      */
     async deleteFile(filePath, commitMessage = 'Delete file') {
         try {
-            const commitUrl = `${this.baseURL}/api/datasets/${this.repo}/commit/main`;
+            // 使用 DELETE 请求删除文件
+            const deleteUrl = `${this.baseURL}/api/datasets/${this.repo}/delete/main/${filePath}`;
             
-            const response = await fetch(commitUrl, {
-                method: 'POST',
+            const response = await fetch(deleteUrl, {
+                method: 'DELETE',
                 headers: {
-                    ...this.defaultHeaders,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    summary: commitMessage,
-                    deletedFiles: [filePath]
-                })
+                    'Authorization': `Bearer ${this.token}`
+                }
             });
 
             if (!response.ok) {
@@ -174,7 +185,7 @@ export class HuggingFaceAPI {
         const fileUrl = `${this.baseURL}/datasets/${this.repo}/resolve/main/${filePath}`;
         
         const response = await fetch(fileUrl, {
-            headers: this.isPrivate ? this.defaultHeaders : {}
+            headers: this.isPrivate ? { 'Authorization': `Bearer ${this.token}` } : {}
         });
 
         return response;
