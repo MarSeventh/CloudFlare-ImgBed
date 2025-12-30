@@ -109,19 +109,25 @@ export class HuggingFaceAPI {
             console.log('Commit URL:', commitUrl);
 
             // 构建 multipart form data
+            // HuggingFace commit API 格式参考: https://huggingface.co/docs/huggingface.js
             const formData = new FormData();
             
-            // 添加文件，使用特定的字段名格式
-            // HuggingFace 期望的格式: file-{index}-{path}
-            formData.append(`file`, file, filePath);
+            // header 必须是 JSON blob，包含 summary
+            const header = {
+                summary: commitMessage,
+                description: ''
+            };
+            formData.append('header', new Blob([JSON.stringify(header)], { type: 'application/json' }));
             
-            // 添加操作描述
-            const operations = JSON.stringify([{
-                key: 'file',
+            // 添加文件操作描述
+            const operations = [{
+                key: 'file-0',
                 path: filePath
-            }]);
-            formData.append('operations', operations);
-            formData.append('summary', commitMessage);
+            }];
+            formData.append('operations', new Blob([JSON.stringify(operations)], { type: 'application/json' }));
+            
+            // 添加文件，key 必须与 operations 中的 key 匹配
+            formData.append('file-0', file, filePath.split('/').pop());
 
             const response = await fetch(commitUrl, {
                 method: 'POST',
