@@ -1,0 +1,157 @@
+import { describe, expect, it } from "vitest";
+import { listCollections } from "./list-collections";
+import type { ApiCollectionInfo } from "../types/api/api-collection";
+
+describe("listCollections", () => {
+	it("should list collections", async () => {
+		const results: ApiCollectionInfo[] = [];
+
+		for await (const entry of listCollections({
+			search: { owner: ["huggingfacejs"] },
+		})) {
+			results.push(entry);
+		}
+
+		expect(results.length).toBe(1);
+
+		const itemTypes = results[0].items.map((item) => item.type);
+		expect(itemTypes).toEqual(["dataset", "collection", "space", "paper"]);
+
+		expect(results).toEqual([
+			{
+				slug: "huggingfacejs/test-collection-690df2897fa1945492b8cf42",
+				title: "Test Collection",
+				description: "Only used in E2E tests",
+				gating: false,
+				lastUpdated: expect.any(String),
+				owner: {
+					_id: "6414d83b385a75d7790d5a58",
+					avatarUrl: expect.any(String),
+					fullname: "Huggingface.js",
+					name: "huggingfacejs",
+					type: "org",
+					followerCount: expect.any(Number),
+					isHf: false,
+					isHfAdmin: false,
+					isMod: false,
+					isEnterprise: false,
+				},
+				items: [
+					{
+						_id: "690df2a467ea25a1a346d0ae",
+						author: "huggingfacejs",
+						datasetsServerInfo: {
+							formats: ["imagefolder"],
+							libraries: ["datasets", "mlcroissant"],
+							modalities: ["audio", "image"],
+							numRows: 38,
+							viewer: "viewer",
+						},
+						downloads: expect.any(Number),
+						gated: false,
+						id: "huggingfacejs/tasks",
+						isLikedByUser: false,
+						lastModified: "2025-05-21T10:59:37.000Z",
+						likes: expect.any(Number),
+						position: 0,
+						private: false,
+						repoType: "dataset",
+						type: "dataset",
+					},
+					{
+						_id: "690df2b1954547dac9727da3",
+						description: "Only used in E2E tests",
+						id: "690df2897fa1945492b8cf42",
+						isUpvotedByUser: false,
+						lastUpdated: "2025-11-07T13:24:26.277Z",
+						numberItems: 5,
+						owner: {
+							_id: "6414d83b385a75d7790d5a58",
+							avatarUrl:
+								"https://cdn-avatars.huggingface.co/v1/production/uploads/1679315631188-61d2f90c3c2083e1c08af22d.png",
+							followerCount: expect.any(Number),
+							fullname: "Huggingface.js",
+							isEnterprise: false,
+							isHf: false,
+							isHfAdmin: false,
+							isMod: false,
+							name: "huggingfacejs",
+							type: "org",
+						},
+						position: 1,
+						shareUrl: "https://hf.co/collections/huggingfacejs/test-collection",
+						slug: "huggingfacejs/test-collection-690df2897fa1945492b8cf42",
+						theme: "pink",
+						title: "Test Collection",
+						type: "collection",
+						upvotes: expect.any(Number),
+					},
+					{
+						_id: "690df2c49f252aa897a873b2",
+						ai_category: "Model Benchmarking",
+						ai_short_description: "Upload ML models to Hugging Face Hub from your browser",
+						author: "huggingfacejs",
+						authorData: {
+							_id: "6414d83b385a75d7790d5a58",
+							avatarUrl:
+								"https://cdn-avatars.huggingface.co/v1/production/uploads/1679315631188-61d2f90c3c2083e1c08af22d.png",
+							followerCount: expect.any(Number),
+							fullname: "Huggingface.js",
+							isEnterprise: false,
+							isHf: false,
+							isHfAdmin: false,
+							isMod: false,
+							name: "huggingfacejs",
+							type: "org",
+						},
+						colorFrom: "green",
+						colorTo: "green",
+						createdAt: "2023-03-17T21:33:16.000Z",
+						emoji: "🌎",
+						id: "huggingfacejs/push-model-from-web",
+						isLikedByUser: false,
+						lastModified: "2023-04-01T15:29:38.000Z",
+						likes: expect.any(Number),
+						pinned: false,
+						position: 2,
+						private: false,
+						featured: false,
+						repoType: "space",
+						runtime: {
+							hardware: {
+								current: null,
+								requested: null,
+							},
+							replicas: {
+								current: 1,
+								requested: 1,
+							},
+							stage: "RUNNING",
+							storage: null,
+						},
+						sdk: "static",
+						tags: ["static", "region:us"],
+						title: "Push Model From Web",
+						trendingScore: 0,
+						type: "space",
+					},
+					{
+						_id: "690df2d0c9390ed6ab0f88b1",
+						id: "2510.04871",
+						isUpvotedByUser: false,
+						position: 3,
+						publishedAt: "2025-10-06T14:58:08.000Z",
+						thumbnailUrl: "https://cdn-thumbnails.huggingface.co/social-thumbnails/papers/2510.04871.png",
+						title: "Less is More: Recursive Reasoning with Tiny Networks",
+						type: "paper",
+						upvotes: expect.any(Number),
+					},
+				],
+				theme: "pink",
+				private: false,
+				upvotes: expect.any(Number),
+				isUpvotedByUser: false,
+			},
+		]);
+	});
+});

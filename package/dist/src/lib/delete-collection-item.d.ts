@@ -1,0 +1,18 @@
+import type { CredentialsParams } from "../types/public";
+export declare function deleteCollectionItem(params: {
+    /**
+     * The slug of the collection to delete the item from.
+     */
+    slug: string;
+    /**
+     * The item object id which is different from the repo_id/paper_id provided when adding the item to the collection.
+     * This should be the _id property of the item.
+     */
+    itemId: string;
+    hubUrl?: string;
+    /**
+     * Custom fetch function to use instead of the default one, for example to use a proxy or edit headers.
+     */
+    fetch?: typeof fetch;
+} & Partial<CredentialsParams>): Promise<void>;
+//# sourceMappingURL=delete-collection-item.d.ts.map

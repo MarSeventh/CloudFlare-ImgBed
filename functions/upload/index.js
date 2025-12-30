@@ -682,7 +682,9 @@ async function uploadFileToHuggingFace(context, fullId, metadata, returnLink) {
 
     const file = formdata.get('file');
     const fileName = metadata.FileName;
-    console.log('File to upload:', fileName, 'size:', file?.size);
+    // 获取前端预计算的 SHA256（如果有）
+    const precomputedSha256 = formdata.get('sha256') || null;
+    console.log('File to upload:', fileName, 'size:', file?.size, 'precomputed SHA256:', precomputedSha256 ? 'yes' : 'no');
 
     // 构建文件路径：images/年月/文件名
     const now = new Date();
@@ -693,9 +695,9 @@ async function uploadFileToHuggingFace(context, fullId, metadata, returnLink) {
     const huggingfaceAPI = new HuggingFaceAPI(hfChannel.token, hfChannel.repo, hfChannel.isPrivate || false);
 
     try {
-        // 上传文件到 HuggingFace
+        // 上传文件到 HuggingFace（传入预计算的 SHA256）
         console.log('Starting HuggingFace upload...');
-        const result = await huggingfaceAPI.uploadFile(file, hfFilePath, `Upload ${fileName}`);
+        const result = await huggingfaceAPI.uploadFile(file, hfFilePath, `Upload ${fileName}`, precomputedSha256);
         console.log('HuggingFace upload result:', result);
 
         if (!result.success) {
