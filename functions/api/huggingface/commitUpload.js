@@ -5,7 +5,7 @@
  */
 
 import { HuggingFaceAPI } from '../../utils/huggingfaceAPI.js';
-import { getUploadConfig } from '../../utils/sysConfig.js';
+import { fetchUploadConfig } from '../../utils/sysConfig.js';
 import { getDatabase } from '../../utils/databaseAdapter.js';
 import { moderateContent, endUpload } from '../../upload/uploadTools.js';
 
@@ -35,7 +35,7 @@ export async function onRequestPost(context) {
         }
 
         // 获取 HuggingFace 配置
-        const uploadConfig = await getUploadConfig(env);
+        const uploadConfig = await fetchUploadConfig(env);
         const hfSettings = uploadConfig.huggingface;
 
         if (!hfSettings || !hfSettings.channels || hfSettings.channels.length === 0) {
