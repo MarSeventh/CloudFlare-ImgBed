@@ -567,10 +567,12 @@ async function uploadFileToDiscord(context, fullId, metadata, returnLink) {
     const fileSize = file.size;
     const fileName = metadata.FileName;
 
-    // Discord 免费用户限制 10MB，超过则返回错误让其他渠道处理
-    const DISCORD_MAX_SIZE = 10 * 1024 * 1024; // 10MB
+    // Discord 文件大小限制：Nitro 会员 25MB，免费用户 10MB
+    const isNitro = discordChannel.isNitro || false;
+    const DISCORD_MAX_SIZE = isNitro ? 25 * 1024 * 1024 : 10 * 1024 * 1024;
     if (fileSize > DISCORD_MAX_SIZE) {
-        return createResponse('Error: File size exceeds Discord limit (10MB), please use another channel', { status: 413 });
+        const limitMB = isNitro ? 25 : 10;
+        return createResponse(`Error: File size exceeds Discord limit (${limitMB}MB), please use another channel`, { status: 413 });
     }
 
     const discordAPI = new DiscordAPI(discordChannel.botToken);
