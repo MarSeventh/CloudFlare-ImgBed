@@ -5,7 +5,11 @@
  * HuggingFace 要求二进制文件通过 LFS 协议上传
  * 流程：preupload -> LFS batch -> upload to LFS storage -> commit
  * 
- * 优化：SHA256 可由前端预计算传入，避免后端 CPU 超时
+ * 优化方案：
+ * 1. 小文件（<20MB）：前端 → CF Workers → HuggingFace S3
+ * 2. 大文件（>=20MB）：前端直接上传到 HuggingFace S3，CF Workers 只负责获取签名 URL 和提交
+ * 
+ * SHA256 由前端预计算传入，避免后端 CPU 超时
  */
 
 export class HuggingFaceAPI {
@@ -266,7 +270,64 @@ export class HuggingFaceAPI {
     }
 
     /**
-     * 上传文件（完整流程）
+     * 获取 LFS 上传信息（用于前端直传大文件）
+     * 返回上传 URL 和必要的信息，让前端直接上传到 S3
+     * @param {number} fileSize - 文件大小
+     * @param {string} filePath - 存储路径
+     * @param {string} sha256 - 文件的 SHA256 哈希
+     * @param {string} fileSample - 文件前512字节的 base64
+     */
+    async getLfsUploadInfo(fileSize, filePath, sha256, fileSample) {
+        // 确保仓库存在
+        if (!await this.createRepoIfNotExists()) {
+            throw new Error('Failed to create or access repository');
+        }
+
+        // 1. Preupload 检查
+        console.log('Preupload check for direct upload...');
+        const preuploadResult = await this.preupload(filePath, fileSize, fileSample);
+        console.log('Preupload result:', JSON.stringify(preuploadResult));
+
+        const fileInfo = preuploadResult.files?.[0];
+        const needsLfs = fileInfo?.uploadMode === 'lfs';
+
+        if (!needsLfs) {
+            // 小文件不需要 LFS，返回 null 让后端处理
+            return { needsLfs: false };
+        }
+
+        // 2. LFS Batch - 获取上传 URL
+        console.log('LFS batch request for direct upload...');
+        const batchResult = await this.lfsBatch(sha256, fileSize);
+        console.log('LFS batch result:', JSON.stringify(batchResult));
+
+        const obj = batchResult.objects?.[0];
+        if (obj?.error) {
+            throw new Error(`LFS error: ${obj.error.message}`);
+        }
+
+        // 检查文件是否已存在
+        if (!obj?.actions?.upload) {
+            return {
+                needsLfs: true,
+                alreadyExists: true,
+                oid: sha256,
+                filePath
+            };
+        }
+
+        // 返回上传信息
+        return {
+            needsLfs: true,
+            alreadyExists: false,
+            oid: sha256,
+            filePath,
+            uploadAction: obj.actions.upload
+        };
+    }
+
+    /**
+     * 上传文件（完整流程）- 用于小文件或后端代理上传
      * @param {File|Blob} file - 要上传的文件
      * @param {string} filePath - 存储路径
      * @param {string} commitMessage - 提交信息
