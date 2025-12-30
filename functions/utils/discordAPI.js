@@ -137,4 +137,30 @@ export class DiscordAPI {
         const response = await fetch(fileURL);
         return response;
     }
+
+    /**
+     * 删除消息（用于删除文件）
+     * @param {string} channelId - 频道 ID
+     * @param {string} messageId - 消息 ID
+     * @returns {Promise<boolean>} 是否删除成功
+     */
+    async deleteMessage(channelId, messageId) {
+        try {
+            const response = await fetch(`${this.baseURL}/channels/${channelId}/messages/${messageId}`, {
+                method: 'DELETE',
+                headers: this.defaultHeaders
+            });
+
+            // Discord 删除成功返回 204 No Content
+            if (response.status === 204 || response.ok) {
+                return true;
+            }
+
+            console.error('Discord deleteMessage error:', response.status, response.statusText);
+            return false;
+        } catch (error) {
+            console.error('Error deleting Discord message:', error.message);
+            return false;
+        }
+    }
 }

@@ -2,6 +2,7 @@ import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { purgeCFCache } from "../../../utils/purgeCache";
 import { removeFileFromIndex, batchRemoveFilesFromIndex } from "../../../utils/indexManager.js";
 import { getDatabase } from '../../../utils/databaseAdapter.js';
+import { DiscordAPI } from '../../../utils/discordAPI.js';
 
 // CORS 跨域响应头
 const corsHeaders = {
@@ -142,6 +143,11 @@ async function deleteFile(env, fileId, cdnUrl, url) {
             await deleteS3File(img);
         }
 
+        // Discord 渠道的图片，需要删除 Discord 中对应的消息
+        if (img.metadata?.Channel === 'Discord') {
+            await deleteDiscordFile(img);
+        }
+
         // 删除数据库中的记录
         // 注意：容量统计现在由索引自动维护，删除文件后索引更新时会自动重新计算
         await db.delete(fileId);
@@ -192,6 +198,30 @@ async function deleteS3File(img) {
         return true;
     } catch (error) {
         console.error("S3 Delete Failed:", error);
+        return false;
+    }
+}
+
+// 删除 Discord 渠道的图片（删除 Discord 消息）
+async function deleteDiscordFile(img) {
+    const botToken = img.metadata?.DiscordBotToken;
+    const channelId = img.metadata?.DiscordChannelId;
+    const messageId = img.metadata?.DiscordMessageId;
+
+    if (!botToken || !channelId || !messageId) {
+        console.warn('Discord file missing required metadata for deletion');
+        return false;
+    }
+
+    try {
+        const discordAPI = new DiscordAPI(botToken);
+        const success = await discordAPI.deleteMessage(channelId, messageId);
+        if (!success) {
+            console.error('Discord Delete Failed: API returned false');
+        }
+        return success;
+    } catch (error) {
+        console.error("Discord Delete Failed:", error);
         return false;
     }
 }
