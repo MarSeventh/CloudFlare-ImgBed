@@ -178,6 +178,7 @@ export async function purgeCDNCache(env, cdnUrl, url, normalizedFolder) {
 }
 
 // 结束上传：清除缓存，维护索引
+// 注意：容量统计现在由索引自动维护，不需要单独更新 quota
 export async function endUpload(context, fileId, metadata) {
     const { env, url } = context;
 
@@ -186,7 +187,7 @@ export async function endUpload(context, fileId, metadata) {
     const normalizedFolder = (url.searchParams.get('uploadFolder') || '').replace(/^\/+/, '').replace(/\/{2,}/g, '/').replace(/\/$/, '');
     await purgeCDNCache(env, cdnUrl, url, normalizedFolder);
 
-    // 更新文件索引
+    // 更新文件索引（索引更新时会自动计算容量统计）
     await addFileToIndex(context, fileId, metadata);
 }
 

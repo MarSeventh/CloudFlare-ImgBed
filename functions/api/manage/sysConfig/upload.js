@@ -110,6 +110,7 @@ export async function getUploadConfig(db, env) {
             if (cfr2Channels[0]) {
                 cfr2Channels[0].publicUrl = r2.publicUrl
                 cfr2Channels[0].enabled = r2.enabled
+                cfr2Channels[0].quota = r2.quota  // 保留容量限制配置
             }
 
             continue
@@ -153,6 +154,7 @@ export async function getUploadConfig(db, env) {
             // 如果环境变量未删除，进行覆盖操作
             if (s3Channels[0]) {
                 s3Channels[0].enabled = s.enabled
+                s3Channels[0].quota = s.quota  // 保留容量限制配置
             }
             
             continue

@@ -125,6 +125,12 @@ async function deleteFile(env, fileId, cdnUrl, url) {
         const db = getDatabase(env);
         const img = await db.getWithMetadata(fileId);
 
+        // 如果文件记录不存在，直接返回成功（幂等删除）
+        if (!img) {
+            console.warn(`File ${fileId} not found in database, skipping delete`);
+            return true;
+        }
+
         // 如果是R2渠道的图片，需要删除R2中对应的图片
         if (img.metadata?.Channel === 'CloudflareR2') {
             const R2DataBase = env.img_r2;
@@ -137,6 +143,7 @@ async function deleteFile(env, fileId, cdnUrl, url) {
         }
 
         // 删除数据库中的记录
+        // 注意：容量统计现在由索引自动维护，删除文件后索引更新时会自动重新计算
         await db.delete(fileId);
 
         // 清除CDN缓存
