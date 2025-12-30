@@ -145,13 +145,16 @@ export class HuggingFaceAPI {
 
     /**
      * 步骤3: 上传文件到 LFS 存储
+     * @param {object} uploadAction - 上传动作信息
+     * @param {File|Blob} file - 文件
+     * @param {string} oid - 文件的 SHA256 哈希
      */
-    async uploadToLFS(uploadAction, file) {
+    async uploadToLFS(uploadAction, file, oid) {
         const { href, header } = uploadAction;
 
         // 检查是否是分片上传
         if (header?.chunk_size) {
-            return await this.uploadMultipart(uploadAction, file);
+            return await this.uploadMultipart(uploadAction, file, oid);
         }
 
         // 基本上传
@@ -172,8 +175,11 @@ export class HuggingFaceAPI {
 
     /**
      * 分片上传（大文件）
+     * @param {object} uploadAction - 上传动作信息
+     * @param {File|Blob} file - 文件
+     * @param {string} oid - 文件的 SHA256 哈希
      */
-    async uploadMultipart(uploadAction, file) {
+    async uploadMultipart(uploadAction, file, oid) {
         const { href: completionUrl, header } = uploadAction;
         const chunkSize = parseInt(header.chunk_size);
         
@@ -216,7 +222,7 @@ export class HuggingFaceAPI {
                 'Content-Type': 'application/vnd.git-lfs+json'
             },
             body: JSON.stringify({
-                oid: uploadAction.oid,
+                oid: oid,
                 parts: completeParts
             })
         });
@@ -383,7 +389,7 @@ export class HuggingFaceAPI {
                 // 5. 上传到 LFS 存储（如果需要）
                 if (obj?.actions?.upload) {
                     console.log('Uploading to LFS storage...');
-                    await this.uploadToLFS(obj.actions.upload, file);
+                    await this.uploadToLFS(obj.actions.upload, file, oid);
                     console.log('LFS upload complete');
                 } else {
                     console.log('File already exists in LFS');
