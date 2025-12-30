@@ -187,6 +187,7 @@ export async function getUploadConfig(db, env) {
             botToken: env.DISCORD_BOT_TOKEN,
             channelId: env.DISCORD_CHANNEL_ID,
             proxyUrl: env.DISCORD_PROXY_URL || '',  // 可选的代理 URL
+            isNitro: env.DISCORD_IS_NITRO === 'true',  // Nitro 会员，支持 25MB
             enabled: true,
             fixed: true,
         })
@@ -199,6 +200,7 @@ export async function getUploadConfig(db, env) {
             if (discordChannels[0]) {
                 discordChannels[0].enabled = dc.enabled
                 discordChannels[0].proxyUrl = dc.proxyUrl
+                discordChannels[0].isNitro = dc.isNitro
             }
             continue
         }
