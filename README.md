@@ -102,12 +102,14 @@
 
 **演示站点**：[CloudFlare ImgBed](https://cfbed.1314883.xyz/) 访问密码：`cfbed`
 
-![image-20250313204101984](static/readme/202503132041511.png)
+![image-20250313204101984](static/readme/login.png)
 
-![image-20250313204138886](static/readme/202503132041072.png)
+![image-20250313204101984](static/readme/upload.png)
 
 <details>
     <summary>其他页面效果展示</summary>
+
+![image-20250313204138886](static/readme/uploading.png)
 
 ![image-20250313204308225](static/readme/dashboard.png)
 

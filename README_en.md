@@ -91,12 +91,14 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 
 **Demo Address**: [CloudFlare ImgBed](https://cfbed.1314883.xyz/) Access Password: `cfbed`
 
-![image-20250313204101984](static/readme/202503132041511.png)
+![image-20250313204101984](static/readme/login.png)
 
-![image-20250313204138886](static/readme/202503132041072.png)
+![image-20250313204138886](static/readme/upload.png)
 
 <details>
     <summary>Other page screenshots</summary>
+
+![image-20250313204138886](static/readme/uploading.png)
 
 ![image-20250313204308225](static/readme/dashboard.png)
 
