@@ -82,7 +82,7 @@ export class HuggingFaceAPI {
 
     /**
      * 上传文件到仓库
-     * 直接使用 PUT 请求上传文件，不做任何编码转换
+     * 使用 HuggingFace 的 commit API 上传文件
      * 
      * @param {File|Blob} file - 要上传的文件
      * @param {string} filePath - 存储路径（如 images/xxx.jpg）
@@ -103,19 +103,33 @@ export class HuggingFaceAPI {
             console.log('File size:', file.size);
             console.log('File type:', file.type);
 
-            // 使用 HuggingFace 的文件上传 API
-            // PUT /api/datasets/{repo_id}/upload/main/{path_in_repo}
-            const uploadUrl = `${this.baseURL}/api/datasets/${this.repo}/upload/main/${filePath}`;
-            console.log('Upload URL:', uploadUrl);
+            // 使用 multipart/form-data 上传到 commit 端点
+            // POST https://huggingface.co/api/datasets/{repo_id}/commit/main
+            const commitUrl = `${this.baseURL}/api/datasets/${this.repo}/commit/main`;
+            console.log('Commit URL:', commitUrl);
 
-            // 直接 PUT 文件内容，不做任何转换
-            const response = await fetch(uploadUrl, {
-                method: 'PUT',
+            // 构建 multipart form data
+            const formData = new FormData();
+            
+            // 添加文件，使用特定的字段名格式
+            // HuggingFace 期望的格式: file-{index}-{path}
+            formData.append(`file`, file, filePath);
+            
+            // 添加操作描述
+            const operations = JSON.stringify([{
+                key: 'file',
+                path: filePath
+            }]);
+            formData.append('operations', operations);
+            formData.append('summary', commitMessage);
+
+            const response = await fetch(commitUrl, {
+                method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                    'Content-Type': file.type || 'application/octet-stream'
+                    'Authorization': `Bearer ${this.token}`
+                    // 不设置 Content-Type，让浏览器自动设置 multipart boundary
                 },
-                body: file  // 直接传递 File/Blob 对象
+                body: formData
             });
 
             console.log('Upload response status:', response.status);
