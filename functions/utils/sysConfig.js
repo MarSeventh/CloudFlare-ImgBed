@@ -61,6 +61,8 @@ export async function fetchUploadConfig(env, context = null) {
         settings.telegram.channels = settings.telegram.channels.filter((channel) => channel.enabled);
         settings.cfr2.channels = settings.cfr2.channels.filter((channel) => channel.enabled);
         settings.s3.channels = settings.s3.channels.filter((channel) => channel.enabled);
+        settings.discord.channels = settings.discord.channels.filter((channel) => channel.enabled);
+        settings.huggingface.channels = settings.huggingface.channels.filter((channel) => channel.enabled);
 
         // 根据容量限制过滤渠道（仅 R2 和 S3）
         // 需要 context 来调用 getIndexMeta
@@ -76,7 +78,9 @@ export async function fetchUploadConfig(env, context = null) {
         return {
             telegram: { channels: [] },
             cfr2: { channels: [] },
-            s3: { channels: [] }
+            s3: { channels: [] },
+            discord: { channels: [] },
+            huggingface: { channels: [] }
         };
     }
 }

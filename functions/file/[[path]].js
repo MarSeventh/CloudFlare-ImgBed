@@ -1,6 +1,8 @@
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { fetchSecurityConfig } from "../utils/sysConfig";
 import { TelegramAPI } from "../utils/telegramAPI";
+import { DiscordAPI } from "../utils/discordAPI";
+import { HuggingFaceAPI } from "../utils/huggingfaceAPI";
 import { setCommonHeaders, setRangeHeaders, handleHeadRequest, getFileContent, isTgChannel,
             returnWithCheck, return404, isDomainAllowed } from './fileTools';
 import { getDatabase } from '../utils/databaseAdapter.js';
@@ -70,6 +72,20 @@ export async function onRequest(context) {  // Contents of context object
     /* S3渠道 */
     if (imgRecord.metadata?.Channel === "S3") {
         return await handleS3File(context, imgRecord.metadata, encodedFileName, fileType);
+    }
+
+    /* Discord 渠道 */
+    if (imgRecord.metadata?.Channel === 'Discord') {
+        // 检查是否为分片文件
+        if (imgRecord.metadata?.IsChunked === true) {
+            return await handleDiscordChunkedFile(context, imgRecord, encodedFileName, fileType);
+        }
+        return await handleDiscordFile(context, imgRecord.metadata, encodedFileName, fileType);
+    }
+
+    /* HuggingFace 渠道 */
+    if (imgRecord.metadata?.Channel === 'HuggingFace') {
+        return await handleHuggingFaceFile(context, imgRecord.metadata, encodedFileName, fileType);
     }
 
     /* 外链渠道 */
@@ -328,6 +344,202 @@ async function fetchTelegramChunkWithRetry(botToken, chunk, maxRetries = 3) {
     return null;
 }
 
+// 处理 Discord 渠道分片文件读取
+async function handleDiscordChunkedFile(context, imgRecord, encodedFileName, fileType) {
+    const { request, url, Referer } = context;
+
+    const metadata = imgRecord.metadata;
+    const botToken = metadata.DiscordBotToken;
+    const proxyUrl = metadata.DiscordProxyUrl;
+    
+    // 从KV的value中读取分片信息
+    let chunks = [];
+    try {
+        if (imgRecord.value) {
+            chunks = JSON.parse(imgRecord.value);
+            // 确保分片按索引排序
+            chunks.sort((a, b) => a.index - b.index);
+        }
+    } catch (parseError) {
+        console.error('Failed to parse Discord chunks data:', parseError);
+        return new Response('Error: Invalid chunks data', { status: 500 });
+    }
+    
+    if (chunks.length === 0) {
+        return new Response('Error: No chunks found for this file', { status: 500 });
+    }
+    
+    // 验证分片完整性
+    const expectedChunks = metadata.TotalChunks || chunks.length;
+    if (chunks.length !== expectedChunks) {
+        return new Response(`Error: Missing chunks, expected ${expectedChunks}, got ${chunks.length}`, { status: 500 });
+    }
+    
+    // 计算文件总大小
+    const totalSize = chunks.reduce((total, chunk) => total + (chunk.size || 0), 0);
+    
+    // 构建响应头
+    const headers = new Headers();
+    setCommonHeaders(headers, encodedFileName, fileType, Referer, url);
+    headers.set('Content-Length', totalSize.toString());
+    
+    // 添加ETag支持
+    const etag = `"${metadata.TimeStamp || Date.now()}-${totalSize}"`;
+    headers.set('ETag', etag);
+    
+    // 检查If-None-Match头（304缓存）
+    const ifNoneMatch = request.headers.get('If-None-Match');
+    if (ifNoneMatch && ifNoneMatch === etag) {
+        return new Response(null, {
+            status: 304,
+            headers: {
+                'ETag': etag,
+                'Cache-Control': headers.get('Cache-Control'),
+                'Accept-Ranges': 'bytes'
+            }
+        });
+    }
+    
+    // 检查Range请求头
+    const range = request.headers.get('Range');
+    let rangeStart = 0;
+    let rangeEnd = totalSize - 1;
+    let isRangeRequest = false;
+    
+    if (range) {
+        const matches = range.match(/bytes=(\d+)-(\d*)/);
+        if (matches) {
+            rangeStart = parseInt(matches[1]);
+            rangeEnd = matches[2] ? parseInt(matches[2]) : totalSize - 1;
+            isRangeRequest = true;
+            
+            // 验证范围有效性
+            if (rangeStart >= totalSize || rangeEnd >= totalSize || rangeStart > rangeEnd) {
+                return new Response('Range Not Satisfiable', { status: 416 });
+            }
+        }
+    }
+    
+    // 处理HEAD请求
+    if (request.method === 'HEAD') {
+        return handleHeadRequest(headers, etag);
+    }
+    
+    try {
+        // 创建支持Range请求的流
+        const stream = new ReadableStream({
+            async start(controller) {
+                try {
+                    let currentPosition = 0;
+                    
+                    for (let i = 0; i < chunks.length; i++) {
+                        const chunk = chunks[i];
+                        const chunkSize = chunk.size || 0;
+                        
+                        // 如果当前分片完全在请求范围之前，跳过
+                        if (currentPosition + chunkSize <= rangeStart) {
+                            currentPosition += chunkSize;
+                            continue;
+                        }
+                        
+                        // 如果当前分片完全在请求范围之后，结束
+                        if (currentPosition > rangeEnd) {
+                            break;
+                        }
+                        
+                        // 获取分片数据
+                        const chunkData = await fetchDiscordChunkWithRetry(chunk, proxyUrl, 3);
+                        if (!chunkData) {
+                            throw new Error(`Failed to fetch Discord chunk ${chunk.index} after retries`);
+                        }
+                        
+                        // 计算在当前分片中的起始和结束位置
+                        const chunkStart = Math.max(0, rangeStart - currentPosition);
+                        const chunkEnd = Math.min(chunkSize, rangeEnd - currentPosition + 1);
+                        
+                        // 如果需要部分分片数据
+                        if (chunkStart > 0 || chunkEnd < chunkSize) {
+                            const partialData = chunkData.slice(chunkStart, chunkEnd);
+                            controller.enqueue(partialData);
+                        } else {
+                            controller.enqueue(chunkData);
+                        }
+                        
+                        currentPosition += chunkSize;
+                    }
+                    
+                    controller.close();
+                } catch (error) {
+                    controller.error(error);
+                }
+            }
+        });
+        
+        // 设置Range相关头部
+        if (isRangeRequest) {
+            setRangeHeaders(headers, rangeStart, rangeEnd, totalSize);
+            
+            return new Response(stream, {
+                status: 206, // Partial Content
+                headers,
+            });
+        } else {
+            headers.set('Cache-Control', 'private, max-age=86400');
+            
+            return new Response(stream, {
+                status: 200,
+                headers,
+            });
+        }
+        
+    } catch (error) {
+        return new Response(`Error: Failed to reconstruct Discord chunked file - ${error.message}`, { status: 500 });
+    }
+}
+
+// 带重试机制的Discord分片获取函数
+async function fetchDiscordChunkWithRetry(chunk, proxyUrl, maxRetries = 3) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            let fileUrl = chunk.url;
+            
+            // 如果配置了代理 URL，替换 Discord CDN 域名
+            if (proxyUrl) {
+                fileUrl = fileUrl.replace('https://cdn.discordapp.com', `https://${proxyUrl}`);
+            }
+
+            const response = await fetch(fileUrl);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            // 验证分片大小是否匹配
+            const chunkData = await response.arrayBuffer();
+            const actualSize = chunkData.byteLength;
+            
+            // 如果有期望大小且不匹配，记录警告
+            if (chunk.size && actualSize !== chunk.size) {
+                console.warn(`Discord chunk ${chunk.index} size mismatch: expected ${chunk.size}, got ${actualSize}`);
+            }
+            
+            return new Uint8Array(chunkData);
+            
+        } catch (error) {
+            console.warn(`Discord chunk ${chunk.index} fetch attempt ${attempt + 1} failed:`, error.message);
+            
+            if (attempt === maxRetries - 1) {
+                return null; // 最后一次尝试也失败了
+            }
+            
+            // 重试前等待一段时间
+            await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+        }
+    }
+    
+    return null;
+}
+
 // 处理R2文件读取
 async function handleR2File(context, fileId, encodedFileName, fileType) {
     const { env, request, url, Referer } = context;
@@ -462,5 +674,144 @@ async function handleS3File(context, metadata, encodedFileName, fileType) {
 
     } catch (error) {
         return new Response(`Error: Failed to fetch from S3 - ${error.message}`, { status: 500 });
+    }
+}
+
+
+// 处理 Discord 文件读取
+async function handleDiscordFile(context, metadata, encodedFileName, fileType) {
+    const { env, request, url, Referer } = context;
+
+    try {
+        // 优先使用存储的附件 URL
+        let fileUrl = metadata.DiscordAttachmentUrl;
+
+        // 如果没有存储 URL，尝试通过 API 获取
+        if (!fileUrl && metadata.DiscordMessageId && metadata.DiscordChannelId && metadata.DiscordBotToken) {
+            const discordAPI = new DiscordAPI(metadata.DiscordBotToken);
+            fileUrl = await discordAPI.getFileURL(metadata.DiscordChannelId, metadata.DiscordMessageId);
+        }
+
+        if (!fileUrl) {
+            return new Response('Error: Discord file URL not found', { status: 500 });
+        }
+
+        // 如果配置了代理 URL，替换 Discord CDN 域名
+        if (metadata.DiscordProxyUrl) {
+            fileUrl = fileUrl.replace('https://cdn.discordapp.com', `https://${metadata.DiscordProxyUrl}`);
+        }
+
+        // 处理 HEAD 请求
+        if (request.method === 'HEAD') {
+            const headers = new Headers();
+            setCommonHeaders(headers, encodedFileName, fileType, Referer, url);
+            return handleHeadRequest(headers);
+        }
+
+        // 获取文件内容（支持 Range 请求）
+        const fetchHeaders = {};
+        const range = request.headers.get('Range');
+        if (range) {
+            fetchHeaders['Range'] = range;
+        }
+
+        const response = await fetch(fileUrl, {
+            method: 'GET',
+            headers: fetchHeaders
+        });
+
+        if (!response.ok && response.status !== 206) {
+            return new Response(`Error: Failed to fetch from Discord - ${response.status}`, { status: response.status });
+        }
+
+        // 构建响应头
+        const headers = new Headers();
+        setCommonHeaders(headers, encodedFileName, fileType, Referer, url);
+
+        // 复制相关头部
+        if (response.headers.get('Content-Length')) {
+            headers.set('Content-Length', response.headers.get('Content-Length'));
+        }
+        if (response.headers.get('Content-Range')) {
+            headers.set('Content-Range', response.headers.get('Content-Range'));
+        }
+
+        return new Response(response.body, {
+            status: response.status,
+            headers
+        });
+
+    } catch (error) {
+        return new Response(`Error: Failed to fetch from Discord - ${error.message}`, { status: 500 });
+    }
+}
+
+
+// 处理 HuggingFace 文件读取
+async function handleHuggingFaceFile(context, metadata, encodedFileName, fileType) {
+    const { request, url, Referer } = context;
+
+    try {
+        const hfRepo = metadata.HfRepo;
+        const hfFilePath = metadata.HfFilePath;
+        const hfToken = metadata.HfToken;
+        const hfIsPrivate = metadata.HfIsPrivate || false;
+
+        if (!hfRepo || !hfFilePath) {
+            return new Response('Error: HuggingFace file info not found', { status: 500 });
+        }
+
+        // 构建文件 URL
+        const fileUrl = metadata.HfFileUrl || `https://huggingface.co/datasets/${hfRepo}/resolve/main/${hfFilePath}`;
+
+        // 处理 HEAD 请求
+        if (request.method === 'HEAD') {
+            const headers = new Headers();
+            setCommonHeaders(headers, encodedFileName, fileType, Referer, url);
+            return handleHeadRequest(headers);
+        }
+
+        // 构建请求头
+        const fetchHeaders = {};
+        
+        // 私有仓库需要 Authorization
+        if (hfIsPrivate && hfToken) {
+            fetchHeaders['Authorization'] = `Bearer ${hfToken}`;
+        }
+
+        // 支持 Range 请求
+        const range = request.headers.get('Range');
+        if (range) {
+            fetchHeaders['Range'] = range;
+        }
+
+        const response = await fetch(fileUrl, {
+            method: 'GET',
+            headers: fetchHeaders
+        });
+
+        if (!response.ok && response.status !== 206) {
+            return new Response(`Error: Failed to fetch from HuggingFace - ${response.status}`, { status: response.status });
+        }
+
+        // 构建响应头
+        const headers = new Headers();
+        setCommonHeaders(headers, encodedFileName, fileType, Referer, url);
+
+        // 复制相关头部
+        if (response.headers.get('Content-Length')) {
+            headers.set('Content-Length', response.headers.get('Content-Length'));
+        }
+        if (response.headers.get('Content-Range')) {
+            headers.set('Content-Range', response.headers.get('Content-Range'));
+        }
+
+        return new Response(response.body, {
+            status: response.status,
+            headers
+        });
+
+    } catch (error) {
+        return new Response(`Error: Failed to fetch from HuggingFace - ${error.message}`, { status: 500 });
     }
 }

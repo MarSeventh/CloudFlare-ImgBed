@@ -204,6 +204,8 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
             result = await mergeS3ChunksInfo(context, uploadId, completedChunks, metadata);
         } else if (uploadChannel === 'telegram') {
             result = await mergeTelegramChunksInfo(context, uploadId, completedChunks, metadata);
+        } else if (uploadChannel === 'discord') {
+            result = await mergeDiscordChunksInfo(context, uploadId, completedChunks, metadata);
         } else {
             throw new Error(`Unsupported upload channel: ${uploadChannel}`);
         }
@@ -459,5 +461,77 @@ async function mergeTelegramChunksInfo(context, uploadId, completedChunks, metad
 
     } catch (error) {
         throw new Error(`Telegram merge failed: ${error.message}`);
+    }
+}
+
+// 合并Discord分块信息
+async function mergeDiscordChunksInfo(context, uploadId, completedChunks, metadata) {
+    const { env, waitUntil, uploadConfig, url } = context;
+    const db = getDatabase(env);
+
+    try {
+        const discordSettings = uploadConfig.discord;
+        const discordChannels = discordSettings.channels;
+        const discordChannel = selectConsistentChannel(discordChannels, uploadId, discordSettings.loadBalance?.enabled);
+
+        console.log(`Merging Discord chunks for uploadId: ${uploadId}, selected channel: ${discordChannel.name || 'default'}`);
+
+        const botToken = discordChannel.botToken;
+        const channelId = discordChannel.channelId;
+
+        // 按顺序排列分块
+        const sortedChunks = completedChunks.sort((a, b) => a.index - b.index);
+
+        // 计算总大小
+        const totalSize = sortedChunks.reduce((sum, chunk) => sum + chunk.uploadResult.size, 0);
+
+        // 构建分块信息数组
+        const chunks = sortedChunks.map(chunk => ({
+            index: chunk.index,
+            messageId: chunk.uploadResult.messageId,
+            attachmentId: chunk.uploadResult.attachmentId,
+            url: chunk.uploadResult.url,
+            size: chunk.uploadResult.size,
+            fileName: chunk.uploadResult.fileName
+        }));
+
+        // 生成 finalFileId
+        const finalFileId = await buildUniqueFileId(context, metadata.FileName, metadata.FileType);
+
+        // 更新metadata
+        metadata.Channel = "Discord";
+        metadata.ChannelName = discordChannel.name;
+        metadata.DiscordChannelId = channelId;
+        metadata.DiscordBotToken = botToken;
+        metadata.DiscordProxyUrl = discordChannel.proxyUrl || '';
+        metadata.IsChunked = true;
+        metadata.TotalChunks = completedChunks.length;
+        metadata.FileSize = (totalSize / 1024 / 1024).toFixed(2);
+
+        // 将分片信息存储到value中
+        const chunksData = JSON.stringify(chunks);
+
+        // 写入数据库
+        await db.put(finalFileId, chunksData, { metadata });
+
+        // 异步结束上传
+        waitUntil(endUpload(context, finalFileId, metadata));
+
+        // 生成返回链接
+        const returnFormat = url.searchParams.get('returnFormat') || 'default';
+        let updatedReturnLink = '';
+        if (returnFormat === 'full') {
+            updatedReturnLink = `${url.origin}/file/${finalFileId}`;
+        } else {
+            updatedReturnLink = `/file/${finalFileId}`;
+        }
+
+        return {
+            success: true,
+            result: [{ 'src': updatedReturnLink }]
+        };
+
+    } catch (error) {
+        throw new Error(`Discord merge failed: ${error.message}`);
     }
 }
