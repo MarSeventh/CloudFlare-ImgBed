@@ -112,8 +112,6 @@ export async function onRequestPost(context) {
         await db.put(fullId, "", { metadata });
 
         // 结束上传（更新索引等）
-        // 构造 url 对象用于 endUpload
-        const url = new URL(request.url);
         const uploadContext = {
             env,
             waitUntil,
