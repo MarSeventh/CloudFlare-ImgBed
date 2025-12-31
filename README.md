@@ -118,6 +118,8 @@
 
 ![status-page](static/readme/status-page.png)
 
+![public-gallery](static/readme/public-gallery.png)
+
 
 
 </details>
