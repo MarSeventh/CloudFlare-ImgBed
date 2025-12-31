@@ -1,6 +1,7 @@
 /* ======= 客户端分块上传处理 ======= */
 import { createResponse, selectConsistentChannel, getUploadIp, getIPAddress, buildUniqueFileId, endUpload } from './uploadTools';
 import { TelegramAPI } from '../utils/telegramAPI';
+import { DiscordAPI } from '../utils/discordAPI';
 import { S3Client, CreateMultipartUploadCommand, UploadPartCommand, AbortMultipartUploadCommand } from "@aws-sdk/client-s3";
 import { getDatabase } from '../utils/databaseAdapter.js';
 
@@ -268,6 +269,8 @@ async function uploadChunkToStorage(context, chunkIndex, totalChunks, uploadId, 
                 uploadResult = await uploadSingleChunkToS3Multipart(context, chunkData, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType);
             } else if (uploadChannel === 'telegram') {
                 uploadResult = await uploadSingleChunkToTelegram(context, chunkData, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType);
+            } else if (uploadChannel === 'discord') {
+                uploadResult = await uploadSingleChunkToDiscord(context, chunkData, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType);
             }
 
             if (uploadResult && uploadResult.success) {
@@ -587,6 +590,105 @@ async function uploadSingleChunkToTelegram(context, chunkData, chunkIndex, total
     }
 }
 
+// 上传单个分块到Discord
+async function uploadSingleChunkToDiscord(context, chunkData, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType) {
+    const { uploadConfig } = context;
+
+    try {
+        const discordSettings = uploadConfig.discord;
+        const discordChannels = discordSettings.channels;
+        const discordChannel = selectConsistentChannel(discordChannels, uploadId, discordSettings.loadBalance?.enabled);
+
+        console.log(`Uploading Discord chunk ${chunkIndex} for uploadId: ${uploadId}, selected channel: ${discordChannel.name || 'default'}`);
+
+        if (!discordChannel) {
+            return { success: false, error: 'No Discord channel provided' };
+        }
+
+        const botToken = discordChannel.botToken;
+        const channelId = discordChannel.channelId;
+
+        // 创建分块文件名
+        const chunkFileName = `${originalFileName}.part${chunkIndex.toString().padStart(3, '0')}`;
+        const chunkBlob = new Blob([chunkData], { type: 'application/octet-stream' });
+
+        // 上传分块到Discord（带重试）
+        const chunkInfo = await uploadChunkToDiscordWithRetry(
+            botToken,
+            channelId,
+            chunkBlob,
+            chunkFileName,
+            chunkIndex,
+            totalChunks,
+            2 // maxRetries
+        );
+
+        if (!chunkInfo) {
+            return { success: false, error: 'Failed to upload chunk to Discord' };
+        }
+
+        return {
+            success: true,
+            messageId: chunkInfo.message_id,
+            attachmentId: chunkInfo.attachment_id,
+            url: chunkInfo.url,
+            size: chunkInfo.file_size,
+            fileName: chunkFileName,
+            uploadTime: Date.now(),
+            discordChannel: discordChannel.name
+        };
+
+    } catch (error) {
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
+
+// 将每个分块上传至Discord，支持失败重试和 rate limit 处理
+async function uploadChunkToDiscordWithRetry(botToken, channelId, chunkBlob, chunkFileName, chunkIndex, totalChunks, maxRetries = 2) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            const discordAPI = new DiscordAPI(botToken);
+
+            const response = await discordAPI.sendFile(chunkBlob, channelId, chunkFileName);
+            
+            if (!response || !response.id) {
+                throw new Error('Invalid Discord response');
+            }
+
+            const fileInfo = discordAPI.getFileInfo(response);
+            if (!fileInfo) {
+                throw new Error('Failed to extract file info from response');
+            }
+
+            return fileInfo;
+
+        } catch (error) {
+            console.warn(`Discord chunk ${chunkIndex} upload attempt ${attempt + 1} failed:`, error.message);
+
+            // 检查是否是 rate limit (429)
+            if (error.message && error.message.includes('429')) {
+                // 从错误消息中提取 retry_after，或使用默认值
+                const retryAfter = 5000; // 默认等待 5 秒
+                console.log(`Discord rate limited, waiting ${retryAfter}ms...`);
+                await new Promise(resolve => setTimeout(resolve, retryAfter));
+                continue; // 不计入重试次数
+            }
+
+            if (attempt === maxRetries - 1) {
+                return null; // 最后一次尝试也失败了
+            }
+
+            // 指数退避延迟
+            await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+        }
+    }
+
+    return null;
+}
+
 /* ======== 分块合并时与上传相关的工具函数 ======= */
 
 // 重传失败的分块
@@ -726,6 +828,8 @@ async function retrySingleChunk(context, chunk, uploadChannel, maxRetries = 5, r
                     return await uploadSingleChunkToS3Multipart(context, chunkData, chunk.index, totalChunks, uploadId, originalFileName, originalFileType);
                 } else if (uploadChannel === 'telegram') {
                     return await uploadSingleChunkToTelegram(context, chunkData, chunk.index, totalChunks, uploadId, originalFileName, originalFileType);
+                } else if (uploadChannel === 'discord') {
+                    return await uploadSingleChunkToDiscord(context, chunkData, chunk.index, totalChunks, uploadId, originalFileName, originalFileType);
                 }
                 return null;
             })();
@@ -1019,7 +1123,7 @@ export async function uploadLargeFileToTelegram(context, file, fullId, metadata,
     const { env, waitUntil } = context;
     const db = getDatabase(env);
 
-    const CHUNK_SIZE = 20 * 1024 * 1024; // 20MB
+    const CHUNK_SIZE = 16 * 1024 * 1024; // 16MB (TG Bot getFile download limit: 20MB, leave 4MB safety margin)
     const fileSize = file.size;
     const totalChunks = Math.ceil(fileSize / CHUNK_SIZE);
 
