@@ -8,26 +8,25 @@ import { HuggingFaceAPI } from '../../utils/huggingfaceAPI.js';
 import { fetchUploadConfig } from '../../utils/sysConfig.js';
 import { getDatabase } from '../../utils/databaseAdapter.js';
 import { moderateContent, endUpload } from '../../upload/uploadTools.js';
+import { userAuthCheck, UnauthorizedResponse } from '../../utils/userAuth.js';
 
 export async function onRequestPost(context) {
     const { request, env, waitUntil } = context;
+    const url = new URL(request.url);
 
     try {
-        // 验证认证码
-        const authCode = request.headers.get('authcode');
-        if (env.AUTH_CODE && authCode !== env.AUTH_CODE) {
-            return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-                status: 401,
-                headers: { 'Content-Type': 'application/json' }
-            });
+        // 鉴权
+        const requiredPermission = 'upload';
+        if (!await userAuthCheck(env, url, request, requiredPermission)) {
+            return UnauthorizedResponse('Unauthorized');
         }
 
         const body = await request.json();
         const { fullId, filePath, sha256, fileSize, fileName, channelName, multipartParts } = body;
 
         if (!fullId || !filePath || !sha256 || !fileSize) {
-            return new Response(JSON.stringify({ 
-                error: 'Missing required fields: fullId, filePath, sha256, fileSize' 
+            return new Response(JSON.stringify({
+                error: 'Missing required fields: fullId, filePath, sha256, fileSize'
             }), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
@@ -74,9 +73,9 @@ export async function onRequestPost(context) {
         // 提交 LFS 文件引用
         console.log('Committing LFS file...');
         const commitResult = await huggingfaceAPI.commitLfsFile(
-            filePath, 
-            sha256, 
-            fileSize, 
+            filePath,
+            sha256,
+            fileSize,
             `Upload ${fileName || fullId}`
         );
         console.log('Commit result:', JSON.stringify(commitResult));
