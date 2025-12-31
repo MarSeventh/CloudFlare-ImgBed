@@ -3,12 +3,12 @@ import { getDatabase } from '../../../utils/databaseAdapter.js';
 export async function onRequest(context) {
     // 页面设置相关，GET方法读取设置，POST方法保存设置
     const {
-      request, // same as existing Worker API
-      env, // same as existing Worker API
-      params, // if filename includes [id] or [[path]]
-      waitUntil, // same as ctx.waitUntil in existing Worker API
-      next, // used for middleware or to fetch assets
-      data, // arbitrary space for passing data between middlewares
+        request, // same as existing Worker API
+        env, // same as existing Worker API
+        params, // if filename includes [id] or [[path]]
+        waitUntil, // same as ctx.waitUntil in existing Worker API
+        next, // used for middleware or to fetch assets
+        data, // arbitrary space for passing data between middlewares
     } = context;
 
     const db = getDatabase(env);
@@ -107,6 +107,8 @@ export async function getPageConfig(db, env) {
                 { label: 'Telegram', value: 'telegram' },
                 { label: 'Cloudflare R2', value: 'cfr2' },
                 { label: 'S3', value: 's3' },
+                { label: 'Discord', value: 'discord' },
+                { label: 'HuggingFace', value: 'huggingface' },
             ],
             placeholder: 'telegram',
             category: '客户端设置',
