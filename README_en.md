@@ -107,6 +107,8 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 
 ![status-page](static/readme/status-page.png)
 
+![public-gallery](static/readme/public-gallery.png)
+
 
 
 </details>
