@@ -12,26 +12,25 @@
 
 import { HuggingFaceAPI } from '../../utils/huggingfaceAPI.js';
 import { fetchUploadConfig } from '../../utils/sysConfig.js';
+import { userAuthCheck, UnauthorizedResponse } from '../../utils/userAuth.js';
 
 export async function onRequestPost(context) {
     const { request, env } = context;
+    const url = new URL(request.url);
 
     try {
-        // 验证认证码
-        const authCode = request.headers.get('authcode');
-        if (env.AUTH_CODE && authCode !== env.AUTH_CODE) {
-            return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-                status: 401,
-                headers: { 'Content-Type': 'application/json' }
-            });
+        // 鉴权
+        const requiredPermission = 'upload';
+        if (!await userAuthCheck(env, url, request, requiredPermission)) {
+            return UnauthorizedResponse('Unauthorized');
         }
 
         const body = await request.json();
         const { fileSize, fileName, sha256, fileSample, channelName } = body;
 
         if (!fileSize || !fileName || !sha256 || !fileSample) {
-            return new Response(JSON.stringify({ 
-                error: 'Missing required fields: fileSize, fileName, sha256, fileSample' 
+            return new Response(JSON.stringify({
+                error: 'Missing required fields: fileSize, fileName, sha256, fileSample'
             }), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
@@ -70,7 +69,7 @@ export async function onRequestPost(context) {
         // 构建文件路径
         const now = new Date();
         const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
-        
+
         // 生成唯一文件名
         const ext = fileName.includes('.') ? fileName.substring(fileName.lastIndexOf('.')) : '';
         const uniqueId = crypto.randomUUID().replace(/-/g, '');
