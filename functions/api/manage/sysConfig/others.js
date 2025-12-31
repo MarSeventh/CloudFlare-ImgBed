@@ -80,6 +80,14 @@ export async function getOthersConfig(db, env) {
         fixed: false,
     }
 
+    // 公开浏览
+    const kvPublicBrowse = settingsKV.publicBrowse || {}
+    settings.publicBrowse = {
+        enabled: kvPublicBrowse.enabled ?? false,
+        allowedDir: kvPublicBrowse.allowedDir || '',
+        fixed: false,
+    }
+
 
     return settings;
 }
