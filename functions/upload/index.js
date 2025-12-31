@@ -434,7 +434,7 @@ async function uploadFileToTelegram(context, fullId, metadata, fileExt, fileName
         const newFileName = fileName.replace(/\.webp$/, '.jpeg');
         const newFile = new File([formdata.get('file')], newFileName, { type: fileType });
         formdata.set('file', newFile);
-    } 
+    }
 
     // 选择对应的发送接口
     const fileTypeMap = {
@@ -606,7 +606,7 @@ async function uploadFileToDiscord(context, fullId, metadata, returnLink) {
         metadata.DiscordChannelId = discordChannel.channelId;
         metadata.DiscordBotToken = discordChannel.botToken;
         metadata.DiscordAttachmentUrl = fileInfo.url;
-        
+
         // 如果配置了代理 URL，保存代理信息
         if (discordChannel.proxyUrl) {
             metadata.DiscordProxyUrl = discordChannel.proxyUrl;
@@ -655,7 +655,7 @@ async function uploadFileToHuggingFace(context, fullId, metadata, returnLink) {
     // 获取 HuggingFace 渠道配置
     const hfSettings = uploadConfig.huggingface;
     console.log('HuggingFace settings:', hfSettings ? 'found' : 'not found');
-    
+
     if (!hfSettings || !hfSettings.channels || hfSettings.channels.length === 0) {
         console.log('Error: No HuggingFace channel configured');
         return createResponse('Error: No HuggingFace channel configured', { status: 400 });
@@ -664,7 +664,7 @@ async function uploadFileToHuggingFace(context, fullId, metadata, returnLink) {
     // 选择渠道（支持负载均衡）
     const hfChannels = hfSettings.channels;
     console.log('HuggingFace channels count:', hfChannels.length);
-    
+
     const hfChannel = hfSettings.loadBalance?.enabled
         ? hfChannels[Math.floor(Math.random() * hfChannels.length)]
         : hfChannels[0];
@@ -672,10 +672,10 @@ async function uploadFileToHuggingFace(context, fullId, metadata, returnLink) {
     console.log('Selected channel:', hfChannel?.name, 'repo:', hfChannel?.repo);
 
     if (!hfChannel || !hfChannel.token || !hfChannel.repo) {
-        console.log('Error: HuggingFace channel not properly configured', { 
-            hasChannel: !!hfChannel, 
-            hasToken: !!hfChannel?.token, 
-            hasRepo: !!hfChannel?.repo 
+        console.log('Error: HuggingFace channel not properly configured', {
+            hasChannel: !!hfChannel,
+            hasToken: !!hfChannel?.token,
+            hasRepo: !!hfChannel?.repo
         });
         return createResponse('Error: HuggingFace channel not properly configured', { status: 400 });
     }
@@ -764,6 +764,8 @@ async function tryRetry(err, context, uploadChannel, fullId, metadata, fileExt, 
             if (channelList[i] === 'CloudflareR2') {
                 res = await uploadFileToCloudflareR2(context, fullId, metadata, returnLink);
             } else if (channelList[i] === 'TelegramNew') {
+                // 重试时禁用服务端压缩，避免压缩导致的问题
+                url.searchParams.set('serverCompress', 'false');
                 res = await uploadFileToTelegram(context, fullId, metadata, fileExt, fileName, fileType, returnLink);
             } else if (channelList[i] === 'S3') {
                 res = await uploadFileToS3(context, fullId, metadata, returnLink);
