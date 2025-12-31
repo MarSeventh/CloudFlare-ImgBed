@@ -1,22 +1,19 @@
-name: Sync Release to Frontend Repo
+name: Sync Release (Create & Update) to Frontend Repo
 
 on:
   release:
-    # 当 Release 被发布时触发
-    types: [published]
+    # 创建、发布、更新
+    types: [created, published, edited]
 
 jobs:
   sync-release:
     if: github.repository == 'MarSeventh/CloudFlare-ImgBed'
     runs-on: ubuntu-latest
     steps:
-      - name: Sync Release to Another Repo
+      - name: Sync or Update Release
         env:
-          # 你刚才存的 PAT
           GH_TOKEN: ${{ secrets.RELEASE_SYNC_PAT }}
-          # 目标仓库，格式为 "用户名/仓库名"
           TARGET_REPO: "MarSeventh/Sanyue-ImgHub"
-          # 从事件中提取的数据
           TAG_NAME: ${{ github.event.release.tag_name }}
           RELEASE_TITLE: ${{ github.event.release.name }}
           RELEASE_BODY: ${{ github.event.release.body }}
@@ -24,15 +21,26 @@ jobs:
           IS_PRERELEASE: ${{ github.event.release.prerelease }}
 
         run: |
-          # 使用 GitHub CLI (gh) 进行操作，这比写 curl 简单得多
-          # 根据源仓库的状态判断目标仓库是否也设为 draft 或 prerelease
-          
+          # 格式化参数
           ARGS=""
-          if [ "$IS_DRAFT" = "true" ]; then ARGS="$ARGS --draft"; fi
-          if [ "$IS_PRERELEASE" = "true" ]; then ARGS="$ARGS --prerelease"; fi
+          if [ "$IS_DRAFT" = "true" ]; then ARGS="$ARGS --draft"; else ARGS="$ARGS --draft=false"; fi
+          if [ "$IS_PRERELEASE" = "true" ]; then ARGS="$ARGS --prerelease"; else ARGS="$ARGS --prerelease=false"; fi
 
-          gh release create "$TAG_NAME" \
-            --repo "$TARGET_REPO" \
-            --title "$RELEASE_TITLE" \
-            --notes "$RELEASE_BODY" \
-            $ARGS
+          echo "正在检查目标仓库 $TARGET_REPO 中是否存在 Tag: $TAG_NAME..."
+
+          # 检查目标仓库是否已有该 Release
+          if gh release view "$TAG_NAME" --repo "$TARGET_REPO" > /dev/null 2>&1; then
+            echo "检测到现有 Release，正在执行更新操作..."
+            gh release edit "$TAG_NAME" \
+              --repo "$TARGET_REPO" \
+              --title "$RELEASE_TITLE" \
+              --notes "$RELEASE_BODY" \
+              $ARGS
+          else
+            echo "未发现现有 Release，正在创建新 Release..."
+            gh release create "$TAG_NAME" \
+              --repo "$TARGET_REPO" \
+              --title "$RELEASE_TITLE" \
+              --notes "$RELEASE_BODY" \
+              $ARGS
+          fi
