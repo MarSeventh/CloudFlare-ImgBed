@@ -758,14 +758,35 @@ async function tryRetry(err, context, uploadChannel, fullId, metadata, fileExt, 
     const errMessages = {};
     errMessages[uploadChannel] = 'Error: ' + uploadChannel + err;
 
+    // 先用原渠道再试一次（关闭服务端压缩）
+    url.searchParams.set('serverCompress', 'false');
+    let retryRes = null;
+    if (uploadChannel === 'CloudflareR2') {
+        retryRes = await uploadFileToCloudflareR2(context, fullId, metadata, returnLink);
+    } else if (uploadChannel === 'TelegramNew') {
+        retryRes = await uploadFileToTelegram(context, fullId, metadata, fileExt, fileName, fileType, returnLink);
+    } else if (uploadChannel === 'S3') {
+        retryRes = await uploadFileToS3(context, fullId, metadata, returnLink);
+    } else if (uploadChannel === 'HuggingFace') {
+        retryRes = await uploadFileToHuggingFace(context, fullId, metadata, returnLink);
+    } else if (uploadChannel === 'Discord') {
+        retryRes = await uploadFileToDiscord(context, fullId, metadata, returnLink);
+    }
+
+    // 原渠道重试成功，直接返回
+    if (retryRes && retryRes.status === 200) {
+        return retryRes;
+    } else if (retryRes) {
+        errMessages[uploadChannel + '_retry'] = 'Error: ' + uploadChannel + ' retry - ' + await retryRes.text();
+    }
+
+    // 原渠道重试失败，切换到其他渠道
     for (let i = 0; i < channelList.length; i++) {
         if (channelList[i] !== uploadChannel) {
             let res = null;
             if (channelList[i] === 'CloudflareR2') {
                 res = await uploadFileToCloudflareR2(context, fullId, metadata, returnLink);
             } else if (channelList[i] === 'TelegramNew') {
-                // 重试时禁用服务端压缩，避免压缩导致的问题
-                url.searchParams.set('serverCompress', 'false');
                 res = await uploadFileToTelegram(context, fullId, metadata, fileExt, fileName, fileType, returnLink);
             } else if (channelList[i] === 'S3') {
                 res = await uploadFileToS3(context, fullId, metadata, returnLink);
