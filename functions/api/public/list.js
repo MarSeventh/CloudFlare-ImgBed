@@ -16,24 +16,34 @@ const corsHeaders = {
  * @returns {boolean}
  */
 function isAllowedDirectory(dir, allowedDirs) {
+    // 如果允许目录列表为空，视为允许所有目录（包括根目录）
+    if (!allowedDirs || allowedDirs.length === 0) {
+        return true;
+    }
+
     // 标准化目录格式
     const normalizedDir = dir.replace(/^\/+/, '').replace(/\/+$/, '');
-    
+
     for (const allowed of allowedDirs) {
         const normalizedAllowed = allowed.trim().replace(/^\/+/, '').replace(/\/+$/, '');
-        
-        // 空字符串表示允许所有
-        if (normalizedAllowed === '') {
+
+        // "*" 或空字符串表示允许所有目录（包括根目录）
+        if (normalizedAllowed === '*' || normalizedAllowed === '') {
             return true;
         }
-        
+
+        // 根目录访问：如果请求的是空目录，需要精确匹配
+        if (normalizedDir === '' && normalizedAllowed !== '') {
+            continue; // 根目录不匹配具体目录名
+        }
+
         // 精确匹配或子目录匹配
-        if (normalizedDir === normalizedAllowed || 
+        if (normalizedDir === normalizedAllowed ||
             normalizedDir.startsWith(normalizedAllowed + '/')) {
             return true;
         }
     }
-    
+
     return false;
 }
 
@@ -72,15 +82,7 @@ export async function onRequest(context) {
 
         // 解析允许的目录
         const allowedDirStr = publicBrowse.allowedDir || '';
-        const allowedDirs = allowedDirStr.split(',').filter(d => d.trim());
-
-        // 如果没有配置任何允许的目录，拒绝访问
-        if (allowedDirs.length === 0) {
-            return new Response(JSON.stringify({ error: 'No public directories configured' }), {
-                status: 403,
-                headers: { 'Content-Type': 'application/json', ...corsHeaders }
-            });
-        }
+        let allowedDirs = allowedDirStr.split(',').map(d => d.trim()).filter(d => d);
 
         // 获取请求的目录和搜索参数
         let dir = url.searchParams.get('dir') || '';
