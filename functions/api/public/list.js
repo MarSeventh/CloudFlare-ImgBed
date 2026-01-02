@@ -82,8 +82,12 @@ export async function onRequest(context) {
             });
         }
 
-        // 获取请求的目录
+        // 获取请求的目录和搜索参数
         let dir = url.searchParams.get('dir') || '';
+        let search = url.searchParams.get('search') || '';
+        if (search) {
+            search = decodeURIComponent(search).trim();
+        }
         
         // 检查目录权限
         if (!isAllowedDirectory(dir, allowedDirs)) {
@@ -108,6 +112,7 @@ export async function onRequest(context) {
         // 读取文件列表
         const result = await readIndex(context, {
             directory: dir,
+            search,
             start,
             count,
             includeSubdirFiles: false,
