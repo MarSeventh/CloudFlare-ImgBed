@@ -448,7 +448,7 @@ async function handleDiscordChunkedFile(context, imgRecord, encodedFileName, fil
                         }
                         
                         // 获取分片数据
-                        const chunkData = await fetchDiscordChunkWithRetry(chunk, proxyUrl, 3);
+                        const chunkData = await fetchDiscordChunkWithRetry(chunk, proxyUrl, botToken, metadata.DiscordChannelId, 3);
                         if (!chunkData) {
                             throw new Error(`Failed to fetch Discord chunk ${chunk.index} after retries`);
                         }
@@ -497,18 +497,37 @@ async function handleDiscordChunkedFile(context, imgRecord, encodedFileName, fil
     }
 }
 
-// 带重试机制的Discord分片获取函数
-async function fetchDiscordChunkWithRetry(chunk, proxyUrl, maxRetries = 3) {
+// 带重试机制的Discord分片获取函数（支持URL过期刷新）
+async function fetchDiscordChunkWithRetry(chunk, proxyUrl, botToken, channelId, maxRetries = 3) {
+    let fileUrl = chunk.url;
+    let urlRefreshed = false;
+    
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
-            let fileUrl = chunk.url;
+            let fetchUrl = fileUrl;
             
             // 如果配置了代理 URL，替换 Discord CDN 域名
             if (proxyUrl) {
-                fileUrl = fileUrl.replace('https://cdn.discordapp.com', `https://${proxyUrl}`);
+                fetchUrl = fetchUrl.replace('https://cdn.discordapp.com', `https://${proxyUrl}`);
             }
 
-            const response = await fetch(fileUrl);
+            const response = await fetch(fetchUrl);
+            
+            // 如果返回 403/404，可能是 URL 过期，尝试刷新
+            if ((response.status === 403 || response.status === 404) && !urlRefreshed && botToken && channelId && chunk.messageId) {
+                console.log(`Discord chunk ${chunk.index} URL expired, attempting to refresh...`);
+                
+                const discordAPI = new DiscordAPI(botToken);
+                const newUrl = await discordAPI.getFileURL(channelId, chunk.messageId);
+                
+                if (newUrl) {
+                    fileUrl = newUrl;
+                    urlRefreshed = true;
+                    console.log(`Discord chunk ${chunk.index} URL refreshed successfully`);
+                    // 不增加 attempt，用新 URL 重试
+                    continue;
+                }
+            }
             
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
