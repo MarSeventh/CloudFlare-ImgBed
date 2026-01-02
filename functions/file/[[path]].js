@@ -689,11 +689,9 @@ async function handleDiscordFile(context, metadata, encodedFileName, fileType) {
     const { env, request, url, Referer } = context;
 
     try {
-        // 优先使用存储的附件 URL
-        let fileUrl = metadata.DiscordAttachmentUrl;
-
-        // 如果没有存储 URL，尝试通过 API 获取
-        if (!fileUrl && metadata.DiscordMessageId && metadata.DiscordChannelId && metadata.DiscordBotToken) {
+        // 每次读取都通过 API 获取新的附件 URL（因为 Discord 附件 URL 会在约24小时后过期）
+        let fileUrl = null;
+        if (metadata.DiscordMessageId && metadata.DiscordChannelId && metadata.DiscordBotToken) {
             const discordAPI = new DiscordAPI(metadata.DiscordBotToken);
             fileUrl = await discordAPI.getFileURL(metadata.DiscordChannelId, metadata.DiscordMessageId);
         }
