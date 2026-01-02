@@ -485,12 +485,11 @@ async function mergeDiscordChunksInfo(context, uploadId, completedChunks, metada
         // 计算总大小
         const totalSize = sortedChunks.reduce((sum, chunk) => sum + chunk.uploadResult.size, 0);
 
-        // 构建分块信息数组
+        // 构建分块信息数组（不存储 url 因为会过期，读取时通过 API 获取）
         const chunks = sortedChunks.map(chunk => ({
             index: chunk.index,
             messageId: chunk.uploadResult.messageId,
-            attachmentId: chunk.uploadResult.attachmentId,
-            url: chunk.uploadResult.url,
+            // 注意：不存储 attachmentId 和 url，它们会在约24小时后过期
             size: chunk.uploadResult.size,
             fileName: chunk.uploadResult.fileName
         }));
