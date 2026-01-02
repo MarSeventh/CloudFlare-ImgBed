@@ -113,12 +113,12 @@ export async function onRequest(context) {
         const start = parseInt(url.searchParams.get('start'), 10) || 0;
         const count = parseInt(url.searchParams.get('count'), 10) || 50;
 
-        // 读取文件列表
+        // 读取文件列表（获取全部，因为需要先过滤 block/adult）
         const result = await readIndex(context, {
             directory: dir,
             search,
-            start: fileType ? 0 : start, // 如果有类型过滤，先获取全部再过滤
-            count: fileType ? -1 : count,
+            start: 0,
+            count: -1, // 获取全部
             includeSubdirFiles: recursive,
         });
 
@@ -144,10 +144,20 @@ export async function onRequest(context) {
         const isVideoFile = (name) => videoExts.includes(getFileExt(name));
         const isAudioFile = (name) => audioExts.includes(getFileExt(name));
 
+        // 过滤掉 block 和 adult 图片（公开浏览不应显示这些内容）
+        let filteredFiles = result.files.filter(file => {
+            const listType = file.metadata?.ListType;
+            const label = file.metadata?.Label;
+            // 排除被屏蔽的和成人内容
+            if (listType === 'Block' || label === 'adult') {
+                return false;
+            }
+            return true;
+        });
+
         // 按文件类型过滤
-        let filteredFiles = result.files;
         if (fileType) {
-            filteredFiles = result.files.filter(file => {
+            filteredFiles = filteredFiles.filter(file => {
                 const name = file.id;
                 switch (fileType) {
                     case 'image': return isImageFile(name);
@@ -161,10 +171,8 @@ export async function onRequest(context) {
 
         // 计算过滤后的总数和分页
         const filteredTotalCount = filteredFiles.length;
-        if (fileType) {
-            // 如果有类型过滤，在过滤后再分页
-            filteredFiles = filteredFiles.slice(start, start + count);
-        }
+        // 过滤后再分页
+        filteredFiles = filteredFiles.slice(start, start + count);
 
         // 转换文件格式（只返回必要信息，隐藏敏感元数据）
         const safeFiles = filteredFiles.map(file => ({
