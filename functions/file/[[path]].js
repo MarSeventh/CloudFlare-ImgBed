@@ -351,7 +351,7 @@ async function handleDiscordChunkedFile(context, imgRecord, encodedFileName, fil
     const metadata = imgRecord.metadata;
     const botToken = metadata.DiscordBotToken;
     const proxyUrl = metadata.DiscordProxyUrl;
-    
+
     // 从KV的value中读取分片信息
     let chunks = [];
     try {
@@ -364,29 +364,29 @@ async function handleDiscordChunkedFile(context, imgRecord, encodedFileName, fil
         console.error('Failed to parse Discord chunks data:', parseError);
         return new Response('Error: Invalid chunks data', { status: 500 });
     }
-    
+
     if (chunks.length === 0) {
         return new Response('Error: No chunks found for this file', { status: 500 });
     }
-    
+
     // 验证分片完整性
     const expectedChunks = metadata.TotalChunks || chunks.length;
     if (chunks.length !== expectedChunks) {
         return new Response(`Error: Missing chunks, expected ${expectedChunks}, got ${chunks.length}`, { status: 500 });
     }
-    
+
     // 计算文件总大小
     const totalSize = chunks.reduce((total, chunk) => total + (chunk.size || 0), 0);
-    
+
     // 构建响应头
     const headers = new Headers();
     setCommonHeaders(headers, encodedFileName, fileType, Referer, url);
     headers.set('Content-Length', totalSize.toString());
-    
+
     // 添加ETag支持
     const etag = `"${metadata.TimeStamp || Date.now()}-${totalSize}"`;
     headers.set('ETag', etag);
-    
+
     // 检查If-None-Match头（304缓存）
     const ifNoneMatch = request.headers.get('If-None-Match');
     if (ifNoneMatch && ifNoneMatch === etag) {
@@ -399,64 +399,64 @@ async function handleDiscordChunkedFile(context, imgRecord, encodedFileName, fil
             }
         });
     }
-    
+
     // 检查Range请求头
     const range = request.headers.get('Range');
     let rangeStart = 0;
     let rangeEnd = totalSize - 1;
     let isRangeRequest = false;
-    
+
     if (range) {
         const matches = range.match(/bytes=(\d+)-(\d*)/);
         if (matches) {
             rangeStart = parseInt(matches[1]);
             rangeEnd = matches[2] ? parseInt(matches[2]) : totalSize - 1;
             isRangeRequest = true;
-            
+
             // 验证范围有效性
             if (rangeStart >= totalSize || rangeEnd >= totalSize || rangeStart > rangeEnd) {
                 return new Response('Range Not Satisfiable', { status: 416 });
             }
         }
     }
-    
+
     // 处理HEAD请求
     if (request.method === 'HEAD') {
         return handleHeadRequest(headers, etag);
     }
-    
+
     try {
         // 创建支持Range请求的流
         const stream = new ReadableStream({
             async start(controller) {
                 try {
                     let currentPosition = 0;
-                    
+
                     for (let i = 0; i < chunks.length; i++) {
                         const chunk = chunks[i];
                         const chunkSize = chunk.size || 0;
-                        
+
                         // 如果当前分片完全在请求范围之前，跳过
                         if (currentPosition + chunkSize <= rangeStart) {
                             currentPosition += chunkSize;
                             continue;
                         }
-                        
+
                         // 如果当前分片完全在请求范围之后，结束
                         if (currentPosition > rangeEnd) {
                             break;
                         }
-                        
-                        // 获取分片数据
-                        const chunkData = await fetchDiscordChunkWithRetry(chunk, proxyUrl, botToken, metadata.DiscordChannelId, 3);
+
+                        // 获取分片数据（每次通过 API 获取新的附件 URL）
+                        const chunkData = await fetchDiscordChunkWithRetry(botToken, metadata.DiscordChannelId, chunk, proxyUrl, 3);
                         if (!chunkData) {
                             throw new Error(`Failed to fetch Discord chunk ${chunk.index} after retries`);
                         }
-                        
+
                         // 计算在当前分片中的起始和结束位置
                         const chunkStart = Math.max(0, rangeStart - currentPosition);
                         const chunkEnd = Math.min(chunkSize, rangeEnd - currentPosition + 1);
-                        
+
                         // 如果需要部分分片数据
                         if (chunkStart > 0 || chunkEnd < chunkSize) {
                             const partialData = chunkData.slice(chunkStart, chunkEnd);
@@ -464,98 +464,85 @@ async function handleDiscordChunkedFile(context, imgRecord, encodedFileName, fil
                         } else {
                             controller.enqueue(chunkData);
                         }
-                        
+
                         currentPosition += chunkSize;
                     }
-                    
+
                     controller.close();
                 } catch (error) {
                     controller.error(error);
                 }
             }
         });
-        
+
         // 设置Range相关头部
         if (isRangeRequest) {
             setRangeHeaders(headers, rangeStart, rangeEnd, totalSize);
-            
+
             return new Response(stream, {
                 status: 206, // Partial Content
                 headers,
             });
         } else {
             headers.set('Cache-Control', 'private, max-age=86400');
-            
+
             return new Response(stream, {
                 status: 200,
                 headers,
             });
         }
-        
+
     } catch (error) {
         return new Response(`Error: Failed to reconstruct Discord chunked file - ${error.message}`, { status: 500 });
     }
 }
 
-// 带重试机制的Discord分片获取函数（支持URL过期刷新）
-async function fetchDiscordChunkWithRetry(chunk, proxyUrl, botToken, channelId, maxRetries = 3) {
-    let fileUrl = chunk.url;
-    let urlRefreshed = false;
-    
+// 带重试机制的Discord分片获取函数（每次通过 API 获取新的附件 URL）
+async function fetchDiscordChunkWithRetry(botToken, channelId, chunk, proxyUrl, maxRetries = 3) {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
-            let fetchUrl = fileUrl;
-            
-            // 如果配置了代理 URL，替换 Discord CDN 域名
-            if (proxyUrl) {
-                fetchUrl = fetchUrl.replace('https://cdn.discordapp.com', `https://${proxyUrl}`);
+            // 通过 Discord API 获取新的附件 URL（因为 URL 会在约24小时后过期）
+            const discordAPI = new DiscordAPI(botToken);
+            let fileUrl = await discordAPI.getFileURL(channelId, chunk.messageId);
+
+            if (!fileUrl) {
+                throw new Error('Failed to get attachment URL from Discord API');
             }
 
-            const response = await fetch(fetchUrl);
-            
-            // 如果返回 403/404，可能是 URL 过期，尝试刷新
-            if ((response.status === 403 || response.status === 404) && !urlRefreshed && botToken && channelId && chunk.messageId) {
-                console.log(`Discord chunk ${chunk.index} URL expired, attempting to refresh...`);
-                
-                const discordAPI = new DiscordAPI(botToken);
-                const newUrl = await discordAPI.getFileURL(channelId, chunk.messageId);
-                
-                if (newUrl) {
-                    fileUrl = newUrl;
-                    urlRefreshed = true;
-                    console.log(`Discord chunk ${chunk.index} URL refreshed successfully`);
-                    // 不增加 attempt，用新 URL 重试
-                    continue;
-                }
+            // 如果配置了代理 URL，替换 Discord CDN 域名
+            if (proxyUrl) {
+                fileUrl = fileUrl.replace('https://cdn.discordapp.com', `https://${proxyUrl}`);
             }
-            
+
+            const response = await fetch(fileUrl);
+
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
-            
+
             // 验证分片大小是否匹配
             const chunkData = await response.arrayBuffer();
             const actualSize = chunkData.byteLength;
-            
+
             // 如果有期望大小且不匹配，记录警告
             if (chunk.size && actualSize !== chunk.size) {
                 console.warn(`Discord chunk ${chunk.index} size mismatch: expected ${chunk.size}, got ${actualSize}`);
             }
-            
+
             return new Uint8Array(chunkData);
-            
+
         } catch (error) {
             console.warn(`Discord chunk ${chunk.index} fetch attempt ${attempt + 1} failed:`, error.message);
-            
+
             if (attempt === maxRetries - 1) {
                 return null; // 最后一次尝试也失败了
             }
-            
+
             // 重试前等待一段时间
             await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
         }
     }
-    
+
     return null;
 }
 
