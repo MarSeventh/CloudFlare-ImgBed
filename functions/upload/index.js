@@ -605,7 +605,8 @@ async function uploadFileToDiscord(context, fullId, metadata, returnLink) {
         metadata.DiscordMessageId = fileInfo.message_id;
         metadata.DiscordChannelId = discordChannel.channelId;
         metadata.DiscordBotToken = discordChannel.botToken;
-        metadata.DiscordAttachmentUrl = fileInfo.url;
+        // 注意：不存储 DiscordAttachmentUrl，因为 Discord 附件 URL 会在约24小时后过期
+        // 读取时会通过 API 获取新的 URL
 
         // 如果配置了代理 URL，保存代理信息
         if (discordChannel.proxyUrl) {

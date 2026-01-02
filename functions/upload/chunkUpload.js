@@ -630,8 +630,8 @@ async function uploadSingleChunkToDiscord(context, chunkData, chunkIndex, totalC
         return {
             success: true,
             messageId: chunkInfo.message_id,
-            attachmentId: chunkInfo.attachment_id,
-            url: chunkInfo.url,
+            // 注意：不存储 attachmentId 和 url，因为它们会在约24小时后过期
+            // 读取时会通过 messageId 获取新的 URL
             size: chunkInfo.file_size,
             fileName: chunkFileName,
             uploadTime: Date.now(),
@@ -653,7 +653,7 @@ async function uploadChunkToDiscordWithRetry(botToken, channelId, chunkBlob, chu
             const discordAPI = new DiscordAPI(botToken);
 
             const response = await discordAPI.sendFile(chunkBlob, channelId, chunkFileName);
-            
+
             if (!response || !response.id) {
                 throw new Error('Invalid Discord response');
             }
