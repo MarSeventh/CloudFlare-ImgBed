@@ -83,26 +83,46 @@ export class DiscordAPI {
      * 获取消息信息（用于获取文件 URL）
      * @param {string} channelId - 频道 ID
      * @param {string} messageId - 消息 ID
+     * @param {number} maxRetries - 最大重试次数（默认 3 次）
      * @returns {Promise<Object|null>} 消息数据或 null
      */
-    async getMessage(channelId, messageId) {
-        try {
-            const response = await fetch(`${this.baseURL}/channels/${channelId}/messages/${messageId}`, {
-                method: 'GET',
-                headers: this.defaultHeaders
-            });
+    async getMessage(channelId, messageId, maxRetries = 3) {
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                const response = await fetch(`${this.baseURL}/channels/${channelId}/messages/${messageId}`, {
+                    method: 'GET',
+                    headers: this.defaultHeaders
+                });
 
-            if (!response.ok) {
-                console.error('Discord getMessage error:', response.status, response.statusText);
+                // 429 速率限制：等待后重试
+                if (response.status === 429) {
+                    const retryAfter = response.headers.get('Retry-After');
+                    const waitTime = retryAfter ? parseFloat(retryAfter) * 1000 : 1000 * (attempt + 1);
+                    console.warn(`Discord 429 rate limit, waiting ${waitTime}ms before retry ${attempt + 1}/${maxRetries}`);
+                    
+                    if (attempt < maxRetries) {
+                        await new Promise(resolve => setTimeout(resolve, waitTime));
+                        continue;
+                    }
+                }
+
+                if (!response.ok) {
+                    console.error('Discord getMessage error:', response.status, response.statusText);
+                    return null;
+                }
+
+                const messageData = await response.json();
+                return messageData;
+            } catch (error) {
+                console.error('Error getting Discord message:', error.message);
+                if (attempt < maxRetries) {
+                    await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+                    continue;
+                }
                 return null;
             }
-
-            const messageData = await response.json();
-            return messageData;
-        } catch (error) {
-            console.error('Error getting Discord message:', error.message);
-            return null;
         }
+        return null;
     }
 
     /**
