@@ -5,7 +5,7 @@ export function isDomainAllowed(context) {
     const { Referer, securityConfig, url } = context;
 
     const allowedDomains = securityConfig.access.allowedDomains;
-    
+
     if (Referer) {
         try {
             const refererUrl = new URL(Referer);
@@ -17,7 +17,7 @@ export function isDomainAllowed(context) {
                     let domainPattern = new RegExp(`(^|\\.)${domain.replace('.', '\\.')}$`); // Escape dot in domain
                     return domainPattern.test(refererUrl.hostname);
                 });
-                
+
                 if (!isAllowed) {
                     return false;
                 }
@@ -30,19 +30,37 @@ export function isDomainAllowed(context) {
     return true;
 }
 
+// 判断请求是否来自公开图库页面 (/browse 或 /browse/*)
+export function isFromPublicBrowse(Referer, origin) {
+    if (!Referer) return false;
+    try {
+        const refererUrl = new URL(Referer);
+        // 检查是否来自同源的 /browse 或 /browse/* 路径
+        if (refererUrl.origin === origin) {
+            const pathname = refererUrl.pathname;
+            if (pathname === '/browse' || pathname.startsWith('/browse/')) {
+                return true;
+            }
+        }
+    } catch (e) {
+        return false;
+    }
+    return false;
+}
+
 // 公共响应头设置函数
 export function setCommonHeaders(headers, encodedFileName, fileType, Referer, url) {
     headers.set('Content-Disposition', `inline; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
     headers.set('Access-Control-Allow-Origin', '*');
     headers.set('Accept-Ranges', 'bytes');
     headers.set('Vary', 'Range');
-    
+
     if (fileType) {
         headers.set('Content-Type', fileType);
     }
-    
-    // 根据Referer设置CDN缓存策略
-    if (Referer && Referer.includes(url.origin)) {
+
+    // 根据Referer设置CDN缓存策略（排除公开图库页面的请求）
+    if (Referer && Referer.includes(url.origin) && !isFromPublicBrowse(Referer, url.origin)) {
         headers.set('Cache-Control', 'private, max-age=86400'); // 本地缓存 1天
     } else {
         headers.set('Cache-Control', 'public, max-age=2592000'); // CDN缓存 30天
@@ -59,7 +77,7 @@ export function setRangeHeaders(headers, rangeStart, rangeEnd, totalSize) {
 // 处理HEAD请求的公共函数
 export function handleHeadRequest(headers, etag = null) {
     const responseHeaders = new Headers();
-    
+
     // 复制关键头部
     responseHeaders.set('Content-Length', headers.get('Content-Length') || '0');
     responseHeaders.set('Content-Type', headers.get('Content-Type') || 'application/octet-stream');
@@ -67,11 +85,11 @@ export function handleHeadRequest(headers, etag = null) {
     responseHeaders.set('Access-Control-Allow-Origin', headers.get('Access-Control-Allow-Origin') || '*');
     responseHeaders.set('Accept-Ranges', headers.get('Accept-Ranges') || 'bytes');
     responseHeaders.set('Cache-Control', headers.get('Cache-Control') || 'public, max-age=2592000');
-    
+
     if (etag) {
         responseHeaders.set('ETag', etag);
     }
-    
+
     return new Response(null, {
         status: 200,
         headers: responseHeaders,
@@ -112,8 +130,9 @@ export async function returnWithCheck(context, imgRecord) {
 
     const response = new Response('success', { status: 200 });
 
-    // Referer header equal to the dashboard page or upload page
-    if (request.headers.get('Referer') && request.headers.get('Referer').includes(url.origin)) {
+    // Referer header equal to the dashboard page or upload page (排除公开图库页面的请求)
+    const referer = request.headers.get('Referer');
+    if (referer && referer.includes(url.origin) && !isFromPublicBrowse(referer, url.origin)) {
         //show the image
         return response;
     }
@@ -139,7 +158,7 @@ export async function returnWithCheck(context, imgRecord) {
             return response;
         }
     }
-    
+
     // other cases
     return response;
 }
