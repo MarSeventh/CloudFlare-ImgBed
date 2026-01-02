@@ -89,6 +89,10 @@ export async function onRequest(context) {
             search = decodeURIComponent(search).trim();
         }
         
+        // 获取高级搜索参数
+        const recursive = url.searchParams.get('recursive') === 'true';
+        const fileType = url.searchParams.get('type') || ''; // image, video, audio, other
+        
         // 检查目录权限
         if (!isAllowedDirectory(dir, allowedDirs)) {
             return new Response(JSON.stringify({ error: 'Directory not allowed' }), {
@@ -113,9 +117,9 @@ export async function onRequest(context) {
         const result = await readIndex(context, {
             directory: dir,
             search,
-            start,
-            count,
-            includeSubdirFiles: false,
+            start: fileType ? 0 : start, // 如果有类型过滤，先获取全部再过滤
+            count: fileType ? -1 : count,
+            includeSubdirFiles: recursive,
         });
 
         if (!result.success) {
@@ -130,8 +134,40 @@ export async function onRequest(context) {
             return isAllowedDirectory(subDir, allowedDirs);
         });
 
+        // 文件类型过滤辅助函数
+        const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'avif'];
+        const videoExts = ['mp4', 'webm', 'ogg', 'mov', 'm4v', 'mkv', 'avi', '3gp', 'mpeg', 'mpg', 'flv', 'wmv', 'ts', 'rmvb'];
+        const audioExts = ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma', 'ape', 'opus'];
+        
+        const getFileExt = (name) => (name.split('.').pop() || '').toLowerCase();
+        const isImageFile = (name) => imageExts.includes(getFileExt(name));
+        const isVideoFile = (name) => videoExts.includes(getFileExt(name));
+        const isAudioFile = (name) => audioExts.includes(getFileExt(name));
+
+        // 按文件类型过滤
+        let filteredFiles = result.files;
+        if (fileType) {
+            filteredFiles = result.files.filter(file => {
+                const name = file.id;
+                switch (fileType) {
+                    case 'image': return isImageFile(name);
+                    case 'video': return isVideoFile(name);
+                    case 'audio': return isAudioFile(name);
+                    case 'other': return !isImageFile(name) && !isVideoFile(name) && !isAudioFile(name);
+                    default: return true;
+                }
+            });
+        }
+
+        // 计算过滤后的总数和分页
+        const filteredTotalCount = filteredFiles.length;
+        if (fileType) {
+            // 如果有类型过滤，在过滤后再分页
+            filteredFiles = filteredFiles.slice(start, start + count);
+        }
+
         // 转换文件格式（只返回必要信息，隐藏敏感元数据）
-        const safeFiles = result.files.map(file => ({
+        const safeFiles = filteredFiles.map(file => ({
             name: file.id,
             metadata: {
                 FileType: file.metadata?.FileType,
@@ -144,8 +180,8 @@ export async function onRequest(context) {
         return new Response(JSON.stringify({
             files: safeFiles,
             directories: filteredDirectories,
-            totalCount: result.totalCount,
-            returnedCount: result.returnedCount,
+            totalCount: fileType ? filteredTotalCount : result.totalCount,
+            returnedCount: safeFiles.length,
             allowedDirs: allowedDirs, // 返回允许的目录列表供前端使用
         }), {
             headers: { 'Content-Type': 'application/json', ...corsHeaders }
