@@ -97,7 +97,7 @@ export async function getUploadConfig(db, env) {
     if (env.img_r2) {
         cfr2Channels.push({
             id: 1,
-            name: 'Cloudflare R2_env',
+            name: 'R2_env',
             type: 'cfr2',
             savePath: 'environment variable',
             publicUrl: env.R2PublicUrl,
