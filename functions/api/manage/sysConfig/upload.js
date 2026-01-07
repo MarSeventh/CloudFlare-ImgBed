@@ -3,12 +3,12 @@ import { getDatabase } from '../../../utils/databaseAdapter.js';
 export async function onRequest(context) {
     // 上传设置相关，GET方法读取设置，POST方法保存设置
     const {
-      request, // same as existing Worker API
-      env, // same as existing Worker API
-      params, // if filename includes [id] or [[path]]
-      waitUntil, // same as ctx.waitUntil in existing Worker API
-      next, // used for middleware or to fetch assets
-      data, // arbitrary space for passing data between middlewares
+        request, // same as existing Worker API
+        env, // same as existing Worker API
+        params, // if filename includes [id] or [[path]]
+        waitUntil, // same as ctx.waitUntil in existing Worker API
+        next, // used for middleware or to fetch assets
+        data, // arbitrary space for passing data between middlewares
     } = context;
 
     const db = getDatabase(env);
@@ -60,6 +60,7 @@ export async function getUploadConfig(db, env) {
             savePath: 'environment variable',
             botToken: env.TG_BOT_TOKEN,
             chatId: env.TG_CHAT_ID,
+            proxyUrl: env.TG_PROXY_URL || '',  // 可选的代理 URL
             enabled: true,
             fixed: true,
         })
@@ -70,6 +71,7 @@ export async function getUploadConfig(db, env) {
             // 如果环境变量未删除，进行覆盖操作
             if (telegramChannels[0]) {
                 telegramChannels[0].enabled = tg.enabled
+                telegramChannels[0].proxyUrl = tg.proxyUrl
             }
 
             continue
@@ -85,7 +87,7 @@ export async function getUploadConfig(db, env) {
         channels: [],
     }
     telegram.loadBalance = tgLoadBalance
-    
+
 
 
     // =====================读取r2渠道配置=====================
@@ -156,7 +158,7 @@ export async function getUploadConfig(db, env) {
                 s3Channels[0].enabled = s.enabled
                 s3Channels[0].quota = s.quota  // 保留容量限制配置
             }
-            
+
             continue
         }
         // id自增
@@ -176,7 +178,7 @@ export async function getUploadConfig(db, env) {
     const discord = {}
     const discordChannels = []
     discord.channels = discordChannels
-    
+
     // 从环境变量读取 Discord 配置
     if (env.DISCORD_BOT_TOKEN) {
         discordChannels.push({
@@ -192,7 +194,7 @@ export async function getUploadConfig(db, env) {
             fixed: true,
         })
     }
-    
+
     for (const dc of settingsKV.discord?.channels || []) {
         // 如果 savePath 是 environment variable，修改可变参数
         if (dc.savePath === 'environment variable') {
@@ -221,7 +223,7 @@ export async function getUploadConfig(db, env) {
     const huggingface = {}
     const huggingfaceChannels = []
     huggingface.channels = huggingfaceChannels
-    
+
     // 从环境变量读取 HuggingFace 配置
     if (env.HF_TOKEN) {
         huggingfaceChannels.push({
@@ -236,7 +238,7 @@ export async function getUploadConfig(db, env) {
             fixed: true,
         })
     }
-    
+
     for (const hf of settingsKV.huggingface?.channels || []) {
         // 如果 savePath 是 environment variable，修改可变参数
         if (hf.savePath === 'environment variable') {

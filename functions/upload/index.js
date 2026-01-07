@@ -412,10 +412,11 @@ async function uploadFileToTelegram(context, fullId, metadata, fileExt, fileName
 
     const tgBotToken = tgChannel.botToken;
     const tgChatId = tgChannel.chatId;
+    const tgProxyUrl = tgChannel.proxyUrl || '';
     const file = formdata.get('file');
     const fileSize = file.size;
 
-    const telegramAPI = new TelegramAPI(tgBotToken);
+    const telegramAPI = new TelegramAPI(tgBotToken, tgProxyUrl);
 
     // 16MB 分片阈值 (TG Bot getFile download limit: 20MB, leave 4MB safety margin)
     const CHUNK_SIZE = 16 * 1024 * 1024; // 16MB
@@ -484,8 +485,9 @@ async function uploadFileToTelegram(context, fullId, metadata, fileExt, fileName
         );
 
 
-        // 图像审查
-        const moderateUrl = `https://api.telegram.org/file/bot${tgBotToken}/${filePath}`;
+        // 图像审查（使用代理域名或官方域名）
+        const moderateDomain = tgProxyUrl ? `https://${tgProxyUrl}` : 'https://api.telegram.org';
+        const moderateUrl = `${moderateDomain}/file/bot${tgBotToken}/${filePath}`;
         metadata.Label = await moderateContent(env, moderateUrl);
 
         // 更新metadata，写入KV数据库
@@ -496,6 +498,10 @@ async function uploadFileToTelegram(context, fullId, metadata, fileExt, fileName
             metadata.TgFileId = id;
             metadata.TgChatId = tgChatId;
             metadata.TgBotToken = tgBotToken;
+            // 保存代理域名配置
+            if (tgProxyUrl) {
+                metadata.TgProxyUrl = tgProxyUrl;
+            }
             await db.put(fullId, "", {
                 metadata: metadata,
             });

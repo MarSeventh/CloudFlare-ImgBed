@@ -2,9 +2,13 @@
  * Telegram API 封装类
  */
 export class TelegramAPI {
-    constructor(botToken) {
+    constructor(botToken, proxyUrl = '') {
         this.botToken = botToken;
-        this.baseURL = `https://api.telegram.org/bot${this.botToken}`;
+        this.proxyUrl = proxyUrl;
+        // 如果设置了代理域名，使用代理域名，否则使用官方 API
+        const apiDomain = proxyUrl ? `https://${proxyUrl}` : 'https://api.telegram.org';
+        this.baseURL = `${apiDomain}/bot${this.botToken}`;
+        this.fileDomain = proxyUrl ? `https://${proxyUrl}` : 'https://api.telegram.org';
         this.defaultHeaders = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36 Edg/121.0.0.0"
         };
@@ -36,8 +40,8 @@ export class TelegramAPI {
             headers: this.defaultHeaders,
             body: formData
         });
-        console.log('Telegram API response:', response.status,  response.statusText);
-        if (!response.ok) {            
+        console.log('Telegram API response:', response.status, response.statusText);
+        if (!response.ok) {
             throw new Error(`Telegram API error: ${response.statusText}`);
         }
 
@@ -54,10 +58,10 @@ export class TelegramAPI {
      */
     getFileInfo(responseData) {
         const getFileDetails = (file) => ({
-                file_id: file.file_id,
-                file_name: file.file_name || file.file_unique_id,
-                file_size: file.file_size,
-            });
+            file_id: file.file_id,
+            file_name: file.file_name || file.file_unique_id,
+            file_size: file.file_size,
+        });
 
         try {
             if (!responseData.ok) {
@@ -127,7 +131,7 @@ export class TelegramAPI {
             throw new Error(`File path not found for fileId: ${fileId}`);
         }
 
-        const fullURL = `https://api.telegram.org/file/bot${this.botToken}/${filePath}`;
+        const fullURL = `${this.fileDomain}/file/bot${this.botToken}/${filePath}`;
         const response = await fetch(fullURL, {
             headers: this.defaultHeaders
         });

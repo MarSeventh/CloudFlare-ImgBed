@@ -119,14 +119,17 @@ export async function onRequest(context) {  // Contents of context object
             }
         }
 
-        // 获取TG图片真实地址
+        // 获取TG图片真实地址（支持代理域名）
         const TgBotToken = imgRecord.metadata?.TgBotToken || env.TG_BOT_TOKEN;
-        const tgApi = new TelegramAPI(TgBotToken);
+        const TgProxyUrl = imgRecord.metadata?.TgProxyUrl || '';
+        const tgApi = new TelegramAPI(TgBotToken, TgProxyUrl);
         const filePath = await tgApi.getFilePath(TgFileID);
         if (filePath === null) {
             return new Response('Error: Failed to fetch image path', { status: 500 });
         }
-        targetUrl = `https://api.telegram.org/file/bot${TgBotToken}/${filePath}`;
+        // 使用代理域名或官方域名
+        const fileDomain = TgProxyUrl ? `https://${TgProxyUrl}` : 'https://api.telegram.org';
+        targetUrl = `${fileDomain}/file/bot${TgBotToken}/${filePath}`;
     } else {
         targetUrl = 'https://telegra.ph/' + url.pathname + url.search;
     }
@@ -162,6 +165,7 @@ async function handleTelegramChunkedFile(context, imgRecord, encodedFileName, fi
 
     const metadata = imgRecord.metadata;
     const TgBotToken = metadata.TgBotToken || env.TG_BOT_TOKEN;
+    const TgProxyUrl = metadata.TgProxyUrl || '';
 
     // 从KV的value中读取分片信息
     let chunks = [];
@@ -258,8 +262,8 @@ async function handleTelegramChunkedFile(context, imgRecord, encodedFileName, fi
                             break;
                         }
 
-                        // 获取分片数据
-                        const chunkData = await fetchTelegramChunkWithRetry(TgBotToken, chunk, 3);
+                        // 获取分片数据（支持代理域名）
+                        const chunkData = await fetchTelegramChunkWithRetry(TgBotToken, chunk, TgProxyUrl, 3);
                         if (!chunkData) {
                             throw new Error(`Failed to fetch chunk ${chunk.index} after retries`);
                         }
@@ -308,11 +312,11 @@ async function handleTelegramChunkedFile(context, imgRecord, encodedFileName, fi
     }
 }
 
-// 带重试机制的Telegram分片获取函数
-async function fetchTelegramChunkWithRetry(botToken, chunk, maxRetries = 3) {
+// 带重试机制的Telegram分片获取函数（支持代理域名）
+async function fetchTelegramChunkWithRetry(botToken, chunk, proxyUrl = '', maxRetries = 3) {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
-            const tgApi = new TelegramAPI(botToken);
+            const tgApi = new TelegramAPI(botToken, proxyUrl);
 
             const response = await tgApi.getFileContent(chunk.fileId);
 
