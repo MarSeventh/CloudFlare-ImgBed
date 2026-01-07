@@ -553,15 +553,17 @@ async function uploadSingleChunkToTelegram(context, chunkData, chunkIndex, total
 
         const tgBotToken = tgChannel.botToken;
         const tgChatId = tgChannel.chatId;
+        const tgProxyUrl = tgChannel.proxyUrl || '';
 
         // 创建分块文件名
         const chunkFileName = `${originalFileName}.part${chunkIndex.toString().padStart(3, '0')}`;
         const chunkBlob = new Blob([chunkData], { type: 'application/octet-stream' });
 
-        // 上传分块到Telegram
+        // 上传分块到Telegram（支持代理域名）
         const chunkInfo = await uploadChunkToTelegramWithRetry(
             tgBotToken,
             tgChatId,
+            tgProxyUrl,
             chunkBlob,
             chunkFileName,
             chunkIndex,
@@ -1218,11 +1220,11 @@ export async function uploadLargeFileToTelegram(context, file, fullId, metadata,
     }
 }
 
-// 将每个分块上传至Telegram，支持失败重试
-async function uploadChunkToTelegramWithRetry(tgBotToken, tgChatId, chunkBlob, chunkFileName, chunkIndex, totalChunks, maxRetries = 2) {
+// 将每个分块上传至Telegram，支持失败重试（支持代理域名）
+async function uploadChunkToTelegramWithRetry(tgBotToken, tgChatId, tgProxyUrl, chunkBlob, chunkFileName, chunkIndex, totalChunks, maxRetries = 2) {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
-            const tgAPI = new TelegramAPI(tgBotToken);
+            const tgAPI = new TelegramAPI(tgBotToken, tgProxyUrl);
 
             const caption = `Part ${chunkIndex + 1}/${totalChunks}`;
 
