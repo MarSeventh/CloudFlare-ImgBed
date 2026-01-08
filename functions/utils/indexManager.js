@@ -578,12 +578,16 @@ export async function readIndex(context, options = {}) {
 
         let resultFiles = filteredFiles;
 
+        // 计算当前目录下的直接文件（不包含子目录文件）
+        const directFiles = filteredFiles.filter(file => {
+            const fileDir = file.metadata.Directory ? file.metadata.Directory : extractDirectory(file.id);
+            return fileDir === dirPrefix;
+        });
+        const directFileCount = directFiles.length;
+
         // 如果不包含子目录文件，获取当前目录下的直接文件
         if (!includeSubdirFiles) {
-            resultFiles = filteredFiles.filter(file => {
-                const fileDir = file.metadata.Directory ? file.metadata.Directory : extractDirectory(file.id);
-                return fileDir === dirPrefix;
-            });
+            resultFiles = directFiles;
         }
 
         if (count !== -1) {
@@ -606,10 +610,15 @@ export async function readIndex(context, options = {}) {
             }
         });
 
+        // 直接子文件夹数目
+        const directFolderCount = directories.size;
+
         return {
             files: resultFiles,
             directories: Array.from(directories),
             totalCount: totalCount,
+            directFileCount: directFileCount,
+            directFolderCount: directFolderCount,
             indexLastUpdated: index.lastUpdated,
             returnedCount: resultFiles.length,
             success: true

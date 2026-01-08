@@ -133,6 +133,8 @@ export async function onRequest(context) {
                 files: dbRecords.files,
                 directories: dbRecords.directories,
                 totalCount: dbRecords.totalCount,
+                directFileCount: dbRecords.directFileCount,
+                directFolderCount: dbRecords.directFolderCount,
                 returnedCount: dbRecords.returnedCount,
                 indexLastUpdated: Date.now(),
                 isIndexedResponse: false // 标记这是来自 KV 的响应
@@ -151,6 +153,8 @@ export async function onRequest(context) {
             files: compatibleFiles,
             directories: result.directories,
             totalCount: result.totalCount,
+            directFileCount: result.directFileCount,
+            directFolderCount: result.directFolderCount,
             returnedCount: result.returnedCount,
             indexLastUpdated: result.indexLastUpdated,
             isIndexedResponse: true // 标记这是来自索引的响应
@@ -229,6 +233,8 @@ async function getAllFileRecords(env, dir) {
             files: filteredRecords,
             directories: Array.from(directories),
             totalCount: allRecords.length,
+            directFileCount: filteredRecords.length,
+            directFolderCount: directories.size,
             returnedCount: filteredRecords.length
         };
 
@@ -238,6 +244,8 @@ async function getAllFileRecords(env, dir) {
             files: [],
             directories: [],
             totalCount: 0,
+            directFileCount: 0,
+            directFolderCount: 0,
             returnedCount: 0,
             error: error.message
         };
