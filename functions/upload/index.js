@@ -693,10 +693,8 @@ async function uploadFileToHuggingFace(context, fullId, metadata, returnLink) {
     const precomputedSha256 = formdata.get('sha256') || null;
     console.log('File to upload:', fileName, 'size:', file?.size, 'precomputed SHA256:', precomputedSha256 ? 'yes' : 'no');
 
-    // 构建文件路径：images/年月/文件名
-    const now = new Date();
-    const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const hfFilePath = `images/${yearMonth}/${fullId}`;
+    // 构建文件路径：直接使用 fullId（与其他渠道保持一致）
+    const hfFilePath = fullId;
     console.log('HuggingFace file path:', hfFilePath);
 
     const huggingfaceAPI = new HuggingFaceAPI(hfChannel.token, hfChannel.repo, hfChannel.isPrivate || false);

@@ -22,7 +22,7 @@ export async function onRequestPost(context) {
         }
 
         const body = await request.json();
-        const { fullId, filePath, sha256, fileSize, fileName, channelName, multipartParts } = body;
+        const { fullId, filePath, sha256, fileSize, fileName, fileType, channelName, multipartParts } = body;
 
         if (!fullId || !filePath || !sha256 || !fileSize) {
             return new Response(JSON.stringify({
@@ -86,6 +86,7 @@ export async function onRequestPost(context) {
         // 构建 metadata
         const metadata = {
             FileName: fileName || fullId,
+            FileType: fileType || null,
             Channel: "HuggingFace",
             ChannelName: hfChannel.name || "HuggingFace_env",
             FileSize: (fileSize / 1024 / 1024).toFixed(2),
