@@ -108,7 +108,7 @@ export async function getPageConfig(db, env) {
         },
         {
             id: 'defaultUploadChannel',
-            label: '默认上传渠道',
+            label: '默认渠道类型',
             type: 'select',
             options: [
                 { label: 'Telegram', value: 'telegram' },
@@ -118,6 +118,13 @@ export async function getPageConfig(db, env) {
                 { label: 'HuggingFace', value: 'huggingface' },
             ],
             placeholder: 'telegram',
+            category: '客户端设置',
+        },
+        {
+            id: 'defaultChannelName',
+            label: '默认渠道名称',
+            type: 'channelName',
+            tooltip: '指定默认使用的渠道名称，需先选择上传渠道',
             category: '客户端设置',
         },
         {

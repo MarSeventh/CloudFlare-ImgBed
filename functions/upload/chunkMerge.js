@@ -47,6 +47,10 @@ export async function handleChunkMerge(context) {
         // 使用会话中的上传渠道，或者从URL参数获取
         uploadChannel = url.searchParams.get('uploadChannel') || sessionInfo.uploadChannel || 'telegram';
 
+        // 获取指定的渠道名称（优先URL参数，其次会话信息）
+        const channelName = url.searchParams.get('channelName') || sessionInfo.channelName || '';
+        context.specifiedChannelName = channelName;
+
         // 检查分块上传状态
         const chunkStatuses = await checkChunkUploadStatuses(env, uploadId, totalChunks);
 
@@ -222,7 +226,7 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
 
 // 合并R2分块信息
 async function mergeR2ChunksInfo(context, uploadId, completedChunks, metadata) {
-    const { env, waitUntil, url } = context;
+    const { env, waitUntil, url, specifiedChannelName } = context;
     const db = getDatabase(env);
 
     try {
@@ -259,9 +263,17 @@ async function mergeR2ChunksInfo(context, uploadId, completedChunks, metadata) {
         // 使用multipart info中的finalFileId更新metadata
         const finalFileId = multipartInfo.key;
         metadata.Channel = "CloudflareR2";
-        // 从 R2 设置中获取渠道名称
+        // 从 R2 设置中获取渠道名称（优先使用指定的渠道名称）
         const r2Settings = context.uploadConfig.cfr2;
-        const r2ChannelName = r2Settings.channels?.[0]?.name || "R2_env";
+        let r2ChannelName = "R2_env";
+        if (specifiedChannelName) {
+            const r2Channel = r2Settings.channels?.find(ch => ch.name === specifiedChannelName);
+            if (r2Channel) {
+                r2ChannelName = r2Channel.name;
+            }
+        } else if (r2Settings.channels?.[0]?.name) {
+            r2ChannelName = r2Settings.channels[0].name;
+        }
         metadata.ChannelName = r2ChannelName;
         metadata.FileSize = (totalSize / 1024 / 1024).toFixed(2);
 
@@ -295,13 +307,21 @@ async function mergeR2ChunksInfo(context, uploadId, completedChunks, metadata) {
 
 // 合并S3分块信息
 async function mergeS3ChunksInfo(context, uploadId, completedChunks, metadata) {
-    const { env, waitUntil, uploadConfig, url } = context;
+    const { env, waitUntil, uploadConfig, url, specifiedChannelName } = context;
     const db = getDatabase(env);
 
     try {
         const s3Settings = uploadConfig.s3;
         const s3Channels = s3Settings.channels;
-        const s3Channel = selectConsistentChannel(s3Channels, uploadId, s3Settings.loadBalance.enabled);
+        
+        // 优先使用指定的渠道名称
+        let s3Channel;
+        if (specifiedChannelName) {
+            s3Channel = s3Channels.find(ch => ch.name === specifiedChannelName);
+        }
+        if (!s3Channel) {
+            s3Channel = selectConsistentChannel(s3Channels, uploadId, s3Settings.loadBalance.enabled);
+        }
 
         console.log(`Merging S3 chunks for uploadId: ${uploadId}, selected channel: ${s3Channel.name || 'default'}`);
 
@@ -397,13 +417,21 @@ async function mergeS3ChunksInfo(context, uploadId, completedChunks, metadata) {
 
 // 合并Telegram分块信息
 async function mergeTelegramChunksInfo(context, uploadId, completedChunks, metadata) {
-    const { env, waitUntil, uploadConfig, url } = context;
+    const { env, waitUntil, uploadConfig, url, specifiedChannelName } = context;
     const db = getDatabase(env);
 
     try {
         const tgSettings = uploadConfig.telegram;
         const tgChannels = tgSettings.channels;
-        const tgChannel = selectConsistentChannel(tgChannels, uploadId, tgSettings.loadBalance.enabled);
+        
+        // 优先使用指定的渠道名称
+        let tgChannel;
+        if (specifiedChannelName) {
+            tgChannel = tgChannels.find(ch => ch.name === specifiedChannelName);
+        }
+        if (!tgChannel) {
+            tgChannel = selectConsistentChannel(tgChannels, uploadId, tgSettings.loadBalance.enabled);
+        }
 
         console.log(`Merging Telegram chunks for uploadId: ${uploadId}, selected channel: ${tgChannel.name || 'default'}`);
 
@@ -470,13 +498,21 @@ async function mergeTelegramChunksInfo(context, uploadId, completedChunks, metad
 
 // 合并Discord分块信息
 async function mergeDiscordChunksInfo(context, uploadId, completedChunks, metadata) {
-    const { env, waitUntil, uploadConfig, url } = context;
+    const { env, waitUntil, uploadConfig, url, specifiedChannelName } = context;
     const db = getDatabase(env);
 
     try {
         const discordSettings = uploadConfig.discord;
         const discordChannels = discordSettings.channels;
-        const discordChannel = selectConsistentChannel(discordChannels, uploadId, discordSettings.loadBalance?.enabled);
+        
+        // 优先使用指定的渠道名称
+        let discordChannel;
+        if (specifiedChannelName) {
+            discordChannel = discordChannels.find(ch => ch.name === specifiedChannelName);
+        }
+        if (!discordChannel) {
+            discordChannel = selectConsistentChannel(discordChannels, uploadId, discordSettings.loadBalance?.enabled);
+        }
 
         console.log(`Merging Discord chunks for uploadId: ${uploadId}, selected channel: ${discordChannel.name || 'default'}`);
 
