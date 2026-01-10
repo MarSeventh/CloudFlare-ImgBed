@@ -77,6 +77,8 @@ export async function getOthersConfig(db, env) {
         enabled: kvWebDAV.enabled ?? false,
         username: kvWebDAV.username || '',
         password: kvWebDAV.password || '',
+        uploadChannel: kvWebDAV.uploadChannel || '',
+        channelName: kvWebDAV.channelName || '',
         fixed: false,
     }
 
