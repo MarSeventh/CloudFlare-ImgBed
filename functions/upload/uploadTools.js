@@ -83,71 +83,146 @@ export function isExtValid(fileExt) {
 
 // 图像审查
 export async function moderateContent(env, url) {
-    const securityConfig = await fetchSecurityConfig(env);
-    const uploadModerate = securityConfig.upload.moderate;
+    try {
+        const securityConfig = await fetchSecurityConfig(env);
+        const uploadModerate = securityConfig?.upload?.moderate;
 
-    const enableModerate = uploadModerate && uploadModerate.enabled;
+        // 如果未配置审查或未启用审查，直接返回"None"
+        if (!uploadModerate?.enabled) {
+            console.log('Content moderation is disabled');
+            return "None";
+        }
 
-    let label = "None";
+        const channel = uploadModerate.channel;
+        console.log(`Using content moderation channel: ${channel}`);
 
-    // 如果未启用审查，直接返回label
-    if (!enableModerate) {
-        return label;
+        switch (channel) {
+            case 'moderatecontent.com':
+                return await moderateWithModerateContent(uploadModerate, url);
+            
+            case 'nsfwjs':
+                return await moderateWithNsfwJs(uploadModerate, url);
+            
+            default:
+                console.warn(`Unsupported moderation channel: ${channel}`);
+                return "None";
+        }
+    } catch (error) {
+        console.error('Content moderation failed:', error);
+        return "None";
     }
+}
 
-    // moderatecontent.com 渠道
-    if (uploadModerate.channel === 'moderatecontent.com') {
-        const apikey = uploadModerate.moderateContentApiKey;
-        if (apikey == undefined || apikey == null || apikey == "") {
-            label = "None";
+/**
+ * 使用 moderatecontent.com 进行内容审查
+ */
+async function moderateWithModerateContent(config, url) {
+    try {
+        const apiKey = config.moderateContentApiKey;
+        
+        if (!apiKey) {
+            console.error('moderatecontent.com API key is missing');
+            return "None";
+        }
+
+        const encodedUrl = encodeURIComponent(url);
+        const apiUrl = `https://api.moderatecontent.com/moderate/?key=${apiKey}&url=${encodedUrl}`;
+        
+        console.log(`Calling moderatecontent.com API: ${apiUrl}`);
+        
+        const response = await fetchWithTimeout(apiUrl, { timeout: 10000 });
+        
+        if (!response.ok) {
+            throw new Error(`API request failed with status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('moderatecontent.com response:', data);
+
+        if (data.rating_label) {
+            return data.rating_label;
+        }
+        
+        console.warn('moderatecontent.com response does not contain rating_label');
+        return "None";
+    } catch (error) {
+        console.error('moderatecontent.com moderation failed:', error);
+        return "None";
+    }
+}
+
+/**
+ * 使用 nsfwjs 进行内容审查
+ */
+async function moderateWithNsfwJs(config, url) {
+    try {
+        const apiPath = config.nsfwApiPath;
+        
+        if (!apiPath) {
+            console.error('nsfwjs API path is missing');
+            return "None";
+        }
+
+        const encodedUrl = encodeURIComponent(url);
+        const apiUrl = `${apiPath}?url=${encodedUrl}`;
+        
+        console.log(`Calling nsfwjs API: ${apiUrl}`);
+        
+        const response = await fetchWithTimeout(apiUrl, { timeout: 10000 });
+        
+        if (!response.ok) {
+            throw new Error(`API request failed with status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('nsfwjs response:', data);
+
+        // 检查API响应结构
+        if (!data || !data.data) {
+            throw new Error('Invalid API response structure');
+        }
+
+        const nsfwScore = data.data.nsfw || 0;
+        const isNsfw = data.data.is_nsfw || false;
+
+        console.log(`NSFW score: ${nsfwScore}, is_nsfw: ${isNsfw}`);
+
+        // 根据NSFW分数设置标签
+        if (nsfwScore >= 0.9) {
+            return "色情";
+        } else if (nsfwScore >= 0.7) {
+            return "成年";
         } else {
-            try {
-                const fetchResponse = await fetch(`https://api.moderatecontent.com/moderate/?key=${apikey}&url=${url}`);
-                if (!fetchResponse.ok) {
-                    throw new Error(`HTTP error! status: ${fetchResponse.status}`);
-                }
-                const moderate_data = await fetchResponse.json();
-                if (moderate_data.rating_label) {
-                    label = moderate_data.rating_label;
-                }
-            } catch (error) {
-                console.error('Moderate Error:', error);
-                // 将不带审查的图片写入数据库
-                label = "None";
-            }
+            return "大众";
         }
-        return label;
+    } catch (error) {
+        console.error('nsfwjs moderation failed:', error);
+        return "None";
     }
+}
 
-    // nsfw 渠道 和 默认渠道
-    if (uploadModerate.channel === 'nsfwjs') {
-        const nsfwApiPath = securityConfig.upload.moderate.nsfwApiPath;
-
-        try {
-            const fetchResponse = await fetch(`${nsfwApiPath}?url=${encodeURIComponent(url)}`);
-            if (!fetchResponse.ok) {
-                throw new Error(`HTTP error! status: ${fetchResponse.status}`);
-            }
-            const moderate_data = await fetchResponse.json();
-
-            const score = moderate_data.score || 0;
-            if (score >= 0.9) {
-                label = "adult";
-            } else if (score >= 0.7) {
-                label = "teen";
-            } else {
-                label = "everyone";
-            }
-        } catch (error) {
-            console.error('Moderate Error:', error);
-            // 将不带审查的图片写入数据库
-            label = "None";
+/**
+ * 带超时的fetch函数
+ */
+async function fetchWithTimeout(resource, options = {}) {
+    const { timeout = 8000 } = options;
+    
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    
+    try {
+        const response = await fetch(resource, {
+            ...options,
+            signal: controller.signal
+        });
+        clearTimeout(id);
+        return response;
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            throw new Error(`Request timed out after ${timeout}ms`);
         }
-
-        return label;
+        throw error;
     }
-
-    return label;
 }
 
 // 清除CDN缓存
