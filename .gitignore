@@ -1,4 +1,8 @@
 .wrangler/*
 data/*
 node_modules
+wrangler.toml
 .DS_Store
+
+.kiro/
+.vscode/
