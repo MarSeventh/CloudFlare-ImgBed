@@ -760,13 +760,26 @@ async function uploadFileToHuggingFace(context, fullId, metadata, returnLink) {
         metadata.HfIsPrivate = hfChannel.isPrivate || false;
         metadata.HfFileUrl = result.fileUrl;
 
-        // 图像审查（公开仓库直接访问，私有仓库需要代理）
-        let moderateUrl = result.fileUrl;
-        if (!hfChannel.isPrivate) {
-            metadata.Label = await moderateContent(env, moderateUrl);
-        } else {
-            // 私有仓库暂不支持图像审查，标记为 None
-            metadata.Label = "None";
+        // 图像审查
+        const securityConfig = context.securityConfig;
+        const uploadModerate = securityConfig.upload?.moderate;
+        
+        if (uploadModerate && uploadModerate.enabled) {
+            if (!hfChannel.isPrivate) {
+                // 公开仓库：直接通过公开URL访问进行审查，只写入1次KV
+                metadata.Label = await moderateContent(env, result.fileUrl);
+            } else {
+                // 私有仓库：先写入KV，再通过自己的域名访问进行审查
+                try {
+                    await db.put(fullId, "", { metadata });
+                } catch (error) {
+                    return createResponse('Error: Failed to write to KV database', { status: 500 });
+                }
+                
+                const moderateUrl = `https://${context.url.hostname}/file/${fullId}`;
+                await purgeCDNCache(env, moderateUrl, context.url);
+                metadata.Label = await moderateContent(env, moderateUrl);
+            }
         }
 
         // 写入 KV 数据库
