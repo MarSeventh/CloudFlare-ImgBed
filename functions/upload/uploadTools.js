@@ -102,7 +102,12 @@ export async function moderateContent(env, url) {
             label = "None";
         } else {
             try {
-                const fetchResponse = await fetch(`https://api.moderatecontent.com/moderate/?key=${apikey}&url=${url}`);
+                const params = new URLSearchParams({ key: apikey, url: url });
+                const fetchResponse = await fetch('https://api.moderatecontent.com/moderate/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: params.toString()
+                });
                 if (!fetchResponse.ok) {
                     throw new Error(`HTTP error! status: ${fetchResponse.status}`);
                 }
@@ -119,7 +124,7 @@ export async function moderateContent(env, url) {
         return label;
     }
 
-    // nsfw 渠道 和 默认渠道
+    // nsfw 渠道
     if (uploadModerate.channel === 'nsfwjs') {
         const nsfwApiPath = securityConfig.upload.moderate.nsfwApiPath;
 
