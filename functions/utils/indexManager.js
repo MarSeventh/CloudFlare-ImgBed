@@ -37,15 +37,26 @@
  *   }
  */
 
-import { getDatabase } from './databaseAdapter.js';
-import { matchesTags } from './tagHelpers.js';
+import { getDatabase, checkDatabaseConfig } from './databaseAdapter.js';
 
 const INDEX_KEY = 'manage@index';
 const INDEX_META_KEY = 'manage@index@meta'; // 索引元数据键
 const OPERATION_KEY_PREFIX = 'manage@index@operation_';
-const INDEX_CHUNK_SIZE = 10000; // 索引分块大小
+// D1 单字段限制 2MB，KV 限制 25MB，根据数据库类型动态设置
+const INDEX_CHUNK_SIZE_D1 = 500; // D1 数据库分块大小
+const INDEX_CHUNK_SIZE_KV = 5000; // KV 存储分块大小
 const KV_LIST_LIMIT = 1000; // 数据库列出批量大小
 const BATCH_SIZE = 10; // 批量处理大小
+
+/**
+ * 根据数据库类型获取索引分块大小
+ * @param {Object} env - 环境变量
+ * @returns {number} 分块大小
+ */
+export function getIndexChunkSize(env) {
+    const config = checkDatabaseConfig(env);
+    return config.usingD1 ? INDEX_CHUNK_SIZE_D1 : INDEX_CHUNK_SIZE_KV;
+}
 
 /**
  * 添加文件到索引
@@ -1338,14 +1349,15 @@ async function promiseLimit(tasks, concurrency = BATCH_SIZE) {
 async function saveChunkedIndex(context, index) {
     const { env } = context;
     const db = getDatabase(env);
+    const chunkSize = getIndexChunkSize(env);
     
     try {
         const files = index.files || [];
         const chunks = [];
         
         // 将文件数组分块
-        for (let i = 0; i < files.length; i += INDEX_CHUNK_SIZE) {
-            const chunk = files.slice(i, i + INDEX_CHUNK_SIZE);
+        for (let i = 0; i < files.length; i += chunkSize) {
+            const chunk = files.slice(i, i + chunkSize);
             chunks.push(chunk);
         }
         
@@ -1376,7 +1388,7 @@ async function saveChunkedIndex(context, index) {
             channelStats,
             lastOperationId: index.lastOperationId,
             chunkCount: chunks.length,
-            chunkSize: INDEX_CHUNK_SIZE
+            chunkSize: chunkSize
         };
         
         await db.put(INDEX_META_KEY, JSON.stringify(metadata));
