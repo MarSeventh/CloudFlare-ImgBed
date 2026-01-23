@@ -6,7 +6,7 @@
  * 清理临时分块数据
  */
 
-import { getDatabase } from '../../../../utils/databaseAdapter.js';
+import { getDatabase, checkDatabaseConfig } from '../../../../utils/databaseAdapter.js';
 
 // CORS 跨域响应头
 const corsHeaders = {
@@ -19,7 +19,19 @@ const corsHeaders = {
 // 索引存储键
 const INDEX_KEY = 'manage@index';
 const INDEX_META_KEY = 'manage@index@meta';
-const INDEX_CHUNK_SIZE = 10000; // 索引分块大小
+// D1 单字段限制 2MB，KV 限制 25MB，根据数据库类型动态设置
+const INDEX_CHUNK_SIZE_D1 = 500; // D1 数据库分块大小
+const INDEX_CHUNK_SIZE_KV = 5000; // KV 存储分块大小
+
+/**
+ * 根据数据库类型获取索引分块大小
+ * @param {Object} env - 环境变量
+ * @returns {number} 分块大小
+ */
+function getIndexChunkSize(env) {
+  const config = checkDatabaseConfig(env);
+  return config.usingD1 ? INDEX_CHUNK_SIZE_D1 : INDEX_CHUNK_SIZE_KV;
+}
 
 /**
  * 创建 JSON 响应
@@ -182,15 +194,17 @@ function assembleChunks(chunks) {
  * 保存分块索引到数据库
  * @param {Object} db - 数据库实例
  * @param {Array} files - 文件记录数组
+ * @param {Object} env - 环境变量
  * @returns {Promise<{success: boolean, metadata?: Object, error?: string}>}
  */
-async function saveIndex(db, files) {
+async function saveIndex(db, files, env) {
   try {
+    const chunkSize = getIndexChunkSize(env);
     const chunks = [];
     
     // 将文件数组分块
-    for (let i = 0; i < files.length; i += INDEX_CHUNK_SIZE) {
-      const chunk = files.slice(i, i + INDEX_CHUNK_SIZE);
+    for (let i = 0; i < files.length; i += chunkSize) {
+      const chunk = files.slice(i, i + chunkSize);
       chunks.push(chunk);
     }
 
@@ -223,7 +237,7 @@ async function saveIndex(db, files) {
       channelStats,
       lastOperationId: null, // 重建后清除操作 ID
       chunkCount: chunks.length,
-      chunkSize: INDEX_CHUNK_SIZE,
+      chunkSize: chunkSize,
     };
 
     await db.put(INDEX_META_KEY, JSON.stringify(metadata));
@@ -338,7 +352,7 @@ export async function onRequestPost(context) {
     // 5. 处理空索引的情况
     if (totalChunks === 0 || totalFiles === 0) {
       // 保存空索引
-      const saveResult = await saveIndex(db, []);
+      const saveResult = await saveIndex(db, [], env);
       if (!saveResult.success) {
         return errorResponse('Failed to save empty index', 500, saveResult.error);
       }
@@ -369,11 +383,12 @@ export async function onRequestPost(context) {
     }
 
     // 9. 清理旧的索引分块（在保存新索引之前）
-    const newChunkCount = Math.ceil(allFiles.length / INDEX_CHUNK_SIZE);
+    const chunkSize = getIndexChunkSize(env);
+    const newChunkCount = Math.ceil(allFiles.length / chunkSize);
     await cleanupOldIndexChunks(db, newChunkCount);
 
     // 10. 保存新索引
-    const saveResult = await saveIndex(db, allFiles);
+    const saveResult = await saveIndex(db, allFiles, env);
     if (!saveResult.success) {
       return errorResponse('Failed to save index', 500, saveResult.error);
     }
