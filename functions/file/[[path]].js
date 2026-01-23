@@ -630,6 +630,72 @@ async function handleR2File(context, fileId, encodedFileName, fileType) {
 async function handleS3File(context, metadata, encodedFileName, fileType) {
     const { Referer, url, request } = context;
 
+    // 检查是否配置了 CDN 文件完整路径
+    const cdnFileUrl = metadata?.S3CdnFileUrl;
+
+    // 如果配置了 CDN 文件路径，通过 CDN 读取文件
+    if (cdnFileUrl) {
+        try {
+            // 处理 HEAD 请求
+            if (request.method === 'HEAD') {
+                const headers = new Headers();
+                setCommonHeaders(headers, encodedFileName, fileType, Referer, url);
+                return handleHeadRequest(headers);
+            }
+
+            // 构建请求头
+            const fetchHeaders = {};
+
+            // 支持 Range 请求
+            const range = request.headers.get('Range');
+            if (range) {
+                fetchHeaders['Range'] = range;
+            }
+
+            // 通过 CDN 获取文件（直接使用完整路径，无需拼接）
+            const response = await fetch(cdnFileUrl, {
+                method: 'GET',
+                headers: fetchHeaders
+            });
+
+            if (!response.ok && response.status !== 206) {
+                // CDN 读取失败，回退到 S3 API
+                console.warn(`CDN fetch failed (${response.status}), falling back to S3 API`);
+                return await handleS3FileViaAPI(context, metadata, encodedFileName, fileType);
+            }
+
+            // 构建响应头
+            const headers = new Headers();
+            setCommonHeaders(headers, encodedFileName, fileType, Referer, url);
+
+            // 复制相关头部
+            if (response.headers.get('Content-Length')) {
+                headers.set('Content-Length', response.headers.get('Content-Length'));
+            }
+            if (response.headers.get('Content-Range')) {
+                headers.set('Content-Range', response.headers.get('Content-Range'));
+            }
+
+            return new Response(response.body, {
+                status: response.status,
+                headers
+            });
+
+        } catch (error) {
+            // CDN 读取出错，回退到 S3 API
+            console.error(`CDN fetch error: ${error.message}, falling back to S3 API`);
+            return await handleS3FileViaAPI(context, metadata, encodedFileName, fileType);
+        }
+    }
+
+    // 没有配置 CDN 文件路径，使用 S3 API
+    return await handleS3FileViaAPI(context, metadata, encodedFileName, fileType);
+}
+
+// 通过 S3 API 读取文件
+async function handleS3FileViaAPI(context, metadata, encodedFileName, fileType) {
+    const { Referer, url, request } = context;
+
     const s3Client = new S3Client({
         region: metadata?.S3Region || "auto",
         endpoint: metadata?.S3Endpoint,
