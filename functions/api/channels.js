@@ -1,5 +1,7 @@
-// 获取可用上传渠道列表 API
+// 获取上传渠道列表 API
 import { fetchUploadConfig } from '../utils/sysConfig.js';
+import { getUploadConfig } from './manage/sysConfig/upload.js';
+import { getDatabase } from '../utils/databaseAdapter.js';
 
 export async function onRequest(context) {
     const { request, env } = context;
@@ -9,30 +11,40 @@ export async function onRequest(context) {
     }
 
     try {
-        // 获取上传配置（已过滤禁用的渠道）
-        const uploadConfig = await fetchUploadConfig(env, context);
+        const url = new URL(request.url);
+        const includeDisabled = url.searchParams.get('includeDisabled') === 'true';
 
-        // 构建渠道列表，只返回渠道名称
+        let uploadConfig;
+        if (includeDisabled) {
+            // 获取所有上传配置（包括禁用的渠道）
+            const db = getDatabase(env);
+            uploadConfig = await getUploadConfig(db, env);
+        } else {
+            // 获取上传配置（已过滤禁用的渠道）
+            uploadConfig = await fetchUploadConfig(env, context);
+        }
+
+        // 构建渠道列表，返回渠道名称和实际的 Channel 类型
         const channels = {
             telegram: uploadConfig.telegram.channels.map(ch => ({
                 name: ch.name,
-                type: 'telegram'
+                type: 'TelegramNew'
             })),
             cfr2: uploadConfig.cfr2.channels.map(ch => ({
                 name: ch.name,
-                type: 'cfr2'
+                type: 'CloudflareR2'
             })),
             s3: uploadConfig.s3.channels.map(ch => ({
                 name: ch.name,
-                type: 's3'
+                type: 'S3'
             })),
             discord: uploadConfig.discord.channels.map(ch => ({
                 name: ch.name,
-                type: 'discord'
+                type: 'Discord'
             })),
             huggingface: uploadConfig.huggingface.channels.map(ch => ({
                 name: ch.name,
-                type: 'huggingface'
+                type: 'HuggingFace'
             }))
         };
 
