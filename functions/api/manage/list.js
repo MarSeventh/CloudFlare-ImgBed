@@ -25,9 +25,13 @@ export async function onRequest(context) {
     let search = url.searchParams.get('search') || '';
     let channel = url.searchParams.get('channel') || '';
     let listType = url.searchParams.get('listType') || '';
+    let accessStatus = url.searchParams.get('accessStatus') || '';
     let action = url.searchParams.get('action') || '';
     let includeTags = url.searchParams.get('includeTags') || '';
     let excludeTags = url.searchParams.get('excludeTags') || '';
+    let label = url.searchParams.get('label') || '';
+    let fileType = url.searchParams.get('fileType') || '';
+    let channelName = url.searchParams.get('channelName') || '';
 
     // 处理搜索关键字
     if (search) {
@@ -37,6 +41,14 @@ export async function onRequest(context) {
     // 处理标签参数
     const includeTagsArray = includeTags ? includeTags.split(',').map(t => t.trim()).filter(t => t) : [];
     const excludeTagsArray = excludeTags ? excludeTags.split(',').map(t => t.trim()).filter(t => t) : [];
+
+    // 处理筛选参数（支持逗号分隔的多选）
+    const listTypeArray = listType ? listType.split(',').map(t => t.trim()).filter(t => t) : [];
+    const accessStatusArray = accessStatus ? accessStatus.split(',').map(t => t.trim()).filter(t => t) : [];
+    const labelArray = label ? label.split(',').map(t => t.trim()).filter(t => t) : [];
+    const fileTypeArray = fileType ? fileType.split(',').map(t => t.trim()).filter(t => t) : [];
+    const channelArray = channel ? channel.split(',').map(t => t.trim()).filter(t => t) : [];
+    const channelNameArray = channelName ? channelName.split(',').map(t => t.trim()).filter(t => t) : [];
 
     // 处理目录参数
     if (dir.startsWith('/')) {
@@ -97,8 +109,12 @@ export async function onRequest(context) {
             const result = await readIndex(context, {
                 search,
                 directory: dir,
-                channel,
-                listType,
+                channel: channelArray,
+                listType: listTypeArray,
+                accessStatus: accessStatusArray,
+                label: labelArray,
+                fileType: fileTypeArray,
+                channelName: channelNameArray,
                 includeTags: includeTagsArray,
                 excludeTags: excludeTagsArray,
                 countOnly: true
@@ -118,8 +134,12 @@ export async function onRequest(context) {
             directory: dir,
             start,
             count,
-            channel,
-            listType,
+            channel: channelArray,
+            listType: listTypeArray,
+            accessStatus: accessStatusArray,
+            label: labelArray,
+            fileType: fileTypeArray,
+            channelName: channelNameArray,
             includeTags: includeTagsArray,
             excludeTags: excludeTagsArray,
             includeSubdirFiles: recursive,

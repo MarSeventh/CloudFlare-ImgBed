@@ -475,8 +475,12 @@ export async function mergeOperationsToIndex(context, options = {}) {
  * @param {string} options.directory - 目录过滤
  * @param {number} options.start - 起始位置
  * @param {number} options.count - 返回数量，-1 表示返回所有
- * @param {string} options.channel - 渠道过滤
- * @param {string} options.listType - 列表类型过滤
+ * @param {Array<string>|string} options.channel - 渠道过滤（支持数组多选）
+ * @param {Array<string>|string} options.listType - 列表类型过滤（支持数组多选）
+ * @param {Array<string>|string} options.accessStatus - 访问状态筛选（支持数组多选）：'normal'=正常, 'blocked'=已屏蔽
+ * @param {Array<string>|string} options.label - 审查结果筛选（支持数组多选）
+ * @param {Array<string>|string} options.fileType - 文件类型筛选（支持数组多选）
+ * @param {Array<string>|string} options.channelName - 渠道名称筛选（支持数组多选）
  * @param {Array<string>} options.includeTags - 必须包含的标签数组
  * @param {Array<string>} options.excludeTags - 必须排除的标签数组
  * @param {boolean} options.countOnly - 仅返回总数
@@ -489,13 +493,26 @@ export async function readIndex(context, options = {}) {
             directory = '',
             start = 0,
             count = 50,
-            channel = '',
-            listType = '',
+            channel = [],
+            listType = [],
+            accessStatus = [],
+            label = [],
+            fileType = [],
+            channelName = [],
             includeTags = [],
             excludeTags = [],
             countOnly = false,
             includeSubdirFiles = false
         } = options;
+
+        // 将参数统一转换为数组形式
+        const channelArr = Array.isArray(channel) ? channel : (channel ? [channel] : []);
+        const listTypeArr = Array.isArray(listType) ? listType : (listType ? [listType] : []);
+        const accessStatusArr = Array.isArray(accessStatus) ? accessStatus : (accessStatus ? [accessStatus] : []);
+        const labelArr = Array.isArray(label) ? label : (label ? [label] : []);
+        const fileTypeArr = Array.isArray(fileType) ? fileType : (fileType ? [fileType] : []);
+        const channelNameArr = Array.isArray(channelName) ? channelName : (channelName ? [channelName] : []);
+
         // 处理目录满足无头有尾的格式，根目录为空
         const dirPrefix = directory === '' || directory.endsWith('/') ? directory : directory + '/';
 
@@ -522,18 +539,113 @@ export async function readIndex(context, options = {}) {
             });
         }
 
-        // 渠道过滤
-        if (channel) {
+        // 渠道过滤（支持多选，OR 逻辑）
+        if (channelArr.length > 0) {
             filteredFiles = filteredFiles.filter(file => 
-                file.metadata.Channel?.toLowerCase() === channel.toLowerCase()
+                channelArr.some(ch => file.metadata.Channel?.toLowerCase() === ch.toLowerCase())
             );
         }
 
-        // 列表类型过滤
-        if (listType) {
-            filteredFiles = filteredFiles.filter(file => 
-                file.metadata.ListType === listType
-            );
+        // 列表类型过滤（黑白名单，支持多选，OR 逻辑）
+        // White=白名单, Block=黑名单, None=未设置
+        if (listTypeArr.length > 0) {
+            filteredFiles = filteredFiles.filter(file => {
+                const fileListType = file.metadata.ListType;
+                return listTypeArr.some(lt => {
+                    if (lt === 'None') {
+                        // 未设置：ListType 为空、undefined、null 或字符串 'None'
+                        return !fileListType || fileListType === '' || fileListType === 'None';
+                    }
+                    return fileListType === lt;
+                });
+            });
+        }
+
+        // 访问状态筛选（综合判断 ListType 和 Label，支持多选，OR 逻辑）
+        // 'normal' = 正常：非已屏蔽状态
+        // 'blocked' = 已屏蔽：ListType === 'Block' || (Label === 'adult' && ListType !== 'White')
+        // 注意：白名单优先，即使 Label 是 adult，只要 ListType 是 White 就是正常
+        if (accessStatusArr.length > 0) {
+            filteredFiles = filteredFiles.filter(file => {
+                const fileListType = file.metadata.ListType;
+                const fileLabel = file.metadata.Label;
+                const isBlocked = fileListType === 'Block' || (fileLabel === 'adult' && fileListType !== 'White');
+
+                return accessStatusArr.some(status => {
+                    if (status === 'normal') {
+                        return !isBlocked;
+                    } else if (status === 'blocked') {
+                        return isBlocked;
+                    }
+                    return false;
+                });
+            });
+        }
+
+        // 审查结果筛选 (label)（支持多选，OR 逻辑）
+        // 'normal' 匹配 Label 为 'everyone', 'None', '', null, undefined
+        // 'teen' 匹配 Label 为 'teen'
+        // 'adult' 匹配 Label 为 'adult'
+        if (labelArr.length > 0) {
+            filteredFiles = filteredFiles.filter(file => {
+                const fileLabel = file.metadata.Label;
+                return labelArr.some(lbl => {
+                    if (lbl === 'normal') {
+                        return !fileLabel || fileLabel === '' || fileLabel === 'None' || fileLabel === 'everyone';
+                    } else if (lbl === 'teen') {
+                        return fileLabel === 'teen';
+                    } else if (lbl === 'adult') {
+                        return fileLabel === 'adult';
+                    }
+                    return false;
+                });
+            });
+        }
+
+        // 文件类型筛选 (fileType)（支持多选，OR 逻辑）
+        // 'image' 匹配 FileType 以 'image/' 开头
+        // 'video' 匹配 FileType 以 'video/' 开头
+        // 'audio' 匹配 FileType 以 'audio/' 开头
+        // 'other' 匹配不属于以上三类的文件
+        if (fileTypeArr.length > 0) {
+            filteredFiles = filteredFiles.filter(file => {
+                const mimeType = file.metadata.FileType || '';
+                return fileTypeArr.some(ft => {
+                    if (ft === 'image') {
+                        return mimeType.startsWith('image/');
+                    } else if (ft === 'video') {
+                        return mimeType.startsWith('video/');
+                    } else if (ft === 'audio') {
+                        return mimeType.startsWith('audio/');
+                    } else if (ft === 'other') {
+                        return !mimeType.startsWith('image/') && 
+                               !mimeType.startsWith('video/') && 
+                               !mimeType.startsWith('audio/');
+                    }
+                    return false;
+                });
+            });
+        }
+
+        // 渠道名称筛选 (channelName)（支持多选，OR 逻辑）
+        // 支持 "type:name" 格式（如 "TelegramNew:default"）或单独的名称
+        if (channelNameArr.length > 0) {
+            filteredFiles = filteredFiles.filter(file => {
+                const fileChannel = file.metadata.Channel;
+                const fileChannelName = file.metadata.ChannelName;
+
+                return channelNameArr.some(filterValue => {
+                    // 检查是否是 "type:name" 格式
+                    if (filterValue.includes(':')) {
+                        const [type, name] = filterValue.split(':', 2);
+                        // 同时匹配渠道类型和名称（大小写敏感）
+                        return fileChannel === type && fileChannelName === name;
+                    } else {
+                        // 只匹配名称（向后兼容）
+                        return fileChannelName === filterValue;
+                    }
+                });
+            });
         }
 
         // 标签过滤（独立于搜索关键字）
