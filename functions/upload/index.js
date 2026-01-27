@@ -329,7 +329,7 @@ async function uploadFileToS3(context, fullId, metadata, returnLink) {
         return createResponse('Error: No S3 channel provided', { status: 400 });
     }
 
-    const { endpoint, pathStyle, accessKeyId, secretAccessKey, bucketName, region } = s3Channel;
+    const { endpoint, pathStyle, accessKeyId, secretAccessKey, bucketName, region, cdnDomain } = s3Channel;
 
     // 创建 S3 客户端
     const s3Client = new S3Client({
@@ -381,6 +381,11 @@ async function uploadFileToS3(context, fullId, metadata, returnLink) {
         metadata.S3Region = region || "auto";
         metadata.S3BucketName = bucketName;
         metadata.S3FileKey = s3FileName;
+        // 保存 CDN 文件完整路径（如果配置了 CDN 域名）
+        if (cdnDomain) {
+            // 存储完整的 CDN 文件路径，而不是仅存储域名
+            metadata.S3CdnFileUrl = `${cdnDomain.replace(/\/$/, '')}/${s3FileName}`;
+        }
 
         // 图像审查
         if (uploadModerate && uploadModerate.enabled) {
