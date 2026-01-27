@@ -146,6 +146,7 @@ export async function getUploadConfig(db, env) {
             bucketName: env.S3_BUCKET_NAME,
             endpoint: env.S3_ENDPOINT,
             pathStyle: env.S3_PATH_STYLE === 'true',
+            cdnDomain: env.S3_CDN_DOMAIN || '',  // 可选的 CDN 域名
             enabled: true,
             fixed: true,
         })
@@ -157,6 +158,7 @@ export async function getUploadConfig(db, env) {
             if (s3Channels[0]) {
                 s3Channels[0].enabled = s.enabled
                 s3Channels[0].quota = s.quota  // 保留容量限制配置
+                s3Channels[0].cdnDomain = s.cdnDomain  // 保留 CDN 域名配置
             }
 
             continue
