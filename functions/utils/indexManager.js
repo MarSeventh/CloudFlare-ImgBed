@@ -40,8 +40,9 @@
 import { getDatabase, checkDatabaseConfig } from './databaseAdapter.js';
 
 const INDEX_KEY = 'manage@index';
-const INDEX_META_KEY = 'manage@index@meta'; // 索引元数据键
+const INDEX_META_KEY = 'manage@index@meta';
 const OPERATION_KEY_PREFIX = 'manage@index@operation_';
+const OPERATION_LATEST_KEY = 'manage@index@latest_operation'; // 最新操作ID标记
 // D1 单字段限制 2MB，KV 限制 25MB，根据数据库类型动态设置
 const INDEX_CHUNK_SIZE_D1 = 500; // D1 数据库分块大小
 const INDEX_CHUNK_SIZE_KV = 5000; // KV 存储分块大小
@@ -516,10 +517,27 @@ export async function readIndex(context, options = {}) {
         // 处理目录满足无头有尾的格式，根目录为空
         const dirPrefix = directory === '' || directory.endsWith('/') ? directory : directory + '/';
 
-        // 处理挂起的操作
-        const mergeResult = await mergeOperationsToIndex(context);
-        if (!mergeResult.success) {
-            throw new Error('Failed to merge operations: ' + mergeResult.error);
+        // 智能合并：通过比较操作ID判断是否需要合并，避免频繁触发 KV list
+        const latestOperationId = await getLatestOperationId(context);
+        const indexMeta = await getIndexMeta(context);
+
+        let shouldMerge = true;
+
+        // 只有在明确确认没有新操作时才跳过合并（安全优先）
+        if (latestOperationId && indexMeta.success && indexMeta.lastOperationId) {
+            shouldMerge = indexMeta.lastOperationId !== latestOperationId;
+        } else if (!latestOperationId && indexMeta.success && !indexMeta.lastOperationId) {
+            shouldMerge = false;
+        }
+
+        if (shouldMerge) {
+            console.log('Detected new operations or uncertain state, merging to index...');
+            const mergeResult = await mergeOperationsToIndex(context);
+            if (!mergeResult.success) {
+                throw new Error('Failed to merge operations: ' + mergeResult.error);
+            }
+        } else {
+            console.log('No new operations, skipping merge to save KV list quota.');
         }
 
         // 获取当前索引
@@ -944,7 +962,8 @@ export async function getIndexMeta(context) {
             totalCount: metadata.totalCount || 0,
             totalSizeMB: metadata.totalSizeMB || 0,
             channelStats: metadata.channelStats || {},
-            lastUpdated: metadata.lastUpdated
+            lastUpdated: metadata.lastUpdated,
+            lastOperationId: metadata.lastOperationId || null
         };
     } catch (error) {
         console.error('Error getting index meta:', error);
@@ -952,7 +971,8 @@ export async function getIndexMeta(context) {
             success: false,
             totalCount: 0,
             totalSizeMB: 0,
-            channelStats: {}
+            channelStats: {},
+            lastOperationId: null
         };
     }
 }
@@ -984,11 +1004,39 @@ async function recordOperation(context, type, data) {
         timestamp: Date.now(),
         data
     };
-    
+
     const operationKey = OPERATION_KEY_PREFIX + operationId;
     await db.put(operationKey, JSON.stringify(operation));
 
+    // 更新最新操作ID标记，失败不影响主操作
+    try {
+        await db.put(OPERATION_LATEST_KEY, operationId);
+    } catch (error) {
+        console.warn('Failed to update latest operation marker:', error);
+    }
+
     return operationId;
+}
+
+/**
+ * 获取最新操作ID
+ * @param {Object} context - 上下文对象
+ * @returns {string|null} 最新操作ID
+ */
+async function getLatestOperationId(context) {
+    const { env } = context;
+    const db = getDatabase(env);
+
+    try {
+        const value = await db.get(OPERATION_LATEST_KEY);
+        if (value === null || value === undefined || value === '') {
+            return null;
+        }
+        return value;
+    } catch (error) {
+        console.warn('Failed to read latest operation id:', error);
+        return null;
+    }
 }
 
 /**
@@ -1295,6 +1343,15 @@ export async function deleteAllOperations(context) {
         
         if (totalFound === 0) {
             console.log('No atomic operations found to delete');
+
+            // 清理最新操作标记
+            try {
+                await db.delete(OPERATION_LATEST_KEY);
+                console.log('Cleared latest operation marker');
+            } catch (error) {
+                console.warn('Failed to clear latest operation marker:', error);
+            }
+
             return {
                 success: true,
                 deletedCount: 0,
@@ -1328,6 +1385,14 @@ export async function deleteAllOperations(context) {
 
         } else {
             console.log(`Delete all operations completed`);
+
+            // 清理最新操作标记
+            try {
+                await db.delete(OPERATION_LATEST_KEY);
+                console.log('Cleared latest operation marker');
+            } catch (error) {
+                console.warn('Failed to clear latest operation marker:', error);
+            }
         }
 
     } catch (error) {
