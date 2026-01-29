@@ -125,7 +125,7 @@ Provides detailed deployment documentation, feature docs, development plans, upd
   
 - **Sponsors**: Thanks to the following sponsors for supporting this project!
 
-  [![sponsors](https://afdian-sponsors.sanyue.de/image)](https://afdian.com/a/marseventh)
+  [![sponsors](https://afdian-sponsors.sanyue.de/image?columns=12)](https://afdian.com/a/marseventh)
   
 - **Contributors**: Thanks to the following contributors for their selfless contributions!
 
