@@ -122,6 +122,7 @@ export async function onRequest(context) {
             start: 0,
             count: -1, // 获取全部
             includeSubdirFiles: recursive,
+            publicAccess: true,
         });
 
         if (!result.success) {

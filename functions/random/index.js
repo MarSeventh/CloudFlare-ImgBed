@@ -109,7 +109,7 @@ async function getRandomFileList(context, url, dir) {
         return JSON.parse(await cacheRes.text());
     }
 
-    let allRecords = await readIndex(context, { directory: dir, count: -1, includeSubdirFiles: true });
+    let allRecords = await readIndex(context, { directory: dir, count: -1, includeSubdirFiles: true, publicAccess: true });
 
     // 仅保留记录的name和metadata中的FileType字段
     allRecords = allRecords.files?.map(item => {
@@ -119,14 +119,16 @@ async function getRandomFileList(context, url, dir) {
         }
     });
 
-    // 缓存结果，缓存时间为24小时
-    await cache.put(`${url.origin}/api/randomFileList?dir=${dir}`, new Response(JSON.stringify(allRecords), {
-        headers: {
-            "Content-Type": "application/json",
-        }
-    }), {
-        expirationTtl: 24 * 60 * 60
-    });
-    
+    // 仅在有数据时缓存，避免锁定空结果
+    if (Array.isArray(allRecords) && allRecords.length > 0) {
+        await cache.put(`${url.origin}/api/randomFileList?dir=${dir}`, new Response(JSON.stringify(allRecords), {
+            headers: {
+                "Content-Type": "application/json",
+            }
+        }), {
+            expirationTtl: 24 * 60 * 60
+        });
+    }
+
     return allRecords;
 }
