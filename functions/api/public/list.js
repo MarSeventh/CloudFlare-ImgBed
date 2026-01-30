@@ -47,6 +47,70 @@ function isAllowedDirectory(dir, allowedDirs) {
     return false;
 }
 
+/**
+ * 获取公开浏览文件列表（带缓存）
+ * @param {Object} context - 上下文对象
+ * @param {URL} url - 请求URL
+ * @param {string} dir - 目录
+ * @param {boolean} recursive - 是否递归
+ * @returns {Promise<Object>} 文件列表和目录列表，包含 fromCache 字段
+ */
+async function getPublicFileList(context, url, dir, recursive) {
+    // 构建缓存键（目录格式去掉末尾的/，与清除缓存时的格式一致）
+    const cacheDir = dir.replace(/\/$/, '');
+    const cacheKey = `${url.origin}/api/publicFileList?dir=${cacheDir}&recursive=${recursive}`;
+
+    // 检查缓存中是否有记录
+    const cache = caches.default;
+    const cacheRes = await cache.match(cacheKey);
+    if (cacheRes) {
+        const data = JSON.parse(await cacheRes.text());
+        data.fromCache = true;
+        return data;
+    }
+
+    // 读取文件列表
+    const result = await readIndex(context, {
+        directory: dir,
+        start: 0,
+        count: -1,
+        includeSubdirFiles: recursive,
+        accessStatus: 'normal', // 只返回正常可访问的内容
+    });
+
+    if (!result.success) {
+        return { files: [], directories: [], totalCount: 0, fromCache: false };
+    }
+
+    // 转换文件格式（只保留必要信息）
+    const files = result.files.map(file => ({
+        id: file.id,
+        metadata: {
+            FileType: file.metadata?.FileType,
+            TimeStamp: file.metadata?.TimeStamp,
+            FileSize: file.metadata?.FileSize,
+        }
+    }));
+
+    const cacheData = {
+        files,
+        directories: result.directories,
+        totalCount: result.totalCount,
+    };
+
+    // 缓存结果，缓存时间为24小时
+    await cache.put(cacheKey, new Response(JSON.stringify(cacheData), {
+        headers: {
+            "Content-Type": "application/json",
+        }
+    }), {
+        expirationTtl: 24 * 60 * 60
+    });
+
+    cacheData.fromCache = false;
+    return cacheData;
+}
+
 export async function onRequest(context) {
     const { request, env } = context;
     const url = new URL(request.url);
@@ -88,13 +152,13 @@ export async function onRequest(context) {
         let dir = url.searchParams.get('dir') || '';
         let search = url.searchParams.get('search') || '';
         if (search) {
-            search = decodeURIComponent(search).trim();
+            search = decodeURIComponent(search).trim().toLowerCase();
         }
-        
+
         // 获取高级搜索参数
         const recursive = url.searchParams.get('recursive') === 'true';
         const fileType = url.searchParams.get('type') || ''; // image, video, audio, other
-        
+
         // 检查目录权限
         if (!isAllowedDirectory(dir, allowedDirs)) {
             return new Response(JSON.stringify({ error: 'Directory not allowed' }), {
@@ -115,24 +179,11 @@ export async function onRequest(context) {
         const start = parseInt(url.searchParams.get('start'), 10) || 0;
         const count = parseInt(url.searchParams.get('count'), 10) || 50;
 
-        // 读取文件列表（获取全部，因为需要先过滤 block/adult）
-        const result = await readIndex(context, {
-            directory: dir,
-            search,
-            start: 0,
-            count: -1, // 获取全部
-            includeSubdirFiles: recursive,
-        });
-
-        if (!result.success) {
-            return new Response(JSON.stringify({ error: 'Failed to read file list' }), {
-                status: 500,
-                headers: { 'Content-Type': 'application/json', ...corsHeaders }
-            });
-        }
+        // 获取文件列表（带缓存）
+        const cachedData = await getPublicFileList(context, url, dir, recursive);
 
         // 过滤子目录，只返回允许的目录
-        const filteredDirectories = result.directories.filter(subDir => {
+        const filteredDirectories = cachedData.directories.filter(subDir => {
             return isAllowedDirectory(subDir, allowedDirs);
         });
 
@@ -140,22 +191,20 @@ export async function onRequest(context) {
         const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'avif'];
         const videoExts = ['mp4', 'webm', 'ogg', 'mov', 'm4v', 'mkv', 'avi', '3gp', 'mpeg', 'mpg', 'flv', 'wmv', 'ts', 'rmvb'];
         const audioExts = ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma', 'ape', 'opus'];
-        
+
         const getFileExt = (name) => (name.split('.').pop() || '').toLowerCase();
         const isImageFile = (name) => imageExts.includes(getFileExt(name));
         const isVideoFile = (name) => videoExts.includes(getFileExt(name));
         const isAudioFile = (name) => audioExts.includes(getFileExt(name));
 
-        // 过滤掉 block 和 adult 图片（公开浏览不应显示这些内容）
-        let filteredFiles = result.files.filter(file => {
-            const listType = file.metadata?.ListType;
-            const label = file.metadata?.Label;
-            // 排除被屏蔽的和成人内容
-            if (listType === 'Block' || label === 'adult') {
-                return false;
-            }
-            return true;
-        });
+        let filteredFiles = cachedData.files;
+
+        // 搜索过滤
+        if (search) {
+            filteredFiles = filteredFiles.filter(file => {
+                return file.id.toLowerCase().includes(search);
+            });
+        }
 
         // 按文件类型过滤
         if (fileType) {
@@ -176,23 +225,19 @@ export async function onRequest(context) {
         // 过滤后再分页
         filteredFiles = filteredFiles.slice(start, start + count);
 
-        // 转换文件格式（只返回必要信息，隐藏敏感元数据）
+        // 转换文件格式
         const safeFiles = filteredFiles.map(file => ({
             name: file.id,
-            metadata: {
-                FileType: file.metadata?.FileType,
-                TimeStamp: file.metadata?.TimeStamp,
-                FileSize: file.metadata?.FileSize,
-                // 不返回 Channel、IP、Label 等敏感信息
-            }
+            metadata: file.metadata
         }));
 
         return new Response(JSON.stringify({
             files: safeFiles,
             directories: filteredDirectories,
-            totalCount: fileType ? filteredTotalCount : result.totalCount,
+            totalCount: (search || fileType) ? filteredTotalCount : cachedData.totalCount,
             returnedCount: safeFiles.length,
             allowedDirs: allowedDirs, // 返回允许的目录列表供前端使用
+            fromCache: cachedData.fromCache,
         }), {
             headers: { 'Content-Type': 'application/json', ...corsHeaders }
         });

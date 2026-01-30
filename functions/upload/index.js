@@ -2,7 +2,7 @@ import { userAuthCheck, UnauthorizedResponse } from "../utils/userAuth";
 import { fetchUploadConfig, fetchSecurityConfig } from "../utils/sysConfig";
 import {
     createResponse, getUploadIp, getIPAddress, isExtValid,
-    moderateContent, purgeCDNCache, isBlockedUploadIp, buildUniqueFileId, endUpload
+    moderateContent, purgeCDNCache, isBlockedUploadIp, buildUniqueFileId, endUpload, getImageDimensions
 } from "./uploadTools";
 import { initializeChunkedUpload, handleChunkUpload, uploadLargeFileToTelegram, handleCleanupRequest } from "./chunkUpload";
 import { handleChunkMerge } from "./chunkMerge";
@@ -124,13 +124,30 @@ async function processFileUpload(context, formdata = null) {
 
     // 获取文件信息
     const time = new Date().getTime();
-    const fileType = formdata.get('file').type;
-    let fileName = formdata.get('file').name;
-    const fileSize = (formdata.get('file').size / 1024 / 1024).toFixed(2); // 文件大小，单位MB
+    const file = formdata.get('file');
+    const fileType = file.type;
+    let fileName = file.name;
+    const fileSizeBytes = file.size; // 文件大小，单位字节
+    const fileSize = (fileSizeBytes / 1024 / 1024).toFixed(2); // 文件大小，单位MB
 
     // 检查fileType和fileName是否存在
     if (fileType === null || fileType === undefined || fileName === null || fileName === undefined) {
         return createResponse('Error: fileType or fileName is wrong, check the integrity of this file!', { status: 400 });
+    }
+
+    // 提取图片尺寸
+    let imageDimensions = null;
+    if (fileType.startsWith('image/')) {
+        try {
+            // JPEG 需要更多数据（EXIF 可能很大），其他格式 512 字节足够
+            const lowerType = fileType.toLowerCase();
+            const isJpeg = lowerType === 'image/jpeg' || lowerType === 'image/jpg' || lowerType === 'image/pjpeg';
+            const readSize = isJpeg ? 65536 : 512;
+            const headerBuffer = await file.slice(0, readSize).arrayBuffer();
+            imageDimensions = getImageDimensions(headerBuffer, fileType);
+        } catch (error) {
+            console.error('Error reading image dimensions:', error);
+        }
     }
 
     // 如果上传文件夹路径为空，尝试从文件名中获取
@@ -148,6 +165,7 @@ async function processFileUpload(context, formdata = null) {
         FileName: fileName,
         FileType: fileType,
         FileSize: fileSize,
+        FileSizeBytes: fileSizeBytes,
         UploadIP: uploadIp,
         UploadAddress: ipAddress,
         ListType: "None",
@@ -156,6 +174,12 @@ async function processFileUpload(context, formdata = null) {
         Directory: normalizedFolder === '' ? '' : normalizedFolder + '/',
         Tags: []
     };
+
+    // 添加图片尺寸信息
+    if (imageDimensions) {
+        metadata.Width = imageDimensions.width;
+        metadata.Height = imageDimensions.height;
+    }
 
     let fileExt = fileName.split('.').pop(); // 文件扩展名
     if (!isExtValid(fileExt)) {
