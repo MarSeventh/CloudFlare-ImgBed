@@ -1,4 +1,4 @@
-import { purgeCFCache } from "../../../utils/purgeCache";
+import { purgeCFCache, purgeRandomFileListCache, purgePublicFileListCache } from "../../../utils/purgeCache";
 import { addFileToIndex } from "../../../utils/indexManager.js";
 import { getDatabase } from "../../../utils/databaseAdapter.js";
 
@@ -15,12 +15,12 @@ export async function onRequest(context) {
 
     // 组装 CDN URL
     const url = new URL(request.url);
-    
+
     if (params.path) {
       params.path = String(params.path).split(',').join('/');
     }
     const cdnUrl = `https://${url.hostname}/file/${params.path}`;
-    
+
     // 解码params.path
     params.path = decodeURIComponent(params.path);
 
@@ -36,9 +36,13 @@ export async function onRequest(context) {
     // 清除CDN缓存
     await purgeCFCache(env, cdnUrl);
 
+    // 清除 randomFileList 等API缓存
+    const normalizedFolder = params.path.split('/').slice(0, -1).join('/');
+    await purgeRandomFileListCache(url.origin, normalizedFolder);
+    await purgePublicFileListCache(url.origin, normalizedFolder);
+
     // 更新索引
     waitUntil(addFileToIndex(context, params.path, value.metadata));
 
     return new Response(info);
-
-  }
+}

@@ -1,5 +1,5 @@
 import { fetchSecurityConfig } from "../utils/sysConfig";
-import { purgeCFCache } from "../utils/purgeCache";
+import { purgeCFCache, purgeRandomFileListCache, purgePublicFileListCache } from "../utils/purgeCache";
 import { addFileToIndex } from "../utils/indexManager.js";
 import { getDatabase } from '../utils/databaseAdapter.js';
 
@@ -79,6 +79,98 @@ export function isExtValid(fileExt) {
         'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'pdf',
         'txt', 'md', 'json', 'xml', 'html', 'css', 'js', 'ts', 'go', 'java', 'php', 'py', 'rb', 'sh', 'bat', 'cmd', 'ps1', 'psm1', 'psd', 'ai', 'sketch', 'fig', 'svg', 'eps', 'zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'apk', 'exe', 'msi', 'dmg', 'iso', 'torrent', 'webp', 'ico', 'svg', 'ttf', 'otf', 'woff', 'woff2', 'eot', 'apk', 'crx', 'xpi', 'deb', 'rpm', 'jar', 'war', 'ear', 'img', 'iso', 'vdi', 'ova', 'ovf', 'qcow2', 'vmdk', 'vhd', 'vhdx', 'pvm', 'dsk', 'hdd', 'bin', 'cue', 'mds', 'mdf', 'nrg', 'ccd', 'cif', 'c2d', 'daa', 'b6t', 'b5t', 'bwt', 'isz', 'isz', 'cdi', 'flp', 'uif', 'xdi', 'sdi'
     ].includes(fileExt);
+}
+
+/**
+ * 从图片文件头部提取尺寸信息
+ * 支持 JPEG, PNG, GIF, WebP, BMP 格式
+ * 优先通过文件头魔数检测格式，不依赖 MIME 类型
+ * @param {ArrayBuffer} buffer - 文件的 ArrayBuffer
+ * @param {string} fileType - 文件 MIME 类型（仅作参考）
+ * @returns {Object|null} { width, height } 或 null
+ */
+export function getImageDimensions(buffer, fileType) {
+    try {
+        const view = new DataView(buffer);
+        const uint8 = new Uint8Array(buffer);
+
+        // 通过文件头魔数检测格式（不依赖 MIME 类型）
+
+        // PNG 签名: 89 50 4E 47
+        if (uint8[0] === 0x89 && uint8[1] === 0x50 && uint8[2] === 0x4E && uint8[3] === 0x47) {
+            const width = view.getUint32(16, false);
+            const height = view.getUint32(20, false);
+            return { width, height };
+        }
+
+        // JPEG 签名: FF D8 FF
+        if (uint8[0] === 0xFF && uint8[1] === 0xD8 && uint8[2] === 0xFF) {
+            let offset = 2;
+            while (offset < buffer.byteLength - 9) {
+                if (uint8[offset] !== 0xFF) break;
+                const marker = uint8[offset + 1];
+                // SOF0, SOF1, SOF2 标记包含尺寸信息
+                if (marker >= 0xC0 && marker <= 0xC3 && marker !== 0xC4) {
+                    const height = view.getUint16(offset + 5, false);
+                    const width = view.getUint16(offset + 7, false);
+                    return { width, height };
+                }
+                const length = view.getUint16(offset + 2, false);
+                offset += 2 + length;
+            }
+            return null;
+        }
+
+        // GIF 签名: 47 49 46 (GIF)
+        if (uint8[0] === 0x47 && uint8[1] === 0x49 && uint8[2] === 0x46) {
+            const width = view.getUint16(6, true); // little-endian
+            const height = view.getUint16(8, true);
+            return { width, height };
+        }
+
+        // WebP 签名: RIFF....WEBP
+        if (uint8[0] === 0x52 && uint8[1] === 0x49 && uint8[2] === 0x46 && uint8[3] === 0x46 &&
+            uint8[8] === 0x57 && uint8[9] === 0x45 && uint8[10] === 0x42 && uint8[11] === 0x50) {
+            // VP8 (lossy): VP8 + 空格
+            if (uint8[12] === 0x56 && uint8[13] === 0x50 && uint8[14] === 0x38 && uint8[15] === 0x20) {
+                if (buffer.byteLength >= 30) {
+                    const width = (view.getUint16(26, true) & 0x3FFF);
+                    const height = (view.getUint16(28, true) & 0x3FFF);
+                    return { width, height };
+                }
+            }
+            // VP8L (lossless): VP8L
+            if (uint8[12] === 0x56 && uint8[13] === 0x50 && uint8[14] === 0x38 && uint8[15] === 0x4C) {
+                if (buffer.byteLength >= 25) {
+                    const bits = view.getUint32(21, true);
+                    const width = (bits & 0x3FFF) + 1;
+                    const height = ((bits >> 14) & 0x3FFF) + 1;
+                    return { width, height };
+                }
+            }
+            // VP8X (extended): VP8X
+            if (uint8[12] === 0x56 && uint8[13] === 0x50 && uint8[14] === 0x38 && uint8[15] === 0x58) {
+                if (buffer.byteLength >= 30) {
+                    const width = (uint8[24] | (uint8[25] << 8) | (uint8[26] << 16)) + 1;
+                    const height = (uint8[27] | (uint8[28] << 8) | (uint8[29] << 16)) + 1;
+                    return { width, height };
+                }
+            }
+            return null;
+        }
+
+        // BMP 签名: 42 4D (BM)
+        if (uint8[0] === 0x42 && uint8[1] === 0x4D) {
+            const width = view.getInt32(18, true);
+            const height = Math.abs(view.getInt32(22, true)); // height 可能为负数
+            return { width, height };
+        }
+
+        return null;
+    } catch (error) {
+        console.error('Error extracting image dimensions:', error);
+        return null;
+    }
 }
 
 // 图像审查
@@ -168,18 +260,9 @@ export async function purgeCDNCache(env, cdnUrl, url, normalizedFolder) {
         console.error('Failed to clear CDN cache:', error);
     }
 
-    // 清除api/randomFileList API缓存
-    try {
-        const cache = caches.default;
-        // await cache.delete(`${url.origin}/api/randomFileList`); delete有bug，通过写入一个max-age=0的response来清除缓存
-        const nullResponse = new Response(null, {
-            headers: { 'Cache-Control': 'max-age=0' },
-        });
-
-        await cache.put(`${url.origin}/api/randomFileList?dir=${normalizedFolder}`, nullResponse);
-    } catch (error) {
-        console.error('Failed to clear cache:', error);
-    }
+    // 清除 api/randomFileList 等API缓存
+    await purgeRandomFileListCache(url.origin, normalizedFolder);
+    await purgePublicFileListCache(url.origin, normalizedFolder);
 }
 
 // 结束上传：清除缓存，维护索引

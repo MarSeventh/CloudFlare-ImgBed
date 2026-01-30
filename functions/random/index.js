@@ -40,6 +40,9 @@ export async function onRequest(context) {
         fileType = fileType.split(',');
     }
 
+    // 读取图片方向参数：landscape(横图), portrait(竖图), square(方图)
+    const orientation = requestUrl.searchParams.get('orientation') || '';
+
     // 读取指定文件夹
     const paramDir = requestUrl.searchParams.get('dir') || '';
     const dir = paramDir.replace(/^\/+/, '').replace(/\/{2,}/g, '/').replace(/\/$/, '');
@@ -61,6 +64,27 @@ export async function onRequest(context) {
 
     // 筛选出符合fileType要求的记录
     allRecords = allRecords.filter(item => { return fileType.some(type => item.FileType?.includes(type)) });
+
+    // 根据图片方向筛选
+    if (orientation && allRecords.length > 0) {
+        const SQUARE_THRESHOLD = 0.1; // 宽高比差异小于10%视为方图
+        allRecords = allRecords.filter(item => {
+            // 如果没有尺寸信息，跳过该记录
+            if (!item.Width || !item.Height) return false;
+
+            const ratio = item.Width / item.Height;
+            switch (orientation) {
+                case 'landscape': // 横图：宽 > 高
+                    return ratio > (1 + SQUARE_THRESHOLD);
+                case 'portrait': // 竖图：高 > 宽
+                    return ratio < (1 - SQUARE_THRESHOLD);
+                case 'square': // 方图：宽 ≈ 高
+                    return ratio >= (1 - SQUARE_THRESHOLD) && ratio <= (1 + SQUARE_THRESHOLD);
+                default:
+                    return true;
+            }
+        });
+    }
 
 
     if (allRecords.length == 0) {
@@ -109,13 +133,15 @@ async function getRandomFileList(context, url, dir) {
         return JSON.parse(await cacheRes.text());
     }
 
-    let allRecords = await readIndex(context, { directory: dir, count: -1, includeSubdirFiles: true });
+    let allRecords = await readIndex(context, { directory: dir, count: -1, includeSubdirFiles: true, accessStatus: 'normal' });
 
-    // 仅保留记录的name和metadata中的FileType字段
+    // 仅保留记录的name和metadata中的必要字段
     allRecords = allRecords.files?.map(item => {
         return {
             name: item.id,
-            FileType: item.metadata?.FileType
+            FileType: item.metadata?.FileType,
+            Width: item.metadata?.Width,
+            Height: item.metadata?.Height
         }
     });
 
