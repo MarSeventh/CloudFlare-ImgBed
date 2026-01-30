@@ -139,11 +139,8 @@ async function processFileUpload(context, formdata = null) {
     let imageDimensions = null;
     if (fileType.startsWith('image/')) {
         try {
-            // JPEG 需要更多数据（EXIF 可能很大），其他格式 512 字节足够
-            const lowerType = fileType.toLowerCase();
-            const isJpeg = lowerType === 'image/jpeg' || lowerType === 'image/jpg' || lowerType === 'image/pjpeg';
-            const readSize = isJpeg ? 65536 : 512;
-            const headerBuffer = await file.slice(0, readSize).arrayBuffer();
+            // 统一读取 64KB，足以覆盖 JPEG 的 EXIF 数据和其他格式
+            const headerBuffer = await file.slice(0, 65536).arrayBuffer();
             imageDimensions = getImageDimensions(headerBuffer, fileType);
         } catch (error) {
             console.error('Error reading image dimensions:', error);
@@ -287,16 +284,12 @@ async function uploadFileToCloudflareR2(context, fullId, metadata, returnLink) {
 
     const R2DataBase = env.img_r2;
 
-    // 写入R2数据库，获取实际存储大小
-    const r2Object = await R2DataBase.put(fullId, formdata.get('file'));
+    // 写入R2数据库
+    await R2DataBase.put(fullId, formdata.get('file'));
 
     // 更新metadata
     metadata.Channel = "CloudflareR2";
     metadata.ChannelName = r2Channel.name || "R2_env";
-    // 使用 R2 返回的实际文件大小
-    if (r2Object && r2Object.size) {
-        metadata.FileSize = (r2Object.size / 1024 / 1024).toFixed(2);
-    }
 
     // 图像审查，采用R2的publicUrl
     const R2PublicUrl = r2Channel.publicUrl;
@@ -782,7 +775,6 @@ async function uploadFileToHuggingFace(context, fullId, metadata, returnLink) {
         // 更新 metadata
         metadata.Channel = "HuggingFace";
         metadata.ChannelName = hfChannel.name || "HuggingFace_env";
-        metadata.FileSize = (file.size / 1024 / 1024).toFixed(2);
         metadata.HfRepo = hfChannel.repo;
         metadata.HfFilePath = hfFilePath;
         metadata.HfToken = hfChannel.token;

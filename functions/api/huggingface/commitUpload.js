@@ -90,6 +90,7 @@ export async function onRequestPost(context) {
             Channel: "HuggingFace",
             ChannelName: hfChannel.name || "HuggingFace_env",
             FileSize: (fileSize / 1024 / 1024).toFixed(2),
+            FileSizeBytes: fileSize,
             HfRepo: hfChannel.repo,
             HfFilePath: filePath,
             HfToken: hfChannel.token,
