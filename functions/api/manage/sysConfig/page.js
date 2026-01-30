@@ -206,6 +206,12 @@ export async function getPageConfig(db, env) {
             label: '登录页背景图',
             tooltip: '1.填写 bing 使用必应壁纸轮播 <br/> 2.填写 ["url1","url2"] 使用多张图片轮播 <br/> 3.填写 ["url"] 使用单张图片',
             category: '管理端设置',
+        },
+        {
+            id: 'adminBkImg',
+            label: '管理页背景图',
+            tooltip: '1.填写 bing 使用必应壁纸轮播 <br/> 2.填写 ["url1","url2"] 使用多张图片轮播 <br/> 3.填写 ["url"] 使用单张图片',
+            category: '管理端设置',
         }
     )
 
