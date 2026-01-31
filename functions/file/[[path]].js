@@ -5,7 +5,7 @@ import { DiscordAPI } from "../utils/discordAPI";
 import { HuggingFaceAPI } from "../utils/huggingfaceAPI";
 import {
     setCommonHeaders, setRangeHeaders, handleHeadRequest, getFileContent, isTgChannel,
-    returnWithCheck, return404, isDomainAllowed
+    returnWithCheck, return404, isDomainAllowed, cacheResponse
 } from './fileTools';
 import { getDatabase } from '../utils/databaseAdapter.js';
 
@@ -19,6 +19,29 @@ export async function onRequest(context) {  // Contents of context object
         next, // used for middleware or to fetch assets
         data, // arbitrary space for passing data between middlewares
     } = context;
+
+    // CDN 缓存逻辑：只缓存 GET 请求且无 Range 头的请求
+    const cache = caches.default;
+    const cacheKey = new Request(request.url, { method: 'GET' });
+    const isGET = request.method === 'GET';
+    const hasRange = request.headers.has('Range');
+    const shouldCache = isGET && !hasRange;
+
+    if (shouldCache) {
+        const cachedResponse = await cache.match(cacheKey);
+        if (cachedResponse) {
+            // 添加缓存命中标识
+            const headers = new Headers(cachedResponse.headers);
+            headers.set('X-Cache-Status', 'HIT');
+            return new Response(cachedResponse.body, {
+                status: cachedResponse.status,
+                headers
+            });
+        }
+    }
+
+    // 挂载缓存相关信息到 context，供后续存入缓存使用
+    context.cacheInfo = { shouldCache, cache, cacheKey, waitUntil };
 
     // 解码文件ID
     let fileId = '';
@@ -152,7 +175,7 @@ export async function onRequest(context) {  // Contents of context object
             headers,
         });
 
-        return newRes;
+        return cacheResponse(context, newRes);
     } catch (error) {
         return new Response('Error: ' + error, { status: 500 });
     }
@@ -617,10 +640,11 @@ async function handleR2File(context, fileId, encodedFileName, fileType) {
         }
 
         // 正常请求
-        return new Response(object.body, {
+        const r2Response = new Response(object.body, {
             status: 200,
             headers,
         });
+        return cacheResponse(context, r2Response);
     } catch (error) {
         return new Response(`Error: Failed to fetch from R2 - ${error.message}`, { status: 500 });
     }
@@ -676,10 +700,11 @@ async function handleS3File(context, metadata, encodedFileName, fileType) {
                 headers.set('Content-Range', response.headers.get('Content-Range'));
             }
 
-            return new Response(response.body, {
+            const cdnResponse = new Response(response.body, {
                 status: response.status,
                 headers
             });
+            return response.status === 200 ? cacheResponse(context, cdnResponse) : cdnResponse;
 
         } catch (error) {
             // CDN 读取出错，回退到 S3 API
@@ -745,10 +770,11 @@ async function handleS3FileViaAPI(context, metadata, encodedFileName, fileType) 
 
         // 返回响应，支持流式传输
         const statusCode = range ? 206 : 200; // Range请求返回206 Partial Content
-        return new Response(response.Body, {
+        const s3Response = new Response(response.Body, {
             status: statusCode,
             headers
         });
+        return statusCode === 200 ? cacheResponse(context, s3Response) : s3Response;
 
     } catch (error) {
         return new Response(`Error: Failed to fetch from S3 - ${error.message}`, { status: 500 });
@@ -812,10 +838,11 @@ async function handleDiscordFile(context, metadata, encodedFileName, fileType) {
             headers.set('Content-Range', response.headers.get('Content-Range'));
         }
 
-        return new Response(response.body, {
+        const discordResponse = new Response(response.body, {
             status: response.status,
             headers
         });
+        return response.status === 200 ? cacheResponse(context, discordResponse) : discordResponse;
 
     } catch (error) {
         return new Response(`Error: Failed to fetch from Discord - ${error.message}`, { status: 500 });
@@ -882,10 +909,11 @@ async function handleHuggingFaceFile(context, metadata, encodedFileName, fileTyp
             headers.set('Content-Range', response.headers.get('Content-Range'));
         }
 
-        return new Response(response.body, {
+        const hfResponse = new Response(response.body, {
             status: response.status,
             headers
         });
+        return response.status === 200 ? cacheResponse(context, hfResponse) : hfResponse;
 
     } catch (error) {
         return new Response(`Error: Failed to fetch from HuggingFace - ${error.message}`, { status: 500 });

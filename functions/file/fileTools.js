@@ -67,6 +67,29 @@ export function setCommonHeaders(headers, encodedFileName, fileType, Referer, ur
     }
 }
 
+// 将响应存入 CDN 缓存（异步执行，不阻塞响应）
+export function cacheResponse(context, response) {
+    const { cacheInfo } = context;
+    if (!cacheInfo?.shouldCache || response.status !== 200) {
+        return response;
+    }
+
+    const { cache, cacheKey, waitUntil } = cacheInfo;
+    const headers = new Headers(response.headers);
+    headers.set('X-Cache-Status', 'MISS');
+
+    const responseToCache = new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers
+    });
+
+    // 使用 waitUntil 异步存入缓存，不阻塞响应返回
+    waitUntil(cache.put(cacheKey, responseToCache.clone()));
+
+    return responseToCache;
+}
+
 // 设置Range请求相关头部
 export function setRangeHeaders(headers, rangeStart, rangeEnd, totalSize) {
     const contentLength = rangeEnd - rangeStart + 1;
