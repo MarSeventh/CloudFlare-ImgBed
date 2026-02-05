@@ -5,9 +5,45 @@ import { getDatabase } from '../utils/databaseAdapter.js';
 
 export async function onRequest(context) {
     const { request, env } = context;
-
+    
+    // 设置CORS头部的辅助函数
+    const setCorsHeaders = (response, origin) => {
+        const allowedOrigins = [
+            'https://editblog.3my.top'
+        ];
+        
+        const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+        
+        const headers = new Headers(response.headers);
+        headers.set('Access-Control-Allow-Origin', allowedOrigin);
+        headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        headers.set('Access-Control-Allow-Credentials', 'true');
+        headers.set('Vary', 'Origin');
+        
+        return new Response(response.body, {
+            status: response.status,
+            statusText: response.statusText,
+            headers,
+        });
+    };
+    
+    const origin = request.headers.get('Origin') || '';
+    
+    // 处理预检请求
+    if (request.method === 'OPTIONS') {
+        return setCorsHeaders(new Response(null, {
+            headers: {
+                'Access-Control-Max-Age': '86400',
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+            }
+        }), origin);
+    }
+    
+    // 只允许GET方法
     if (request.method !== 'GET') {
-        return new Response('Method Not Allowed', { status: 405 });
+        return setCorsHeaders(new Response('Method Not Allowed', { 
+            status: 405 
+        }), origin);
     }
 
     try {
@@ -16,15 +52,12 @@ export async function onRequest(context) {
 
         let uploadConfig;
         if (includeDisabled) {
-            // 获取所有上传配置（包括禁用的渠道）
             const db = getDatabase(env);
             uploadConfig = await getUploadConfig(db, env);
         } else {
-            // 获取上传配置（已过滤禁用的渠道）
             uploadConfig = await fetchUploadConfig(env, context);
         }
 
-        // 构建渠道列表，返回渠道名称和实际的 Channel 类型
         const channels = {
             telegram: uploadConfig.telegram.channels.map(ch => ({
                 name: ch.name,
@@ -48,15 +81,16 @@ export async function onRequest(context) {
             }))
         };
 
-        return new Response(JSON.stringify(channels), {
+        return setCorsHeaders(new Response(JSON.stringify(channels), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
-        });
+        }), origin);
     } catch (error) {
         console.error('Failed to get channels:', error);
-        return new Response(JSON.stringify({ error: 'Failed to get channels' }), {
+        
+        return setCorsHeaders(new Response(JSON.stringify({ error: 'Failed to get channels' }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' }
-        });
+        }), origin);
     }
 }
