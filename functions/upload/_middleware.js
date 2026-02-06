@@ -2,7 +2,7 @@ import { errorHandling, telemetryData, checkDatabaseConfig } from '../utils/midd
 
 // CORS 跨域响应头
 const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': 'edit.3my.top,blog.sysii.cn',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Max-Age': '86400',
