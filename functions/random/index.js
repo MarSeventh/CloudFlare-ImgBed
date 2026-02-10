@@ -1,5 +1,6 @@
 import { fetchOthersConfig } from "../utils/sysConfig";
 import { readIndex } from "../utils/indexManager";
+import { detectDevice, resolveOrientation, addClientHintsHeaders } from "./adaptive.js";
 
 let othersConfig = {};
 let allowRandom = false;
@@ -40,8 +41,24 @@ export async function onRequest(context) {
         fileType = fileType.split(',');
     }
 
-    // 读取图片方向参数：landscape(横图), portrait(竖图), square(方图)
-    const orientation = requestUrl.searchParams.get('orientation') || '';
+    // 读取图片方向参数：landscape(横图), portrait(竖图), square(方图), auto(自适应)
+    const orientationParam = requestUrl.searchParams.get('orientation') || '';
+
+    // 根据参数值决定行为
+    const VALID_ORIENTATIONS = ['landscape', 'portrait', 'square'];
+    let orientation = '';
+    let isAutoMode = false;
+
+    if (VALID_ORIENTATIONS.includes(orientationParam)) {
+        // 手动指定有效方向，直接使用
+        orientation = orientationParam;
+    } else if (orientationParam === 'auto') {
+        // 自适应模式：检测设备并自动决策
+        isAutoMode = true;
+        const deviceInfo = detectDevice(request);
+        orientation = resolveOrientation(deviceInfo);
+    }
+    // 其他情况（未指定或无效值）：orientation 保持空字符串，不过滤
 
     // 读取指定文件夹
     const paramDir = requestUrl.searchParams.get('dir') || '';
@@ -65,6 +82,9 @@ export async function onRequest(context) {
     // 筛选出符合fileType要求的记录
     allRecords = allRecords.filter(item => { return fileType.some(type => item.FileType?.includes(type)) });
 
+    // 保存过滤前的记录，用于自适应模式降级
+    const allRecordsBeforeOrientationFilter = allRecords;
+
     // 根据图片方向筛选
     if (orientation && allRecords.length > 0) {
         const SQUARE_THRESHOLD = 0.1; // 宽高比差异小于10%视为方图
@@ -86,9 +106,19 @@ export async function onRequest(context) {
         });
     }
 
+    // 自适应模式降级：过滤后无匹配图片时，降级到全部图片
+    if (isAutoMode && orientation && allRecords.length === 0) {
+        allRecords = allRecordsBeforeOrientationFilter;
+    }
+
+    // 构建响应头：自适应模式下添加 Client Hints 协商头
+    const responseHeaders = new Headers();
+    if (isAutoMode) {
+        addClientHintsHeaders(responseHeaders);
+    }
 
     if (allRecords.length == 0) {
-        return new Response(JSON.stringify({}), { status: 200 });
+        return new Response(JSON.stringify({}), { status: 200, headers: responseHeaders });
     } else {
         const randomIndex = Math.floor(Math.random() * allRecords.length);
         const randomKey = allRecords[randomIndex];
@@ -108,19 +138,23 @@ export async function onRequest(context) {
             // Return an image response
             randomUrl = requestUrl.origin + randomPath;
             let contentType = 'image/jpeg';
+            const imgHeaders = new Headers(responseHeaders);
             return new Response(await fetch(randomUrl).then(res => {
                 contentType = res.headers.get('content-type');
                 return res.blob();
             }), {
-                headers: contentType ? { 'Content-Type': contentType } : { 'Content-Type': 'image/jpeg' },
+                headers: (() => {
+                    imgHeaders.set('Content-Type', contentType || 'image/jpeg');
+                    return imgHeaders;
+                })(),
                 status: 200
             });
         }
         
         if (resType == 'text') {
-            return new Response(randomUrl, { status: 200 });
+            return new Response(randomUrl, { status: 200, headers: responseHeaders });
         } else {
-            return new Response(JSON.stringify({ url: randomUrl }), { status: 200 });
+            return new Response(JSON.stringify({ url: randomUrl }), { status: 200, headers: responseHeaders });
         }
     }
 }
