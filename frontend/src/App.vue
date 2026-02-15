@@ -4,83 +4,85 @@
 
 <script>
 import { mapGetters } from 'vuex'
+import { OverlayScrollbars } from 'overlayscrollbars'
 
 export default {
+  data() {
+    return {
+      osInstance: null,
+      imageViewerObserver: null
+    }
+  },
   computed: {
     ...mapGetters(['userConfig', 'useDarkMode'])
   },
-  watch: {
-    useDarkMode() {
-      this.setSiteIcon()
+  mounted() {
+    // 初始化 OverlayScrollbars 悬浮滚动条
+    this.$nextTick(() => {
+      this.initOverlayScrollbars()
+      this.setupImageViewerObserver()
+    })
+  },
+  beforeUnmount() {
+    // 清理 MutationObserver
+    if (this.imageViewerObserver) {
+      this.imageViewerObserver.disconnect()
     }
   },
+  watch: {
+  },
   methods: {
-    setSiteIcon() {
-      const link = document.createElement('link')
-      link.rel = 'icon'
-      
-      // 根据深色模式选择不同的 logo
-      if (this.useDarkMode) {
-        link.href = this.userConfig?.siteIcon || '/logo-dark.png'
-      } else {
-        link.href = this.userConfig?.siteIcon || '/logo.png'
+    initOverlayScrollbars() {
+      try {
+        // 检查是否已经初始化
+        if (OverlayScrollbars.valid(document.body)) {
+          this.osInstance = OverlayScrollbars(document.body)
+          return
+        }
+        
+        // 应用到 body 实现全局悬浮滚动条
+        this.osInstance = OverlayScrollbars(document.body, {
+          scrollbars: {
+            theme: 'os-theme-dark',
+            visibility: 'auto',
+            autoHide: 'scroll',
+            autoHideDelay: 600,
+            dragScroll: true,
+            clickScroll: true
+          },
+          overflow: {
+            x: 'hidden',
+            y: 'scroll'
+          }
+        })
+        
+        console.log('OverlayScrollbars initialized successfully')
+      } catch (error) {
+        console.error('Failed to initialize OverlayScrollbars:', error)
       }
+    },
+    setupImageViewerObserver() {
+      // 监听图片预览器的打开/关闭，动态控制 OverlayScrollbars
+      this.imageViewerObserver = new MutationObserver((mutations) => {
+        const imageViewer = document.querySelector('.el-image-viewer__wrapper')
+        if (imageViewer) {
+          // 图片预览器打开，禁用滚动
+          if (this.osInstance) {
+            this.osInstance.options({ overflow: { x: 'hidden', y: 'hidden' } })
+          }
+        } else {
+          // 图片预览器关闭，恢复滚动
+          if (this.osInstance) {
+            this.osInstance.options({ overflow: { x: 'hidden', y: 'scroll' } })
+          }
+        }
+      })
       
-      document.head.appendChild(link)
+      this.imageViewerObserver.observe(document.body, {
+        childList: true,
+        subtree: true
+      })
     }
   }
 }
 </script>
-
-<style>
-#app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
-}
-
-nav {
-  padding: 30px;
-}
-
-nav a {
-  font-weight: bold;
-  color: #2c3e50;
-}
-
-nav a.router-link-exact-active {
-  color: #42b983;
-}
-
-body {
-  margin: 0;
-  padding: 0;
-  background-color: #f8f8f8;
-}
-:focus-visible {
-    outline: none;
-}
-</style>
-<style>
-.el-dropdown__popper.el-popper {
-    border-radius: 12px;
-    border: none;
-    background-color: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(10px);
-    box-shadow: 0 0 10px 2px rgba(0, 0, 0, 0.1);
-}
-.el-dropdown__popper.el-popper .el-dropdown-menu {
-    background: none;
-    border: none;
-}
-.el-dropdown__popper.el-popper .el-dropdown-menu__item {
-    border: none;
-    background: none;
-}
-.el-popper.is-light>.el-popper__arrow::before {
-    background: none;
-    border: none;
-}
-</style>

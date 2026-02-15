@@ -4,12 +4,21 @@
             <el-header>
             <div class="header-content">
                 <DashboardTabs activeTab="dashboard"></DashboardTabs>
-                <div class="search-card">
-                <el-input v-model="search" size="mini" placeholder="输入关键字搜索"></el-input>
+                <div class="search-area">
+                    <div class="search-card">
+                        <el-input v-model="tempSearch" size="mini" placeholder="搜索：#标签 -#排除标签" @keyup.enter="handleSearch">
+                            <template #suffix>
+                                <font-awesome-icon icon="search" class="search-icon" @click="handleSearch"/>
+                            </template>
+                        </el-input>
+                    </div>
+                    <!-- 筛选下拉菜单 -->
+                    <FilterDropdown
+                        v-model:filters="filters"
+                        :channelNameOptions="channelNameOptions"
+                        @change="handleFilterChange"
+                    />
                 </div>
-                <span class="stats">
-                    <font-awesome-icon icon="database" class="fa-database"></font-awesome-icon> 文件数量: {{ Number }}
-                </span>
                 <div class="actions">
                 <el-dropdown @command="sort" :hide-on-click="false">
                     <span class="el-dropdown-link">
@@ -32,27 +41,31 @@
                     <template #dropdown>
                         <el-dropdown-menu>
                             <el-dropdown-item command="copy">
-                                <font-awesome-icon icon="copy" style="margin-right: 5px;"></font-awesome-icon>
+                                <font-awesome-icon icon="copy" class="batch-action-item-icon"></font-awesome-icon>
                                 复制
                             </el-dropdown-item>
                             <el-dropdown-item command="delete">
-                                <font-awesome-icon icon="trash-alt" style="margin-right: 5px;"></font-awesome-icon>
+                                <font-awesome-icon icon="trash-alt" class="batch-action-item-icon"></font-awesome-icon>
                                 删除
                             </el-dropdown-item>
                             <el-dropdown-item command="download">
-                                <font-awesome-icon icon="download" style="margin-right: 5px;"></font-awesome-icon>
+                                <font-awesome-icon icon="download" class="batch-action-item-icon"></font-awesome-icon>
                                 下载
                             </el-dropdown-item>
                             <el-dropdown-item command="move">
-                                <font-awesome-icon icon="file-export" style="margin-right: 5px;"></font-awesome-icon>
+                                <font-awesome-icon icon="file-export" class="batch-action-item-icon"></font-awesome-icon>
                                 移动
                             </el-dropdown-item>
+                            <el-dropdown-item command="tagManagement">
+                                <font-awesome-icon icon="tags" class="batch-action-item-icon"></font-awesome-icon>
+                                标签管理
+                            </el-dropdown-item>
                             <el-dropdown-item command="ban">
-                                <font-awesome-icon icon="ban" style="margin-right: 5px;"></font-awesome-icon>
+                                <font-awesome-icon icon="ban" class="batch-action-item-icon"></font-awesome-icon>
                                 加入黑名单
                             </el-dropdown-item>
                             <el-dropdown-item command="white">
-                                <font-awesome-icon icon="user-plus" style="margin-right: 5px;"></font-awesome-icon>
+                                <font-awesome-icon icon="user-plus" class="batch-action-item-icon"></font-awesome-icon>
                                 加入白名单
                             </el-dropdown-item>
                         </el-dropdown-menu>
@@ -63,6 +76,9 @@
                         <font-awesome-icon icon="link" class="header-icon" @click="showUrlDialog = true"></font-awesome-icon>
                     </span>
                 </el-tooltip>
+                <el-tooltip :disabled="disableTooltip" :content="viewMode === 'card' ? '列表视图' : '卡片视图'" placement="bottom">
+                    <font-awesome-icon :icon="viewMode === 'card' ? 'list' : 'th-large'" class="header-icon" @click="toggleViewMode"></font-awesome-icon>
+                </el-tooltip>
                 <el-tooltip :disabled="disableTooltip" content="退出登录" placement="bottom">
                     <font-awesome-icon icon="sign-out-alt" class="header-icon" @click="handleLogout"></font-awesome-icon>
                 </el-tooltip>
@@ -71,111 +87,159 @@
             </el-header>
             <el-main class="main-container">
             <!-- 目录导航 -->
-            <div class="breadcrumb">
-                <el-breadcrumb separator="/">
-                    <el-breadcrumb-item @click="navigateToFolder('')">根目录</el-breadcrumb-item>
-                    <el-breadcrumb-item 
-                        v-for="(folder, index) in currentPath.split('/').filter(Boolean)" 
-                        :key="index"
-                        @click="navigateToFolder(currentPath.split('/').slice(0, index + 1).join('/'))"
-                    >
-                        {{ folder }}
-                    </el-breadcrumb-item>
-                </el-breadcrumb>
+            <div class="breadcrumb-container">
+                <!-- 移动端目录按钮 -->
+                <div class="mobile-directory-trigger" @click="showMobileDirectoryDrawer = true">
+                    <font-awesome-icon icon="folder-open" class="mobile-directory-icon"/>
+                    <span class="mobile-directory-path">{{ currentPath && currentPath.split('/').filter(Boolean).length > 0 ? currentPath.split('/').filter(Boolean).pop() : '根目录' }}</span>
+                    <font-awesome-icon icon="chevron-down" class="mobile-directory-arrow"/>
+                </div>
+                <!-- 桌面端面包屑 -->
+                <div class="breadcrumb desktop-only">
+                    <el-breadcrumb separator="/">
+                        <el-breadcrumb-item @click="navigateToFolder('')">
+                            <font-awesome-icon icon="home" class="breadcrumb-home-icon"/>
+                        </el-breadcrumb-item>
+                        <el-breadcrumb-item 
+                            v-for="(folder, index) in currentPath.split('/').filter(Boolean)" 
+                            :key="index"
+                            @click="navigateToFolder(currentPath.split('/').filter(Boolean).slice(0, index + 1).join('/'))">
+                            {{ folder }}
+                        </el-breadcrumb-item>
+                    </el-breadcrumb>
+                </div>
+                <span class="stats-badge" :title="`共 ${$data.Number} 个文件`">
+                    <font-awesome-icon icon="database" class="stats-badge-icon"/>
+                    {{ Number }}
+                </span>
             </div>
-            <div class="content" v-loading="loading">
+            
+            <!-- 卡片视图 -->
+            <div v-if="viewMode === 'card'" class="content" ref="cardContainerRef">
+                <!-- 加载骨架屏 -->
+                <SkeletonLoader v-if="loading" type="card" :count="15" />
+                <!-- 空状态 -->
+                <div v-else-if="paginatedTableData.length === 0" class="empty-state">
+                    <font-awesome-icon icon="folder-open" class="empty-icon" />
+                    <p class="empty-text">{{ hasSearchOrFilter ? '未找到匹配的文件或文件夹' : '当前目录为空' }}</p>
+                    <p class="empty-hint">{{ hasSearchOrFilter ? '尝试调整搜索条件或筛选器' : '上传文件后将显示在这里' }}</p>
+                </div>
                 <!-- 文件夹和文件列表 -->
-                <template v-for="(item, index) in paginatedTableData" :key="index">
+                <template v-else v-for="(item, index) in paginatedTableData" :key="index">
                     <!-- 文件夹卡片 -->
-                    <el-card v-if="isFolder(item)" class="img-card folder-card">
-                        <el-checkbox v-model="item.selected"></el-checkbox>
-                        <div class="folder-icon" @click="enterFolder(item.name)">
-                            <font-awesome-icon icon="folder-open" size="4x"/>
-                        </div>
-                        <div class="folder-overlay">
-                            <div class="folder-actions">
-                                <el-tooltip :disabled="disableTooltip" content="删除" placement="top">
-                                    <el-button size="mini" type="danger" @click.stop="handleDelete(index, item.name)">
-                                        <font-awesome-icon icon="trash-alt"></font-awesome-icon>
-                                    </el-button>
-                                </el-tooltip>
-                                <el-tooltip :disabled="disableTooltip" content="移动" placement="top">
-                                    <el-button size="mini" type="primary" @click.stop="handleMove(index, item.name)">
-                                        <font-awesome-icon icon="file-export"></font-awesome-icon>
-                                    </el-button>
-                                </el-tooltip>  
-                            </div>
-                        </div>
-                        <div class="file-info">{{ getFolderName(item.name) }}</div>
-                    </el-card>
-                    
+                    <FolderCard 
+                        v-if="isFolder(item)"
+                        :name="item.name"
+                        v-model:selected="item.selected"
+                        :showActions="!isSearchMode"
+                        :disableTooltip="disableTooltip"
+                        @enter="enterFolder(item.name)"
+                        @copy="handleFolderCopy(item.name)"
+                        @move="handleMove(index, item.name)"
+                        @delete="handleDelete(index, item.name)"
+                        @touchstart="handleFolderTouchStart(item, index)"
+                        @touchend="handleTouchEnd"
+                        @touchmove="handleTouchEnd"
+                    />
                     <!-- 文件卡片 -->
-                    <el-card v-else class="img-card">
-                        <el-checkbox v-model="item.selected"></el-checkbox>
-                        <div class="file-short-info">
-                            <div v-if="item.metadata?.ListType === 'White'" class="success-tag">{{ item.channelTag }}</div>
-                            <div v-else-if="item.metadata?.ListType === 'Block' || item.metadata?.Label === 'adult'" class="fail-tag">{{ item.channelTag }}</div>
-                            <div v-else class="success-tag">{{ item.channelTag }}</div>
-                        </div>
-                        <video v-if="isVideo(item)" :src="'/file/' + item.name + '?from=admin'" autoplay muted loop class="video-preview" @click="handleVideoClick"></video>
-                        <el-image v-else-if="isImage(item)" :preview-teleported="true" :src="'/file/' + item.name + '?from=admin'" :preview-src-list="item.previewSrcList" fit="cover" lazy class="image-preview"></el-image>
-                        <div v-else class="file-preview">
-                            <font-awesome-icon icon="file" class="file-icon" size="4x"></font-awesome-icon>
-                        </div>
-                        <div class="image-overlay">
-                            <div class="overlay-buttons">
-                                <div class="button-row">
-                                    <el-tooltip :disabled="disableTooltip" content="复制链接" placement="top">
-                                        <el-button size="mini" type="primary" @click.stop="handleCopy(index, item.name)">
-                                            <font-awesome-icon icon="copy"></font-awesome-icon>
-                                        </el-button>
-                                    </el-tooltip>
-                                    <el-tooltip :disabled="disableTooltip" content="下载" placement="top">
-                                        <el-button size="mini" type="primary" @click.stop="handleDownload(item.name)">
-                                            <font-awesome-icon icon="download"></font-awesome-icon>
-                                        </el-button>
-                                    </el-tooltip>
-                                </div>
-                                <div class="button-row">
-                                    <el-tooltip :disabled="disableTooltip" content="详情" placement="top">
-                                        <el-button size="mini" type="primary" @click.stop="openDetailDialog(index, item.name)">
-                                            <font-awesome-icon icon="info"></font-awesome-icon>
-                                        </el-button>
-                                    </el-tooltip>
-                                    <el-tooltip :disabled="disableTooltip" content="移动" placement="top">
-                                        <el-button size="mini" type="primary" @click.stop="handleMove(index, item.name)">
-                                            <font-awesome-icon icon="file-export"></font-awesome-icon>
-                                        </el-button>
-                                    </el-tooltip>
-                                    <el-tooltip :disabled="disableTooltip" content="删除" placement="top">
-                                        <el-button size="mini" type="danger" @click.stop="handleDelete(index, item.name)">
-                                            <font-awesome-icon icon="trash-alt"></font-awesome-icon>
-                                        </el-button>
-                                    </el-tooltip>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="file-info">{{ getFileName(item.metadata?.FileName || item.name) }}</div>
-                    </el-card>
+                    <FileCard 
+                        v-else
+                        :item="item"
+                        v-model:selected="item.selected"
+                        :fileLink="getFileLink(item.name)"
+                        :previewSrcList="item.previewSrcList"
+                        :disableTooltip="disableTooltip"
+                        @detail="openDetailDialog(index, item.name)"
+                        @copy="handleCopy(index, item.name)"
+                        @move="handleMove(index, item.name)"
+                        @delete="handleDelete(index, item.name)"
+                        @download="handleDownload(item.name)"
+                        @touchstart="handleTouchStart(item, index)"
+                        @touchend="handleTouchEnd"
+                        @touchmove="handleTouchEnd"
+                    />
                 </template>
             </div>
+            <!-- 列表视图 -->
+            <div v-else class="list-view" ref="listContainerRef">
+                <div class="list-header">
+                    <div class="list-col list-col-checkbox">
+                        <span class="custom-checkbox" :class="{ 'checked': isSelectAll, 'indeterminate': isIndeterminate }" @click="handleSelectAllPage(!isSelectAll)">
+                            <font-awesome-icon v-if="isSelectAll" icon="check" class="check-icon"/>
+                            <font-awesome-icon v-else-if="isIndeterminate" icon="minus" class="check-icon"/>
+                        </span>
+                    </div>
+                    <div class="list-col list-col-preview">预览</div>
+                    <div class="list-col list-col-name">文件名</div>
+                    <div class="list-col list-col-tags">标签</div>
+                    <div class="list-col list-col-channel">渠道类型</div>
+                    <div class="list-col list-col-channel-name">渠道名称</div>
+                    <div class="list-col list-col-address">上传地址</div>
+                    <div class="list-col list-col-size">大小</div>
+                    <div class="list-col list-col-date">上传时间</div>
+                    <div class="list-col list-col-actions">操作</div>
+                </div>
+                <!-- 列表骨架屏 -->
+                <SkeletonLoader v-if="loading" type="list" :count="15" />
+                <!-- 空状态 -->
+                <div v-else-if="paginatedTableData.length === 0" class="empty-state list-empty">
+                    <font-awesome-icon icon="folder-open" class="empty-icon" />
+                    <p class="empty-text">{{ hasSearchOrFilter ? '未找到匹配的文件或文件夹' : '当前目录为空' }}</p>
+                    <p class="empty-hint">{{ hasSearchOrFilter ? '尝试调整搜索条件或筛选器' : '上传文件后将显示在这里' }}</p>
+                </div>
+                <!-- 实际数据 -->
+                <template v-else>
+                    <FileListItem
+                        v-for="(item, index) in paginatedTableData"
+                        :key="index"
+                        :item="item"
+                        v-model:selected="item.selected"
+                        :fileLink="getFileLink(item.name)"
+                        @enter="enterFolder(item.name)"
+                        @detail="openDetailDialog(index, item.name)"
+                        @copy="handleCopy(index, item.name)"
+                        @folderCopy="handleFolderCopy(item.name)"
+                        @move="handleMove(index, item.name)"
+                        @delete="handleDelete(index, item.name)"
+                        @download="handleDownload(item.name)"
+                        @touchstart="isFolder(item) ? handleFolderTouchStart(item, index) : handleTouchStart(item, index)"
+                        @touchend="handleTouchEnd"
+                        @touchmove="handleTouchEnd"
+                    />
+                </template>
+            </div>
+            
+            <!-- 选区矩形覆盖层 -->
+            <div
+              v-if="isDragging"
+              class="drag-select-overlay"
+              :style="{
+                position: 'fixed',
+                left: selectionRect.left + 'px',
+                top: selectionRect.top + 'px',
+                width: selectionRect.width + 'px',
+                height: selectionRect.height + 'px'
+              }"
+            ></div>
+
             <div class="pagination-container">
-                <el-pagination 
-                    background 
-                    layout="prev, pager, next" 
-                    :total="filteredTableData.length" 
-                    :page-size="pageSize" 
-                    :current-page="currentPage" 
-                    @current-change="handlePageChange">
-                </el-pagination>
-                <div class="pagination-right">
+                <div class="pagination-center">
+                    <el-pagination
+                        background
+                        layout="prev, pager, next"
+                        :total="filteredTableData.length"
+                        :page-size="pageSize"
+                        :current-page="currentPage"
+                        :pager-count="pagerCount"
+                        @current-change="handlePageChange">
+                    </el-pagination>
                     <el-button 
                         type="primary" 
                         @click="refreshFileList" 
                         class="refresh-btn">
                         <font-awesome-icon icon="sync" :class="{ 'fa-spin': refreshLoading }"/>
                     </el-button>
-                    <el-button 
+                    <el-button
                         v-if="currentPage === Math.ceil(filteredTableData.length / pageSize)" 
                         type="primary" 
                         @click="loadMoreData" 
@@ -184,96 +248,122 @@
                         加载更多
                     </el-button>
                 </div>
+                <div class="pagination-right">
+                    <span class="page-total">共 {{ realTotalPages }} 页</span>
+                    <div class="page-jump">
+                        <span>跳至</span>
+                        <el-input 
+                            v-model="jumpPage" 
+                            size="small" 
+                            class="jump-input"
+                            @keyup.enter="handleJumpPage"
+                        />
+                        <el-button size="small" type="primary" @click="handleJumpPage" class="jump-btn">GO</el-button>
+                    </div>
+                </div>
             </div>
             </el-main>
         </el-container>
-        <el-dialog title="文件详情" v-model="showdetailDialog" :width="dialogWidth">
-            <div class="detail-actions">
-                <el-button type="primary" @click="handleDownload(detailFile?.name)" round size="small" class="detail-action">
-                    <font-awesome-icon icon="download" style="margin-right: 3px;"></font-awesome-icon> 下载
-                </el-button>
-                <el-button type="primary" @click="handleBlock(detailFile?.name)" round size="small" class="detail-action">
-                    <font-awesome-icon icon="ban" style="margin-right: 3px;"></font-awesome-icon> 黑名单
-                </el-button>
-                <el-button type="primary" @click="handleWhite(detailFile?.name)" round size="small" class="detail-action">
-                    <font-awesome-icon icon="user-plus" style="margin-right: 3px;"></font-awesome-icon> 白名单
-                </el-button>
-                <el-button type="danger" @click="handleDetailDelete(detailFile?.name)" round size="small" class="detail-action">
-                    <font-awesome-icon icon="trash-alt" style="margin-right: 3px;"></font-awesome-icon> 删除
-                </el-button>
-            </div> 
-            <el-tabs  v-model="activeUrlTab" @tab-click="handleTabClick" style="margin-bottom: 10px;">
-                <el-tab-pane label="原始链接" name="originUrl">
-                    <el-input v-model="allUrl.originUrl" readonly @click="handleUrlClick"></el-input>
-                </el-tab-pane>
-                <el-tab-pane label="Markdown" name="mdUrl">
-                    <el-input v-model="allUrl.mdUrl" readonly @click="handleUrlClick"></el-input>
-                </el-tab-pane>
-                <el-tab-pane label="HTML" name="htmlUrl">
-                    <el-input v-model="allUrl.htmlUrl" readonly @click="handleUrlClick"></el-input>
-                </el-tab-pane>
-                <el-tab-pane label="BBCode" name="bbUrl">
-                    <el-input v-model="allUrl.bbUrl" readonly @click="handleUrlClick"></el-input>
-                </el-tab-pane>
-                <el-tab-pane label="TG File ID" v-if="detailFile?.metadata?.TgFileId" name="tgId">
-                    <el-input v-model="allUrl.tgId" readonly @click="handleUrlClick"></el-input>
-                </el-tab-pane>
-                <el-tab-pane label="S3 Location" v-if="detailFile?.metadata?.S3Location" name="s3Location">
-                    <el-input v-model="allUrl.S3Location" readonly @click="handleUrlClick"></el-input>
-                </el-tab-pane>
-            </el-tabs>
-            <el-descriptions direction="vertical" border :column="tableColumnNum">
-                <el-descriptions-item 
-                    label="文件预览"
-                    :rowspan="tablePreviewSpan"
-                    :width="300"
-                    align="center"
-                    >
-                    <video v-if="isVideo(detailFile)" :src="'/file/' + detailFile?.name + '?from=admin'" autoplay muted loop class="video-preview" @click="handleVideoClick"></video>
-                    <el-image v-else-if="isImage(detailFile)" :src="'/file/' + detailFile?.name + '?from=admin'" fit="cover" lazy class="image-preview"></el-image>
-                    <font-awesome-icon v-else icon="file" class="file-icon-detail"></font-awesome-icon>
-                </el-descriptions-item>
-                <el-descriptions-item label="文件名" class-name="description-item">{{ detailFile?.metadata?.FileName || detailFile?.name }}</el-descriptions-item>
-                <el-descriptions-item label="文件类型" class-name="description-item">{{ detailFile?.metadata?.FileType || '未知' }}</el-descriptions-item>
-                <el-descriptions-item label="文件大小(MB)" class-name="description-item">{{ detailFile?.metadata?.FileSize || '未知' }}</el-descriptions-item>
-                <el-descriptions-item label="上传时间" class-name="description-item">{{ new Date(detailFile?.metadata?.TimeStamp).toLocaleString() || '未知' }}</el-descriptions-item>
-                <el-descriptions-item label="访问状态" class-name="description-item">{{ accessType }}</el-descriptions-item>
-                <el-descriptions-item label="上传渠道" class-name="description-item">{{ detailFile?.metadata?.Channel || '未知' }}</el-descriptions-item>
-                <el-descriptions-item label="审查结果" class-name="description-item">{{ detailFile?.metadata?.Label || '无' }}</el-descriptions-item>
-                <el-descriptions-item label="上传IP" class-name="description-item">{{ detailFile?.metadata?.UploadIP || '未知' }}</el-descriptions-item>
-                <el-descriptions-item label="上传地址" class-name="description-item">{{ detailFile?.metadata?.UploadAddress || '未知' }}</el-descriptions-item>
-            </el-descriptions>
-        </el-dialog>
-        <el-dialog title="链接格式" v-model="showUrlDialog" :width="dialogWidth" :show-close="false">
-            <p style="font-size: medium; font-weight: bold">默认复制链接</p>
-            <el-radio-group v-model="defaultUrlFormat">
-                <el-radio label="originUrl">原始链接</el-radio>
-                <el-radio label="mdUrl">Markdown</el-radio>
-                <el-radio label="htmlUrl">HTML</el-radio>
-                <el-radio label="bbUrl">BBCode</el-radio>
-                <el-radio label="tgId">TG File ID</el-radio>
-                <el-radio label="s3Location">S3链接</el-radio>
-            </el-radio-group>
-            <p style="font-size: medium; font-weight: bold">自定义链接
-                <el-tooltip content="默认链接为https://your.domain/file/xxx.jpg <br> 如果启用自定义链接格式，只保留xxx.jpg部分，其他部分请自行输入" placement="top" raw-content>
-                    <font-awesome-icon icon="question-circle" class="question-icon" size="me"/>
-                </el-tooltip>
-            </p>
-            <el-form label-width="25%">
-                <el-form-item label="启用自定义">
-                    <el-radio-group v-model="useCustomUrl">
-                        <el-radio value="true">是</el-radio>
-                        <el-radio value="false">否</el-radio>
+        <!-- 文件详情弹窗 -->
+        <FileDetailDialog
+            v-model="showdetailDialog"
+            :file="detailFile"
+            :fileLink="getFileLink(detailFile?.name)"
+            :urls="allUrl"
+            @download="handleDownload(detailFile?.name)"
+            @tagManagement="handleTagManagement(detailFile?.name)"
+            @block="handleBlock(detailFile?.name)"
+            @white="handleWhite(detailFile?.name)"
+            @delete="handleDetailDelete(detailFile?.name)"
+            @metadataUpdated="handleMetadataUpdated"
+            @fileRenamed="handleFileRenamed"
+        />
+        <el-dialog title="链接格式" v-model="showUrlDialog" :width="dialogWidth" :show-close="false" class="settings-dialog">
+            <div class="dialog-section">
+                <div class="section-header">
+                    <span class="section-title">默认复制链接</span>
+                </div>
+                <div class="section-content">
+                    <el-radio-group v-model="defaultUrlFormat" class="radio-card-group grid-2x2">
+                        <el-radio label="originUrl" class="radio-card">
+                            <font-awesome-icon icon="link" class="radio-icon"/>
+                            <span>原始链接</span>
+                        </el-radio>
+                        <el-radio label="mdUrl" class="radio-card">
+                            <font-awesome-icon icon="code" class="radio-icon"/>
+                            <span>Markdown</span>
+                        </el-radio>
+                        <el-radio label="htmlUrl" class="radio-card">
+                            <font-awesome-icon icon="code-branch" class="radio-icon"/>
+                            <span>HTML</span>
+                        </el-radio>
+                        <el-radio label="bbUrl" class="radio-card">
+                            <font-awesome-icon icon="quote-right" class="radio-icon"/>
+                            <span>BBCode</span>
+                        </el-radio>
+                        <el-radio label="tgId" class="radio-card">
+                            <font-awesome-icon icon="paper-plane" class="radio-icon"/>
+                            <span>TG File ID</span>
+                        </el-radio>
+                        <el-radio label="s3Location" class="radio-card">
+                            <font-awesome-icon icon="cloud" class="radio-icon"/>
+                            <span>S3链接</span>
+                        </el-radio>
                     </el-radio-group>
-                </el-form-item>
-                <el-form-item label="自定义前缀" v-if="useCustomUrl === 'true'">
-                    <el-input v-model="customUrlPrefix" placeholder="请输入自定义链接前缀"/>
-                </el-form-item>
-            </el-form>
+                </div>
+            </div>
+
+            <div class="dialog-section">
+                <div class="section-header">
+                    <span class="section-title">自定义链接</span>
+                    <el-tooltip content="默认链接为https://your.domain/file/xxx.jpg <br> 如果启用自定义链接格式，只保留xxx.jpg部分，其他部分请自行输入" placement="top" raw-content>
+                        <font-awesome-icon icon="question-circle" class="section-help-icon"/>
+                    </el-tooltip>
+                </div>
+                <div class="section-content">
+                    <div class="setting-item">
+                        <span class="setting-label">启用自定义</span>
+                        <el-switch v-model="useCustomUrl" active-value="true" inactive-value="false" />
+                    </div>
+                    <div class="setting-item" v-if="useCustomUrl === 'true'">
+                        <span class="setting-label">自定义前缀</span>
+                        <el-input v-model="customUrlPrefix" placeholder="请输入自定义链接前缀" class="setting-input"/>
+                    </div>
+                </div>
+            </div>
+
             <div class="dialog-action">
-                <el-button type="primary" @click="showUrlDialog = false">确定</el-button>
+                <el-button type="primary" @click="showUrlDialog = false" class="confirm-btn">确定</el-button>
             </div>
         </el-dialog>
+
+        <!-- Tag Management Dialog -->
+        <TagManagementDialog
+            v-model="showTagDialog"
+            :fileId="currentTagFile"
+            @tagsUpdated="handleTagsUpdated"
+        />
+
+        <!-- Batch Tag Management Dialog -->
+        <BatchTagDialog
+            v-model="showBatchTagDialog"
+            :selectedFiles="selectedFiles"
+            @tagsUpdated="handleBatchTagsUpdated"
+        />
+        <!-- 移动端操作菜单 -->
+        <MobileActionSheet
+            v-model="showMobileActionModal"
+            :title="mobileActionIsFolder ? getFolderName(mobileActionFile?.name || '') : (mobileActionFile?.metadata?.FileName || getFileName(mobileActionFile?.name || ''))"
+            :isFolder="mobileActionIsFolder"
+            @action="handleMobileAction"
+        />
+        <!-- 移动端目录抽屉 -->
+        <MobileDirectoryDrawer
+            v-model="showMobileDirectoryDrawer"
+            :currentPath="currentPath"
+            @navigate="navigateToFolder"
+            @goBack="handleGoBack"
+        />
     </div>
 </template>
 
@@ -281,15 +371,39 @@
 import { mapGetters } from 'vuex';
 import JSZip from 'jszip';
 import DashboardTabs from '@/components/DashboardTabs.vue';
+import TagManagementDialog from '@/components/dashboard/TagManagementDialog.vue';
+import BatchTagDialog from '@/components/dashboard/BatchTagDialog.vue';
+import SkeletonLoader from '@/components/dashboard/SkeletonLoader.vue';
+import FileCard from '@/components/dashboard/FileCard.vue';
+import FolderCard from '@/components/dashboard/FolderCard.vue';
+import FileListItem from '@/components/dashboard/FileListItem.vue';
+import FileDetailDialog from '@/components/dashboard/FileDetailDialog.vue';
+import MobileActionSheet from '@/components/dashboard/MobileActionSheet.vue';
+import MobileDirectoryDrawer from '@/components/dashboard/MobileDirectoryDrawer.vue';
+import FilterDropdown from '@/components/dashboard/FilterDropdown.vue';
 import { fileManager } from '@/utils/fileManager';
+import fetchWithAuth from '@/utils/fetchWithAuth';
+import { validateFolderPath } from '@/utils/pathValidator';
+import backgroundManager from '@/mixins/backgroundManager';
+import { ref } from 'vue';
+import { useDragSelect } from '@/utils/dashboard/useDragSelect.js';
 
 export default {
+name: 'AdminDashBoard',
+mixins: [backgroundManager],
 data() {
     return {
         Number: 0,
+        directFileCount: 0, // 当前目录直接子文件数量
+        directFolderCount: 0, // 当前目录直接子文件夹数量
         showLogoutButton: false,
         tableData: [],
+        tempSearch: '',
         search: '',
+        searchKeywords: '', // Keywords only (without tag filters) for backend search
+        searchIncludeTags: '', // 包含的标签，逗号分隔
+        searchExcludeTags: '', // 排除的标签，逗号分隔
+        isSearchMode: false,
         currentPage: 1,
         pageSize: 15,
         selectedFiles: [],
@@ -305,20 +419,86 @@ data() {
         loading: false, // 加载状态
         currentPath: '', // 当前文件夹路径
         refreshLoading: false,
+        showTagDialog: false, // 标签管理对话框
+        showBatchTagDialog: false, // 批量标签管理对话框
+        currentTagFile: '', // 当前标签管理的文件
+        viewMode: 'card', // 视图模式：card 或 list
+        showMobileActionModal: false, // 移动端操作模态框
+        mobileActionFile: null, // 当前移动端操作的文件
+        mobileActionIndex: -1, // 当前移动端操作的文件索引
+        mobileActionIsFolder: false, // 是否为文件夹操作
+        longPressTimer: null, // 长按计时器
+        showMobileDirectoryDrawer: false, // 移动端目录抽屉
+        jumpPage: '', // 跳转页码输入
+        // 筛选相关状态（数组形式支持多选）
+        filters: {
+            accessStatus: [], // 访问状态: 'normal'(正常), 'blocked'(已屏蔽)
+            listType: [],     // 黑白名单: 'White', 'Block', 'None'
+            label: [],         // 审查结果: 'normal', 'teen', 'adult'
+            fileType: [],      // 文件类型: 'image', 'video', 'audio', 'other'
+            channel: [],       // 渠道类型: 'TelegramNew', 'CloudflareR2', 'S3', 'Discord', 'HuggingFace', 'External'
+            channelName: []    // 渠道名称: 动态获取
+        },
+        channelNameOptions: [] // 动态从文件列表中提取
     }
 },
 components: {
-    DashboardTabs
+    DashboardTabs,
+    TagManagementDialog,
+    BatchTagDialog,
+    SkeletonLoader,
+    FileCard,
+    FolderCard,
+    FileListItem,
+    FileDetailDialog,
+    MobileActionSheet,
+    MobileDirectoryDrawer,
+    FilterDropdown
+},
+setup() {
+    const cardContainerRef = ref(null);
+    const listContainerRef = ref(null);
+    const viewModeRef = ref('card');
+    const itemsRef = ref([]);
+
+    const { isDragging, selectionRect } = useDragSelect({
+        modes: {
+            card: { containerRef: cardContainerRef, itemSelector: '.img-card' },
+            list: { containerRef: listContainerRef, itemSelector: '.list-item' },
+        },
+        viewMode: viewModeRef,
+        items: itemsRef,
+    });
+
+    return {
+        cardContainerRef,
+        listContainerRef,
+        viewModeRef,
+        itemsRef,
+        isDragging,
+        selectionRect,
+    };
 },
 computed: {
-    ...mapGetters(['credentials', 'adminUrlSettings', 'userConfig']),
+    ...mapGetters(['adminUrlSettings', 'userConfig']),
     filteredTableData() {
-        // 根据搜索条件过滤
-        return this.tableData.filter(data => 
-            !this.search || 
-            data.name.toLowerCase().includes(this.search.toLowerCase()) || 
-            data.metadata?.FileName?.toLowerCase().includes(this.search.toLowerCase())
-        );
+        return this.tableData;
+    },
+    totalPages() {
+        return Math.ceil(this.filteredTableData.length / this.pageSize) || 1;
+    },
+    // 基于当前文件夹直接子文件和子文件夹数量计算的真实总页数
+    realTotalPages() {
+        const total = this.directFolderCount + this.directFileCount;
+        return Math.ceil(total / this.pageSize) || 1;
+    },
+    // 计算当前激活的筛选条件数量（数组形式）
+    activeFilterCount() {
+        return Object.values(this.filters).reduce((count, arr) => count + (Array.isArray(arr) ? arr.length : 0), 0);
+    },
+    // 判断是否处于搜索或筛选模式
+    hasSearchOrFilter() {
+        return this.isSearchMode || this.activeFilterCount > 0;
     },
     paginatedTableData() {
         const sortedData = this.sortData(this.filteredTableData);
@@ -326,21 +506,25 @@ computed: {
         const end = start + this.pageSize;
         let data = sortedData.slice(start, end);
         // 增加previewSrcList属性，用于预览图片
-        const fullList = data.filter(file => file.metadata?.FileType?.includes('image') ).map(file => `/file/${file.name}?from=admin`);
+        const fullList = data.filter(file => this.isImage(file)).map(file => this.getFileLink(file.name));
         data.forEach(file => {
-            if (!file.metadata?.FileType?.includes('video')) {
+            if (this.isImage(file)) {
                 // 重新排序，索引大于等于当前索引的元素在前，否则在后
-                file.previewSrcList = fullList.slice(fullList.indexOf(`/file/${file.name}?from=admin`)).concat(fullList.slice(0, fullList.indexOf(`/file/${file.name}?from=admin`)));
+                file.previewSrcList = fullList.slice(fullList.indexOf(this.getFileLink(file.name))).concat(fullList.slice(0, fullList.indexOf(this.getFileLink(file.name))));
             }
         });
         // 增加channelTag属性，用于显示渠道信息
         data.forEach(file => {
-            if (file.metadata?.Channel === 'TelegramNew') {
+            if (file.metadata?.Channel === 'TelegramNew' || file.metadata?.Channel === 'Telegram') {
                 file.channelTag = 'TG';
             } else if (file.metadata?.Channel === 'CloudflareR2') {
                 file.channelTag = 'R2';
             } else if (file.metadata?.Channel === 'S3') {
                 file.channelTag = 'S3';
+            } else if (file.metadata?.Channel === 'Discord') {
+                file.channelTag = 'DC';
+            } else if (file.metadata?.Channel === 'HuggingFace') {
+                file.channelTag = 'HF';
             } else if (file.metadata?.Channel === 'External') {
                 file.channelTag = '外链';
             } else {
@@ -354,6 +538,9 @@ computed: {
     },
     dialogWidth() {
         return window.innerWidth > 768 ? '50%' : '90%';
+    },
+    detailDialogWidth() {
+        return window.innerWidth > 768 ? '70%' : '90%';
     },
     accessType() {
         if (this.detailFile?.metadata?.ListType === 'White') {
@@ -373,7 +560,8 @@ computed: {
                 'htmlUrl': `<img src="${this.detailFile?.metadata?.ExternalLink}" alt="${this.detailFile?.metadata?.FileName || this.detailFile?.name}" width=100%>`,
                 'bbUrl': `[img]${this.detailFile?.metadata?.ExternalLink}[/img]`,
                 'tgId': this.detailFile?.metadata?.TgFileId || '未知',
-                'S3Location': this.detailFile?.metadata?.S3Location || '未知'
+                'S3Location': this.detailFile?.metadata?.S3Location || '未知',
+                'S3CdnFileUrl': this.detailFile?.metadata?.S3CdnFileUrl || '未知'
             }
         } else {
             return {
@@ -382,7 +570,8 @@ computed: {
                 'htmlUrl': `<img src="${this.rootUrl}${this.detailFile?.name}" alt="${this.detailFile?.metadata?.FileName || this.detailFile?.name}" width=100%>`,
                 'bbUrl': `[img]${this.rootUrl}${this.detailFile?.name}[/img]`,
                 'tgId': this.detailFile?.metadata?.TgFileId || '未知',
-                'S3Location': this.detailFile?.metadata?.S3Location || '未知'
+                'S3Location': this.detailFile?.metadata?.S3Location || '未知',
+                'S3CdnFileUrl': this.detailFile?.metadata?.S3CdnFileUrl || '未知'
             }
         }
     },
@@ -410,9 +599,38 @@ computed: {
     rootUrl() {
         // 链接前缀，优先级：用户自定义 > urlPrefix > 默认
         return this.useCustomUrl === 'true' ? this.customUrlPrefix : this.userConfig?.urlPrefix || `${document.location.origin}/file/`
+    },
+    isSelectAll: {
+        get() {
+            return this.paginatedTableData.length > 0 && this.paginatedTableData.every(file => file.selected);
+        },
+        set(val) {
+            this.paginatedTableData.forEach(file => file.selected = val);
+        }
+    },
+    isIndeterminate() {
+        const selectedCount = this.paginatedTableData.filter(file => file.selected).length;
+        return selectedCount > 0 && selectedCount < this.paginatedTableData.length;
+    },
+    pagerCount() {
+        return window.innerWidth < 768 ? 3 : 7;
     }
 },
 watch: {
+    // Sync viewMode data property to the ref used by useDragSelect
+    viewMode: {
+        handler(newVal) {
+            this.viewModeRef = newVal;
+        },
+        immediate: true
+    },
+    // Sync paginatedTableData computed property to the ref used by useDragSelect
+    paginatedTableData: {
+        handler(newVal) {
+            this.itemsRef = newVal;
+        },
+        immediate: true
+    },
     tableData: {
         handler(newData) {
             // selectedFiles 增加 newData中新选中，不包含在 selectedFiles 中的文件
@@ -447,9 +665,235 @@ watch: {
     }
 },
 methods: {
+    // 切换视图模式
+    toggleViewMode() {
+        this.viewMode = this.viewMode === 'card' ? 'list' : 'card';
+        localStorage.setItem('viewMode', this.viewMode);
+    },
+    // 列表视图全选当前页
+    handleSelectAllPage(val) {
+        this.paginatedTableData.forEach(file => file.selected = val);
+    },
+    // 移动端长按开始
+    handleTouchStart(item, index) {
+        this.longPressTimer = setTimeout(() => {
+            this.mobileActionFile = item;
+            this.mobileActionIndex = index;
+            this.mobileActionIsFolder = false;
+            this.showMobileActionModal = true;
+        }, 500); // 500ms 长按触发
+    },
+    // 移动端长按结束/取消
+    handleTouchEnd() {
+        if (this.longPressTimer) {
+            clearTimeout(this.longPressTimer);
+            this.longPressTimer = null;
+        }
+    },
+    // 文件夹长按开始
+    handleFolderTouchStart(item, index) {
+        this.longPressTimer = setTimeout(() => {
+            this.mobileActionFile = item;
+            this.mobileActionIndex = index;
+            this.mobileActionIsFolder = true;
+            this.showMobileActionModal = true;
+        }, 500);
+    },
+    // 处理移动端操作
+    handleMobileAction(action) {
+        const file = this.mobileActionFile;
+        const index = this.mobileActionIndex;
+        this.showMobileActionModal = false;
+        
+        if (!file) return;
+        
+        switch (action) {
+            case 'detail':
+                this.openDetailDialog(index, file.name);
+                break;
+            case 'copy':
+                this.handleCopy(index, file.name);
+                break;
+            case 'folderCopy':
+                this.handleFolderCopy(file.name);
+                break;
+            case 'download':
+                this.handleDownload(file.name);
+                break;
+            case 'move':
+                this.handleMove(index, file.name);
+                break;
+            case 'delete':
+                this.handleDelete(index, file.name);
+                break;
+            case 'tag':
+                this.handleTagManagement(file.name);
+                break;
+        }
+    },
+    // 返回上一级目录
+    handleGoBack() {
+        const pathParts = this.currentPath.split('/').filter(Boolean);
+        if (pathParts.length > 0) {
+            pathParts.pop();
+            const parentPath = pathParts.join('/');
+            this.navigateToFolder(parentPath);
+        }
+        this.showMobileDirectoryDrawer = false;
+    },
+    // 获取标签颜色
+    getTagColor(index) {
+        const colors = [
+            'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+            'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+            'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+            'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+            'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)'
+        ];
+        return colors[index % colors.length];
+    },
+    // 视频hover播放控制
+    handleVideoHover(event, isEnter) {
+        const video = event.target;
+        if (isEnter) {
+            video.play().catch(() => {});
+        } else {
+            video.pause();
+            video.currentTime = 0;
+        }
+    },
+    // 格式化文件大小
+    formatFileSize(bytes) {
+        if (!bytes || bytes === 0) return '-';
+        bytes = Number(bytes);
+        if (isNaN(bytes)) return '-';
+        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        let i = 0;
+        while (bytes >= 1024 && i < units.length - 1) {
+            bytes /= 1024;
+            i++;
+        }
+        return bytes.toFixed(i > 0 ? 1 : 0) + ' ' + units[i];
+    },
+    handleSearch() {
+        this.search = this.tempSearch;
+        this.isSearchMode = this.search.trim() !== '';
+        this.currentPage = 1; // 重置到第一页
+
+        // 解析搜索字符串，提取标签和关键字
+        // 支持 #tag 表示包含标签，-#tag 表示排除标签
+        if (this.search && this.search.trim()) {
+            const includeTags = [];
+            const excludeTags = [];
+            
+            // 匹配 -#tag 和 #tag
+            let searchText = this.search;
+            
+            // 先匹配排除标签 -#tag
+            const excludeTagRegex = /-#([\w\u4e00-\u9fa5\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af\.\+\-]+)/g;
+            searchText = searchText.replace(excludeTagRegex, (match, tag) => {
+                excludeTags.push(tag.toLowerCase());
+                return ' ';
+            });
+            
+            // 再匹配包含标签 #tag
+            const includeTagRegex = /#([\w\u4e00-\u9fa5\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af\.\+\-]+)/g;
+            searchText = searchText.replace(includeTagRegex, (match, tag) => {
+                includeTags.push(tag.toLowerCase());
+                return ' ';
+            });
+            
+            // 清理剩余的关键字（去除多余空格）
+            this.searchKeywords = searchText.replace(/\s+/g, ' ').trim();
+            
+            // 构建标签查询字符串
+            this.searchIncludeTags = includeTags.join(',');
+            this.searchExcludeTags = excludeTags.join(',');
+            
+            console.log('Search keywords:', this.searchKeywords);
+            console.log('Include tags:', this.searchIncludeTags);
+            console.log('Exclude tags:', this.searchExcludeTags);
+        } else {
+            this.searchKeywords = '';
+            this.searchIncludeTags = '';
+            this.searchExcludeTags = '';
+        }
+
+        this.refreshFileList();
+    },
+    // 处理筛选变化（来自 FilterDropdown 组件）
+    handleFilterChange({ type, filters }) {
+        this.filters = filters;
+        this.currentPage = 1; // 重置到第一页
+        this.refreshFileList();
+    },
+    // 清除所有筛选条件
+    clearFilters() {
+        this.filters = {
+            listType: [],
+            label: [],
+            fileType: [],
+            channel: [],
+            channelName: []
+        };
+        this.currentPage = 1;
+        this.refreshFileList();
+    },
+    // 从 API 获取所有渠道名称
+    async extractChannelNames() {
+        try {
+            const response = await fetchWithAuth('/api/channels?includeDisabled=true', {
+                method: 'GET'
+            });
+
+            if (response.ok) {
+                const channels = await response.json();
+                const channelOptions = [];
+
+                // 类型映射（显示名称）
+                const typeLabels = {
+                    telegram: 'Telegram',
+                    cfr2: 'Cloudflare R2',
+                    s3: 'S3',
+                    discord: 'Discord',
+                    huggingface: 'HuggingFace'
+                };
+
+                // 按类型提取渠道名称，channel.type是类型内部存储名称（可能根据版本有变化），type是类型对外名称
+                Object.entries(channels).forEach(([type, channelList]) => {
+                    if (Array.isArray(channelList) && channelList.length > 0) {
+                        channelList.forEach(channel => {
+                            if (channel.name) {
+                                channelOptions.push({
+                                    name: channel.name,
+                                    type: channel.type,
+                                    typeLabel: typeLabels[type] || type,
+                                    // 使用 channel.type:channel.name 作为唯一标识
+                                    value: `${channel.type}:${channel.name}`,
+                                });
+                            }
+                        });
+                    }
+                });
+
+                // 按类型和名称排序
+                channelOptions.sort((a, b) => {
+                    if (a.type !== b.type) {
+                        return a.type.localeCompare(b.type);
+                    }
+                    return a.name.localeCompare(b.name);
+                });
+
+                this.channelNameOptions = channelOptions;
+            }
+        } catch (error) {
+            console.error('Failed to fetch channel names:', error);
+        }
+    },
     handleDownload(key) {
         const link = document.createElement('a');
-        link.href = `/file/${key}?from=admin`;
+        link.href = this.getFileLink(key);
         link.download = key;
         link.click();
     },
@@ -482,7 +926,7 @@ methods: {
         cancelButtonText: '取消',
         type: 'warning'
         }).then(() => {
-        this.fetchWithAuth(`/api/manage/delete/${key}`, { method: 'GET' })
+        fetchWithAuth(`/api/manage/delete/${key}`, { method: 'GET' })
             .then(response => {
             if (response.ok) {
                 const fileIndex = this.tableData.findIndex(file => file.name === key);
@@ -495,11 +939,11 @@ methods: {
             })
             .then(() => {
             this.updateStats(-1, false);
-            this.$message.success('删除成功!');
+            this.$message.success('删除成功');
             this.showdetailDialog = false;
             })
-            .catch(() => this.$message.error('删除失败，请检查网络连接'));
-        }).catch(() => this.$message.info('已取消删除'));
+            .catch(() => this.$message.error('删除失败'));
+        }).catch(() => console.log('已取消删除'));
     },
     handleBlock(key) {
         this.$confirm('此操作将把该文件加入黑名单, 是否继续?', '提示', {
@@ -507,7 +951,7 @@ methods: {
             cancelButtonText: '取消',
             type: 'warning'
         }).then(() => {
-        this.fetchWithAuth(`/api/manage/block/${key}`, { method: 'GET' })
+        fetchWithAuth(`/api/manage/block/${key}`, { method: 'GET' })
             .then(response => {
                 if (response.ok) {
                     const fileIndex = this.tableData.findIndex(file => file.name === key);
@@ -519,9 +963,9 @@ methods: {
                 }
             })
             .then(() => {
-                this.$message.success('加入黑名单成功!');
+                this.$message.success('加入黑名单成功');
             })
-            .catch(() => this.$message.error('加入黑名单失败，请检查网络连接'));
+            .catch(() => this.$message.error('加入黑名单失败'));
         }).catch(
             () => console.log('已取消加入黑名单')
         );
@@ -532,7 +976,7 @@ methods: {
             cancelButtonText: '取消',
             type: 'warning'
         }).then(() => {
-        this.fetchWithAuth(`/api/manage/white/${key}`, { method: 'GET' })
+        fetchWithAuth(`/api/manage/white/${key}`, { method: 'GET' })
             .then(response => {
                 if (response.ok) {
                     const fileIndex = this.tableData.findIndex(file => file.name === key);
@@ -544,36 +988,12 @@ methods: {
                 }
             })
             .then(() => {
-                this.$message.success('加入白名单成功!');
+                this.$message.success('加入白名单成功');
             })
-            .catch(() => this.$message.error('加入白名单失败，请检查网络连接'));
+            .catch(() => this.$message.error('加入白名单失败'));
         }).catch(
             () => console.log('已取消加入白名单')
         );
-    },
-    async fetchWithAuth(url, options = {}) {
-        // 开发环境, url 前面加上 /api
-        // url = `/api${url}`;
-        if (this.credentials) {
-            // 设置 Authorization 头
-            options.headers = {
-                ...options.headers,
-                'Authorization': `Basic ${this.credentials}`
-            };
-            // 确保包含凭据，如 cookies
-            options.credentials = 'include'; 
-        }
-
-        const response = await fetch(url, options);
-
-        if (response.status === 401) {
-            // Redirect to the login page if a 401 Unauthorized is returned
-            this.$message.error('认证状态错误，请重新登录');
-            this.$router.push('/adminLogin'); 
-            throw new Error('Unauthorized');
-        }
-
-        return response;
     },
     handleDelete(index, key) {
         // 判断是否为文件夹
@@ -584,7 +1004,7 @@ methods: {
         cancelButtonText: '取消',
         type: 'warning'
         }).then(() => {
-        this.fetchWithAuth(`/api/manage/delete/${key}?folder=${isFolder}`, { method: 'GET' })
+        fetchWithAuth(`/api/manage/delete/${key}?folder=${isFolder}`, { method: 'GET' })
             .then(response => {
                 if (response.ok) {
                     const fileIndex = this.tableData.findIndex(file => file.name === key);
@@ -598,10 +1018,10 @@ methods: {
             .then(() => {
                 this.updateStats(-1, false);
                 fileManager.removeFile(key);
-                this.$message.success('删除成功!');
+                this.$message.success('删除成功');
             })
-            .catch(() => this.$message.error('删除失败，请检查网络连接'));
-        }).catch(() => this.$message.info('已取消删除'));
+            .catch(() => this.$message.error('删除失败'));
+        }).catch(() => console.log('已取消删除'));
     },
     handleBatchDelete() {
         this.$confirm('此操作将永久删除选中的文件及文件夹, 是否继续?', '提示', {
@@ -611,7 +1031,7 @@ methods: {
         }).then(() => {
         const promises = this.selectedFiles.map(file => {
             const isFolder = file.isFolder;
-            return this.fetchWithAuth(`/api/manage/delete/${file.name}?folder=${isFolder}`, { method: 'GET' });
+            return fetchWithAuth(`/api/manage/delete/${file.name}?folder=${isFolder}`, { method: 'GET' });
         });
 
         Promise.all(promises)
@@ -629,75 +1049,75 @@ methods: {
                 });
                 this.selectedFiles = [];
                 this.updateStats(-successNum, false);
-                this.$message.success('批量删除成功!');
+                this.$message.success('批量删除成功');
             })
-            .catch(() => this.$message.error('批量删除失败，请检查网络连接'));
-        }).catch(() => this.$message.info('已取消批量删除'));
+            .catch(() => this.$message.error('批量删除失败'));
+        }).catch(() => console.log('已取消批量删除'));
     },
-    handleBatchCopy() {
-        let tmpLinks = '';
-        switch (this.defaultUrlFormat) {
-            case 'originUrl':
-                tmpLinks = this.selectedFiles.map(file => {
-                    // 跳过文件夹
-                    if (file.isFolder) return '';
-
-                    if (file.metadata?.Channel === 'External') {
-                        return file.metadata?.ExternalLink;
-                    } else {
-                        return `${this.rootUrl}${file.name}`;
-                    }
-                }).join('\n');
-                break;
-            case 'mdUrl':
-                tmpLinks = this.selectedFiles.map(file => {
-                    // 跳过文件夹
-                    if (file.isFolder) return '';
-
-                    if (file.metadata?.Channel === 'External') {
-                        return `![${file.metadata?.FileName || file.name}](${file.metadata?.ExternalLink})`;
-                    } else {
-                        return `![${file.metadata?.FileName || file.name}](${this.rootUrl}${file.name})`;
-                    }
-                }).join('\n');
-                break;
-            case 'htmlUrl':
-                tmpLinks = this.selectedFiles.map(file => {
-                    // 跳过文件夹
-                    if (file.isFolder) return '';
-
-                    if (file.metadata?.Channel === 'External') {
-                        return `<img src="${file.metadata?.ExternalLink}" alt="${file.metadata?.FileName || file.name}" width=100%>`;
-                    } else {
-                        return `<img src="${this.rootUrl}${file.name}" alt="${file.metadata?.FileName || file.name}" width=100%>`;
-                    }
-                }).join('\n');
-                break;
-            case 'bbUrl':
-                tmpLinks = this.selectedFiles.map(file => {
-                    // 跳过文件夹
-                    if (file.isFolder) return '';
-
-                    if (file.metadata?.Channel === 'External') {
-                        return `[img]${file.metadata?.ExternalLink}[/img]`;
-                    } else {
-                        return `[img]${this.rootUrl}${file.name}[/img]`;
-                    }
-                }).join('\n');
-                break;
-            case 'tgId':
-                tmpLinks = this.selectedFiles.map(file => file.metadata?.TgFileId || '').join('\n');
-                break;
-            case 's3Location':
-                tmpLinks = this.selectedFiles.map(file => file.metadata?.S3Location || '').join('\n');
-                break;
+    async handleBatchCopy() {
+        // 分离文件和文件夹
+        const files = this.selectedFiles.filter(item => !item.isFolder);
+        const folders = this.selectedFiles.filter(item => item.isFolder);
+        
+        // 如果有文件夹，显示加载状态
+        let loading = null;
+        if (folders.length > 0) {
+            loading = this.$loading({
+                lock: true,
+                text: '正在获取文件列表...'
+            });
         }
-        // 删除空行
-        tmpLinks = tmpLinks.replace(/^\s*[\r\n]/gm, '');
-
-        const links = tmpLinks;
-        navigator.clipboard ? navigator.clipboard.writeText(links).then(() => this.$message.success('批量复制链接成功~')) :
-        this.copyToClipboardFallback(links);
+        
+        try {
+            // 收集所有文件（包括文件夹内的文件）
+            let allFiles = [...files];
+            
+            // 递归获取所有文件夹内的文件
+            for (const folder of folders) {
+                try {
+                    const response = await fetchWithAuth(
+                        `/api/manage/list?dir=${encodeURIComponent(folder.name)}&recursive=true&count=-1`,
+                        { method: 'GET' }
+                    );
+                    const data = await response.json();
+                    if (data.files && data.files.length > 0) {
+                        allFiles = allFiles.concat(data.files);
+                    }
+                } catch (error) {
+                    console.error(`获取文件夹 ${folder.name} 内容失败:`, error);
+                }
+            }
+            
+            if (loading) loading.close();
+            
+            if (allFiles.length === 0) {
+                this.$message.warning('没有可复制的链接');
+                return;
+            }
+            
+            // 生成所有链接
+            const links = allFiles.map(file => {
+                return this.generateFileLink(file.name, file.metadata);
+            }).filter(link => link); // 过滤掉空链接
+            
+            if (links.length === 0) {
+                this.$message.warning('没有可复制的链接');
+                return;
+            }
+            
+            // 复制到剪贴板
+            const text = links.join('\n');
+            if (navigator.clipboard) {
+                await navigator.clipboard.writeText(text);
+                this.$message.success(`批量复制 ${links.length} 个链接成功`);
+            } else {
+                this.copyToClipboardFallback(text);
+            }
+        } catch (error) {
+            if (loading) loading.close();
+            console.error('批量复制链接失败:', error);
+            this.$message.error('批量复制链接失败，请重试');
+        }
     },
     copyToClipboardFallback(text) {
         const textarea = document.createElement('textarea');
@@ -709,7 +1129,7 @@ methods: {
         textarea.select();
         document.execCommand('copy');
         document.body.removeChild(textarea);
-        this.$message.success('批量复制链接成功~');
+        this.$message.success('批量复制链接成功');
     },
     handleCopy(index, key) {
         let text = '';
@@ -756,14 +1176,22 @@ methods: {
                     break;
             }
         }
-        navigator.clipboard ? navigator.clipboard.writeText(text).then(() => this.$message.success('复制文件链接成功~')) :
+        navigator.clipboard ? navigator.clipboard.writeText(text).then(() => this.$message.success('复制文件链接成功')) :
         this.copyToClipboardFallback(text);
     },
     async loadMoreData() {
         this.loading = true;
-        
+
         try {
-            await fileManager.loadMoreFiles(this.fetchWithAuth, this.currentPath);
+            // 传递标签参数和筛选参数到后端
+            await fileManager.loadMoreFiles(
+                this.currentPath, 
+                this.searchKeywords,
+                this.searchIncludeTags,
+                this.searchExcludeTags,
+                60,
+                this.filters
+            );
             // 获取新的文件列表后
             await this.fetchFileList();
         } catch (error) {
@@ -774,12 +1202,7 @@ methods: {
     },
     updateStats(num, init = false) {
         if (init) {
-            this.fetchWithAuth(`/api/manage/list?count=-1&sum=true&dir=${this.currentPath}`, { method: 'GET' })
-            .then(response => response.json())
-            .then(data => {
-                this.Number = data.sum;
-            })
-            .catch(() => this.$message.error('更新统计信息失败，请检查网络连接'));
+            this.Number = num;
         } else {
             this.Number += num;
         }
@@ -839,6 +1262,8 @@ methods: {
             this.handleBatchDownload();
         } else if (command === 'move') {
             this.handleBatchMove();
+        } else if (command === 'tagManagement') {
+            this.handleBatchTagManagement();
         } else if (command === 'ban') {
             this.handleBatchBlock();
         } else if (command === 'white') {
@@ -850,8 +1275,21 @@ methods: {
         this.$prompt('请输入新的目录', '移动文件', {
             confirmButtonText: '确定',
             cancelButtonText: '取消',
-            inputPattern: /^\/([a-zA-Z0-9_\u4e00-\u9fa5]+(\/[a-zA-Z0-9_\u4e00-\u9fa5]+)*)?$/,
-            inputErrorMessage: '请输入/开头的正确目录路径'
+            inputValue: '/',
+            beforeClose: (action, instance, done) => {
+                if (action === 'confirm') {
+                    const value = instance.inputValue;
+                    // 使用共享验证器验证路径
+                    const validation = validateFolderPath(value);
+                    if (!validation.valid) {
+                        this.$message.error(validation.error);
+                        return; // 验证失败，不关闭弹窗
+                    }
+                    done(); // 验证通过，关闭弹窗
+                } else {
+                    done(); // 取消操作，直接关闭
+                }
+            }
         }).then(({ value }) => {
             // 去掉开头的 /，结尾若没有 /，则加上
             const newPath = value.replace(/^\/+/, '') + (value.endsWith('/') ? '' : value === '' ? '' : '/');
@@ -861,7 +1299,7 @@ methods: {
                 this.$message.warning('目标文件夹不能是当前文件夹');
                 return;
             }
-            this.fetchWithAuth(`/api/manage/move/${key}?folder=${isFolder}&dist=${newPath}`, { method: 'GET' })
+            fetchWithAuth(`/api/manage/move/${key}?folder=${isFolder}&dist=${newPath}`, { method: 'GET' })
                 .then(response => {
                     if (response.ok) {
                         const fileIndex = this.tableData.findIndex(file => file.name === key);
@@ -884,7 +1322,7 @@ methods: {
                             });
                         }
                         this.updateStats(-1, false);
-                        this.$message.success('移动成功!');
+                        this.$message.success('移动成功');
                     } else {
                         return Promise.reject('请求失败');
                     }
@@ -893,16 +1331,29 @@ methods: {
                     // 刷新本地文件列表
                     this.refreshLocalFileList();
                 })
-                .catch(() => this.$message.error('移动失败，请检查网络连接'));
-        }).catch(() => this.$message.info('已取消移动文件'));
+                .catch(() => this.$message.error('移动失败'));
+        }).catch(() => console.log('已取消移动文件'));
     },
     handleBatchMove() {
         // 弹窗输入新的文件夹路径
         this.$prompt('请输入新的目录', '移动文件', {
             confirmButtonText: '确定',
             cancelButtonText: '取消',
-            inputPattern: /^\/([a-zA-Z0-9_\u4e00-\u9fa5]+(\/[a-zA-Z0-9_\u4e00-\u9fa5]+)*)?$/,
-            inputErrorMessage: '请输入/开头的正确目录路径'
+            inputValue: '/',
+            beforeClose: (action, instance, done) => {
+                if (action === 'confirm') {
+                    const value = instance.inputValue;
+                    // 使用共享验证器验证路径
+                    const validation = validateFolderPath(value);
+                    if (!validation.valid) {
+                        this.$message.error(validation.error);
+                        return; // 验证失败，不关闭弹窗
+                    }
+                    done(); // 验证通过，关闭弹窗
+                } else {
+                    done(); // 取消操作，直接关闭
+                }
+            }
         }).then(({ value }) => {
             // 去掉开头的 /，结尾若没有 /，则加上
             const newPath = value.replace(/^\/+/, '') + (value.endsWith('/') ? '' : value === '' ? '' : '/');
@@ -913,7 +1364,7 @@ methods: {
             }
             const promises = this.selectedFiles.map(file => {
                 const isFolder = file.isFolder;
-                return this.fetchWithAuth(`/api/manage/move/${file.name}?folder=${isFolder}&dist=${newPath}`, { method: 'GET' });
+                return fetchWithAuth(`/api/manage/move/${file.name}?folder=${isFolder}&dist=${newPath}`, { method: 'GET' });
             });
 
             Promise.all(promises)
@@ -946,14 +1397,14 @@ methods: {
                         });
                     });
                     this.updateStats(-successNum, false);
-                    this.$message.success('移动成功!');
+                    this.$message.success('移动成功');
                 })
                 .then(() => {
                     // 刷新本地文件列表
                     this.refreshLocalFileList();
                 })
-                .catch(() => this.$message.error('移动失败，请检查网络连接'));
-        }).catch(() => this.$message.info('已取消移动文件'));
+                .catch(() => this.$message.error('移动失败'));
+        }).catch(() => console.log('已取消移动文件'));
     },
     handleBatchBlock(){
         this.$confirm('此操作将把选中的文件加入黑名单, 是否继续?', '提示', {
@@ -966,7 +1417,7 @@ methods: {
                 if (file.isFolder) {
                     return Promise.resolve({ ok: false });
                 }
-                return this.fetchWithAuth(`/api/manage/block/${file.name}`, { method: 'GET' });
+                return fetchWithAuth(`/api/manage/block/${file.name}`, { method: 'GET' });
             });
 
             Promise.all(promises)
@@ -979,10 +1430,10 @@ methods: {
                             }
                         }
                     });
-                    this.$message.success('批量加入黑名单成功!');
+                    this.$message.success('批量加入黑名单成功');
                 })
-                .catch(() => this.$message.error('批量加入黑名单失败，请检查网络连接'));
-        }).catch(() => this.$message.info('已取消批量加入黑名单'));
+                .catch(() => this.$message.error('批量加入黑名单失败'));
+        }).catch(() => console.log('已取消批量加入黑名单'));
     },
     handleBatchWhite(){
         this.$confirm('此操作将把选中的文件加入白名单, 是否继续?', '提示', {
@@ -995,7 +1446,7 @@ methods: {
                 if (file.isFolder) {
                     return Promise.resolve({ ok: false });
                 }
-                return this.fetchWithAuth(`/api/manage/white/${file.name}`, { method: 'GET' });
+                return fetchWithAuth(`/api/manage/white/${file.name}`, { method: 'GET' });
             });
 
             Promise.all(promises)
@@ -1008,10 +1459,10 @@ methods: {
                             }
                         }
                     });
-                    this.$message.success('批量加入白名单成功!');
+                    this.$message.success('批量加入白名单成功');
                 })
-                .catch(() => this.$message.error('批量加入白名单失败，请检查网络连接'));
-        }).catch(() => this.$message.info('已取消批量加入白名单'));
+                .catch(() => this.$message.error('批量加入白名单失败'));
+        }).catch(() => console.log('已取消批量加入白名单'));
     },
     handleBatchDownload() {
         // 将选中文件打包成 zip 文件下载
@@ -1025,7 +1476,7 @@ methods: {
             if (file.isFolder) {
                 return;
             }
-            const response = await fetch(`/file/${file.name}?from=admin`);
+            const response = await fetch(this.getFileLink(file.name));
             const blob = await response.blob();
             // 检查文件名是否已经存在
             let fileName = file.metadata?.FileName || file.name;
@@ -1053,12 +1504,24 @@ methods: {
             });
     },
     isVideo(file) {
-        let flag = file.metadata?.FileType?.includes('video') || file.metadata?.FileType?.includes('audio');
+        // 排除音频文件
+        if (this.isAudio(file)) return false;
+        let flag = file.metadata?.FileType?.includes('video');
         // 用文件名后缀判断是否为视频文件
         if (!flag) {
-            const videoExtensions = ['mp4', 'webm', 'ogg', 'avi', 'mov', 'flv', 'wmv', 'mkv', 'rmvb', '3gp', 'mpg', 'mpeg', 'm4v', 'f4v', 'rm', 'asf', 'dat', 'ts', 'vob', 'swf', 'divx', 'xvid', 'm2ts', 'mts', 'm2v', '3g2', '3gp2', '3gpp', '3gpp2', 'mpe', 'm1v', 'mpv', 'mpv2', 'mp2v', 'm2t', 'm2ts', 'm2v', 'm4b', 'm4p', 'm4v', 'm4r'];
+            const videoExtensions = ['mp4', 'webm', 'ogg', 'avi', 'mov', 'flv', 'wmv', 'mkv', 'rmvb', '3gp', 'mpg', 'mpeg', 'm4v', 'f4v', 'rm', 'asf', 'dat', 'ts', 'vob', 'swf', 'divx', 'xvid', 'm2ts', 'mts', 'm2v', '3g2', '3gp2', '3gpp', '3gpp2', 'mpe', 'm1v', 'mpv', 'mpv2', 'mp2v', 'm2t', 'm2ts', 'm2v', 'm4v'];
             const extension = file.name.substring(file.name.lastIndexOf('.') + 1).toLowerCase();
             flag = videoExtensions.includes(extension);
+        }
+        return flag;
+    },
+    isAudio(file) {
+        let flag = file.metadata?.FileType?.includes('audio');
+        // 用文件名后缀判断是否为音频文件
+        if (!flag) {
+            const audioExtensions = ['mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a', 'ape', 'aiff', 'alac', 'opus', 'mid', 'midi', 'm4b', 'm4p', 'm4r', 'amr', 'au', 'ra', 'ram'];
+            const extension = file.name.substring(file.name.lastIndexOf('.') + 1).toLowerCase();
+            flag = audioExtensions.includes(extension);
         }
         return flag;
     },
@@ -1072,11 +1535,68 @@ methods: {
         }
         return flag;
     },
+    getFileLink(filename) {
+        const fileLink = process.env.NODE_ENV === 'production' ? `/file/${filename}?from=admin` : `/api/file/${filename}?from=admin`;
+        return fileLink;
+    },
     handlePageChange(page) {
         this.currentPage = page;
         // 到最后一页时，加载更多数据
-        if (this.currentPage === Math.ceil(this.filteredTableData.length / this.pageSize)) {
+        if (this.currentPage === Math.ceil(this.tableData.length / this.pageSize)) {
             this.loadMoreData();
+        }
+    },
+    // 跳转到指定页码
+    handleJumpPage() {
+        const page = parseInt(this.jumpPage);
+        if (isNaN(page) || page < 1) {
+            this.$message.warning('请输入有效的页码');
+            return;
+        }
+        if (page > this.realTotalPages) {
+            this.$message.warning(`页码不能超过 ${this.realTotalPages}`);
+            return;
+        }
+        // 如果目标页超过当前已加载的页数，需要先加载更多数据
+        if (page > this.totalPages) {
+            this.$message.info('正在加载数据，请稍候...');
+            this.loadMoreDataUntilPage(page);
+        } else {
+            this.currentPage = page;
+        }
+        this.jumpPage = '';
+    },
+    // 加载数据直到指定页
+    async loadMoreDataUntilPage(targetPage) {
+        this.loading = true;
+        try {
+            // 计算目标页需要的文件数量（不包含文件夹）
+            // 目标页最后一个项目的索引 = targetPage * pageSize
+            // 需要的文件数 = 目标索引 - 已有文件夹数量
+            const targetIndex = targetPage * this.pageSize;
+            const currentFolderCount = this.filteredTableData.filter(item => item.isFolder).length;
+            const currentFileCount = this.filteredTableData.filter(item => !item.isFolder).length;
+            
+            // 需要加载的文件数量 = 目标位置需要的文件数 - 当前已加载的文件数
+            const neededFileCount = Math.max(0, targetIndex - currentFolderCount - currentFileCount);
+            
+            if (neededFileCount > 0) {
+                await fileManager.loadMoreFiles(
+                    this.currentPath,
+                    this.searchKeywords,
+                    this.searchIncludeTags,
+                    this.searchExcludeTags,
+                    neededFileCount,
+                    this.filters
+                );
+                await this.fetchFileList();
+            }
+
+            this.currentPage = Math.min(targetPage, this.totalPages);
+        } catch (error) {
+            this.$message.error('加载数据失败，请检查网络连接');
+        } finally {
+            this.loading = false;
         }
     },
     // 判断是否为文件夹
@@ -1150,6 +1670,42 @@ methods: {
         return fileName;
     },
     
+    // 获取文件名前半部分（用于中间省略效果）
+    getFileNameStart(name) {
+        if (!name) return '';
+        // 如果文件名较短，返回全部
+        if (name.length <= 30) return name;
+        // 保留开头部分（约60%的长度用于显示前半部分）
+        const dotIndex = name.lastIndexOf('.');
+        if (dotIndex > 0) {
+            // 有扩展名的情况：返回文件名主体部分
+            const baseName = name.substring(0, dotIndex);
+            const keepLength = Math.min(baseName.length, Math.floor(name.length * 0.6));
+            return baseName.substring(0, keepLength);
+        }
+        // 无扩展名的情况
+        return name.substring(0, Math.floor(name.length * 0.6));
+    },
+    
+    // 获取文件名后半部分（用于中间省略效果）
+    getFileNameEnd(name) {
+        if (!name) return '';
+        // 如果文件名较短，返回空
+        if (name.length <= 30) return '';
+        // 保留末尾部分（包含扩展名）
+        const dotIndex = name.lastIndexOf('.');
+        if (dotIndex > 0) {
+            // 有扩展名的情况：返回最后几个字符 + 扩展名
+            const ext = name.substring(dotIndex);
+            const baseName = name.substring(0, dotIndex);
+            const keepLength = Math.min(8, Math.floor(baseName.length * 0.2));
+            return '…' + baseName.substring(baseName.length - keepLength) + ext;
+        }
+        // 无扩展名的情况
+        const keepLength = Math.min(10, Math.floor(name.length * 0.3));
+        return '…' + name.substring(name.length - keepLength);
+    },
+    
     // 进入文件夹
     enterFolder(folderPath) {
         // 确保路径末尾有 '/'
@@ -1197,8 +1753,12 @@ methods: {
             this.tableData = [...folderItems, ...fileItems];
 
             // 更新统计信息
-            this.updateStats(0, true);
-                
+            this.updateStats(data.totalCount, true);
+            
+            // 更新直接文件和文件夹数量
+            this.directFileCount = data.directFileCount || 0;
+            this.directFolderCount = data.directFolderCount || 0;
+
         } catch (error) {
             console.error('Error fetching file list:', error);
             this.$message.error('获取文件列表失败');
@@ -1211,7 +1771,14 @@ methods: {
         this.refreshLoading = true;
         this.loading = true;
         try {
-            const success = await fileManager.refreshFileList(this.fetchWithAuth, this.currentPath);
+            // 传递标签参数和筛选参数到后端
+            const success = await fileManager.refreshFileList(
+                this.currentPath, 
+                this.searchKeywords,
+                this.searchIncludeTags,
+                this.searchExcludeTags,
+                this.filters
+            );
             if (success) {
                 await this.fetchFileList();
             } else {
@@ -1239,10 +1806,148 @@ methods: {
             this.loading = false;
         }
     },
+    // Tag management methods
+    handleTagManagement(fileId) {
+        this.currentTagFile = fileId;
+        this.showTagDialog = true;
+    },
+    handleBatchTagManagement() {
+        if (this.selectedFiles.length === 0) {
+            this.$message.warning('请先选择文件');
+            return;
+        }
+        this.showBatchTagDialog = true;
+    },
+    async handleTagsUpdated(tags) {
+        // 更新本地文件数据中的标签
+        const fileIndex = this.tableData.findIndex(file => file.name === this.currentTagFile);
+        if (fileIndex !== -1) {
+            // 更新 tableData 中的标签
+            if (!this.tableData[fileIndex].metadata) {
+                this.tableData[fileIndex].metadata = {};
+            }
+            this.tableData[fileIndex].metadata.Tags = tags;
+            
+            // 如果详情对话框正在显示这个文件，也更新详情数据
+            if (this.showdetailDialog && this.detailFile?.name === this.currentTagFile) {
+                if (!this.detailFile.metadata) {
+                    this.detailFile.metadata = {};
+                }
+                this.detailFile.metadata.Tags = tags;
+            }
+        }
+    },
+    async handleBatchTagsUpdated() {
+        // 刷新文件列表以显示更新后的标签
+        await this.refreshLocalFileList();
+    },
+    handleMetadataUpdated(fileId, updatedMetadata) {
+        // 更新 tableData 中对应文件的 metadata
+        const fileIndex = this.tableData.findIndex(f => f.name === fileId);
+        if (fileIndex !== -1) {
+            this.tableData[fileIndex].metadata = { ...this.tableData[fileIndex].metadata, ...updatedMetadata };
+        }
+        // 如果 detailFile 正在显示该文件，同步更新 detailFile
+        if (this.detailFile && this.detailFile.name === fileId) {
+            this.detailFile.metadata = { ...this.detailFile.metadata, ...updatedMetadata };
+        }
+    },
+    handleFileRenamed(oldFileId, newFileId, updatedMetadata) {
+        // 更新 tableData 中对应文件的 name（File_ID）和 metadata
+        const fileIndex = this.tableData.findIndex(f => f.name === oldFileId);
+        if (fileIndex !== -1) {
+            this.tableData[fileIndex].name = newFileId;
+            this.tableData[fileIndex].metadata = { ...this.tableData[fileIndex].metadata, ...updatedMetadata };
+        }
+        // 更新 detailFile 引用并关闭/重新打开详情弹窗以刷新链接
+        if (this.detailFile && this.detailFile.name === oldFileId) {
+            this.detailFile.name = newFileId;
+            this.detailFile.metadata = { ...this.detailFile.metadata, ...updatedMetadata };
+            // 关闭详情弹窗，然后在下一个 tick 重新打开以刷新所有链接
+            this.showdetailDialog = false;
+            this.$nextTick(() => {
+                this.showdetailDialog = true;
+            });
+        }
+    },
+    // 生成单个文件链接
+    generateFileLink(key, metadata) {
+        const isExternal = metadata?.Channel === 'External';
+        const baseUrl = isExternal ? metadata?.ExternalLink : `${this.rootUrl}${key}`;
+        const fileName = metadata?.FileName || key;
+        
+        switch (this.defaultUrlFormat) {
+            case 'originUrl':
+                return baseUrl;
+            case 'mdUrl':
+                return `![${fileName}](${baseUrl})`;
+            case 'htmlUrl':
+                return `<img src="${baseUrl}" alt="${fileName}" width=100%>`;
+            case 'bbUrl':
+                return `[img]${baseUrl}[/img]`;
+            case 'tgId':
+                return metadata?.TgFileId || '';
+            case 's3Location':
+                return metadata?.S3Location || '';
+            default:
+                return baseUrl;
+        }
+    },
+    // 复制文件夹中所有文件的链接
+    async handleFolderCopy(folderName) {
+        // 显示加载状态
+        const loading = this.$loading({
+            lock: true,
+            text: '正在获取文件列表...'
+        });
+        
+        try {
+            // 调用 list API 递归获取文件夹内所有文件
+            const response = await fetchWithAuth(
+                `/api/manage/list?dir=${encodeURIComponent(folderName)}&recursive=true&count=-1`,
+                { method: 'GET' }
+            );
+            
+            const data = await response.json();
+            loading.close();
+            
+            if (!data.files || data.files.length === 0) {
+                this.$message.warning('文件夹为空，没有可复制的链接');
+                return;
+            }
+            
+            // 根据当前链接格式生成所有文件链接
+            const links = data.files.map(file => {
+                return this.generateFileLink(file.name, file.metadata);
+            }).filter(link => link); // 过滤掉空链接
+            
+            if (links.length === 0) {
+                this.$message.warning('没有可复制的链接');
+                return;
+            }
+            
+            // 复制到剪贴板
+            const text = links.join('\n');
+            if (navigator.clipboard) {
+                await navigator.clipboard.writeText(text);
+                this.$message.success(`已复制 ${links.length} 个文件链接`);
+            } else {
+                this.copyToClipboardFallback(text);
+                this.$message.success(`已复制 ${links.length} 个文件链接`);
+            }
+        } catch (error) {
+            loading.close();
+            console.error('复制文件夹链接失败:', error);
+            this.$message.error('复制文件夹链接失败，请重试');
+        }
+    },
 },
 mounted() {
+    // 初始化背景图
+    this.initializeBackground('adminBkImg', '.container', false, true);
+
     this.loading = true;
-    this.fetchWithAuth("/api/manage/check", { method: 'GET' })
+    fetchWithAuth("/api/manage/check", { method: 'GET' })
         .then(response => response.text())
         .then(result => {
             if(result == "true"){
@@ -1258,6 +1963,10 @@ mounted() {
             // 首次加载时刷新文件列表
             return this.refreshFileList();
         })
+        .then(() => {
+            // 获取所有渠道名称
+            return this.extractChannelNames();
+        })
         .catch((err) => {
             if (err.message !== 'Unauthorized') {
                 this.$message.error('同步数据时出错，请检查网络连接');
@@ -1270,6 +1979,12 @@ mounted() {
     // 读取自定义链接设置项
     this.customUrlPrefix = this.adminUrlSettings.customUrlPrefix;
     this.useCustomUrl = this.adminUrlSettings.useCustomUrl;
+
+    // 恢复视图模式偏好
+    const savedViewMode = localStorage.getItem('viewMode');
+    if (savedViewMode === 'card' || savedViewMode === 'list') {
+        this.viewMode = savedViewMode;
+    }
 }
 
 };
@@ -1285,6 +2000,15 @@ mounted() {
     padding: 0;
 }
 
+/* 确保el-container和el-main不裁剪内容 */
+:deep(.el-container) {
+    overflow: visible;
+}
+
+:deep(.el-main) {
+    overflow: visible;
+}
+
 :deep(.el-dialog) {
     border-radius: 12px;
     background-color: var(--dialog-bg-color);
@@ -1296,32 +2020,90 @@ mounted() {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 20px;
-    background-color: var(--admin-header-content-bg-color);
-    backdrop-filter: blur(10px);
-    border-bottom: var(--admin-header-content-border-bottom);
-    box-shadow: var(--admin-header-content-box-shadow);
-    transition: background-color 0.5s ease, box-shadow 0.5s ease;
-    border-bottom-left-radius: 10px;
-    border-bottom-right-radius: 10px;
+    padding: 10px 24px;
+    /* macOS 风格毛玻璃效果 */
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    /* 顶部边框形成玻璃边缘光泽 */
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-top: 1px solid rgba(255, 255, 255, 0.5);
+    /* 悬浮阴影效果 */
+    box-shadow: 
+        0 4px 30px rgba(0, 0, 0, 0.1),
+        0 1px 3px rgba(0, 0, 0, 0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 16px;
     position: fixed;
-    top: 0;
-    left: 50%; /* 将左边缘移动到页面中间 */
-    transform: translateX(-50%); /* 向左移动自身宽度的一半 */
-    width: 95%;
-    z-index: 1000;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(95% - 16px);
+    z-index: 2001;
     min-height: 45px;
 }
+
+/* 深色模式毛玻璃效果 */
+html.dark .header-content {
+    background: rgba(30, 30, 30, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 
+        0 4px 30px rgba(0, 0, 0, 0.3),
+        0 1px 3px rgba(0, 0, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
 
 @media (max-width: 768px) {
     .header-content {
         flex-direction: column;
+        top: 6px;
+        width: calc(100% - 32px);
+        border-radius: 14px;
+        padding: 6px 12px;
+        gap: 4px;
+    }
+    
+    .header-icon {
+        font-size: 0.95em;
+    }
+    
+    .header-content .actions {
+        gap: 10px;
+    }
+    
+    .search-card :deep(.el-input__inner) {
+        height: 28px;
+        font-size: 0.85em;
+        width: 50vw;
+    }
+    
+    .search-card :deep(.el-input__wrapper) {
+        padding: 0 10px;
+    }
+    
+    .search-card :deep(.el-input__inner:focus) {
+        width: 65vw;
     }
 }
 
 .header-content:hover {
-    background-color: var(--admin-header-content-hover-bg-color);
-    box-shadow: var(--admin-header-content-hover-box-shadow);
+    background: rgba(255, 255, 255, 0.82);
+    box-shadow: 
+        0 8px 40px rgba(0, 0, 0, 0.12),
+        0 2px 6px rgba(0, 0, 0, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    transform: translateX(-50%) translateY(-1px);
+}
+
+html.dark .header-content:hover {
+    background: rgba(35, 35, 35, 0.85);
+    box-shadow: 
+        0 8px 40px rgba(0, 0, 0, 0.4),
+        0 2px 6px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .header-icon {
@@ -1338,42 +2120,66 @@ mounted() {
 }
 
 
-.stats {
-    font-size: 1.2em;
-    margin-right: 20px;
+/* 面包屑容器，包含路径和文件数量 */
+.breadcrumb-container {
     display: flex;
     align-items: center;
-    background: var(--admin-dashborad-stats-bg-color);
-    padding: 5px 10px;
-    border-radius: 10px;
-    box-shadow: var(--admin-dashboard-stats-shadow);
-    transition: background-color 0.3s ease, box-shadow 0.3s ease;
-    color: var(--admin-container-color);
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 10px; /* 与 .content 的 padding 对齐 */
+    margin-bottom: 4px; /* 与下方内容的间距 */
 }
 
 @media (max-width: 768px) {
-    .stats {
-        margin-right: 0;
-        margin-top: 10px;
+    .breadcrumb-container {
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+        padding: 0 5px;
+        margin-bottom: 2px;
     }
 }
 
-.stats .fa-database {
-    margin-right: 10px;
-    font-size: 1.5em;
-    transition: color 0.3s ease;
-    color: inherit;
+/* 文件数量小徽章 */
+.stats-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--el-text-color-secondary);
+    background: var(--el-fill-color-light);
+    padding: 4px 10px;
+    border-radius: 12px;
+    border: 1px solid var(--el-border-color-lighter);
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
-.stats:hover {
-    background-color: var(--admin-dashborad-stats-hover-bg-color);
-    box-shadow: var(--admin-dashboard-stats-hover-shadow);
-    color: var(--admin-purple); /* 使用柔和的淡紫色 */
+.stats-badge:hover {
+    background: var(--el-fill-color);
+    color: var(--admin-purple);
+    border-color: var(--admin-purple);
 }
 
-.stats:hover .fa-database {
-    color: var(--admin-purple); /* 使用柔和的淡紫色 */
+.stats-badge-icon {
+    font-size: 11px;
+    opacity: 0.8;
 }
+
+@media (max-width: 768px) {
+    .stats-badge {
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 8px;
+    }
+    
+    .stats-badge-icon {
+        font-size: 9px;
+    }
+}
+
 
 .header-content .actions {
     display: flex;
@@ -1416,19 +2222,33 @@ mounted() {
     color: var(--admin-purple); /* 使用柔和的淡紫色 */
 }
 
-.search-card {
-    margin-left: auto;
-    margin-right: 20px;
+.batch-action-item-icon {
+    width: 20px;
+    margin-right: 5px;
 }
 
+/* 搜索区域样式（包含搜索框和筛选按钮） */
+.search-area {
+    margin-left: auto;
+    margin-right: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
 @media (max-width: 768px) {
-    .search-card {
+    .search-area {
         margin-right: 0;
         margin-left: 0;
         margin-top: 10px;
+        gap: 6px;
     }
 }
 
+/* 搜索卡片样式 */
+.search-card {
+    display: flex;
+    align-items: center;
+}
 .search-card :deep(.el-input__wrapper) {
     border-radius: 20px;
     background: var(--admin-dashboard-search-card-bg-color);
@@ -1437,7 +2257,7 @@ mounted() {
 }
 
 .search-card :deep(.el-input__inner) {
-    width: 300px;
+    width: 280px;
     height: 40px;
     font-size: 1.2em;
     border: none;
@@ -1445,22 +2265,60 @@ mounted() {
     background: none;
 }
 
+.search-card :deep(.el-input__inner::placeholder) {
+    color: var(--el-text-color-placeholder);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 14px;
+    opacity: 0.6;
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+}
+
+.search-card :deep(.el-input__inner:focus::placeholder) {
+    opacity: 0.4;
+    transform: translateX(5px);
+}
 @media (max-width: 768px) {
     .search-card :deep(.el-input__inner) {
-        width: 60vw;
+        width: 45vw;
+        height: 32px;
+        font-size: 1em;
     }
 }
-
 .search-card :deep(.el-input__inner:focus) {
-    width: 400px;
+    width: 350px;
 }
-
 @media (max-width: 768px) {
     .search-card :deep(.el-input__inner:focus) {
-        width: 80vw;
+        width: 55vw;
     }
 }
+.search-icon {
+    cursor: pointer;
+    color: var(--admin-container-color);
+    transition: all 0.3s ease;
+    font-size: 1.3em;
+    opacity: 0;
+    transform: scale(0.8);
+    pointer-events: none;
+}
+.search-card:focus-within .search-icon {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+}
+.search-card:focus-within .search-icon:hover {
+    color: var(--admin-purple);
+    transform: scale(1.2);
+}
+.search-card :deep(.el-input__suffix) {
+    display: flex;
+    align-items: center;
+    right: 10px;
+}
 
+/* 主容器样式 */
 .main-container {
     display: flex;
     flex-direction: column;
@@ -1470,7 +2328,7 @@ mounted() {
 
 @media (max-width: 768px) {
     .main-container {
-        margin-top: 18vh;
+        margin-top: 12vh;
     }
 }
 
@@ -1485,6 +2343,41 @@ mounted() {
     min-height: 80vh;
 }
 
+/* 空状态样式 */
+.empty-state {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    color: var(--admin-container-color);
+    opacity: 0.6;
+}
+
+.empty-icon {
+    font-size: 64px;
+    margin-bottom: 20px;
+    color: var(--admin-container-color);
+    opacity: 0.3;
+}
+
+.empty-text {
+    font-size: 18px;
+    font-weight: 500;
+    margin: 0 0 8px 0;
+}
+
+.empty-hint {
+    font-size: 14px;
+    margin: 0;
+    opacity: 0.7;
+}
+
+.list-empty {
+    padding: 80px 20px;
+}
+
 /* 在小屏幕上，将所有内容放入一列 */
 @media (max-width: 768px) {
     .content {
@@ -1493,202 +2386,296 @@ mounted() {
     }
 }
 
-.img-card {
-    width: 100%;
-    background: var(--admin-dashboard-imgcard-bg-color);
-    border-radius: 8px;
-    box-shadow: var(--admin-dashboard-imgcard-shadow);
-    overflow: hidden;
-    position: relative;
-    transition: transform 0.3s ease;
-}
-
-.img-card:hover {
-    transform: scale(1.05);
-}
-
-.image-preview {
-    width: 100%;
-    height: 18vh;
-    object-fit: cover;
-    transition: opacity 0.3s ease;
-    filter: var(--image-preview-filter);
-}
-
-.image-preview:hover {
-    opacity: 0.8;
-}
-
-.file-short-info {
-    position: absolute;
-    z-index: 10;
-    top: 3px;
-    left: 3px;
-    display: flex;
-    gap: 5px;
-    align-items: start;
-}
-
-.success-tag {
-    background-color: rgba(129, 251, 129, 0.3);
-    color: rgba(57, 174, 21, 0.8);
-    border: 0.5px solid rgba(60, 255, 0, 0.1);
-    padding: 2px 5px;
-    border-radius: 5px;
-    font-size: 0.6em;
-}
-.fail-tag {
-    background-color: rgba(255, 0, 0, 0.3);
-    color: rgba(255, 0, 0, 0.8);
-    border: 0.5px solid rgba(255, 0, 0, 0.1);
-    padding: 2px 5px;
-    border-radius: 5px;
-    font-size: 0.6em;
-}
-.info-tag {
-    background-color: rgba(110, 110, 110, 0.3);
-    color: rgba(110, 110, 110, 0.8);
-    border: 0.5px solid rgba(110, 110, 110, 0.1);
-    padding: 2px 5px;
-    border-radius: 5px;
-    font-size: 0.6em;
-}
-
-.file-preview {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 100%;
-    height: 18vh;
-}
-.file-icon {
-    opacity: 0.6;
-}
-.file-icon-detail {
-    height: 40px;
-}
-
-.file-info {
-    padding: 10px;
-    background: rgba(0, 0, 0, 0.6);
-    color: white;
-    text-align: center;
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    box-sizing: border-box;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.image-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.6);
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    pointer-events: none;
-}
-
-.el-card:hover .image-overlay {
-    opacity: 1;
-}
-
-.overlay-buttons {
+/* 列表视图样式 - 仅保留容器和表头 */
+.list-view {
     display: flex;
     flex-direction: column;
-    gap: 8px; /* 行间距 */
-    pointer-events: auto;
+    gap: 0;
+    background: var(--admin-dashboard-imgcard-bg-color);
+    border-radius: 12px;
+    overflow-x: auto;
+    overflow-y: visible;
+    box-shadow: var(--admin-dashboard-imgcard-shadow);
+    margin-top: 15px;
 }
 
-.button-row {
+.list-header {
+    display: grid;
+    grid-template-columns: 50px 60px minmax(180px, 1fr) 130px 100px 110px 130px 80px 100px 120px;
+    padding: 12px 20px;
+    background: var(--admin-dashboard-stats-bg);
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--el-text-color-secondary);
+    border-bottom: 1px solid var(--el-border-color-lighter);
+    min-width: fit-content;
+}
+
+.list-col {
     display: flex;
-    justify-content: center; /* 按钮居中 */
-    gap: 8px; /* 按钮间距 */
+    align-items: center;
+}
+
+.list-col-checkbox {
+    justify-content: center;
+    min-width: 40px;
+}
+
+/* 表头自定义复选框 */
+.custom-checkbox {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--el-border-color);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: transparent;
+}
+
+.custom-checkbox:hover {
+    border-color: #38bdf8;
+}
+
+.custom-checkbox.checked,
+.custom-checkbox.indeterminate {
+    background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+    border-color: #38bdf8;
+}
+
+.custom-checkbox .check-icon {
+    font-size: 10px;
+    color: white;
+}
+
+/* 移动端列表视图 */
+@media (max-width: 768px) {
+    .list-header {
+        display: none;
+    }
 }
 
 .pagination-container {
     display: flex;
     justify-content: center;
+    align-items: center;
     margin-top: 20px;
     padding-bottom: 20px;
+    gap: 15px;
+    position: relative;
 }
-.load-more {
-    cursor: pointer;
-    background-color: var(--admin-dashboard-btn-bg-color);
-    box-shadow: var(--admin-dashboard-btn-shadow);
-    color: var(--admin-dashboard-btn-color);
+
+.pagination-center {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* 页码按钮美化 */
+.pagination-container :deep(.el-pagination) {
+    --el-pagination-button-bg-color: var(--admin-dashboard-btn-bg-color);
+    --el-pagination-hover-color: var(--admin-purple);
+}
+
+.pagination-container :deep(.el-pager li) {
+    background: var(--admin-dashboard-btn-bg-color);
+    border-radius: 10px;
+    margin: 0 4px;
+    min-width: 36px;
+    height: 36px;
+    line-height: 36px;
+    font-weight: 500;
     border: none;
-    transition: color 0.3s;
-    margin-left: 20px;
+    box-shadow: var(--admin-dashboard-btn-shadow);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+.pagination-container :deep(.el-pager li:hover) {
+    color: #38bdf8;
+    transform: translateY(-2px);
+    box-shadow: var(--admin-dashboard-btn-hover-shadow);
+}
+
+.pagination-container :deep(.el-pager li.is-active) {
+    background: linear-gradient(135deg, #0ea5e9, #38bdf8) !important;
+    color: white !important;
+    border-radius: 10px;
+    box-shadow: 
+        var(--admin-dashboard-btn-shadow),
+        0 4px 12px rgba(56, 189, 248, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pagination-container :deep(.el-pager li.is-active:hover) {
+    transform: translateY(-2px) !important;
+    box-shadow: 
+        var(--admin-dashboard-btn-hover-shadow),
+        0 6px 16px rgba(56, 189, 248, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+.pagination-container :deep(.btn-prev),
+.pagination-container :deep(.btn-next) {
+    background: var(--admin-dashboard-btn-bg-color) !important;
+    border-radius: 10px !important;
+    min-width: 36px;
+    height: 36px;
+    border: none;
+    box-shadow: var(--admin-dashboard-btn-shadow);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pagination-container :deep(.btn-prev:hover),
+.pagination-container :deep(.btn-next:hover) {
+    color: #38bdf8;
+    transform: translateY(-2px);
+    box-shadow: var(--admin-dashboard-btn-hover-shadow);
+}
+
+.pagination-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: absolute;
+    right: 0;
+}
+
+/* 分页信息区域 */
+.page-total {
+    font-size: 13px;
+    color: var(--el-text-color-secondary);
+    white-space: nowrap;
+}
+
+.page-jump {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--el-text-color-secondary);
+}
+
+.page-jump .jump-input {
+    width: 50px;
+}
+
+.page-jump .jump-input :deep(.el-input__wrapper) {
+    background: var(--admin-dashboard-btn-bg-color);
+    box-shadow: var(--admin-dashboard-btn-shadow);
+    border-radius: 8px;
+    padding: 0 8px;
+    height: 28px;
+}
+
+.page-jump .jump-input :deep(.el-input__inner) {
+    text-align: center;
+    color: var(--el-text-color-primary);
+    height: 28px;
+    line-height: 28px;
+}
+
+.page-jump .jump-btn {
+    background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+    border: none;
+    border-radius: 8px;
+    padding: 0 12px;
+    height: 28px;
+    font-size: 12px;
+    font-weight: 600;
+    color: white;
+    box-shadow: 0 2px 8px rgba(56, 189, 248, 0.3);
+    transition: all 0.3s ease;
+}
+
+.page-jump .jump-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(56, 189, 248, 0.4);
+}
+
+/* 移动端分页适配 */
+@media (max-width: 768px) {
+    .pagination-container {
+        flex-direction: column;
+        gap: 12px;
+        padding-bottom: 15px;
+    }
+    
+    .pagination-center {
+        order: 0;
+    }
+    
+    .pagination-right {
+        position: static;
+        width: 100%;
+        justify-content: center;
+        order: 1;
+    }
+    
+    .page-jump .jump-input {
+        width: 45px;
+    }
+}
+
 .refresh-btn {
     cursor: pointer;
-    background-color: var(--admin-dashboard-btn-bg-color);
+    background: var(--admin-dashboard-btn-bg-color);
     box-shadow: var(--admin-dashboard-btn-shadow);
-    color: var(--admin-dashboard-btn-color);
+    color: #38bdf8;
     border: none;
-    transition: color 0.3s;
-    margin-left: 20px;
-}
-
-.el-checkbox {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    transform: scale(1.5);
-    z-index: 10;
-}
-
-.video-preview {
-    width: 100%; 
-    height: 18vh;
-    display: block;
-    cursor: pointer;
-}
-
-:deep(.description-item) {
-    word-break: break-all;
-    word-wrap: break-word;
-}
-
-.detail-actions {
+    border-radius: 10px;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    padding: 0;
     display: flex;
-    justify-content: right;
-    margin-bottom: 10px;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
-@media (max-width: 768px) {
-    .detail-actions {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 10px;
-    }
-    .detail-action {
-        margin-left: 0;
-    }
+
+.refresh-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--admin-dashboard-btn-hover-shadow);
+    background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+    color: white;
 }
+
+.load-more {
+    cursor: pointer;
+    background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+    box-shadow: 0 4px 15px rgba(56, 189, 248, 0.3);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    height: 36px;
+    padding: 0 16px;
+    font-weight: 500;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.load-more:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(56, 189, 248, 0.5);
+}
+
 :deep(.btn-prev){
     border-radius: 100%;
     position: fixed;
     top: 50%;
-    left: 18px;
-    scale: 1.3;
+    left: 8px;
+    scale: 1;
     color: var(--admin-dashboard-btn-color);
 }
 :deep(.btn-next) {
     border-radius: 100%;
     position: fixed;
     top: 50%;
-    right: 18px;
-    scale: 1.3;
+    right: 8px;
+    scale: 1;
     color: var(--admin-dashboard-btn-color);
 }
 @media (min-width: 768px) {
@@ -1709,69 +2696,101 @@ mounted() {
 }
 
 .breadcrumb {
-    padding: 15px;
+    padding: 8px 12px;
     background-color: var(--el-bg-color);
-    border-radius: 8px;
-    font-size: 1.2em;
+    border-radius: 6px;
+    font-size: 0.95em;
     box-shadow: var(--admin-dashboard-stats-shadow);
     transition: all 0.3s ease;
 }
 
 .breadcrumb:hover {
-    transform: translateY(-2px);
+    transform: translateY(-1px);
     box-shadow: var(--admin-dashboard-stats-hover-shadow);
 }
 
-.folder-card {
-    cursor: pointer;
-    transition: all 0.3s;
+.breadcrumb-home-icon {
+    font-size: 14px;
+    color: #38bdf8;
+    transition: color 0.2s ease;
 }
 
-.folder-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+.breadcrumb-home-icon:hover {
+    color: var(--admin-purple);
 }
-
-.folder-icon {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 100%;
-    height: 18vh;
-    color: var(--el-color-primary);
-}
-
-.folder-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: end;
-    justify-content: center;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    pointer-events: none;
-}
-
-.folder-card:hover .folder-overlay {
-    opacity: 1;
-}
-
-.folder-actions {
-    position: absolute;
-    bottom: 15%;
-    display: flex;
-    pointer-events: auto;
-}
-
 
 :deep(.el-breadcrumb__item) {
     cursor: pointer;
 }
-
 :deep(.el-breadcrumb__inner:hover) {
     color: var(--el-color-primary);
 }
+
+/* 移动端目录触发按钮 */
+.mobile-directory-trigger {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: var(--el-fill-color-light);
+    border-radius: 8px;
+    border: 1px solid var(--el-border-color-lighter);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.mobile-directory-trigger:active {
+    background: var(--el-fill-color);
+}
+
+.mobile-directory-icon {
+    font-size: 12px;
+    color: #38bdf8;
+}
+
+.mobile-directory-path {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--el-text-color-primary);
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mobile-directory-arrow {
+    font-size: 8px;
+    color: var(--el-text-color-secondary);
+}
+
+/* 桌面端显示面包屑，隐藏移动端触发器 */
+.desktop-only {
+    display: block;
+}
+
+@media (max-width: 768px) {
+    .mobile-directory-trigger {
+        display: flex;
+    }
+    
+    .desktop-only {
+        display: none !important;
+    }
+    
+    .breadcrumb-container {
+        padding: 0;
+        margin-left: 0;
+    }
+}
+
+/* 框选选区矩形覆盖层 */
+.drag-select-overlay {
+    position: fixed;
+    background: rgba(24, 144, 255, 0.1);
+    border: 1px solid rgba(24, 144, 255, 0.6);
+    pointer-events: none;
+    z-index: 9999;
+    border-radius: 2px;
+}
+
 </style>

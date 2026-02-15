@@ -19,19 +19,21 @@
     </div>
 </template>
 <script>
-import { mapGetters } from 'vuex';
 import DashboardTabs from '@/components/DashboardTabs.vue';
-import SysConfigTabs from '@/components/SysConfigTabs.vue';
-import SysCogUpload from '@/components/SysCogUpload.vue';
-import SysCogSecurity from '@/components/SysCogSecurity.vue';
-import SysCogPage from '@/components/SysCogPage.vue';
-import SysCogOthers from '@/components/SysCogOthers.vue';
+import SysConfigTabs from '@/components/config/SysConfigTabs.vue';
+import SysCogStatus from '@/components/config/SysCogStatus.vue';
+import SysCogUpload from '@/components/config/SysCogUpload.vue';
+import SysCogSecurity from '@/components/config/SysCogSecurity.vue';
+import SysCogPage from '@/components/config/SysCogPage.vue';
+import SysCogOthers from '@/components/config/SysCogOthers.vue';
+import backgroundManager from '@/mixins/backgroundManager';
 
 export default {
     name: 'SystemConfig',
+    mixins: [backgroundManager],
     data() {
         return {
-            activeIndex: 'upload',
+            activeIndex: 'status',
             isSidebarCollapse: false
         }
     },
@@ -53,13 +55,13 @@ export default {
     components: {
         DashboardTabs,
         SysConfigTabs,
+        SysCogStatus,
         SysCogUpload,
         SysCogSecurity,
         SysCogPage,
         SysCogOthers
     },
     computed: {
-        ...mapGetters(['credentials']),
         disableTooltip() {
             return window.innerWidth < 768;
         },
@@ -67,6 +69,10 @@ export default {
         currentComponent() {
             const hash = this.$route.hash.replace('#', '');
             switch (hash) {
+                case 'status':
+                    return SysCogStatus;
+                case 'upload':
+                    return SysCogUpload;
                 case 'security':
                     return SysCogSecurity;
                 case 'page':
@@ -74,47 +80,26 @@ export default {
                 case 'others':
                     return SysCogOthers;
                 default:
-                    return SysCogUpload;
+                    return SysCogStatus;
             }
         }
     },
     methods: {
-        async fetchWithAuth(url, options = {}) {
-            // 开发环境, url 前面加上 /api
-            // url = `/api${url}`;
-            if (this.credentials) {
-                // 设置 Authorization 头
-                options.headers = {
-                    ...options.headers,
-                    'Authorization': `Basic ${this.credentials}`
-                };
-                // 确保包含凭据，如 cookies
-                options.credentials = 'include'; 
-            }
-
-            const response = await fetch(url, options);
-
-            if (response.status === 401) {
-                // Redirect to the login page if a 401 Unauthorized is returned
-                this.$message.error('认证状态错误，请重新登录');
-                this.$router.push('/adminLogin'); 
-                throw new Error('Unauthorized');
-            }
-
-            return response;
-        },
         handleLogout() {
             this.$store.commit('setCredentials', null);
             this.$router.push('/adminLogin');
         },
         // 设置默认锚点
         setDefaultHash() {
-            const defaultHash = '#upload'; // 默认锚点
+            const defaultHash = '#status'; // 默认锚点
             window.location.hash = defaultHash;
             this.activeIndex = defaultHash.replace('#', '');
         },
     },
     mounted() {
+        // 初始化背景图
+        this.initializeBackground('adminBkImg', '.container', false, true);
+
         // 如果 URL 中没有锚点，则设置默认锚点
         if (!window.location.hash) {
             this.setDefaultHash();
@@ -130,38 +115,78 @@ export default {
     color: var(--admin-container-color);
     margin: 0;
     padding: 0;
+    overflow-x: hidden;
 }
 
 .header-content {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 20px;
-    background-color: var(--admin-header-content-bg-color);
-    backdrop-filter: blur(10px);
-    border-bottom: var(--admin-header-content-border-bottom);
-    box-shadow: var(--admin-header-content-box-shadow);
-    transition: background-color 0.5s ease, box-shadow 0.5s ease;
-    border-bottom-left-radius: 10px;
-    border-bottom-right-radius: 10px;
+    padding: 10px 24px;
+    /* macOS 风格毛玻璃效果 */
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    /* 顶部边框形成玻璃边缘光泽 */
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-top: 1px solid rgba(255, 255, 255, 0.5);
+    /* 悬浮阴影效果 */
+    box-shadow: 
+        0 4px 30px rgba(0, 0, 0, 0.1),
+        0 1px 3px rgba(0, 0, 0, 0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 16px;
     position: fixed;
-    top: 0;
-    left: 50%; /* 将左边缘移动到页面中间 */
-    transform: translateX(-50%); /* 向左移动自身宽度的一半 */
-    width: 95%;
-    z-index: 1000;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(95% - 16px);
+    z-index: 2001;
     min-height: 45px;
+}
+
+/* 深色模式毛玻璃效果 */
+html.dark .header-content {
+    background: rgba(30, 30, 30, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 
+        0 4px 30px rgba(0, 0, 0, 0.3),
+        0 1px 3px rgba(0, 0, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 @media (max-width: 768px) {
     .header-content {
         flex-direction: column;
+        top: 6px;
+        width: calc(100% - 32px);
+        border-radius: 14px;
+        padding: 6px 12px;
+        gap: 4px;
+    }
+    
+    .header-icon {
+        font-size: 0.95em;
     }
 }
 
 .header-content:hover {
-    background-color: var(--admin-header-content-hover-bg-color);
-    box-shadow: var(--admin-header-content-hover-box-shadow);
+    background: rgba(255, 255, 255, 0.82);
+    box-shadow: 
+        0 8px 40px rgba(0, 0, 0, 0.12),
+        0 2px 6px rgba(0, 0, 0, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    transform: translateX(-50%) translateY(-1px);
+}
+
+html.dark .header-content:hover {
+    background: rgba(35, 35, 35, 0.85);
+    box-shadow: 
+        0 8px 40px rgba(0, 0, 0, 0.4),
+        0 2px 6px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .header-icon {
@@ -185,12 +210,25 @@ export default {
 .main-container {
   margin-top: 60px;
   transition: margin-left 0.3s ease, width 0.3s ease; /* 添加过渡效果 */
-  width: calc(100% - 200px); /* 默认宽度（侧边栏展开时） */
-  margin-left: 130px; /* 默认左边距（侧边栏展开时） */
+  width: calc(100% - 280px); /* 默认宽度（侧边栏展开时） */
+  margin-left: 170px; /* 默认左边距（侧边栏展开时） */
 }
 
 .main-container.collapsed {
-  width: calc(100% - 134px); /* 折叠时的宽度 */
-  margin-left: 64px; /* 折叠时的左边距 */
+  width: calc(100% - 150px); /* 折叠时的宽度 */
+  margin-left: 80px; /* 折叠时的左边距 */
+}
+
+/* 移动端不压缩内容，但让出折叠侧边栏宽度 */
+@media (max-width: 768px) {
+  .main-container,
+  .main-container.collapsed {
+    width: auto;
+    margin-left: 65px;
+    margin-right: 15px;
+    padding: 0;
+    min-height: calc(100vh - 60px);
+    box-sizing: border-box;
+  }
 }
 </style>

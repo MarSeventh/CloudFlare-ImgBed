@@ -1,4 +1,7 @@
 // 文件管理器工具类
+import fetchWithAuth from '@/utils/fetchWithAuth';
+import { ElMessage } from 'element-plus';
+
 class FileManager {
     constructor() {
         this.FILE_LIST_PATH = 'data/fileList.json';
@@ -131,13 +134,54 @@ class FileManager {
         }
     }
 
+    // 构建筛选参数URL
+    buildFilterParams(filters) {
+        let params = '';
+        // 访问状态筛选（综合判断）
+        if (filters.accessStatus && filters.accessStatus.length > 0) {
+            params += `&accessStatus=${encodeURIComponent(filters.accessStatus.join(','))}`;
+        }
+        // 黑白名单筛选（直接使用 ListType 字段）
+        if (filters.listType && filters.listType.length > 0) {
+            params += `&listType=${encodeURIComponent(filters.listType.join(','))}`;
+        }
+        if (filters.label && filters.label.length > 0) {
+            params += `&label=${encodeURIComponent(filters.label.join(','))}`;
+        }
+        if (filters.fileType && filters.fileType.length > 0) {
+            params += `&fileType=${encodeURIComponent(filters.fileType.join(','))}`;
+        }
+        if (filters.channel && filters.channel.length > 0) {
+            params += `&channel=${encodeURIComponent(filters.channel.join(','))}`;
+        }
+        if (filters.channelName && filters.channelName.length > 0) {
+            params += `&channelName=${encodeURIComponent(filters.channelName.join(','))}`;
+        }
+        return params;
+    }
+
     // 更新文件列表
-    async refreshFileList(fetchWithAuth, dir) {
+    async refreshFileList(dir, search = '', includeTags = '', excludeTags = '', filters = {}) {
+        search = search.trim();
         try {
-            const response = await fetchWithAuth(`/api/manage/list?count=60&dir=${dir}`, {
+            let url = `/api/manage/list?count=60&dir=${dir}&search=${encodeURIComponent(search)}`;
+            if (includeTags) {
+                url += `&includeTags=${encodeURIComponent(includeTags)}`;
+            }
+            if (excludeTags) {
+                url += `&excludeTags=${encodeURIComponent(excludeTags)}`;
+            }
+            // 添加筛选参数（支持多选）
+            url += this.buildFilterParams(filters);
+            
+            const response = await fetchWithAuth(url, {
                 method: 'GET',
             });
             const newFileList = await response.json();
+            if (!newFileList.isIndexedResponse) {
+                ElMessage.warning('索引构建中，当前搜索和排序结果可能不准确，请稍后再试。');
+            }
+            // 保存包含新字段的完整数据
             return this.saveFileList(newFileList);
         } catch (error) {
             console.error('Error refreshing file list:', error);
@@ -146,12 +190,23 @@ class FileManager {
     }
 
     // 读取更多数据
-    async loadMoreFiles(fetchWithAuth, dir) {
+    async loadMoreFiles(dir, search = '', includeTags = '', excludeTags = '', count = 60, filters = {}) {
+        search = search.trim();
         try {
             const fileList = this.getLocalFileList();
             const start = fileList.files.length;
 
-            const response = await fetchWithAuth(`/api/manage/list?dir=${dir}&start=${start}&count=60`, {
+            let url = `/api/manage/list?dir=${dir}&start=${start}&count=${count}&search=${encodeURIComponent(search)}`;
+            if (includeTags) {
+                url += `&includeTags=${encodeURIComponent(includeTags)}`;
+            }
+            if (excludeTags) {
+                url += `&excludeTags=${encodeURIComponent(excludeTags)}`;
+            }
+            // 添加筛选参数（支持多选）
+            url += this.buildFilterParams(filters);
+
+            const response = await fetchWithAuth(url, {
                 method: 'GET',
             });
            

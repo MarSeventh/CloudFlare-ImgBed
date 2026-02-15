@@ -16,7 +16,7 @@ export default {
     computed: {
         ...mapGetters(['userConfig']),
         footerLink() {
-            return this.userConfig?.footerLink || 'https://github.com/MarSeventh/CloudFlare-ImgBed'
+            return this.userConfig?.footerLink || 'https://github.com/MarSeventh'
         },
         thisYear() {
             return new Date().getFullYear()
@@ -47,9 +47,32 @@ export default {
     color: var(--page-footer-name-color);
     font-weight: bold;
     text-decoration: none;
+    position: relative;
+    transition: all 0.3s ease;
 }
+
+.footer-name::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: -2px;
+    left: 0;
+    background-color: var(--page-footer-name-color);
+    transition: width 0.3s ease-in-out;
+}
+
+.footer-name:hover::after {
+    width: 100%;
+}
+
 .footer-link-icon {
     color: var(--page-footer-name-color);
     margin-left: 5px;
+    transition: transform 0.3s ease-in-out;
+}
+
+.footer-link-icon:hover {
+    transform: scale(1.2) rotate(-12deg);
 }
 </style>

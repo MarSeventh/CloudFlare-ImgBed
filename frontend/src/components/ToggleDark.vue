@@ -3,46 +3,57 @@
       id="themeToggle"
       @click="handleToggleClick"
     >
-      <svg
-        class="theme_toggle_svg"
-        :class="{ 'dark': isDark }"
-        width="1.5em"
-        height="1.5em"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        stroke="currentColor"
-      >
-        <mask id="themeMask">
-          <rect x="0" y="0" width="100%" height="100%" fill="white"></rect>
+      <transition name="icon-fade" mode="out-in">
+        <svg
+          v-if="!isAuto"
+          key="sun-moon"
+          class="theme_toggle_svg"
+          :class="{ 'dark': isDark }"
+          width="1.5em"
+          height="1.5em"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke="currentColor"
+        >
+          <mask id="themeMask">
+            <rect x="0" y="0" width="100%" height="100%" fill="white"></rect>
+            <circle
+              class="theme_toggle_circle1"
+              fill="black"
+              :cx="isDark ? '50%' : '100%'"
+              :cy="isDark ? '23%' : '0%'"
+              :r="isDark ? '9' : '5'"
+            ></circle>
+          </mask>
           <circle
-            class="theme_toggle_circle1"
-            fill="black"
-            :cx="isDark ? '50%' : '100%'"
-            :cy="isDark ? '23%' : '0%'"
+            class="theme_toggle_circle2"
+            cx="12"
+            cy="12"
             :r="isDark ? '9' : '5'"
+            mask="url(#themeMask)"
           ></circle>
-        </mask>
-        <circle
-          class="theme_toggle_circle2"
-          cx="12"
-          cy="12"
-          :r="isDark ? '9' : '5'"
-          mask="url(#themeMask)"
-        ></circle>
-        <g class="theme_toggle_g" stroke="currentColor" :opacity="isDark ? 0 : 1">
-          <line x1="12" y1="1" x2="12" y2="3"></line>
-          <line x1="12" y1="21" x2="12" y2="23"></line>
-          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-          <line x1="1" y1="12" x2="3" y2="12"></line>
-          <line x1="21" y1="12" x2="23" y2="12"></line>
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-        </g>
-      </svg>
+          <g class="theme_toggle_g" stroke="currentColor" :opacity="isDark ? 0 : 1">
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </g>
+        </svg>
+        <font-awesome-icon 
+          v-else 
+          key="auto-mode"
+          icon="circle-half-stroke" 
+          class="auto-icon"
+          style="font-size: 1.5em; color: var(--theme-toggle-color);" 
+        />
+      </transition>
     </div>
 </template>
   
@@ -52,14 +63,29 @@ export default {
   data() {
     return {
       isDark: this.$store.getters.useDarkMode,
+      isAuto: !this.$store.getters.cusDarkMode,
     };
   },
   methods: {
     handleToggleClick() {
-      this.isDark = !this.isDark;
-      this.$store.commit('setUseDarkMode', this.isDark);
-      this.$store.commit('setCusDarkMode', true);
-    },
+      // 三种状态循环：亮色 -> 暗色 -> 跟随系统 -> 亮色
+      if (this.isAuto) {
+        // 当前是自动模式，切换到亮色
+        this.isDark = false;
+        this.isAuto = false;
+        this.$store.commit('setCusDarkMode', true);
+        this.$store.commit('setUseDarkMode', false);
+      } else if (!this.isDark) {
+        // 当前是亮色，切换到暗色
+        this.isDark = true;
+        this.$store.commit('setCusDarkMode', true);
+        this.$store.commit('setUseDarkMode', true);
+      } else {
+        // 当前是暗色，切换到跟随系统
+        this.isAuto = true;
+        this.$store.commit('setCusDarkMode', false);
+      }
+    }
   }
 };
 </script>
@@ -92,7 +118,7 @@ export default {
 
 .theme_toggle_svg {
   transition: transform 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55);
-  transform: rotate(90deg);
+  /* transform: rotate(90deg); */
   color: var(--theme-toggle-color);
 }
 .dark.theme_toggle_svg {
@@ -101,5 +127,31 @@ export default {
 
 .theme_toggle_g {
   transition: opacity 0.5s ease-in-out;
+}
+
+/* 图标切换过渡效果 */
+.icon-fade-enter-active,
+.icon-fade-leave-active {
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+}
+
+.icon-fade-enter-from {
+  opacity: 0;
+  transform: scale(0.8) rotate(-90deg);
+}
+
+.icon-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.8) rotate(90deg);
+}
+
+.icon-fade-enter-to,
+.icon-fade-leave-from {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+}
+
+.auto-icon {
+  display: inline-block;
 }
 </style>

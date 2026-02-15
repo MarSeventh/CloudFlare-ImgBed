@@ -1,12 +1,10 @@
 import { S3Client, CopyObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
-import { purgeCFCache } from "../../../utils/purgeCache";
+import { purgeCFCache, purgeRandomFileListCache, purgePublicFileListCache } from "../../../utils/purgeCache";
+import { moveFileInIndex, batchMoveFilesInIndex } from "../../../utils/indexManager.js";
+import { getDatabase } from '../../../utils/databaseAdapter.js';
 
 export async function onRequest(context) {
-    const {
-        request,
-        env,
-        params,
-    } = context;
+    const { request, env, params, waitUntil } = context;
 
     const url = new URL(request.url);
 
@@ -34,7 +32,7 @@ export async function onRequest(context) {
             while (folderQueue.length > 0) {
                 const currentFolder = folderQueue.shift();
                 const curFolderName = currentFolder.path.split('/').pop();
-                
+
                 // 获取指定目录下的所有文件
                 const listUrl = new URL(`${url.origin}/api/manage/list?count=-1&dir=${currentFolder.path}`);
                 const listRequest = new Request(listUrl, request);
@@ -53,7 +51,7 @@ export async function onRequest(context) {
 
                     const success = await moveFile(env, fileId, newFileId, cdnUrl, url);
                     if (success) {
-                        processedFiles.push(fileId);
+                        processedFiles.push({ fileId: fileId, newFileId: newFileId });
                     } else {
                         failedFiles.push(fileId);
                     }
@@ -67,6 +65,16 @@ export async function onRequest(context) {
                         dist: folderDist
                     });
                 }
+            }
+
+            // 批量从索引中删除文件，添加新文件
+            if (processedFiles.length > 0) {
+                waitUntil(batchMoveFilesInIndex(context, processedFiles.map(file => {
+                    return {
+                        originalFileId: file.fileId,
+                        newFileId: file.newFileId,
+                    };
+                })));
             }
 
             // 返回处理结果
@@ -96,6 +104,9 @@ export async function onRequest(context) {
         const success = await moveFile(env, fileId, newFileId, cdnUrl, url);
         if (!success) {
             throw new Error('Move file failed');
+        } else {
+            // 从索引中删除旧文件，并添加新文件
+            waitUntil(moveFileInIndex(context, fileId, newFileId));
         }
 
         return new Response(JSON.stringify({
@@ -114,8 +125,10 @@ export async function onRequest(context) {
 // 移动单个文件的核心函数
 async function moveFile(env, fileId, newFileId, cdnUrl, url) {
     try {
+        const db = getDatabase(env);
+
         // 读取图片信息
-        const img = await env.img_url.getWithMetadata(fileId);
+        const img = await db.getWithMetadata(fileId);
 
         // 如果是R2渠道的图片，需要移动R2中对应的图片
         if (img.metadata?.Channel === 'CloudflareR2') {
@@ -153,31 +166,22 @@ async function moveFile(env, fileId, newFileId, cdnUrl, url) {
             throw new Error('Unsupported Channel');
         }
 
-        // 更新文件夹信息
-        const folderPath = newFileId.split('/').slice(0, -1).join('/');
-        img.metadata.Folder = folderPath;
-        
+        // 更新文件夹信息，根目录为空，否则为 aaa/123/ 的格式
+        const DirectoryPath = newFileId.split('/').slice(0, -1).join('/') === '' ? '' : newFileId.split('/').slice(0, -1).join('/') + '/';
+        img.metadata.Directory = DirectoryPath;
+
         // 更新KV存储
-        await env.img_url.put(newFileId, img.value, { metadata: img.metadata });
-        await env.img_url.delete(fileId);
+        await db.put(newFileId, img.value, { metadata: img.metadata });
+        await db.delete(fileId);
 
         // 清除CDN缓存
         await purgeCFCache(env, cdnUrl);
 
-        // 清除randomFileList API缓存
-        try {
-            const cache = caches.default;
-            const nullResponse = new Response(null, {
-                headers: { 'Cache-Control': 'max-age=0' },
-            });
-            
-            const normalizedFolder = fileId.split('/').slice(0, -1).join('/');
-            const normalizedDist = newFileId.split('/').slice(0, -1).join('/');
-            await cache.put(`${url.origin}/api/randomFileList?dir=${normalizedFolder}`, nullResponse);
-            await cache.put(`${url.origin}/api/randomFileList?dir=${normalizedDist}`, nullResponse);
-        } catch (error) {
-            console.error('Failed to clear cache:', error);
-        }
+        // 清除 api/randomFileList 等API缓存
+        const normalizedFolder = fileId.split('/').slice(0, -1).join('/');
+        const normalizedDist = newFileId.split('/').slice(0, -1).join('/');
+        await purgeRandomFileListCache(url.origin, normalizedFolder, normalizedDist);
+        await purgePublicFileListCache(url.origin, normalizedFolder, normalizedDist);
 
         return true;
     } catch (e) {
@@ -195,6 +199,7 @@ async function moveS3File(img, newFileId) {
             accessKeyId: img.metadata?.S3AccessKeyId,
             secretAccessKey: img.metadata?.S3SecretAccessKey
         },
+        forcePathStyle: img.metadata?.S3PathStyle || false // 是否启用路径风格
     });
 
     const bucketName = img.metadata?.S3BucketName;

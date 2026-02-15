@@ -5,8 +5,6 @@ const { ElementPlusResolver } = require('unplugin-vue-components/resolvers');
 const CompressionPlugin = require("compression-webpack-plugin")
 
 module.exports = defineConfig({
-  outputDir: 'dist',
-  assetsDir: 'assets', // 静态资源目录
   configureWebpack: {
     plugins: [
       new CompressionPlugin(),
@@ -19,10 +17,10 @@ module.exports = defineConfig({
     ],
   },
   devServer: {
-    port: 3000, // 前端开发服务器端口
+    port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:8080', // 代理到后端开发服务器
+        target: process.env.VUE_APP_BACKEND_URL,
         changeOrigin: true,
         pathRewrite: {
           '^/api': '',

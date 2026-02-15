@@ -1,4 +1,5 @@
 import { createStore } from 'vuex'
+import axios from '@/utils/axios';
 import createPersistedState from 'vuex-persistedstate';
 
 export default createStore({
@@ -9,14 +10,17 @@ export default createStore({
     uploadMethod: 'default',
     uploadCopyUrlForm: '',
     compressConfig: {
-      customerCompress: true,
-      compressQuality: 4,
-      compressBar: 5,
-      serverCompress: true,
+      customerCompress: undefined,
+      compressQuality: undefined,
+      compressBar: undefined,
+      serverCompress: undefined,
+      convertToWebp: undefined,
     },
-    storeUploadChannel: 'telegram',
+    storeUploadChannel: '',
+    storeChannelName: null, // 指定的渠道名称，null表示从未选择，''表示用户主动清空
     storeAutoRetry: true,
-    storeUploadNameType: 'default',
+    storeUploadNameType: '',
+    uploadFolder: '',
     customUrlSettings: {
       useCustomUrl: 'false',
       customUrlPrefix: '',
@@ -25,9 +29,10 @@ export default createStore({
       useCustomUrl: 'false',
       customUrlPrefix: '',
     },
+    autoReUpload: true,
+    // 深色模式
     useDarkMode: null,
     cusDarkMode: false,
-    uploadFolder: '',
   },
   getters: {
     userConfig: state => state.userConfig,
@@ -37,15 +42,17 @@ export default createStore({
     uploadCopyUrlForm: state => state.uploadCopyUrlForm,
     compressConfig: state => state.compressConfig,
     storeUploadChannel: state => state.storeUploadChannel,
+    storeChannelName: state => state.storeChannelName,
     storeUploadNameType: state => state.storeUploadNameType,
     customUrlSettings: state => state.customUrlSettings,
     storeAutoRetry: state => state.storeAutoRetry,
     adminUrlSettings: state => state.adminUrlSettings,
-    useDarkMode: state => state.useDarkMode,
-    cusDarkMode: state => state.cusDarkMode,
     storeUploadFolder: (state) => {
       return state.uploadFolder || localStorage.getItem('uploadFolder') || ''
-    }
+    },
+    useDarkMode: state => state.useDarkMode,
+    cusDarkMode: state => state.cusDarkMode,
+    storeAutoReUpload: state => state.autoReUpload,
   },
   mutations: {
     setUserConfig(state, userConfig) {
@@ -69,6 +76,9 @@ export default createStore({
     setStoreUploadChannel(state, uploadChannel) {
       state.storeUploadChannel = uploadChannel;
     },
+    setStoreChannelName(state, channelName) {
+      state.storeChannelName = channelName;
+    },
     setStoreUploadNameType(state, storeUploadNameType) {
       state.storeUploadNameType = storeUploadNameType;
     },
@@ -90,29 +100,31 @@ export default createStore({
     setStoreUploadFolder(state, folder) {
       state.uploadFolder = folder
       localStorage.setItem('uploadFolder', folder)
+    },
+    setStoreAutoReUpload(state, autoReUpload) {
+      state.autoReUpload = autoReUpload;
     }
   },
   actions: {
     async fetchUserConfig({ commit }) {
       try {
-        const response = await fetch('/userConfig');
-        const userConfig = await response.json();
-        commit('setUserConfig', userConfig);
+        const response = await axios.get('/api/userConfig');
+        commit('setUserConfig', response.data);
       } catch (error) {
         console.log(error);
       }
     },
     async fetchBingWallPapers({ commit }) {
       try {
-        const response = await fetch('/api/bing/wallpaper');
-        const jsonResponse = await response.json();
-        const wallpapers = jsonResponse.data;
+        const response = await axios.get('/api/bing/wallpaper');
+        const wallpapers = response.data.data;
         const bingWallPapers = wallpapers.map(wallpaper => {
           return {
             url: 'https://www.bing.com' + wallpaper.url,
           };
         }
         );
+
         //预加载图片，阻塞直到图片加载完成
         await Promise.all(bingWallPapers.map(wallpaper => {
           return new Promise((resolve, reject) => {
@@ -125,15 +137,6 @@ export default createStore({
         commit('setBingWallPapers', bingWallPapers);
       } catch (error) {
         console.log(error);
-      }
-    },
-    initializeStore({ commit }) {
-      // ... existing initialization code ...
-      
-      // 初始化上传文件夹设置
-      const uploadFolder = localStorage.getItem('uploadFolder')
-      if (uploadFolder) {
-        commit('setStoreUploadFolder', uploadFolder)
       }
     }
   },

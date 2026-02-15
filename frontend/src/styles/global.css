@@ -1,191 +1,1149 @@
 /* 全局样式 */
+
+/* 自定义字体 */
+@font-face {
+    font-family: 'Righteous';
+    src: url('@/assets/fonts/Righteous.woff2') format('woff2');
+    font-display: swap;
+}
+
+/* 基础样式 */
+#app {
+    font-family: Avenir, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-align: center;
+    color: #2c3e50;
+}
+
+nav {
+    padding: 30px;
+}
+
+nav a {
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+nav a.router-link-exact-active {
+    color: #42b983;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #f8f8f8;
+}
+
+:focus-visible {
+    outline: none;
+}
+
+/* 禁用移动端点击高亮 */
+* {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+}
+
 :root {
     /* 全局 */
-    --bg-color: linear-gradient(90deg, #efe8e8 0%, #e4f8ff 100%); /* 背景颜色 */
-    --popper-bg-color: rgba(255, 255, 255, 0.8); /* el-dropdown背景 */
-    --popper-shadow: 0 0 10px 2px rgba(0, 0, 0, 0.1); /* el-dropdown阴影 */
-    --image-preview-filter: brightness(1); /* 图片预览滤镜 */
+    --bg-color: linear-gradient(90deg, #efe8e8 0%, #e4f8ff 100%);
+    /* 背景颜色 */
+    --popper-bg-color: rgba(255, 255, 255, 0.8);
+    /* el-dropdown背景 */
+    --popper-shadow: 0 0 10px 2px rgba(0, 0, 0, 0.1);
+    /* el-dropdown阴影 */
+    --image-preview-filter: brightness(1);
+    /* 图片预览滤镜 */
+    --text-bg-color: rgba(0, 0, 0, 0.1);
+    /* 文本背景颜色 */
+    --background-image-filter: brightness(1);
+    /* 背景图亮度滤镜 */
 
     /* 上传页 */
-    --upload-list-card-bg-color: rgba(255, 255, 255, 0.7); /* el-upload-list-card背景 */
-    --upload-list-card-border: 1px solid #327ecc50; /* el-upload-list-card边框 */
-    --upload-list-card-box-shadow: 1px 2px 5px 1px #327ecc50; /* el-upload-list-card阴影 */
-    --upload-list-item-border: 1px solid #a5bef7; /* el-upload-list-item边框 */
-    --upload-list-dashboard-bg-color: rgba(255, 255, 255, 0.7); /* el-upload-list-dashboard背景 */
-    --upload-list-dashboard-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); /* el-upload-list-dashboard阴影 */
-    --upload-list-file-icon-color: #327ecc; /* el-upload-list-file-icon颜色 */
+    --upload-list-card-bg-color: rgba(255, 255, 255, 0.7);
+    /* el-upload-list-card背景 */
+    --upload-list-card-border: 1px solid #327ecc50;
+    /* el-upload-list-card边框 */
+    --upload-list-card-box-shadow: 1px 2px 5px 1px #327ecc50;
+    /* el-upload-list-card阴影 */
+    --upload-list-item-border: 1px solid #a5bef7;
+    /* el-upload-list-item边框 */
+    --upload-list-dashboard-bg-color: rgba(255, 255, 255, 0.7);
+    /* el-upload-list-dashboard背景 */
+    --upload-list-dashboard-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    /* el-upload-list-dashboard阴影 */
+    --upload-list-file-icon-color: #327ecc;
+    /* el-upload-list-file-icon颜色 */
 
-    --el-upload-dragger-bg-color: rgba(255, 255, 255, 0.6); /* el-upload-dragger背景 */
-    --el-upload-dragger-border: 3px dashed #409EFF; /* el-upload-dragger边框 */
-    --el-upload-dragger-hover-box-shadow: 0 0 10px 5px #409EFF; /* el-upload-dragger悬浮阴影 */
-    --el-upload-dragger-uniform-color: #409EFF; /* el-upload-dragger统一颜色 */
+    --el-upload-dragger-bg-color: rgba(255, 255, 255, 0.6);
+    /* el-upload-dragger背景 */
+    --el-upload-dragger-border: 3px dashed #409EFF;
+    /* el-upload-dragger边框 */
+    --el-upload-dragger-border-color: #409EFF;
+    /* el-upload-dragger边框颜色 */
+    --el-upload-dragger-hover-box-shadow: 0 0 10px 5px #409EFF;
+    /* el-upload-dragger悬浮阴影 */
+    --el-upload-dragger-uniform-color: #409EFF;
+    /* el-upload-dragger统一颜色 */
 
-    --paste-card-textarea-border-color: #409EFF; /* 粘贴卡片文本框边框颜色 */
-    --paste-card-textarea-box-shadow: 0 0 6px 1px #409EFF; /* 粘贴卡片文本框阴影 */
+    --paste-card-textarea-border-color: #409EFF;
+    /* 粘贴卡片文本框边框颜色 */
+    --paste-card-textarea-box-shadow: 0 0 6px 1px #409EFF;
+    /* 粘贴卡片文本框阴影 */
 
-    --el-icon--upload-color: #1f8bf8; /* 上传图标颜色 */
-    --upload-text-color: rgba(58, 58, 58, 0.8); /* 上传页提示文字颜色 */
-    --upload-header-color:  rgba(58, 58, 58, 0.8); /* 上传页标题颜色 */
-    --upload-main-title-color: linear-gradient(to right, #a1e3cc, rgb(120, 174, 236)); /* 上传页主标题颜色 */
+    --el-icon--upload-color: #1f8bf8;
+    /* 上传图标颜色 */
+    --upload-text-color: rgba(58, 58, 58, 0.8);
+    /* 上传页提示文字颜色 */
+    --upload-header-color: rgba(58, 58, 58, 0.8);
+    /* 上传页标题颜色 */
+    --upload-main-title-color: linear-gradient(to right, #a1e3cc, rgb(120, 174, 236));
+    /* 上传页主标题颜色 */
+
+    /* 上传页现代化组件 */
+    --modern-action-group-bg: rgba(64, 158, 255, 0.08);
+    /* 操作按钮组背景 */
+    --modern-action-group-border: rgba(64, 158, 255, 0.15);
+    /* 操作按钮组边框 */
+    --logo-glow-color: #409EFF;
+    /* Logo悬停发光颜色 */
+    --modern-action-group-shadow: rgba(0, 0, 0, 0.06);
+    /* 操作按钮组阴影 */
+    --modern-action-group-hover-bg: rgba(64, 158, 255, 0.12);
+    /* 操作按钮组悬浮背景 */
+    --modern-action-group-hover-shadow: rgba(64, 158, 255, 0.15);
+    /* 操作按钮组悬浮阴影 */
+    --file-name-bg: linear-gradient(135deg, rgba(64, 158, 255, 0.08) 0%, rgba(64, 158, 255, 0.03) 100%);
+    /* 文件名背景 */
+    --file-name-border: rgba(64, 158, 255, 0.12);
+    /* 文件名边框 */
+    --file-name-hover-bg: linear-gradient(135deg, rgba(64, 158, 255, 0.12) 0%, rgba(64, 158, 255, 0.06) 100%);
+    /* 文件名悬浮背景 */
+    --file-name-hover-border: rgba(64, 158, 255, 0.2);
+    /* 文件名悬浮边框 */
+    --upload-list-item-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.7) 100%);
+    /* 上传列表项背景 */
+    --upload-list-item-border-color: rgba(64, 158, 255, 0.1);
+    /* 上传列表项边框颜色 */
+    --upload-list-item-shadow: rgba(0, 0, 0, 0.04);
+    /* 上传列表项阴影 */
+    --upload-list-item-hover-border: rgba(64, 158, 255, 0.25);
+    /* 上传列表项悬浮边框 */
+    --upload-list-item-hover-shadow: rgba(64, 158, 255, 0.12);
+    /* 上传列表项悬浮阴影 */
+    --dashboard-title-bg: linear-gradient(135deg, rgba(64, 158, 255, 0.06) 0%, transparent 100%);
+    /* 仪表盘标题背景 */
+    /* 上传页工具栏按钮 */
+    --toolbar-button-bg-color: rgba(255, 255, 255, 0.5);
+    /* 上传页工具栏按钮背景 */
+    --toolbar-button-shadow: 1px 2px 4px rgba(0, 0, 0, 0.3);
+    /* 上传页工具栏按钮阴影 */
+    --toolbar-button-shadow-hover: 1px 2px 4px rgba(0, 0, 0, 0.5);
+    /* 上传页工具栏按钮悬浮阴影 */
+    --toolbar-button-color: #327ECC;
+    /* 上传页工具栏按钮文字颜色 */
 
     /* Footer */
-    --page-footer-text-color: rgb(58, 58, 58, 0.8); /* 页脚文字颜色 */
-    --page-footer-name-color: rgba(12, 76, 105, 0.8); /* 页脚用户名颜色 */
+    --page-footer-text-color: rgb(58, 58, 58, 0.8);
+    /* 页脚文字颜色 */
+    --page-footer-name-color: rgba(12, 76, 105, 0.8);
+    /* 页脚用户名颜色 */
 
     /* 登录页 */
-    --login-container-bg-color: rgba(255, 255, 255, 0.6); /* 登录容器背景 */
-    --password-input-bg-color: rgba(255, 255, 255, 0.9); /* 密码输入框背景 */
-    --password-input-border: 1px solid #dcdfe6; /* 密码输入框边框 */
-    --login-title-color: #000000; /* 登录标题颜色 */
-    --login-container-box-shadow: 0 0 12px rgba(0, 0, 0, 0.12); /* 登录容器阴影 */
-    --login-container-hover-box-shadow: 0 0 12px 4px rgba(0, 0, 0, 0.24); /* 登录容器悬浮阴影 */
-    --login-submit-btn-bg-color: #487cb0e8; /* 登录按钮背景 */
+    --login-container-bg-color: rgba(255, 255, 255, 0.6);
+    /* 登录容器背景 */
+    --password-input-bg-color: rgba(255, 255, 255, 0.9);
+    /* 密码输入框背景 */
+    --password-input-border: 1px solid #dcdfe6;
+    /* 密码输入框边框 */
+    --login-title-color: #000000;
+    /* 登录标题颜色 */
+    --login-container-box-shadow: 0 0 12px rgba(0, 0, 0, 0.12);
+    /* 登录容器阴影 */
+    --login-container-hover-box-shadow: 0 0 12px 4px rgba(0, 0, 0, 0.24);
+    /* 登录容器悬浮阴影 */
+    --login-submit-btn-bg-color: #487cb0e8;
+    /* 登录按钮背景 */
+    --login-title-glow-color: rgba(52, 152, 219, 0.5);
+    /* 登录标题辉光颜色 */
+    --login-input-underline-color: #5b9bd3;
+    /* 登录输入框下划线颜色 */
+    --login-input-underline-secondary-color: #7ba9d8;
+    /* 登录输入框下划线次要颜色 */
+    --login-input-label-focus-color: #5b9bd3;
+    /* 登录输入框标签聚焦颜色 */
 
     /* el-dialog */
-    --dialog-bg-color: rgba(255, 255, 255, 0.7); /* el-dialog背景 */
-    --dialog-box-shadow: 0 0 10px 2px rgba(0, 0, 0, 0.1); /* el-dialog阴影 */
+    --dialog-bg-color: rgba(255, 255, 255, 0.7);
+    /* el-dialog背景 */
+    --dialog-box-shadow: 0 0 10px 2px rgba(0, 0, 0, 0.1);
+    /* el-dialog阴影 */
 
     /* el-tabs */
-    --tabs-dropdown-popper-bg-color: rgba(255, 255, 255, 0.2); /* el-tabs下拉菜单背景 */
-    --tabs-dropdown-popper-shadow: 0 0 10px 2px rgba(0, 0, 0, 0.1); /* el-tabs下拉菜单阴影 */
+    --tabs-dropdown-popper-bg-color: rgba(255, 255, 255, 0.2);
+    /* el-tabs下拉菜单背景 */
+    --tabs-dropdown-popper-shadow: 0 0 10px 2px rgba(0, 0, 0, 0.1);
+    /* el-tabs下拉菜单阴影 */
 
     /* 管理端 */
-    --admin-header-content-bg-color: rgba(255, 255, 255, 0.75); /* admin-header-content背景 */
-    --admin-header-content-hover-bg-color: rgba(255, 255, 255, 0.85); /* admin-header-content悬浮背景 */
-    --admin-header-content-border-bottom: 1px solid rgba(0, 0, 0, 0.1); /* admin-header-content底部边框 */
-    --admin-header-content-box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* admin-header-content阴影 */
-    --admin-header-content-hover-box-shadow: 0 6px 10px rgba(0, 0, 0, 0.2); /* admin-header-content悬浮阴影 */
+    --admin-header-content-bg-color: rgba(255, 255, 255, 0.75);
+    /* admin-header-content背景 */
+    --admin-header-content-hover-bg-color: rgba(255, 255, 255, 0.85);
+    /* admin-header-content悬浮背景 */
+    --admin-header-content-border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    /* admin-header-content底部边框 */
+    --admin-header-content-box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    /* admin-header-content阴影 */
+    --admin-header-content-hover-box-shadow: 0 6px 10px rgba(0, 0, 0, 0.2);
+    /* admin-header-content悬浮阴影 */
 
 
-    --admin-container-bg-color: linear-gradient(90deg, #fdf3f6 0%, #e4f8ff 100%); /* admin-container背景 */
-    --admin-container-color: #333; /* admin-container字体颜色 */
+    --admin-container-bg-color: linear-gradient(90deg, #fdf3f6 0%, #e4f8ff 100%);
+    /* admin-container背景 */
+    --admin-container-color: #333;
+    /* admin-container字体颜色 */
 
 
-    --admin-dashborad-stats-bg-color: rgba(255, 255, 255, 0.9); /* admin-dashborad-stats背景 */
-    --admin-dashborad-stats-hover-bg-color: #f0eaf8; /* admin-dashborad-stats悬浮背景 */
-    --admin-dashboard-search-card-bg-color: rgba(255, 255, 255, 0.9); /* admin-dashboard-search-card背景 */
-    --admin-dashboard-stats-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* admin-dashboard-stats阴影 */
-    --admin-dashboard-stats-hover-shadow: 0 4px 6px rgba(0, 0, 0, 0.15); /* admin-dashboard-stats悬浮阴影 */
-    --admin-dashboard-search-card-box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); /* admin-dashboard-search-card阴影 */
-    --admin-dashboard-btn-color: #000000; /* admin-dashboard翻页按钮文字颜色 */
-    --admin-dashboard-btn-bg-color: rgba(255, 255, 255, 0.3); /* admin-dashboard翻页按钮背景 */
-    --admin-dashboard-btn-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); /* admin-dashboard翻页按钮阴影 */
-    --admin-dashboard-btn-hover-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); /* admin-dashboard翻页按钮悬浮阴影 */
-    --admin-dashboard-imgcard-bg-color: rgba(255, 255, 255, 0.6); /* admin-dashboard-imgcard背景 */
-    --admin-dashboard-imgcard-shadow: 0 2px 12px rgba(0, 0, 0, 0.1); /* admin-dashboard-imgcard阴影 */
+    --admin-dashborad-stats-bg-color: rgba(255, 255, 255, 0.9);
+    /* admin-dashborad-stats背景 */
+    --admin-dashborad-stats-hover-bg-color: #f0eaf8;
+    /* admin-dashborad-stats悬浮背景 */
+    --admin-dashboard-search-card-bg-color: rgba(255, 255, 255, 0.9);
+    /* admin-dashboard-search-card背景 */
+    --admin-dashboard-stats-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    /* admin-dashboard-stats阴影 */
+    --admin-dashboard-stats-hover-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    /* admin-dashboard-stats悬浮阴影 */
+    --admin-dashboard-search-card-box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    /* admin-dashboard-search-card阴影 */
+    --admin-dashboard-btn-color: #000000;
+    /* admin-dashboard翻页按钮文字颜色 */
+    --admin-dashboard-btn-bg-color: rgba(255, 255, 255, 0.3);
+    /* admin-dashboard翻页按钮背景 */
+    --admin-dashboard-btn-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    /* admin-dashboard翻页按钮阴影 */
+    --admin-dashboard-btn-hover-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    /* admin-dashboard翻页按钮悬浮阴影 */
+    --admin-dashboard-imgcard-bg-color: rgba(255, 255, 255, 0.6);
+    /* admin-dashboard-imgcard背景 */
+    --admin-dashboard-imgcard-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+    /* admin-dashboard-imgcard阴影 */
+    --admin-dashboard-tag-suggestion-bg-color: #ffffff;
+    /* admin-dashboard tag搜索建议背景颜色 */
+    --admin-dashboard-tag-suggestion-border-color: #dcdfe6;
+    /* admin-dashboard tag搜索建议边框颜色 */
+    --admin-dashboard-tag-suggestion-box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+    /* admin-dashboard tag搜索建议阴影 */
+    --admin-dashboard-tag-suggestion-item-hover-bg-color: #f5f7fa;
+    /* admin-dashboard tag搜索建议项悬浮背景颜色 */
+
+    /* 骨架图颜色 */
+    --skeleton-bg-color: #e0e0e0;
+    /* 骨架图背景颜色 */
+    --skeleton-shimmer-color: rgba(255, 255, 255, 0.5);
+    /* 骨架图闪烁颜色 */
 
 
-    --admin-cuscfg-table-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* admin 用户管理页面 table阴影 */
-    --admin-cuscfg-table-bg-color: rgba(255, 255, 255, 0.7); /* admin 用户管理页面 table背景 */
+    --admin-cuscfg-table-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    /* admin 用户管理页面 table阴影 */
+    --admin-cuscfg-table-bg-color: rgba(255, 255, 255, 0.95);
+    /* admin 用户管理页面 table背景 */
 
-    --admin-syscfg-tabs-border-color: #3c3c3c4c; /* admin 系统配置页面 tabs边框颜色 */
+    --admin-syscfg-tabs-border-color: #3c3c3c4c;
+    /* admin 系统配置页面 tabs边框颜色 */
 
 
-    --admin-purple: #B39DDB;; /* 管理端全局紫色 */
+    --admin-purple: #B39DDB;
+    ;
+    /* 管理端全局紫色 */
 
     /* 主题切换按钮 */
-    --theme-toggle-color: #327ECC; /* 主题切换按钮颜色 */
-    --theme-toggle-bg-color: #327ECC; /* 主题切换按钮背景 */
-    --admin-theme-toggle-color: #000000; /* 管理端主题切换按钮颜色 */
-    --admin-theme-toggle-bg-color: #000000; /* 管理端主题切换按钮背景 */
+    --theme-toggle-color: #327ECC;
+    /* 主题切换按钮颜色 */
+    --theme-toggle-bg-color: #327ECC;
+    /* 主题切换按钮背景 */
+    --admin-theme-toggle-color: #000000;
+    /* 管理端主题切换按钮颜色 */
+    --admin-theme-toggle-bg-color: #000000;
+    /* 管理端主题切换按钮背景 */
 
-    /* 上传页工具栏按钮 */
-    --toolbar-button-bg-color: rgba(255, 255, 255, 0.5); /* 上传页工具栏按钮背景 */
-    --toolbar-button-shadow: 1px 2px 4px rgba(0, 0, 0, 0.3); /* 上传页工具栏按钮阴影 */
-    --toolbar-button-color: #327ECC; /* 上传页工具栏按钮文字颜色 */
+    /* 404 页面 */
+    --not-found-title-text-color: linear-gradient(to right, #6b9788, rgb(98, 133, 172));
+
+    /* 悬浮保存按钮 */
+    --floating-btn-bg: linear-gradient(135deg, #409EFF, #66b1ff);
+    --floating-btn-color: #ffffff;
+    --floating-btn-shadow: 0 4px 16px rgba(64, 158, 255, 0.4);
+    --floating-btn-shadow-hover: 0 8px 24px rgba(64, 158, 255, 0.5);
+    --floating-btn-right: 32px;
+    --floating-btn-bottom: 32px;
+
+    /* 玻璃效果卡片 */
+    --glass-bg: rgba(255, 255, 255, 0.45);
+    --glass-bg-hover: rgba(255, 255, 255, 0.55);
+    --glass-border: rgba(255, 255, 255, 0.5);
+    --glass-border-hover: rgba(255, 255, 255, 0.6);
+    --glass-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    --glass-shadow-hover: 0 6px 16px rgba(0, 0, 0, 0.1);
+    --glass-header-bg: rgba(255, 255, 255, 0.3);
+    --glass-header-border: rgba(255, 255, 255, 0.4);
 }
 
 /* 暗黑模式 */
 .dark {
     /* 全局 */
-    --bg-color: linear-gradient(90deg, #1c1c1c 0%, #000000 100%); /* 背景颜色 */
-    --popper-bg-color: rgba(0, 0, 0, 0.8); /* el-dropdown背景 */
-    --popper-shadow: 0 0 10px 2px rgba(255, 255, 255, 0.1); /* el-dropdown阴影 */
-    --image-preview-filter: brightness(0.8); /* 图片预览滤镜 */
+    --bg-color: linear-gradient(90deg, #1c1c1c 0%, #000000 100%);
+    /* 背景颜色 */
+    --popper-bg-color: rgba(0, 0, 0, 0.8);
+    /* el-dropdown背景 */
+    --popper-shadow: 0 0 10px 2px rgba(255, 255, 255, 0.1);
+    /* el-dropdown阴影 */
+    --image-preview-filter: brightness(0.8);
+    /* 图片预览滤镜 */
+    --text-bg-color: rgba(255, 255, 255, 0.1);
+    /* 文本背景颜色 */
+    --background-image-filter: brightness(0.6);
+    /* 背景图亮度滤镜 */
 
     /* 上传页 */
-    --upload-list-card-bg-color: rgba(0, 0, 0, 0.7); /* el-upload-list-card背景 */
-    --upload-list-card-border: 1px solid #8fadc8; /* el-upload-list-card边框 */
-    --upload-list-card-box-shadow: -1px 2px 4px #c1ddf5ae; /* el-upload-list-card阴影 */
-    --upload-list-item-border: 1px solid #8fadc8; /* el-upload-list-item边框 */
-    --upload-list-dashboard-bg-color: rgba(0, 0, 0, 0.7); /* el-upload-list-dashboard背景 */
-    --upload-list-dashboard-shadow: 0 2px 10px rgba(255, 255, 255, 0.1); /* el-upload-list-dashboard阴影 */
-    --upload-list-file-icon-color: #8fadc8; /* el-upload-list-file-icon颜色 */
+    --upload-list-card-bg-color: rgba(0, 0, 0, 0.7);
+    /* el-upload-list-card背景 */
+    --upload-list-card-border: 1px solid #8fadc8;
+    /* el-upload-list-card边框 */
+    --upload-list-card-box-shadow: -1px 2px 4px #c1ddf5ae;
+    /* el-upload-list-card阴影 */
+    --upload-list-item-border: 1px solid #8fadc8;
+    /* el-upload-list-item边框 */
+    --upload-list-dashboard-bg-color: rgba(0, 0, 0, 0.7);
+    /* el-upload-list-dashboard背景 */
+    --upload-list-dashboard-shadow: 0 2px 10px rgba(255, 255, 255, 0.1);
+    /* el-upload-list-dashboard阴影 */
+    --upload-list-file-icon-color: #8fadc8;
+    /* el-upload-list-file-icon颜色 */
 
-    --el-upload-dragger-bg-color: rgba(0, 0, 0, 0.6); /* el-upload-dragger背景 */
-    --el-upload-dragger-border: 3px dashed #8fadc8; /* el-upload-dragger边框 */
-    --el-upload-dragger-hover-box-shadow: 0 0 10px 5px #8fadc8; /* el-upload-dragger悬浮阴影 */
-    --el-upload-dragger-uniform-color: #8fadc8; /* el-upload-dragger统一颜色 */
-
-
-    --paste-card-textarea-border-color: #8fadc8; /* 粘贴卡片文本框边框颜色 */
-    --paste-card-textarea-box-shadow: 0 0 6px 1px #8fadc8; /* 粘贴卡片文本框阴影 */
-
-    --el-icon--upload-color: blanchedalmond; /* 上传图标颜色 */
-    --upload-text-color: antiquewhite; /* 上传页提示文字颜色 */
-    --upload-header-color: blanchedalmond; /* 上传页标题颜色 */
-    --upload-main-title-color: linear-gradient(to right, rgb(239, 250, 195), #f3a060); /* 上传页主标题颜色 */
-
-    /* Footer */
-    --page-footer-text-color: aliceblue; /* 页脚文字颜色 */
-    --page-footer-name-color: antiquewhite; /* 页脚用户名颜色 */
-
-    /* 登录页 */
-    --login-container-bg-color: rgba(0, 0, 0, 0.6); /* 登录容器背景 */
-    --password-input-bg-color: rgba(77, 77, 77, 0.8); /* 密码输入框背景 */
-    --password-input-border: 1px solid #919191; /* 密码输入框边框 */
-    --login-title-color: aliceblue; /* 登录标题颜色 */
-    --login-container-box-shadow: -3px 2px 12px rgba(255, 255, 255, 0.12); /* 登录容器阴影 */
-    --login-container-hover-box-shadow: -3px 2px 12px 4px rgba(255, 255, 255, 0.24); /* 登录容器悬浮阴影 */
-    --login-submit-btn-bg-color: #8fadc8b4; /* 登录按钮背景 */
-
-    /* el-dialog */
-    --dialog-bg-color: rgba(0, 0, 0, 0.8); /* el-dialog背景 */
-    --dialog-box-shadow: 0 0 10px 2px rgba(255, 255, 255, 0.1); /* el-dialog阴影 */
-
-    /* el-tabs */
-    --tabs-dropdown-popper-bg-color: rgba(0, 0, 0, 0.2); /* el-tabs下拉菜单背景 */
-    --tabs-dropdown-popper-shadow: 0 0 10px 2px rgba(255, 255, 255, 0.1); /* el-tabs下拉菜单阴影 */
-
-    /* 管理端 */
-    --admin-header-content-bg-color: rgba(0, 0, 0, 0.75); /* admin-header-content背景 */
-    --admin-header-content-hover-bg-color: rgba(0, 0, 0, 0.85); /* admin-header-content悬浮背景 */
-    --admin-header-content-border-bottom: 1px solid rgba(255, 255, 255, 0.1); /* admin-header-content底部边框 */
-    --admin-header-content-box-shadow: 0 4px 6px rgba(255, 255, 255, 0.1); /* admin-header-content阴影 */
-    --admin-header-content-hover-box-shadow: 0 6px 10px rgba(255, 255, 255, 0.2); /* admin-header-content悬浮阴影 */
+    --el-upload-dragger-bg-color: rgba(0, 0, 0, 0.6);
+    /* el-upload-dragger背景 */
+    --el-upload-dragger-border: 3px dashed #8fadc8;
+    /* el-upload-dragger边框 */
+    --el-upload-dragger-border-color: #8fadc8;
+    /* el-upload-dragger边框颜色 */
+    --el-upload-dragger-hover-box-shadow: 0 0 10px 5px #8fadc8;
+    /* el-upload-dragger悬浮阴影 */
+    --el-upload-dragger-uniform-color: #8fadc8;
+    /* el-upload-dragger统一颜色 */
 
 
-    --admin-container-bg-color: linear-gradient(90deg, #464545 0%, #2d2d2d 100%); /* admin-container背景 */
-    --admin-container-color: #f0f0f0; /* admin-container字体颜色 */
+    --paste-card-textarea-border-color: #8fadc8;
+    /* 粘贴卡片文本框边框颜色 */
+    --paste-card-textarea-box-shadow: 0 0 6px 1px #8fadc8;
+    /* 粘贴卡片文本框阴影 */
 
-
-    --admin-dashborad-stats-bg-color: rgba(0, 0, 0, 0.9); /* admin-dashborad-stats背景 */
-    --admin-dashborad-stats-hover-bg-color: #1e1e1e; /* admin-dashborad-stats悬浮背景 */
-    --admin-dashboard-stats-shadow: 0 2px 4px rgba(255, 255, 255, 0.1); /* admin-dashboard-stats阴影 */
-    --admin-dashboard-stats-hover-shadow: 0 4px 6px rgba(255, 255, 255, 0.15); /* admin-dashboard-stats悬浮阴影 */
-    --admin-dashboard-search-card-bg-color: rgba(0, 0, 0, 0.9); /* admin-dashboard-search-card背景 */
-    --admin-dashboard-search-card-box-shadow: 0 2px 6px rgba(255, 255, 255, 0.1); /* admin-dashboard-search-card阴影 */
-    --admin-dashboard-btn-color: #f0f0f0; /* admin-dashboard翻页按钮文字颜色 */
-    --admin-dashboard-btn-bg-color: rgba(0, 0, 0, 0.3); /* admin-dashboard翻页按钮背景 */
-    --admin-dashboard-btn-shadow: 0 2px 4px rgba(255, 255, 255, 0.3); /* admin-dashboard翻页按钮阴影 */
-    --admin-dashboard-btn-hover-shadow: 0 4px 6px rgba(255, 255, 255, 0.3); /* admin-dashboard翻页按钮悬浮阴影 */
-    --admin-dashboard-imgcard-bg-color: rgba(0, 0, 0, 0.6); /* admin-dashboard-imgcard背景 */
-    --admin-dashboard-imgcard-shadow: 0 2px 12px rgba(255, 255, 255, 0.1); /* admin-dashboard-imgcard阴影 */
-
-
-    --admin-cuscfg-table-shadow: 0 4px 6px rgba(255, 255, 255, 0.1); /* admin 用户管理页面 table阴影 */
-    --admin-cuscfg-table-bg-color: rgba(0, 0, 0, 0.7); /* admin 用户管理页面 table背景 */
-
-    --admin-syscfg-tabs-border-color: #cfcccc47; /* admin 系统配置页面 tabs边框颜色 */
-
-    /* 主题切换按钮 */
-    --theme-toggle-color: #bedefd; /* 主题切换按钮颜色 */
-    --theme-toggle-bg-color: #bedefd; /* 主题切换按钮背景 */
-    --admin-theme-toggle-color: #ffffff; /* 管理端主题切换按钮颜色 */
-    --admin-theme-toggle-bg-color: #fcfcfc; /* 管理端主题切换按钮背景 */
+    --el-icon--upload-color: blanchedalmond;
+    /* 上传图标颜色 */
+    --upload-text-color: antiquewhite;
+    /* 上传页提示文字颜色 */
+    --upload-header-color: blanchedalmond;
+    /* 上传页标题颜色 */
+    --upload-main-title-color: linear-gradient(to right, rgb(239, 250, 195), #f3a060);
+    /* 上传页主标题颜色 */
 
     /* 上传页工具栏按钮 */
-    --toolbar-button-bg-color: rgba(0, 0, 0, 0.7); /* 上传页工具栏按钮背景 */
-    --toolbar-button-shadow: -1px 2px 4px rgba(255, 255, 255, 0.3); /* 上传页工具栏按钮阴影 */
-    --toolbar-button-color: #bedefd; /* 上传页工具栏按钮文字颜色 */
+    --toolbar-button-bg-color: rgba(0, 0, 0, 0.7);
+    /* 上传页工具栏按钮背景 */
+    --toolbar-button-shadow: -1px 2px 4px rgba(255, 255, 255, 0.3);
+    /* 上传页工具栏按钮阴影 */
+    --toolbar-button-shadow-hover: -1px 2px 4px rgba(255, 255, 255, 0.5);
+    /* 上传页工具栏按钮悬浮阴影 */
+    --toolbar-button-color: #bedefd;
+    /* 上传页工具栏按钮文字颜色 */
+
+    /* 上传页现代化组件 */
+    --modern-action-group-bg: rgba(64, 158, 255, 0.12);
+    /* 操作按钮组背景 */
+    --modern-action-group-border: rgba(64, 158, 255, 0.2);
+    /* 操作按钮组边框 */
+    --logo-glow-color: #8fadc8;
+    /* Logo悬停发光颜色 */
+    --modern-action-group-shadow: rgba(0, 0, 0, 0.2);
+    /* 操作按钮组阴影 */
+    --modern-action-group-hover-bg: rgba(64, 158, 255, 0.18);
+    /* 操作按钮组悬浮背景 */
+    --modern-action-group-hover-shadow: rgba(64, 158, 255, 0.25);
+    /* 操作按钮组悬浮阴影 */
+    --file-name-bg: linear-gradient(135deg, rgba(64, 158, 255, 0.12) 0%, rgba(64, 158, 255, 0.05) 100%);
+    /* 文件名背景 */
+    --file-name-border: rgba(64, 158, 255, 0.18);
+    /* 文件名边框 */
+    --file-name-hover-bg: linear-gradient(135deg, rgba(64, 158, 255, 0.18) 0%, rgba(64, 158, 255, 0.08) 100%);
+    /* 文件名悬浮背景 */
+    --file-name-hover-border: rgba(64, 158, 255, 0.3);
+    /* 文件名悬浮边框 */
+    --upload-list-item-bg: linear-gradient(135deg, rgba(30, 30, 30, 0.9) 0%, rgba(40, 40, 40, 0.7) 100%);
+    /* 上传列表项背景 */
+    --upload-list-item-border-color: rgba(64, 158, 255, 0.15);
+    /* 上传列表项边框颜色 */
+    --upload-list-item-shadow: rgba(0, 0, 0, 0.15);
+    /* 上传列表项阴影 */
+    --upload-list-item-hover-border: rgba(64, 158, 255, 0.35);
+    /* 上传列表项悬浮边框 */
+    --upload-list-item-hover-shadow: rgba(64, 158, 255, 0.2);
+    /* 上传列表项悬浮阴影 */
+    --dashboard-title-bg: linear-gradient(135deg, rgba(64, 158, 255, 0.1) 0%, transparent 100%);
+    /* 仪表盘标题背景 */
+
+    /* Footer */
+    --page-footer-text-color: aliceblue;
+    /* 页脚文字颜色 */
+    --page-footer-name-color: antiquewhite;
+    /* 页脚用户名颜色 */
+
+    /* 登录页 */
+    --login-container-bg-color: rgba(0, 0, 0, 0.6);
+    /* 登录容器背景 */
+    --password-input-bg-color: rgba(77, 77, 77, 0.8);
+    /* 密码输入框背景 */
+    --password-input-border: 1px solid #919191;
+    /* 密码输入框边框 */
+    --login-title-color: aliceblue;
+    /* 登录标题颜色 */
+    --login-container-box-shadow: -3px 2px 12px rgba(255, 255, 255, 0.12);
+    /* 登录容器阴影 */
+    --login-container-hover-box-shadow: -3px 2px 12px 4px rgba(255, 255, 255, 0.24);
+    /* 登录容器悬浮阴影 */
+    --login-submit-btn-bg-color: #8fadc8b4;
+    /* 登录按钮背景 */
+    --login-title-glow-color: rgba(143, 173, 200, 0.7);
+    /* 登录标题辉光颜色 */
+    --login-input-underline-color: #a3c5e5;
+    /* 登录输入框下划线颜色 */
+    --login-input-underline-secondary-color: #b8d0e8;
+    /* 登录输入框下划线次要颜色 */
+    --login-input-label-focus-color: #a3c5e5;
+    /* 登录输入框标签聚焦颜色 */
+
+    /* el-dialog */
+    --dialog-bg-color: rgba(0, 0, 0, 0.8);
+    /* el-dialog背景 */
+    --dialog-box-shadow: 0 0 10px 2px rgba(255, 255, 255, 0.1);
+    /* el-dialog阴影 */
+
+    /* el-tabs */
+    --tabs-dropdown-popper-bg-color: rgba(0, 0, 0, 0.2);
+    /* el-tabs下拉菜单背景 */
+    --tabs-dropdown-popper-shadow: 0 0 10px 2px rgba(255, 255, 255, 0.1);
+    /* el-tabs下拉菜单阴影 */
+
+    /* 管理端 */
+    --admin-header-content-bg-color: rgba(0, 0, 0, 0.75);
+    /* admin-header-content背景 */
+    --admin-header-content-hover-bg-color: rgba(0, 0, 0, 0.85);
+    /* admin-header-content悬浮背景 */
+    --admin-header-content-border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    /* admin-header-content底部边框 */
+    --admin-header-content-box-shadow: 0 4px 6px rgba(255, 255, 255, 0.1);
+    /* admin-header-content阴影 */
+    --admin-header-content-hover-box-shadow: 0 6px 10px rgba(255, 255, 255, 0.2);
+    /* admin-header-content悬浮阴影 */
+
+
+    --admin-container-bg-color: linear-gradient(90deg, #464545 0%, #2d2d2d 100%);
+    /* admin-container背景 */
+    --admin-container-color: #f0f0f0;
+    /* admin-container字体颜色 */
+
+
+    --admin-dashborad-stats-bg-color: rgba(0, 0, 0, 0.9);
+    /* admin-dashborad-stats背景 */
+    --admin-dashborad-stats-hover-bg-color: #1e1e1e;
+    /* admin-dashborad-stats悬浮背景 */
+    --admin-dashboard-stats-shadow: 0 2px 4px rgba(255, 255, 255, 0.1);
+    /* admin-dashboard-stats阴影 */
+    --admin-dashboard-stats-hover-shadow: 0 4px 6px rgba(255, 255, 255, 0.15);
+    /* admin-dashboard-stats悬浮阴影 */
+    --admin-dashboard-search-card-bg-color: rgba(0, 0, 0, 0.9);
+    /* admin-dashboard-search-card背景 */
+    --admin-dashboard-search-card-box-shadow: 0 2px 6px rgba(255, 255, 255, 0.1);
+    /* admin-dashboard-search-card阴影 */
+    --admin-dashboard-btn-color: #f0f0f0;
+    /* admin-dashboard翻页按钮文字颜色 */
+    --admin-dashboard-btn-bg-color: rgba(0, 0, 0, 0.3);
+    /* admin-dashboard翻页按钮背景 */
+    --admin-dashboard-btn-shadow: 0 2px 4px rgba(255, 255, 255, 0.3);
+    /* admin-dashboard翻页按钮阴影 */
+    --admin-dashboard-btn-hover-shadow: 0 4px 6px rgba(255, 255, 255, 0.3);
+    /* admin-dashboard翻页按钮悬浮阴影 */
+    --admin-dashboard-imgcard-bg-color: rgba(0, 0, 0, 0.6);
+    /* admin-dashboard-imgcard背景 */
+    --admin-dashboard-imgcard-shadow: 0 2px 12px rgba(255, 255, 255, 0.1);
+    /* admin-dashboard-imgcard阴影 */
+    --admin-dashboard-tag-suggestion-bg-color: #2d2d2d;
+    /* admin-dashboard tag搜索建议背景颜色 */
+    --admin-dashboard-tag-suggestion-border-color: #555555;
+    /* admin-dashboard tag搜索建议边框颜色 */
+    --admin-dashboard-tag-suggestion-box-shadow: 0 2px 12px rgba(255, 255, 255, 0.1);
+    /* admin-dashboard tag搜索建议阴影 */
+    --admin-dashboard-tag-suggestion-item-hover-bg-color: #3a3a3a;
+    /* admin-dashboard tag搜索建议项悬浮背景颜色 */
+
+    /* 骨架图颜色 */
+    --skeleton-bg-color: #3a3a3a;
+    /* 骨架图背景颜色 */
+    --skeleton-shimmer-color: rgba(255, 255, 255, 0.15);
+    /* 骨架图闪烁颜色 */
+
+
+    --admin-cuscfg-table-shadow: 0 4px 6px rgba(0, 0, 0, 0.3), 0 0 1px 1px rgba(255, 255, 255, 0.05);
+    /* admin 用户管理页面 table阴影 */
+    --admin-cuscfg-table-bg-color: rgba(45, 45, 45, 0.95);
+    /* admin 用户管理页面 table背景 */
+
+    --admin-syscfg-tabs-border-color: #cfcccc47;
+    /* admin 系统配置页面 tabs边框颜色 */
+
+    /* 主题切换按钮 */
+    --theme-toggle-color: #bedefd;
+    /* 主题切换按钮颜色 */
+    --theme-toggle-bg-color: #bedefd;
+    /* 主题切换按钮背景 */
+    --admin-theme-toggle-color: #ffffff;
+    /* 管理端主题切换按钮颜色 */
+    --admin-theme-toggle-bg-color: #fcfcfc;
+    /* 管理端主题切换按钮背景 */
+
+    /* 404 页面 */
+    --not-found-title-text-color: linear-gradient(to right, rgb(239, 250, 195), #f3a060);
+    /* 404 页面标题颜色 */
+
+    /* 悬浮保存按钮 */
+    --floating-btn-bg: linear-gradient(135deg, #409EFF, #2d8cf0);
+    --floating-btn-color: #ffffff;
+    --floating-btn-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    --floating-btn-shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.5);
+
+    /* 玻璃效果卡片 */
+    --glass-bg: rgba(30, 30, 30, 0.6);
+    --glass-bg-hover: rgba(40, 40, 40, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-border-hover: rgba(255, 255, 255, 0.15);
+    --glass-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    --glass-shadow-hover: 0 6px 16px rgba(0, 0, 0, 0.3);
+    --glass-header-bg: rgba(255, 255, 255, 0.03);
+    --glass-header-border: rgba(255, 255, 255, 0.08);
+}
+
+/* ==============================
+   Element Plus 消息提示美化
+   ============================== */
+.el-message {
+    border-radius: 50px !important;
+    /* 胶囊形状 */
+    border: none !important;
+    padding: 10px 30px !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    background-color: rgba(40, 40, 40, 0.85) !important;
+    /* 亮色模式下使用深色背景（高对比度） */
+    min-width: unset !important;
+    /* 允许自适应内容宽度 */
+    top: 30px !important;
+}
+
+.el-message .el-message__icon {
+    font-size: 18px !important;
+    color: #fff !important;
+    /* 白色图标 */
+}
+
+.el-message .el-message__content {
+    font-size: 16px !important;
+    font-weight: 500 !important;
+    color: #fff !important;
+    /* 白色文字 */
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    letter-spacing: 0.5px;
+}
+
+/* 不同类型消息的图标颜色 */
+.el-message--success .el-message__icon {
+    color: #67c23a !important;
+}
+
+.el-message--warning .el-message__icon {
+    color: #e6a23c !important;
+}
+
+.el-message--error .el-message__icon {
+    color: #f56c6c !important;
+}
+
+/* 暗色模式下使用浅色背景与深色页面形成对比 */
+.dark .el-message {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+    /* 暗色模式下的毛玻璃效果 */
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    /* 细微边框 */
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* ==============================
+   弹窗现代化样式
+   ============================== */
+
+/* 弹窗区块样式 */
+.dialog-section {
+    margin-bottom: 24px;
+    background: var(--el-fill-color-lighter);
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid var(--el-border-color-lighter);
+}
+
+/* 区块标题 */
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+.section-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--el-text-color-primary);
+}
+
+/* 区块帮助图标 */
+.section-help-icon {
+    color: var(--el-text-color-secondary);
+    cursor: pointer;
+    font-size: 14px;
+    transition: color 0.2s;
+}
+
+.section-help-icon:hover {
+    color: var(--el-color-primary);
+}
+
+/* 区块内容 */
+.section-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* ==============================
+   卡片式单选组样式
+   ============================== */
+.radio-card-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+/* 单选卡片基础样式 */
+.radio-card-group .radio-card {
+    margin-right: 0;
+    padding: 10px 16px;
+    border-radius: 8px;
+    background: var(--el-bg-color);
+    border: 1px solid var(--el-border-color-lighter);
+    transition: all 0.2s ease;
+}
+
+/* 单选卡片悬浮效果 */
+.radio-card-group .radio-card:hover {
+    border-color: var(--el-color-primary-light-5);
+}
+
+/* 单选卡片选中状态 */
+.radio-card-group .radio-card.is-checked {
+    background: linear-gradient(135deg, rgba(64, 158, 255, 0.1) 0%, rgba(56, 189, 248, 0.05) 100%);
+    border-color: var(--el-color-primary);
+}
+
+/* 隐藏原生单选按钮 */
+.radio-card-group .el-radio__input {
+    display: none;
+}
+
+/* 单选标签样式 */
+.radio-card-group .el-radio__label {
+    padding-left: 0;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ==============================
+   设置项布局样式
+   ============================== */
+.setting-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--el-bg-color);
+    border-radius: 8px;
+    border: 1px solid var(--el-border-color-lighter);
+}
+
+/* 设置项标签 */
+.setting-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--el-text-color-primary);
+}
+
+/* 设置项输入框 */
+.setting-input {
+    width: 60%;
+    max-width: 250px;
+}
+
+/* 弹窗底部按钮 */
+.dialog-action {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 16px;
+}
+
+.confirm-btn {
+    min-width: 100px;
+    border-radius: 8px;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+
+    /* 移动端 el-message 样式 */
+    .el-message {
+        padding: 8px 18px !important;
+        border-radius: 30px !important;
+    }
+
+    .el-message .el-message__icon {
+        font-size: 14px !important;
+    }
+
+    .el-message .el-message__content {
+        font-size: 13px !important;
+    }
+
+    /* 弹窗区块移动端样式 */
+    .dialog-section {
+        padding: 12px;
+    }
+
+    /* 单选组移动端样式 */
+    .radio-card-group {
+        flex-direction: column;
+    }
+
+    .radio-card-group .radio-card {
+        width: 100%;
+        text-align: center;
+    }
+
+    /* 设置项移动端样式 */
+    .setting-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .setting-item .radio-card-group.compact {
+        width: 100%;
+    }
+
+    .setting-input {
+        width: 100%;
+        max-width: none;
+    }
+
+    /* 紧凑型单选组移动端样式 - 两列网格 */
+    .radio-card-group.compact {
+        flex-direction: row;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+        width: 100%;
+    }
+
+    .radio-card-group.compact .radio-card {
+        width: 100%;
+        box-sizing: border-box;
+        justify-content: center;
+        flex: 1;
+    }
+
+    .radio-card-group.compact .radio-card .el-radio__label {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+    }
+
+    .radio-card-group.compact .channel-icon {
+        width: 16px;
+        text-align: center;
+        flex-shrink: 0;
+    }
+}
+
+/* 滑动条样式（压缩阈值等） */
+.slider-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.slider-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+
+.slider-wrapper .el-slider {
+    flex: 1;
+    min-width: 0;
+}
+
+.slider-input {
+    width: 80px !important;
+    flex-shrink: 0;
+}
+
+.slider-input .el-input__wrapper {
+    padding: 0 8px;
+}
+
+.slider-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.slider-unit {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--el-text-color-secondary);
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+    .slider-wrapper {
+        gap: 8px;
+        width: 100%;
+    }
+
+    .slider-input {
+        width: 80px !important;
+    }
+
+    .setting-input {
+        width: 100% !important;
+        max-width: none !important;
+    }
+
+    .dialog-section {
+        overflow: hidden;
+    }
+
+    /* 移动端网格布局调整 */
+    .radio-card-group.grid-2x2 {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+
+    .radio-card-group.grid-2x2 .radio-card {
+        padding: 10px 12px;
+        font-size: 13px;
+        justify-content: center;
+    }
+}
+
+/* 行内帮助图标 */
+.inline-help-icon {
+    color: var(--el-text-color-secondary);
+    cursor: pointer;
+    font-size: 13px;
+    margin-left: 6px;
+    transition: color 0.2s;
+}
+
+.inline-help-icon:hover {
+    color: var(--el-color-primary);
+}
+
+/* 紧凑型单选组样式 */
+.radio-card-group.compact {
+    gap: 8px;
+}
+
+.radio-card-group.compact .radio-card {
+    padding: 8px 12px;
+    font-size: 13px;
+}
+
+.radio-card-group.compact .radio-card .el-radio__label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* 渠道图标样式 */
+.radio-card-group.compact .channel-icon {
+    width: 16px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+/* 2x2 网格布局单选组 */
+.radio-card-group.grid-2x2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+.radio-card-group.grid-2x2 .radio-card {
+    width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@media (min-width: 769px) {
+    .radio-card-group.grid-2x2 .radio-card {
+        justify-content: flex-start;
+        padding-left: 20px;
+    }
+}
+
+/* 单选按钮图标 */
+.radio-icon {
+    font-size: 14px;
+    opacity: 0.8;
+    width: 20px;
+    text-align: center;
+    display: inline-block;
+}
+
+.radio-card.is-checked .radio-icon {
+    opacity: 1;
+}
+
+/* ==============================
+   全局弹窗和消息框毛玻璃效果
+   ============================== */
+.el-dialog,
+.el-message-box {
+    border-radius: 16px !important;
+    overflow: hidden;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2) !important;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    background-color: rgba(255, 255, 255, 0.85) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+/* 弹窗头部样式 */
+.el-dialog__header,
+.el-message-box__header {
+    border-bottom: none;
+    padding: 16px 20px !important;
+    margin-right: 0 !important;
+    position: relative;
+}
+
+/* 美化分割线 - Dialog 居中标题 */
+.el-dialog__header::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 20px;
+    right: 20px;
+    height: 1px;
+    background: linear-gradient(90deg, 
+        transparent, 
+        rgba(156, 163, 175, 0.5) 20%, 
+        rgba(156, 163, 175, 0.8) 50%, 
+        rgba(156, 163, 175, 0.5) 80%, 
+        transparent);
+}
+
+/* 美化分割线 - MessageBox 左侧标题 */
+.el-message-box__header::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 20px;
+    right: 20px;
+    height: 1px;
+    background: linear-gradient(90deg, 
+        rgba(156, 163, 175, 0.8), 
+        rgba(156, 163, 175, 0.5) 30%, 
+        transparent 80%);
+}
+
+/* 弹窗内容区域样式 */
+.el-dialog__body,
+.el-message-box__content {
+    padding: 20px !important;
+}
+
+/* 弹窗底部样式 */
+.el-dialog__footer,
+.el-message-box__btns {
+    border-top: none;
+    padding: 12px 20px !important;
+    background-color: transparent;
+}
+
+/* ==============================
+   暗色模式弹窗样式覆盖
+   ============================== */
+.dark .el-dialog,
+.dark .el-message-box {
+    background-color: rgba(30, 30, 30, 0.75) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5) !important;
+}
+
+.dark .el-dialog__header,
+.dark .el-message-box__header {
+    border-bottom: none;
+}
+
+/* 暗色模式分割线 - Dialog */
+.dark .el-dialog__header::after {
+    background: linear-gradient(90deg, 
+        transparent, 
+        rgba(156, 163, 175, 0.3) 20%, 
+        rgba(156, 163, 175, 0.5) 50%, 
+        rgba(156, 163, 175, 0.3) 80%, 
+        transparent);
+}
+
+/* 暗色模式分割线 - MessageBox */
+.dark .el-message-box__header::after {
+    background: linear-gradient(90deg, 
+        rgba(156, 163, 175, 0.5), 
+        rgba(156, 163, 175, 0.3) 30%, 
+        transparent 80%);
+}
+
+.dark .el-dialog__footer,
+.dark .el-message-box__btns {
+    border-top: none;
+    background-color: transparent;
+}
+
+.dark .el-dialog__title,
+.dark .el-message-box__title {
+    color: #e5eaf3;
+}
+
+.dark .el-message-box__content {
+    color: #cfd3dc;
+}
+
+/* 加载动画样式 */
+.el-loading-mask {
+    border-radius: 12px;
+}
+
+/* ==============================
+   下拉菜单样式
+   ============================== */
+.el-dropdown__popper.el-popper {
+    border-radius: 12px;
+    border: none;
+    background-color: var(--popper-bg-color);
+    backdrop-filter: blur(10px);
+    box-shadow: var(--popper-shadow);
+}
+
+.el-dropdown__popper.el-popper .el-dropdown-menu {
+    background: none;
+    border: none;
+}
+
+.el-dropdown__popper.el-popper .el-dropdown-menu__item {
+    border: none;
+    background: none;
+}
+
+.el-popper.is-light>.el-popper__arrow::before {
+    background: none !important;
+    border: none !important;
+}
+
+/* ==============================
+   OverlayScrollbars 悬浮滚动条主题
+   macOS 风格：悬浮、自动隐藏、胶囊滑块
+   ============================== */
+
+/* 隐藏浏览器原生滚动条，但保持滚动能力 */
+html,
+body,
+* {
+    scrollbar-width: none !important;
+    /* Firefox */
+    -ms-overflow-style: none !important;
+    /* IE/Edge */
+}
+
+*::-webkit-scrollbar,
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+    display: none !important;
+    /* Chrome/Safari/Opera */
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
+}
+
+/* OverlayScrollbars 主题自定义 */
+.os-theme-dark {
+    --os-handle-bg: rgba(128, 128, 128, 0.5);
+    --os-handle-bg-hover: rgba(128, 128, 128, 0.7);
+    --os-handle-bg-active: rgba(128, 128, 128, 0.85);
+}
+
+/* 深色模式滚动条样式 */
+html.dark .os-theme-dark,
+.dark .os-theme-dark {
+    --os-handle-bg: rgba(180, 180, 180, 0.6);
+    --os-handle-bg-hover: rgba(180, 180, 180, 0.75);
+    --os-handle-bg-active: rgba(180, 180, 180, 0.9);
+}
+
+/* 滚动条轨道 - 完全透明 */
+.os-theme-dark .os-scrollbar,
+.os-theme-dark .os-scrollbar-horizontal,
+.os-theme-dark .os-scrollbar-vertical {
+    --os-size: 10px;
+    --os-padding-perpendicular: 2px;
+    --os-padding-axis: 2px;
+    --os-track-bg: transparent;
+    --os-track-bg-hover: transparent;
+    --os-track-bg-active: transparent;
+}
+
+/* 滚动条滑块 - macOS 风格胶囊 */
+.os-theme-dark .os-scrollbar .os-scrollbar-handle {
+    border-radius: 10px !important;
+    transition: background-color 0.2s ease, opacity 0.2s ease !important;
 }
