@@ -1,11 +1,11 @@
 <div align="center">
     <a href="https://github.com/MarSeventh/CloudFlare-ImgBed"><img width="80%" alt="logo" src="static/readme/banner.png"/></a>
-    <p><em>🗂️Open-source file hosting solution based on Cloudflare Pages, supporting multiple storage channels such as Telegram Bot, Cloudflare R2, S3, etc.</em></p>
+    <p><em>🗂️Open-source file hosting solution, supporting Docker and serverless deployment, supporting multiple storage channels such as Telegram, Discord, Cloudflare R2, S3, Huggingface, etc., supporting WebDAV protocol and various RESTful APIs.</em></p>
     <p>
         <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README.md">简体中文</a> | <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README_en.md">English</a> | <a
-        href="https://cfbed.sanyue.de">Official Website</a>
+        href="https://cfbed.sanyue.de/en">Official Website</a>
     </p>
-    <div>
+    <p align="center">
         <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/LICENSE">
         <img src="https://img.shields.io/github/license/MarSeventh/CloudFlare-ImgBed" alt="License" />
         </a>
@@ -27,8 +27,16 @@
         <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/network/members">
           <img src="https://img.shields.io/github/forks/MarSeventh/CloudFlare-ImgBed" alt="Forks" />
         </a>
-    </div>
+    </p>
+    <p align="center">
+      <a href="https://trendshift.io/repositories/14324" target="_blank">
+        <img src="https://trendshift.io/api/badge/repositories/14324" alt="GitHub Trending" height="80">
+      </a>
+    </p>
 </div>
+
+
+
 
 ---
 
@@ -47,7 +55,7 @@
 
 ## 2025.2.6 Version 2.0 Upgrade Notes
 
-> The v2.0 beta version has been released, with many changes and optimizations compared to v1.0. However, the beta version may have potential instability. If you prefer stability, you may delay updating.
+> The v2.0 version has been released, with many changes and optimizations compared to v1.0. However, the beta version may have potential instability. If you prefer stability, you may delay updating.
 >
 > Due to **changes in the build command**, this update requires **manual operation**. Please follow these steps:
 >
@@ -70,11 +78,11 @@
 
 # 1. Introduction
 
-Free file hosting solution with full lifecycle features including **upload**, **management**, **read**, and **delete**, supporting **authentication**, **directories**, **image moderation**, **random images**, and other features (see [Feature Docs](https://cfbed.sanyue.de/guide/features.html) for details).
+Free file hosting solution with full lifecycle features including **upload**, **management**, **read**, and **delete**, supporting **authentication**, **directories**, **image moderation**, **random images**, and other features (see [Feature Docs](https://cfbed.sanyue.de/en/guide/features.html) for details).
 
 ![CloudFlare](static/readme/海报.png)
 
-# 2. [Document](https://cfbed.sanyue.de)
+# 2. [Document](https://cfbed.sanyue.de/en)
 
 Provides detailed deployment documentation, feature docs, development plans, update logs, FAQ, and more to help you get started quickly.
 
@@ -84,18 +92,24 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 
 **Demo Address**: [CloudFlare ImgBed](https://cfbed.1314883.xyz/) Access Password: `cfbed`
 
-![image-20250313204101984](static/readme/202503132041511.png)
+![image-20250313204101984](static/readme/login.png)
 
-![image-20250313204138886](static/readme/202503132041072.png)
+![image-20250313204138886](static/readme/upload.png)
 
 <details>
     <summary>Other page screenshots</summary>
 
-![image-20250313204308225](static/readme/202503132043466.png)
+![image-20250313204138886](static/readme/uploading.png)
 
-![image-20250314152355339](static/readme/202503141524797.png)
+![image-20250313204308225](static/readme/dashboard.png)
 
-![image-20250313204325002](static/readme/202503132043265.png)
+![image-20250314152355339](static/readme/customer-config.png)
+
+![status-page](static/readme/status-page.png)
+
+![public-gallery](static/readme/public-gallery.png)
+
+
 
 </details>
 
@@ -103,7 +117,7 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 
 - Frontend is open source, see [MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub).
 
-- **Ecosystem**: We welcome community participation in the ecosystem construction. Feel free to submit PRs or Issues, and high-quality content can be found on the [official ecosystem page](https://cfbed.sanyue.de/about/ecosystem.html).
+- **Ecosystem**: We welcome community participation in the ecosystem construction. Feel free to submit PRs or Issues, and high-quality content can be found on the [official ecosystem page](https://cfbed.sanyue.de/en/about/ecosystem.html).
 
 - **Sponsor**: Maintaining the project is not easy. If you like it, please support the author. Your support is the motivation to keep going~
 
@@ -111,7 +125,7 @@ Provides detailed deployment documentation, feature docs, development plans, upd
   
 - **Sponsors**: Thanks to the following sponsors for supporting this project!
 
-  [![sponsors](https://afdian-sponsors.sanyue.de/image)](https://afdian.com/a/marseventh)
+  [![sponsors](https://afdian-sponsors.sanyue.de/image?columns=12)](https://afdian.com/a/marseventh)
   
 - **Contributors**: Thanks to the following contributors for their selfless contributions!
 
@@ -125,8 +139,8 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 
 # 6. Special Sponsors
 
-- **[AsiaYun](https://www.asiayun.com/)**: Provides cloud computing resources support (high defense servers | Fuzhou high defense | Guangdong Telecom | Hong Kong servers | US servers | Overseas servers)
+- **[CloudFlare](https://www.cloudflare.com) & [EdgeOne](https://edgeone.ai/?from=github)**：Provides CDN acceleration, and security protection
 
-- **DartNode**: Provides cloud computing resources support
+  <a href="https://www.cloudflare.com"><img src="static/readme/cloudflare-logo.png" alt="Cloudflare Logo" height="25"></a> <a href="https://edgeone.ai/?from=github"><img src="/static/readme/edgeone-logo.png" alt="Tencent Logo" height="25"></a>
 
-[![Powered by DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")
+- **[svyun](https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC)**：Provides cloud computing resources support
