@@ -95,6 +95,10 @@ export function sanitizeUploadFolder(folder) {
     // 将 .. 替换为 _（无论是否在路径段中）
     folder = folder.replace(/\.\./g, '_');
 
+    // 将单独的 . 路径段替换为 _（例如 /./）
+    // 处理方式：按 / 分割后，将纯 . 的段替换为 _
+    folder = folder.split('/').map(seg => seg === '.' ? '_' : seg).join('/');
+
     // 替换反斜杠为正斜杠
     folder = folder.replace(/\\/g, '/');
 

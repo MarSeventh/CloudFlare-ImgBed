@@ -72,18 +72,14 @@ export async function onRequest(context) {
             });
         }
 
-        const newFileId = body.newFileId;
-
-        // 路径安全检查：防止路径穿越
-        if (newFileId.includes('..') || newFileId.includes('\\')) {
-            return new Response(JSON.stringify({
-                success: false,
-                message: '文件名包含非法路径字符',
-            }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json', ...corsHeaders },
-            });
-        }
+        // 路径安全处理：替换不合法字符
+        const newFileId = body.newFileId
+            .replace(/\.\./g, '_')       // 路径穿越字符替换为 _
+            .replace(/\\/g, '/')          // 反斜杠转正斜杠
+            .replace(/\/{2,}/g, '/')      // 连续斜杠合并
+            .replace(/^\/+/, '')          // 移除开头 /
+            .replace(/\/+$/, '')          // 移除末尾 /
+            .split('/').map(seg => seg === '.' ? '_' : seg).join('/'); // 单独的 . 替换为 _
 
         const url = new URL(request.url);
         const db = getDatabase(env);

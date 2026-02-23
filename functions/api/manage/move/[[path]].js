@@ -15,7 +15,8 @@ function sanitizePath(p) {
         .replace(/\\/g, '/')          // 反斜杠转正斜杠
         .replace(/\/{2,}/g, '/')      // 连续斜杠合并
         .replace(/^\/+/, '')          // 移除开头 /
-        .replace(/\/+$/, '');         // 移除末尾 /
+        .replace(/\/+$/, '')          // 移除末尾 /
+        .split('/').map(seg => seg === '.' ? '_' : seg).join('/'); // 单独的 . 替换为 _
 }
 
 export async function onRequest(context) {
