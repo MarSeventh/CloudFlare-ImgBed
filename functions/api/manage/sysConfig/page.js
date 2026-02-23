@@ -103,6 +103,7 @@ export async function getPageConfig(db, env) {
         {
             id: 'announcement',
             label: '公告',
+            type: 'textarea',
             tooltip: '支持HTML标签',
             category: '客户端设置',
         },
