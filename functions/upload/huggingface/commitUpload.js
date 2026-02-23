@@ -7,7 +7,7 @@
 import { HuggingFaceAPI } from '../../utils/huggingfaceAPI.js';
 import { fetchUploadConfig } from '../../utils/sysConfig.js';
 import { getDatabase } from '../../utils/databaseAdapter.js';
-import { moderateContent, endUpload } from '../../upload/uploadTools.js';
+import { moderateContent, endUpload, getUploadIp, getIPAddress } from '../uploadTools.js';
 import { userAuthCheck, UnauthorizedResponse } from '../../utils/userAuth.js';
 
 export async function onRequestPost(context) {
@@ -27,6 +27,16 @@ export async function onRequestPost(context) {
         if (!fullId || !filePath || !sha256 || !fileSize) {
             return new Response(JSON.stringify({
                 error: 'Missing required fields: fullId, filePath, sha256, fileSize'
+            }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        // 路径安全检查：防止篡改 fullId 进行路径穿越
+        if (fullId.includes('..') || fullId.includes('\\')) {
+            return new Response(JSON.stringify({
+                error: 'Invalid fullId: contains illegal path characters'
             }), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
@@ -65,9 +75,6 @@ export async function onRequestPost(context) {
         // 如果有 multipart parts，需要先完成 multipart 上传
         if (multipartParts && multipartParts.length > 0) {
             console.log('Completing multipart upload...');
-            // multipartParts 格式: [{ partNumber, etag, completionUrl }]
-            // 这里需要调用 HuggingFace 的 multipart complete API
-            // 但由于前端已经完成了所有分片上传，这里只需要提交
         }
 
         // 提交 LFS 文件引用
@@ -83,6 +90,14 @@ export async function onRequestPost(context) {
         // 构建文件 URL
         const fileUrl = `https://huggingface.co/datasets/${hfChannel.repo}/resolve/main/${filePath}`;
 
+        // 从 fullId 中提取目录信息
+        const dirParts = fullId.split('/').slice(0, -1).join('/');
+        const normalizedDirectory = dirParts === '' ? '' : dirParts + '/';
+
+        // 获取上传IP和地址
+        const uploadIp = getUploadIp(request) || '';
+        const uploadAddress = await getIPAddress(uploadIp);
+
         // 构建 metadata
         const metadata = {
             FileName: fileName || fullId,
@@ -91,13 +106,18 @@ export async function onRequestPost(context) {
             ChannelName: hfChannel.name || "HuggingFace_env",
             FileSize: (fileSize / 1024 / 1024).toFixed(2),
             FileSizeBytes: fileSize,
+            UploadIP: uploadIp,
+            UploadAddress: uploadAddress,
+            ListType: "None",
             HfRepo: hfChannel.repo,
             HfFilePath: filePath,
             HfToken: hfChannel.token,
             HfIsPrivate: hfChannel.isPrivate || false,
             HfFileUrl: fileUrl,
             TimeStamp: Date.now(),
-            Label: "None"
+            Label: "None",
+            Directory: normalizedDirectory,
+            Tags: []
         };
 
         // 图像审查（公开仓库）

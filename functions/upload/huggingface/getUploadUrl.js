@@ -13,7 +13,7 @@
 import { HuggingFaceAPI } from '../../utils/huggingfaceAPI.js';
 import { fetchUploadConfig } from '../../utils/sysConfig.js';
 import { userAuthCheck, UnauthorizedResponse } from '../../utils/userAuth.js';
-import { buildUniqueFileId } from '../../upload/uploadTools.js';
+import { buildUniqueFileId, getUploadIp, isBlockedUploadIp } from '../uploadTools.js';
 
 export async function onRequestPost(context) {
     const { request, env } = context;
@@ -25,6 +25,15 @@ export async function onRequestPost(context) {
         const requiredPermission = 'upload';
         if (!await userAuthCheck(env, url, request, requiredPermission)) {
             return UnauthorizedResponse('Unauthorized');
+        }
+
+        // 检查上传IP是否被封禁
+        const uploadIp = getUploadIp(request);
+        if (await isBlockedUploadIp(env, uploadIp)) {
+            return new Response(JSON.stringify({ error: 'IP blocked' }), {
+                status: 403,
+                headers: { 'Content-Type': 'application/json' }
+            });
         }
 
         const body = await request.json();
