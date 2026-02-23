@@ -153,12 +153,12 @@ function validateMetadata(metadata) {
     return { valid: false, error: 'metadata.FileName must be a string if provided' };
   }
   
-  // 可选字段类型检查
-  if (metadata.FileType !== undefined && typeof metadata.FileType !== 'string') {
+  // 可选字段类型检查（允许 null）
+  if (metadata.FileType !== undefined && metadata.FileType !== null && typeof metadata.FileType !== 'string') {
     return { valid: false, error: 'metadata.FileType must be a string' };
   }
   
-  if (metadata.FileSize !== undefined && typeof metadata.FileSize !== 'string') {
+  if (metadata.FileSize !== undefined && metadata.FileSize !== null && typeof metadata.FileSize !== 'string') {
     return { valid: false, error: 'metadata.FileSize must be a string' };
   }
   
@@ -166,7 +166,7 @@ function validateMetadata(metadata) {
     return { valid: false, error: 'metadata.TimeStamp must be a number' };
   }
   
-  if (metadata.Channel !== undefined && typeof metadata.Channel !== 'string') {
+  if (metadata.Channel !== undefined && metadata.Channel !== null && typeof metadata.Channel !== 'string') {
     return { valid: false, error: 'metadata.Channel must be a string' };
   }
   
@@ -175,11 +175,11 @@ function validateMetadata(metadata) {
   }
   
   // 早期版本字段验证
-  if (metadata.ListType !== undefined && typeof metadata.ListType !== 'string') {
+  if (metadata.ListType !== undefined && metadata.ListType !== null && typeof metadata.ListType !== 'string') {
     return { valid: false, error: 'metadata.ListType must be a string' };
   }
   
-  if (metadata.Label !== undefined && typeof metadata.Label !== 'string') {
+  if (metadata.Label !== undefined && metadata.Label !== null && typeof metadata.Label !== 'string') {
     return { valid: false, error: 'metadata.Label must be a string' };
   }
   
