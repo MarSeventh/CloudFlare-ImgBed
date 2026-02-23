@@ -3,17 +3,29 @@ import { purgeCFCache, purgeRandomFileListCache, purgePublicFileListCache } from
 import { moveFileInIndex, batchMoveFilesInIndex } from "../../../utils/indexManager.js";
 import { getDatabase } from '../../../utils/databaseAdapter.js';
 
+// 路径安全处理：防止路径穿越
+function sanitizePath(p) {
+    if (!p) return '';
+    // 防止双重编码绕过：仅在检测到编码字符时解码
+    if (/%[0-9a-fA-F]{2}/.test(p)) {
+        try { p = decodeURIComponent(p); } catch (e) { /* ignore */ }
+    }
+    return p
+        .replace(/\.\./g, '_')       // 路径穿越字符替换为 _
+        .replace(/\\/g, '/')          // 反斜杠转正斜杠
+        .replace(/\/{2,}/g, '/')      // 连续斜杠合并
+        .replace(/^\/+/, '')          // 移除开头 /
+        .replace(/\/+$/, '');         // 移除末尾 /
+}
+
 export async function onRequest(context) {
     const { request, env, params, waitUntil } = context;
 
     const url = new URL(request.url);
 
-    // 读取目标文件夹
-    const dist = url.searchParams.get('dist')
-        ? url.searchParams.get('dist').replace(/^\/+/, '')
-            .replace(/\/{2,}/g, '/')
-            .replace(/\/$/, '')
-        : '';
+    // 读取目标文件夹，并进行路径安全处理
+    const rawDist = url.searchParams.get('dist') || '';
+    const dist = sanitizePath(rawDist);
 
     // 读取folder参数，判断是否为文件夹移动请求
     const folder = url.searchParams.get('folder');

@@ -168,6 +168,10 @@ export async function onRequest(context) {
         }
 
         // 处理目录格式
+        if (dir) {
+            // 路径安全处理：防止路径穿越
+            dir = dir.replace(/\.\./g, '_').replace(/\\/g, '/').replace(/\/{2,}/g, '/');
+        }
         if (dir.startsWith('/')) {
             dir = dir.substring(1);
         }

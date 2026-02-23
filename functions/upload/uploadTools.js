@@ -71,6 +71,55 @@ export function sanitizeFileName(fileName) {
     return fileName.replace(unsafeCharsRe, '_');
 }
 
+/**
+ * 上传路径安全处理：防止路径穿越，标准化特殊字符
+ * @param {string} folder - 原始上传路径
+ * @returns {string} 安全处理后的路径
+ */
+export function sanitizeUploadFolder(folder) {
+    if (!folder || folder.trim() === '') {
+        return '';
+    }
+
+    // 防止编码绕过：如果检测到 URL 编码字符（%XX），先解码再处理
+    // 注意：url.searchParams.get() 已经做过一次解码，这里是为了防御双重编码攻击（如 %252e%252e）
+    if (/%[0-9a-fA-F]{2}/.test(folder)) {
+        try {
+            folder = decodeURIComponent(folder);
+        } catch (e) {
+            // 解码失败（如 %zz 等非法编码）则使用原始值
+        }
+    }
+
+    // 移除路径穿越字符 ..
+    // 将 .. 替换为 _（无论是否在路径段中）
+    folder = folder.replace(/\.\./g, '_');
+
+    // 替换反斜杠为正斜杠
+    folder = folder.replace(/\\/g, '/');
+
+    // 将连续斜杠替换为单个斜杠
+    folder = folder.replace(/\/{2,}/g, '/');
+
+    // 移除开头的 /
+    folder = folder.replace(/^\/+/, '');
+
+    // 移除末尾的 /
+    folder = folder.replace(/\/+$/, '');
+
+    // 对每个路径段进行特殊字符处理
+    const segments = folder.split('/');
+    const sanitizedSegments = segments
+        .map(seg => {
+            // 将路径段中的特殊字符替换为 _
+            // 特殊字符包括: \ : * ? " ' < > | 空格 ( ) [ ] { } # % ^ ` ~ ; @ & = + $ ,
+            return seg.replace(/[\\:\*\?"'<>\| \(\)\[\]\{\}#%\^`~;@&=\+\$,]/g, '_');
+        })
+        .filter(seg => seg.length > 0); // 过滤空段
+
+    return sanitizedSegments.join('/');
+}
+
 // 检查文件扩展名是否有效
 export function isExtValid(fileExt) {
     return ['jpeg', 'jpg', 'png', 'gif', 'webp',
@@ -271,7 +320,7 @@ export async function endUpload(context, fileId, metadata) {
 
     // 清除CDN缓存
     const cdnUrl = `https://${url.hostname}/file/${fileId}`;
-    const normalizedFolder = (url.searchParams.get('uploadFolder') || '').replace(/^\/+/, '').replace(/\/{2,}/g, '/').replace(/\/$/, '');
+    const normalizedFolder = sanitizeUploadFolder(url.searchParams.get('uploadFolder') || '');
     await purgeCDNCache(env, cdnUrl, url, normalizedFolder);
 
     // 更新文件索引（索引更新时会自动计算容量统计）
@@ -327,9 +376,8 @@ export async function buildUniqueFileId(context, fileName, fileType = 'applicati
 
     const nameType = url.searchParams.get('uploadNameType') || 'default';
     const uploadFolder = url.searchParams.get('uploadFolder') || '';
-    const normalizedFolder = uploadFolder
-        ? uploadFolder.replace(/^\/+/, '').replace(/\/{2,}/g, '/').replace(/\/$/, '')
-        : '';
+    // 对上传路径进行安全处理
+    const normalizedFolder = sanitizeUploadFolder(uploadFolder);
 
     if (!isExtValid(fileExt)) {
         fileExt = fileType.split('/').pop();

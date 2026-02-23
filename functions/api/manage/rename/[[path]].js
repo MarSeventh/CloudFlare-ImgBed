@@ -73,6 +73,18 @@ export async function onRequest(context) {
         }
 
         const newFileId = body.newFileId;
+
+        // 路径安全检查：防止路径穿越
+        if (newFileId.includes('..') || newFileId.includes('\\')) {
+            return new Response(JSON.stringify({
+                success: false,
+                message: '文件名包含非法路径字符',
+            }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            });
+        }
+
         const url = new URL(request.url);
         const db = getDatabase(env);
 

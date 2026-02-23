@@ -2,7 +2,8 @@ import { userAuthCheck, UnauthorizedResponse } from "../utils/userAuth";
 import { fetchUploadConfig, fetchSecurityConfig } from "../utils/sysConfig";
 import {
     createResponse, getUploadIp, getIPAddress, isExtValid,
-    moderateContent, purgeCDNCache, isBlockedUploadIp, buildUniqueFileId, endUpload, getImageDimensions
+    moderateContent, purgeCDNCache, isBlockedUploadIp, buildUniqueFileId, endUpload, getImageDimensions,
+    sanitizeUploadFolder
 } from "./uploadTools";
 import { initializeChunkedUpload, handleChunkUpload, uploadLargeFileToTelegram, handleCleanupRequest } from "./chunkUpload";
 import { handleChunkMerge } from "./chunkMerge";
@@ -94,6 +95,9 @@ async function processFileUpload(context, formdata = null) {
     // 获取上传文件夹路径
     let uploadFolder = url.searchParams.get('uploadFolder') || '';
 
+    // 路径安全性处理：防止路径穿越和特殊字符注入
+    uploadFolder = sanitizeUploadFolder(uploadFolder);
+
     let uploadChannel = 'TelegramNew';
     switch (urlParamUploadChannel) {
         case 'telegram':
@@ -150,13 +154,11 @@ async function processFileUpload(context, formdata = null) {
     // 如果上传文件夹路径为空，尝试从文件名中获取
     if (uploadFolder === '' || uploadFolder === null || uploadFolder === undefined) {
         uploadFolder = fileName.split('/').slice(0, -1).join('/');
+        // 对从文件名中提取的路径也进行安全处理
+        uploadFolder = sanitizeUploadFolder(uploadFolder);
     }
-    // 处理文件夹路径格式，确保没有开头的/
-    const normalizedFolder = uploadFolder
-        ? uploadFolder.replace(/^\/+/, '') // 移除开头的/
-            .replace(/\/{2,}/g, '/') // 替换多个连续的/为单个/
-            .replace(/\/$/, '') // 移除末尾的/
-        : '';
+    // uploadFolder 已经过 sanitizeUploadFolder 处理，直接使用
+    const normalizedFolder = uploadFolder;
 
     const metadata = {
         FileName: fileName,

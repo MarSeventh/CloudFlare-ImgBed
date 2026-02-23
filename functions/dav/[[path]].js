@@ -129,8 +129,22 @@ async function handlePut(request, env) {
     }
 
     const lastSlashIndex = fullPath.lastIndexOf('/');
-    const uploadFolder = lastSlashIndex > -1 ? fullPath.substring(0, lastSlashIndex) : '';
+    let uploadFolder = lastSlashIndex > -1 ? fullPath.substring(0, lastSlashIndex) : '';
     const fileName = lastSlashIndex > -1 ? fullPath.substring(lastSlashIndex + 1) : fullPath;
+
+    // 路径安全处理：防止路径穿越
+    if (uploadFolder) {
+        // 防止双重编码绕过：仅在检测到编码字符时解码
+        if (/%[0-9a-fA-F]{2}/.test(uploadFolder)) {
+            try { uploadFolder = decodeURIComponent(uploadFolder); } catch (e) { /* ignore */ }
+        }
+        uploadFolder = uploadFolder
+            .replace(/\.\./g, '_')
+            .replace(/\\/g, '/')
+            .replace(/\/{2,}/g, '/')
+            .replace(/^\/+/, '')
+            .replace(/\/+$/, '');
+    }
     
     const fileContent = await request.blob();
     const formData = new FormData();
