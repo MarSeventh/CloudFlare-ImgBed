@@ -3,7 +3,7 @@ import { createResponse, selectConsistentChannel, getUploadIp, getIPAddress, bui
 import { TelegramAPI } from '../utils/telegramAPI';
 import { DiscordAPI } from '../utils/discordAPI';
 import { S3Client, CreateMultipartUploadCommand, UploadPartCommand, AbortMultipartUploadCommand } from "@aws-sdk/client-s3";
-import { getDatabase } from '../utils/databaseAdapter.js';
+import { getDatabase, checkDatabaseConfig } from '../utils/databaseAdapter.js';
 
 // 初始化分块上传
 export async function initializeChunkedUpload(context) {
@@ -146,13 +146,14 @@ export async function handleChunkUpload(context) {
         };
 
         // 立即保存分块记录和数据，设置过期时间
-        await db.put(chunkKey, chunkData, {
+        const { usingD1 } = checkDatabaseConfig(env);
+        await db.put(chunkKey, usingD1 ? '' : chunkData, {
             metadata: initialChunkMetadata,
             expirationTtl: 3600 // 1小时过期
         });
 
         // 同步上传分块到存储端，添加超时保护
-        await uploadChunkToStorageWithTimeout(context, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType, uploadChannel);
+        await uploadChunkToStorageWithTimeout(context, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType, uploadChannel, usingD1 ? chunkData : undefined);
 
         return createResponse(JSON.stringify({
             success: true,
@@ -202,7 +203,7 @@ export async function handleCleanupRequest(context, uploadId, totalChunks) {
 /* ======= 单个分块上传到不同渠道的存储端 ======= */
 
 // 带超时保护的异步上传分块到存储端
-async function uploadChunkToStorageWithTimeout(context, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType, uploadChannel) {
+async function uploadChunkToStorageWithTimeout(context, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType, uploadChannel, chunkData) {
     const { env } = context;
     const db = getDatabase(env);
     const chunkKey = `chunk_${uploadId}_${chunkIndex.toString().padStart(3, '0')}`;
@@ -215,7 +216,7 @@ async function uploadChunkToStorageWithTimeout(context, chunkIndex, totalChunks,
         });
 
         // 执行实际上传
-        const uploadPromise = uploadChunkToStorage(context, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType, uploadChannel);
+        const uploadPromise = uploadChunkToStorage(context, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType, uploadChannel, chunkData);
 
         // 竞速执行
         await Promise.race([uploadPromise, timeoutPromise]);
@@ -249,7 +250,7 @@ async function uploadChunkToStorageWithTimeout(context, chunkIndex, totalChunks,
 }
 
 // 异步上传分块到存储端，失败自动重试
-async function uploadChunkToStorage(context, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType, uploadChannel) {
+async function uploadChunkToStorage(context, chunkIndex, totalChunks, uploadId, originalFileName, originalFileType, uploadChannel, chunkData) {
     const { env } = context;
     const db = getDatabase(env);
 
@@ -258,15 +259,22 @@ async function uploadChunkToStorage(context, chunkIndex, totalChunks, uploadId, 
     const MAX_RETRIES = 3;
 
     try {
-        // 从数据库分块数据和metadata
-        const chunkRecord = await db.getWithMetadata(chunkKey, { type: 'arrayBuffer' });
-        if (!chunkRecord || !chunkRecord.value) {
-            console.error(`Chunk ${chunkIndex} data not found in database`);
-            return;
-        }
+        let chunkMetadata;
 
-        const chunkData = chunkRecord.value;
-        const chunkMetadata = chunkRecord.metadata;
+        if (chunkData !== undefined) {
+            const chunkRecord = await db.getWithMetadata(chunkKey);
+            chunkMetadata = (chunkRecord && chunkRecord.metadata) ? chunkRecord.metadata : {};
+        } else {
+            // 从数据库分块数据和metadata
+            const chunkRecord = await db.getWithMetadata(chunkKey, { type: 'arrayBuffer' });
+            if (!chunkRecord || !chunkRecord.value) {
+                console.error(`Chunk ${chunkIndex} data not found in database`);
+                return;
+            }
+
+            chunkData = chunkRecord.value;
+            chunkMetadata = chunkRecord.metadata;
+        }
 
         for (let retry = 0; retry < MAX_RETRIES; retry++) {
             // 根据渠道上传分块
