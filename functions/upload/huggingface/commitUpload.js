@@ -7,7 +7,7 @@
 import { HuggingFaceAPI } from '../../utils/huggingfaceAPI.js';
 import { fetchUploadConfig } from '../../utils/sysConfig.js';
 import { getDatabase } from '../../utils/databaseAdapter.js';
-import { moderateContent, endUpload, getUploadIp, getIPAddress } from '../uploadTools.js';
+import { moderateContent, endUpload, getUploadIp, getIPAddress, sanitizeUploadFolder } from '../uploadTools.js';
 import { userAuthCheck, UnauthorizedResponse } from '../../utils/userAuth.js';
 
 export async function onRequestPost(context) {
@@ -33,8 +33,9 @@ export async function onRequestPost(context) {
             });
         }
 
-        // 路径安全检查：防止篡改 fullId 进行路径穿越
-        if (fullId.includes('..') || fullId.includes('\\')) {
+        // 路径安全处理：使用统一的路径安全函数
+        const sanitizedFullId = sanitizeUploadFolder(fullId);
+        if (sanitizedFullId !== fullId) {
             return new Response(JSON.stringify({
                 error: 'Invalid fullId: contains illegal path characters'
             }), {

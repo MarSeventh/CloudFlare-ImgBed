@@ -2,6 +2,7 @@ import { S3Client, CopyObjectCommand, DeleteObjectCommand } from "@aws-sdk/clien
 import { purgeCFCache, purgeRandomFileListCache, purgePublicFileListCache } from "../../../utils/purgeCache";
 import { moveFileInIndex } from "../../../utils/indexManager.js";
 import { getDatabase } from '../../../utils/databaseAdapter.js';
+import { sanitizeUploadFolder } from "../../../upload/uploadTools.js";
 
 // CORS 跨域响应头
 const corsHeaders = {
@@ -72,14 +73,8 @@ export async function onRequest(context) {
             });
         }
 
-        // 路径安全处理：替换不合法字符
-        const newFileId = body.newFileId
-            .replace(/\.\./g, '_')       // 路径穿越字符替换为 _
-            .replace(/\\/g, '/')          // 反斜杠转正斜杠
-            .replace(/\/{2,}/g, '/')      // 连续斜杠合并
-            .replace(/^\/+/, '')          // 移除开头 /
-            .replace(/\/+$/, '')          // 移除末尾 /
-            .split('/').map(seg => seg === '.' ? '_' : seg).join('/'); // 单独的 . 替换为 _
+        // 路径安全处理
+        const newFileId = sanitizeUploadFolder(body.newFileId.trim());
 
         const url = new URL(request.url);
         const db = getDatabase(env);
