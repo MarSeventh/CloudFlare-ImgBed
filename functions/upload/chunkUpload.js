@@ -265,7 +265,7 @@ async function uploadChunkToStorage(context, chunkIndex, totalChunks, uploadId, 
             const chunkRecord = await db.getWithMetadata(chunkKey);
             chunkMetadata = (chunkRecord && chunkRecord.metadata) ? chunkRecord.metadata : {};
         } else {
-            // 从数据库分块数据和metadata
+            // 从数据库读取分块数据和metadata
             const chunkRecord = await db.getWithMetadata(chunkKey, { type: 'arrayBuffer' });
             if (!chunkRecord || !chunkRecord.value) {
                 console.error(`Chunk ${chunkIndex} data not found in database`);
