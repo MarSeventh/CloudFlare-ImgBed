@@ -10,6 +10,9 @@
     "@sentry/tracing": "^7.114.0",
     "miniflare": "^3.20240718.0"
   },
+  "overrides": {
+    "fast-xml-parser": "^5.3.6"
+  },
   "devDependencies": {
     "concurrently": "^8.2.2",
     "mocha": "^10.6.0",

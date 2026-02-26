@@ -554,6 +554,7 @@ async function uploadSingleChunkToS3Multipart(context, chunkData, chunkIndex, to
         };
 
     } catch (error) {
+        console.error(`S3 chunk upload error (chunk ${chunkIndex}):`, error.message, error.name, error.$metadata);
         return {
             success: false,
             error: error.message
