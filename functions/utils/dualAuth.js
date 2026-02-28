@@ -4,23 +4,24 @@ import { validateApiToken } from './tokenValidator';
 import { getDatabase } from './databaseAdapter.js';
 
 /**
- * 双重鉴权检查：用户端或管理端任意一个通过即可
+ * 双重鉴权检查：管理端或用户端任意一个通过即可
+ * 注意：管理端鉴权优先检查，确保管理员权限优先级更高
  * @param {Object} env - 环境变量
  * @param {URL} url - 请求的URL
  * @param {Request} request - 请求对象
  * @returns {Promise<{authorized: boolean, authType: string|null}>}
  */
 export async function dualAuthCheck(env, url, request) {
-    // 1. 尝试用户端鉴权 (authCode / API Token)
-    const userAuthPassed = await userAuthCheck(env, url, request, null);
-    if (userAuthPassed) {
-        return { authorized: true, authType: 'user' };
-    }
-    
-    // 2. 尝试管理端鉴权 (Basic Auth / API Token)
+    // 1. 优先尝试管理端鉴权 (Basic Auth / API Token)
     const adminAuthPassed = await adminAuthCheck(env, request);
     if (adminAuthPassed) {
         return { authorized: true, authType: 'admin' };
+    }
+    
+    // 2. 尝试用户端鉴权 (authCode / API Token)
+    const userAuthPassed = await userAuthCheck(env, url, request, null);
+    if (userAuthPassed) {
+        return { authorized: true, authType: 'user' };
     }
     
     return { authorized: false, authType: null };

@@ -1,5 +1,6 @@
 import { getDirectoryTree } from '../utils/indexManager';
 import { dualAuthCheck } from '../utils/dualAuth';
+import { fetchSecurityConfig } from '../utils/sysConfig';
 
 /**
  * 目录树 API 端点
@@ -11,6 +12,10 @@ import { dualAuthCheck } from '../utils/dualAuth';
  * 响应：
  * - 成功：{ tree: DirectoryTreeNode }
  * - 失败：{ error: string }
+ * 
+ * 权限说明：
+ * - 管理端鉴权成功：始终允许访问
+ * - 用户端鉴权成功：仅当 showDirectorySuggestions 开启时允许访问
  */
 export async function onRequestGet(context) {
     const { env, request } = context;
@@ -20,6 +25,19 @@ export async function onRequestGet(context) {
     const authResult = await dualAuthCheck(env, url, request);
     if (!authResult.authorized) {
         return new Response('Unauthorized', { status: 401 });
+    }
+    
+    // 如果是用户端鉴权，检查 showDirectorySuggestions 设置
+    if (authResult.authType === 'user') {
+        const securityConfig = await fetchSecurityConfig(env);
+        const showDirectorySuggestions = securityConfig?.upload?.showDirectorySuggestions ?? true;
+        
+        if (!showDirectorySuggestions) {
+            return new Response(JSON.stringify({ error: 'Directory suggestions disabled' }), {
+                status: 403,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
     }
     
     try {
