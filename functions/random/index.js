@@ -2,6 +2,14 @@ import { fetchOthersConfig } from "../utils/sysConfig";
 import { readIndex } from "../utils/indexManager";
 import { detectDevice, resolveOrientation, addClientHintsHeaders } from "./adaptive.js";
 
+// CORS 跨域响应头
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Max-Age': '86400',
+};
+
 let othersConfig = {};
 let allowRandom = false;
 
@@ -17,6 +25,11 @@ export async function onRequest(context) {
     } = context;
     const requestUrl = new URL(request.url);
 
+    // 处理 OPTIONS 预检请求
+    if (request.method === 'OPTIONS') {
+        return new Response(null, { headers: corsHeaders });
+    }
+
     // 读取其他设置
     othersConfig = await fetchOthersConfig(env);
     allowRandom = othersConfig.randomImageAPI.enabled;
@@ -24,7 +37,7 @@ export async function onRequest(context) {
 
     // 检查是否启用了随机图功能
     if (allowRandom != true) {
-        return new Response(JSON.stringify({ error: "Random is disabled" }), { status: 403 });
+        return new Response(JSON.stringify({ error: "Random is disabled" }), { status: 403, headers: corsHeaders });
     }
 
     // 处理允许的目录，每个目录调整为标准格式，去掉首尾空格，去掉开头的/，替换多个连续的/为单个/，去掉末尾的/
@@ -73,7 +86,7 @@ export async function onRequest(context) {
         }
     }
     if (!dirAllowed) {
-        return new Response(JSON.stringify({ error: "Directory not allowed" }), { status: 403 });
+        return new Response(JSON.stringify({ error: "Directory not allowed" }), { status: 403, headers: corsHeaders });
     }
 
     // 调用randomFileList接口，读取KV数据库中的所有记录
@@ -111,8 +124,8 @@ export async function onRequest(context) {
         allRecords = allRecordsBeforeOrientationFilter;
     }
 
-    // 构建响应头：自适应模式下添加 Client Hints 协商头
-    const responseHeaders = new Headers();
+    // 构建响应头：添加 CORS 跨域响应头，自适应模式下添加 Client Hints 协商头
+    const responseHeaders = new Headers(corsHeaders);
     if (isAutoMode) {
         addClientHintsHeaders(responseHeaders);
     }
