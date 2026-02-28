@@ -1380,6 +1380,103 @@ function extractDirectory(filePath) {
 }
 
 /**
+ * 将扁平目录路径列表转换为嵌套树结构
+ * @param {Array<string>} directories - 目录路径数组，如 ['photos/', 'photos/2024/', 'documents/']
+ * @returns {Object} 树形结构 { name, path, children }
+ * 
+ * 示例输出：
+ * {
+ *   name: "/",
+ *   path: "",
+ *   children: [
+ *     {
+ *       name: "photos",
+ *       path: "photos/",
+ *       children: [
+ *         { name: "2024", path: "photos/2024/", children: [] }
+ *       ]
+ *     },
+ *     { name: "documents", path: "documents/", children: [] }
+ *   ]
+ * }
+ */
+function buildTree(directories) {
+    // 创建根节点
+    const root = {
+        name: "/",
+        path: "",
+        children: []
+    };
+
+    // 如果没有目录，返回仅包含根节点的空树
+    if (!directories || directories.length === 0) {
+        return root;
+    }
+
+    // 使用 Map 存储已创建的节点，key 为路径
+    const nodeMap = new Map();
+    nodeMap.set("", root);
+
+    // 对目录进行排序，确保父目录在子目录之前处理
+    const sortedDirs = [...directories].sort();
+
+    for (const dirPath of sortedDirs) {
+        // 跳过空路径（根目录已创建）
+        if (!dirPath) continue;
+
+        // 规范化路径：确保以 / 结尾
+        const normalizedPath = dirPath.endsWith('/') ? dirPath : dirPath + '/';
+
+        // 如果节点已存在，跳过
+        if (nodeMap.has(normalizedPath)) continue;
+
+        // 分割路径获取各级目录名
+        const parts = normalizedPath.split('/').filter(part => part !== '');
+
+        // 逐级创建节点
+        let currentPath = "";
+        let parentNode = root;
+
+        for (let i = 0; i < parts.length; i++) {
+            const part = parts[i];
+            currentPath = currentPath + part + '/';
+
+            // 检查当前路径的节点是否已存在
+            if (nodeMap.has(currentPath)) {
+                parentNode = nodeMap.get(currentPath);
+            } else {
+                // 创建新节点
+                const newNode = {
+                    name: part,
+                    path: currentPath,
+                    children: []
+                };
+
+                // 添加到父节点的 children 中
+                parentNode.children.push(newNode);
+
+                // 存储到 Map 中
+                nodeMap.set(currentPath, newNode);
+
+                // 更新父节点引用
+                parentNode = newNode;
+            }
+        }
+    }
+
+    // 对每个节点的 children 按名称排序
+    const sortChildren = (node) => {
+        node.children.sort((a, b) => a.name.localeCompare(b.name));
+        node.children.forEach(sortChildren);
+    };
+    sortChildren(root);
+
+    return root;
+}
+
+
+
+/**
  * 将文件按时间戳倒序插入到已排序的数组中
  * @param {Array} sortedFiles - 已按时间戳倒序排序的文件数组
  * @param {Object} fileItem - 要插入的文件项
@@ -1727,4 +1824,47 @@ export async function getIndexStorageStats(context) {
             isChunked: false
         };
     }
+}
+
+
+
+/**
+ * 从索引中提取目录树结构
+ * @param {Object} context - 上下文对象
+ * @returns {Object} 树形结构 { name, path, children }
+ */
+export async function getDirectoryTree(context) {
+    // 1. 合并挂起操作
+    await mergeOperationsToIndex(context);
+
+    // 2. 获取索引
+    const index = await getIndex(context);
+
+    // 3. 提取所有目录路径
+    const directorySet = new Set();
+
+    if (index.files && index.files.length > 0) {
+        for (const file of index.files) {
+            // 获取文件的目录路径
+            const dirPath = file.metadata?.Directory || extractDirectory(file.id);
+
+            if (dirPath) {
+                // 规范化路径：确保以 / 结尾
+                const normalizedDir = dirPath.endsWith('/') ? dirPath : dirPath + '/';
+
+                // 将路径按 / 分割，逐级添加到目录集合中（确保父目录也被包含）
+                const parts = normalizedDir.split('/').filter(part => part !== '');
+                let currentPath = '';
+
+                for (const part of parts) {
+                    currentPath = currentPath + part + '/';
+                    directorySet.add(currentPath);
+                }
+            }
+        }
+    }
+
+    // 4. 构建树形结构
+    const directories = Array.from(directorySet);
+    return buildTree(directories);
 }

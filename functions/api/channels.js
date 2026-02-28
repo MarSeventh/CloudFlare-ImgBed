@@ -2,6 +2,7 @@
 import { fetchUploadConfig } from '../utils/sysConfig.js';
 import { getUploadConfig } from './manage/sysConfig/upload.js';
 import { getDatabase } from '../utils/databaseAdapter.js';
+import { dualAuthCheck } from '../utils/dualAuth.js';
 
 export async function onRequest(context) {
     const { request, env } = context;
@@ -10,8 +11,17 @@ export async function onRequest(context) {
         return new Response('Method Not Allowed', { status: 405 });
     }
 
+    // 双重鉴权检查
+    const url = new URL(request.url);
+    const { authorized } = await dualAuthCheck(env, url, request);
+    if (!authorized) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+
     try {
-        const url = new URL(request.url);
         const includeDisabled = url.searchParams.get('includeDisabled') === 'true';
 
         let uploadConfig;

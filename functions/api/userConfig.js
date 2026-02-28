@@ -1,4 +1,4 @@
-import { fetchPageConfig } from "../utils/sysConfig";
+import { fetchPageConfig, fetchSecurityConfig } from "../utils/sysConfig";
 
 export async function onRequest(context) {
     const { request, env, params, waitUntil, next, data } = context;
@@ -15,6 +15,15 @@ export async function onRequest(context) {
                 userConfig[config.id] = config.value;
             }
         }
+    }
+
+    // 从安全配置中获取 showDirectorySuggestions 设置
+    try {
+        const securityConfig = await fetchSecurityConfig(env);
+        userConfig.showDirectorySuggestions = securityConfig.upload?.showDirectorySuggestions ?? false;
+    } catch (error) {
+        console.error('Failed to fetch showDirectorySuggestions:', error);
+        userConfig.showDirectorySuggestions = false;
     }
 
     // 检查 USER_CONFIG 是否为空或未定义

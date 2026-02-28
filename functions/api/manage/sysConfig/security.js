@@ -75,7 +75,8 @@ export async function getSecurityConfig(db, env) {
             channel: kvUpload.moderate?.channel || 'moderatecontent.com', // [moderatecontent.com, nsfwjs]
             moderateContentApiKey: kvUpload.moderate?.moderateContentApiKey || kvUpload.moderate?.apiKey || env.ModerateContentApiKey || '',
             nsfwApiPath: kvUpload.moderate?.nsfwApiPath || '',
-        }
+        },
+        showDirectorySuggestions: kvUpload.showDirectorySuggestions ?? true  // 目录候选项开关，默认开启
     }
     settings.upload = upload
 
