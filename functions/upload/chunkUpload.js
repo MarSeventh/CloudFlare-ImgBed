@@ -1199,9 +1199,11 @@ export async function uploadLargeFileToTelegram(context, file, fullId, metadata,
             const chunkFileName = `${fileName}.part${i.toString().padStart(3, '0')}`;
 
             // 上传分片（带重试机制）
+            const tgProxyUrl = tgChannel.proxyUrl || '';
             const chunkInfo = await uploadChunkToTelegramWithRetry(
                 tgBotToken,
                 tgChatId,
+                tgProxyUrl,
                 chunkBlob,
                 chunkFileName,
                 i,
@@ -1237,6 +1239,7 @@ export async function uploadLargeFileToTelegram(context, file, fullId, metadata,
         metadata.ChannelName = tgChannel.name;
         metadata.TgChatId = tgChatId;
         metadata.TgBotToken = tgBotToken;
+        metadata.TgProxyUrl = tgChannel.proxyUrl || '';
         metadata.IsChunked = true;
         metadata.TotalChunks = totalChunks;
         metadata.FileSize = (fileSize / 1024 / 1024).toFixed(2);

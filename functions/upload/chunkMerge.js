@@ -462,10 +462,7 @@ async function mergeTelegramChunksInfo(context, uploadId, completedChunks, metad
         metadata.ChannelName = tgChannel.name;
         metadata.TgChatId = tgChatId;
         metadata.TgBotToken = tgBotToken;
-        // 保存代理域名配置（如果有）
-        if (tgChannel.proxyUrl) {
-            metadata.TgProxyUrl = tgChannel.proxyUrl;
-        }
+        metadata.TgProxyUrl = tgChannel.proxyUrl || '';
         metadata.IsChunked = true;
         metadata.TotalChunks = completedChunks.length;
         metadata.FileSize = (totalSize / 1024 / 1024).toFixed(2);
