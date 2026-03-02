@@ -88,8 +88,12 @@ export async function onRequestPost(context) {
         // 使用统一的文件命名函数生成文件ID
         const fullId = await buildUniqueFileId(context, fileName, fileType || 'application/octet-stream');
 
-        // 构建 HuggingFace 文件路径：直接使用 fullId（与其他渠道保持一致）
-        const filePath = fullId;
+        // 生成唯一标识符前缀（UUID格式），加在文件名前面
+        const uniquePrefix = crypto.randomUUID();
+        const lastSlashIndex = fullId.lastIndexOf('/');
+        const filePath = lastSlashIndex === -1 
+            ? `${uniquePrefix}_${fullId}` 
+            : `${fullId.substring(0, lastSlashIndex + 1)}${uniquePrefix}_${fullId.substring(lastSlashIndex + 1)}`;
 
         // 获取 LFS 上传信息
         const huggingfaceAPI = new HuggingFaceAPI(hfChannel.token, hfChannel.repo, hfChannel.isPrivate || false);

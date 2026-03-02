@@ -752,8 +752,12 @@ async function uploadFileToHuggingFace(context, fullId, metadata, returnLink) {
     const precomputedSha256 = formdata.get('sha256') || null;
     console.log('File to upload:', fileName, 'size:', file?.size, 'precomputed SHA256:', precomputedSha256 ? 'yes' : 'no');
 
-    // 构建文件路径：直接使用 fullId（与其他渠道保持一致）
-    const hfFilePath = fullId;
+    // 生成唯一标识符前缀（UUID格式），加在文件名前面
+    const uniquePrefix = crypto.randomUUID();
+    const lastSlashIndex = fullId.lastIndexOf('/');
+    const hfFilePath = lastSlashIndex === -1 
+        ? `${uniquePrefix}_${fullId}` 
+        : `${fullId.substring(0, lastSlashIndex + 1)}${uniquePrefix}_${fullId.substring(lastSlashIndex + 1)}`;
     console.log('HuggingFace file path:', hfFilePath);
 
     const huggingfaceAPI = new HuggingFaceAPI(hfChannel.token, hfChannel.repo, hfChannel.isPrivate || false);
