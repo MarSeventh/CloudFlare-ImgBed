@@ -26,6 +26,43 @@ if (typeof globalThis.caches === 'undefined') {
     };
 }
 
+// ==================== 自引用 Fetch 拦截器 ====================
+// 解决 Docker 端口映射导致 functions 内部 fetch(url.origin + ...) 失败的问题
+// 不再重写请求 URL，而是拦截自引用的 fetch 调用，透明路由到内部端口
+// 这样 url.origin 保持为外部 origin，确保 Referer 匹配、返回链接、重定向等功能正常
+
+const selfOrigins = new Set();
+const originalFetch = globalThis.fetch;
+
+globalThis.fetch = async function(input, init) {
+    try {
+        let urlStr;
+        if (typeof input === 'string') {
+            urlStr = input;
+        } else if (input instanceof URL) {
+            urlStr = input.toString();
+        } else if (input instanceof Request) {
+            urlStr = input.url;
+        }
+
+        if (urlStr) {
+            const parsed = new URL(urlStr);
+            const internalOrigin = `http://localhost:${port}`;
+            // 如果目标 origin 是已知的外部自身 origin，重写为内部地址
+            if (parsed.origin !== internalOrigin && selfOrigins.has(parsed.origin)) {
+                const newUrl = `${internalOrigin}${parsed.pathname}${parsed.search}`;
+                if (input instanceof Request) {
+                    return originalFetch(new Request(newUrl, input), init);
+                }
+                return originalFetch(newUrl, init);
+            }
+        }
+    } catch (e) {
+        // URL 解析失败，使用原始 fetch
+    }
+    return originalFetch(input, init);
+};
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = resolve(__dirname, '..');
 const FUNCTIONS_DIR = resolve(ROOT_DIR, 'functions');
@@ -197,14 +234,13 @@ async function handleFunctionRequest(originalRequest, pathname) {
     const funcInfo = findFunctionFile(pathname);
     if (!funcInfo) return null;
 
-    // 重写请求 URL，确保 origin 指向内部服务器端口
-    // 解决 Docker 端口映射导致 functions 内部 fetch(url.origin + ...) 失败的问题
-    let request = originalRequest;
-    const originalUrl = new URL(originalRequest.url);
+    // 记录外部 origin，供 fetch 拦截器使用
+    // 不再重写请求 URL，保持 url.origin 为外部 origin
+    const request = originalRequest;
+    const requestUrl = new URL(originalRequest.url);
     const internalOrigin = `http://localhost:${port}`;
-    if (originalUrl.origin !== internalOrigin) {
-        const internalUrl = `${internalOrigin}${originalUrl.pathname}${originalUrl.search}`;
-        request = new Request(internalUrl, originalRequest);
+    if (requestUrl.origin !== internalOrigin) {
+        selfOrigins.add(requestUrl.origin);
     }
 
     // 导入模块

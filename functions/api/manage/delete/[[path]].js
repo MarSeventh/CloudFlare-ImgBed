@@ -36,7 +36,9 @@ export async function onRequest(context) {
 
                 // 获取指定目录下的所有文件
                 const listUrl = new URL(`${url.origin}/api/manage/list?count=-1&dir=${currentFolder.path}`);
-                const listRequest = new Request(listUrl, request);
+                const listRequest = new Request(listUrl, {
+                    headers: request.headers,
+                });
                 const listResponse = await fetch(listRequest);
                 const listData = await listResponse.json();
 
