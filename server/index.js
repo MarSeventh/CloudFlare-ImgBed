@@ -58,7 +58,10 @@ globalThis.fetch = async function(input, init) {
             }
         }
     } catch (e) {
-        // URL 解析失败，使用原始 fetch
+        // URL 解析失败等异常，回退到原始 fetch
+        if (!(e instanceof TypeError)) {
+            console.error('Fetch interceptor error:', e.message);
+        }
     }
     return originalFetch(input, init);
 };
