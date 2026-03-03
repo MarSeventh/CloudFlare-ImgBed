@@ -191,10 +191,20 @@ async function executeChain(middlewares, handler, context) {
 /**
  * 处理 Functions 请求
  */
-async function handleFunctionRequest(request, pathname) {
+async function handleFunctionRequest(originalRequest, pathname) {
     // 查找对应的 function 文件
     const funcInfo = findFunctionFile(pathname);
     if (!funcInfo) return null;
+
+    // 重写请求 URL，确保 origin 指向内部服务器端口
+    // 解决 Docker 端口映射导致 functions 内部 fetch(url.origin + ...) 失败的问题
+    let request = originalRequest;
+    const originalUrl = new URL(originalRequest.url);
+    const internalOrigin = `http://localhost:${port}`;
+    if (originalUrl.origin !== internalOrigin) {
+        const internalUrl = `${internalOrigin}${originalUrl.pathname}${originalUrl.search}`;
+        request = new Request(internalUrl, originalRequest);
+    }
 
     // 导入模块
     const mod = await importModule(funcInfo.file);
