@@ -8,7 +8,9 @@ RUN apt-get update && \
 WORKDIR /app
 COPY . .
 
-RUN npm install --omit=dev
+RUN npm install --omit=dev && \
+    apt-get purge -y --auto-remove python3 make g++ && \
+    rm -rf /root/.npm /tmp/*
 
 EXPOSE 8080
 CMD ["node", "--import", "./server/register.mjs", "server/index.js"]

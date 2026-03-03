@@ -41,6 +41,7 @@ class SqliteD1Statement {
      * 绑定参数（模拟 D1 的 bind 方法）
      */
     bind(...params) {
+        // SQLite 不支持 undefined，转换为 null 以兼容 D1 行为
         this._params = params.map(p => p === undefined ? null : p);
         return this;
     }
