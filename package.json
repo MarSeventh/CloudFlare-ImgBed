@@ -1,7 +1,8 @@
 {
   "type": "module",
   "scripts": {
-    "ci-test": "concurrently --kill-others \"npm run start:docker\" \"wait-on http://localhost:8080 && mocha\"",
+    "ci-test": "concurrently --kill-others \"npm start\" \"wait-on http://localhost:8080 && mocha\"",
+    "ci-test:docker": "concurrently --kill-others \"npm run start:docker\" \"wait-on http://localhost:8080 && mocha\"",
     "test": "mocha",
     "start": "npx wrangler pages dev ./ --kv \"img_url\" --r2 \"img_r2\" --ip 0.0.0.0 --port 8080 --persist-to ./data",
     "start:docker": "node --import ./server/register.mjs server/index.js"
