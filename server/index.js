@@ -13,6 +13,19 @@ import { fileURLToPath } from 'url';
 import { SqliteD1 } from './sqliteD1.js';
 import { LocalR2Storage } from './r2Storage.js';
 
+// ==================== 模拟 Cloudflare 全局 API ====================
+
+// 模拟 Cloudflare Cache API（Node.js 中不存在）
+if (typeof globalThis.caches === 'undefined') {
+    globalThis.caches = {
+        default: {
+            async match() { return undefined; },
+            async put() {},
+            async delete() { return false; },
+        },
+    };
+}
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = resolve(__dirname, '..');
 const FUNCTIONS_DIR = resolve(ROOT_DIR, 'functions');
@@ -209,6 +222,28 @@ async function handleFunctionRequest(request, pathname) {
     // 如果 onRequest 是数组，把前面的加入中间件链
     if (Array.isArray(mod.onRequest) && mod.onRequest.length > 1 && handler === mod.onRequest[mod.onRequest.length - 1]) {
         middlewares.push(...mod.onRequest.slice(0, -1));
+    }
+
+    // 模拟 Cloudflare 的 request.cf 属性（telemetryData 等中间件依赖该属性）
+    if (!request.cf) {
+        request.cf = {
+            country: 'XX',
+            city: 'Unknown',
+            continent: 'XX',
+            latitude: '0',
+            longitude: '0',
+            region: '',
+            regionCode: '',
+            timezone: '',
+            postalCode: '',
+            asn: 0,
+            asOrganization: '',
+            colo: 'LOCAL',
+            httpProtocol: 'HTTP/1.1',
+            requestPriority: '',
+            tlsCipher: '',
+            tlsVersion: '',
+        };
     }
 
     // 创建 Cloudflare Pages Functions 风格的 context 对象
