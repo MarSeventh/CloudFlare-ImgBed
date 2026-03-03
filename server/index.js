@@ -30,6 +30,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = resolve(__dirname, '..');
 const FUNCTIONS_DIR = resolve(ROOT_DIR, 'functions');
 const DATA_DIR = resolve(ROOT_DIR, 'data');
+const port = parseInt(process.env.PORT || '8080', 10);
 
 // 确保数据目录存在
 mkdirSync(DATA_DIR, { recursive: true });
@@ -325,8 +326,6 @@ app.get('*', async (c) => {
 });
 
 // ==================== 启动服务器 ====================
-
-const port = parseInt(process.env.PORT || '8080', 10);
 
 serve({
     fetch: app.fetch,
