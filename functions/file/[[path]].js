@@ -5,7 +5,7 @@ import { DiscordAPI } from "../utils/discordAPI";
 import { HuggingFaceAPI } from "../utils/huggingfaceAPI";
 import {
     setCommonHeaders, setRangeHeaders, handleHeadRequest, getFileContent, isTgChannel,
-    returnWithCheck, return404, isDomainAllowed
+    returnWithCheck, return404, returnBlockImg, isDomainAllowed
 } from './fileTools';
 import { getDatabase } from '../utils/databaseAdapter.js';
 

@@ -6,6 +6,5 @@ services:
     ports:
       - "7658:8080"
     volumes:
-      - ./wrangler.toml:/app/wrangler.toml
       - ./data:/app/data
     restart: unless-stopped
