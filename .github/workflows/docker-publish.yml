@@ -18,6 +18,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Read version from package.json
+        id: version
+        run: echo "VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
@@ -38,7 +42,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
+            type=raw,value=${{ steps.version.outputs.VERSION }}
             type=raw,value=latest
 
       - name: Build and push Docker image
