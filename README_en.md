@@ -55,21 +55,11 @@
 
 ## 2026.3.4 V2.6.2 Docker Image Rebuild Notice
 
-> The Docker image has been rebuilt in this release, involving changes to the base image, directory structure, and database. To ensure data safety, please **back up your data before upgrading**.
+> The Docker image has been rebuilt in this release, involving changes to the base image, directory structure, and database, bringing optimizations in concurrency, memory management, and more. To ensure data safety, please **back up your data before upgrading**.
 >
 > ### Before Upgrading: Back Up Data
 >
-> 1. Stop the running container:
->
->    ```bash
->    docker compose down
->    ```
->
-> 2. Back up the entire `data` directory (including database and storage files):
->
->    ```bash
->    cp -r ./data ./data_backup_$(date +%Y%m%d)
->    ```
+> 1. Back up data: Download the backup file from the admin panel (if you were using local R2 storage, you need to download and re-upload all files)
 >
 > ### Upgrade Steps
 >
@@ -93,6 +83,8 @@
 >
 >    Once you confirm there are no errors in the logs, you're good to go.
 >
+> 4. Restore data: Restore all data from the admin panel (R2 files from the old version need to be re-uploaded)
+> 
 > ### Rollback: Restore Data
 >
 > If something goes wrong after upgrading, follow these steps to roll back:
