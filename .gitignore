@@ -6,3 +6,4 @@ wrangler.toml
 
 .kiro/
 .vscode/
+.claude/

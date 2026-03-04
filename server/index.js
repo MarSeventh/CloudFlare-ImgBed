@@ -7,6 +7,7 @@
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
+import { getConnInfo } from '@hono/node-server/conninfo';
 import { existsSync, readFileSync, readdirSync, statSync, mkdirSync } from 'fs';
 import { join, resolve, dirname } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
@@ -336,7 +337,30 @@ app.all('*', async (c, next) => {
     // 检查是否是 function 路径
     if (isFunctionPath(pathname)) {
         try {
-            const response = await handleFunctionRequest(c.req.raw, pathname);
+            // 获取客户端真实 IP 并注入到请求 header 中
+            // 因为 Node.js 环境没有 cf-connecting-ip 等 CDN header
+            let request = c.req.raw;
+            try {
+                const info = getConnInfo(c);
+                let clientIp = info.remote?.address;
+                // 去掉 IPv6-mapped IPv4 前缀，如 ::ffff:127.0.0.1 → 127.0.0.1
+                if (clientIp && clientIp.startsWith('::ffff:')) {
+                    clientIp = clientIp.slice(7);
+                }
+                if (clientIp && !request.headers.get('x-real-ip')) {
+                    const newHeaders = new Headers(request.headers);
+                    newHeaders.set('x-real-ip', clientIp);
+                    request = new Request(request.url, {
+                        method: request.method,
+                        headers: newHeaders,
+                        body: request.body,
+                        duplex: 'half',
+                    });
+                }
+            } catch (e) {
+                // 获取 IP 失败不影响请求处理
+            }
+            const response = await handleFunctionRequest(request, pathname);
             if (response) {
                 return response;
             }
