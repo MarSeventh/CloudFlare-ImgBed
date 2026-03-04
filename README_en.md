@@ -60,6 +60,7 @@
 > ### Before Upgrading: Back Up Data
 >
 > 1. Back up data: Download the backup file from the admin panel (if you were using local R2 storage, you need to download and re-upload all files)
+> 2. Back up the data folder
 >
 > ### Upgrade Steps
 >
@@ -85,7 +86,7 @@
 >
 > 4. Restore data: Restore all data from the admin panel (R2 files from the old version need to be re-uploaded)
 > 
-> ### Rollback: Restore Data
+> ### Rollback to Previous Version
 >
 > If something goes wrong after upgrading, follow these steps to roll back:
 >
@@ -95,14 +96,7 @@
 >    docker compose down
 >    ```
 >
-> 2. Restore the backup (replace `20260304` with your actual backup date):
->
->    ```bash
->    rm -rf ./data
->    cp -r ./data_backup_20260304 ./data
->    ```
->
-> 3. Pull the previous image version:
+> 2. Pull the previous image version:
 >
 >    ```bash
 >    # amd64
@@ -118,7 +112,7 @@
 >    ```
 >
 > **Notes**:
-> - Make sure the backup is complete before upgrading
+> - Make sure the backup is complete before upgrading, and back up the data folder if necessary
 > - If you have a custom `docker-compose.yml` (e.g., custom ports, environment variables), preserve those settings during the upgrade
 > - For issues, please check the documentation and existing issues first, or submit a new issue
 
