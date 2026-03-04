@@ -6,19 +6,28 @@ let cfEmail = "";
 let cfApiKey = "";
 
 export async function purgeCFCache(env, cdnUrl) {
-    // 读取其他设置
-    othersConfig = await fetchOthersConfig(env);
-    cfZoneId = othersConfig.cloudflareApiToken.CF_ZONE_ID;
-    cfEmail = othersConfig.cloudflareApiToken.CF_EMAIL;
-    cfApiKey = othersConfig.cloudflareApiToken.CF_API_KEY;
+    try {
+        // 读取其他设置
+        othersConfig = await fetchOthersConfig(env);
+        cfZoneId = othersConfig.cloudflareApiToken.CF_ZONE_ID;
+        cfEmail = othersConfig.cloudflareApiToken.CF_EMAIL;
+        cfApiKey = othersConfig.cloudflareApiToken.CF_API_KEY;
 
-    // 清除CDN缓存
-    const options = {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json', 'X-Auth-Email': `${cfEmail}`, 'X-Auth-Key': `${cfApiKey}`},
-        body: `{"files":["${ cdnUrl }"]}`
-    };
-    await fetch(`https://api.cloudflare.com/client/v4/zones/${ cfZoneId }/purge_cache`, options);
+        // 如果没有配置Cloudflare API，跳过缓存清除
+        if (!cfZoneId || !cfEmail || !cfApiKey) {
+            return;
+        }
+
+        // 清除CDN缓存
+        const options = {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-Auth-Email': `${cfEmail}`, 'X-Auth-Key': `${cfApiKey}`},
+            body: `{"files":["${ cdnUrl }"]}`
+        };
+        await fetch(`https://api.cloudflare.com/client/v4/zones/${ cfZoneId }/purge_cache`, options);
+    } catch (error) {
+        console.error('Failed to purge CF cache:', error.message || error);
+    }
 }
 
 export async function purgeRandomFileListCache(origin, ...dirs) {
