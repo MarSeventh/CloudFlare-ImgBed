@@ -9,7 +9,7 @@ import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { existsSync, readFileSync, readdirSync, statSync, mkdirSync } from 'fs';
 import { join, resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { SqliteD1 } from './sqliteD1.js';
 import { LocalR2Storage } from './r2Storage.js';
 
@@ -205,10 +205,12 @@ async function importModule(filePath) {
     if (moduleCache.has(filePath)) {
         return moduleCache.get(filePath);
     }
-    const mod = await import(filePath);
+    // Windows 上 ESM 动态 import 必须使用 file:// URL，不能直接用磁盘路径
+    const mod = await import(pathToFileURL(filePath).href);
     moduleCache.set(filePath, mod);
     return mod;
 }
+
 
 /**
  * 执行中间件链和处理函数
