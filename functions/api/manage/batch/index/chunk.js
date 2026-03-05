@@ -61,6 +61,23 @@ async function calculateChecksum(data) {
 }
 
 /**
+ * 计算 FNV-1a fallback checksum（与前端非安全上下文 fallback 一致）
+ * 当客户端无法使用 crypto.subtle（如通过 0.0.0.0 访问）时使用
+ */
+function calculateFallbackChecksum(data) {
+  const text = JSON.stringify(data);
+  const encoder = new TextEncoder();
+  const dataBuffer = encoder.encode(text);
+  let h1 = 0x811c9dc5 >>> 0;
+  let h2 = 0x811c9dc5 >>> 0;
+  for (let i = 0; i < dataBuffer.length; i++) {
+    h1 = Math.imul(h1 ^ dataBuffer[i], 0x01000193) >>> 0;
+    h2 = Math.imul(h2 ^ dataBuffer[i], 0x01000193 + 0x10) >>> 0;
+  }
+  return h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0');
+}
+
+/**
  * 验证 sessionId 格式
  * 格式: rebuild_{timestamp}_{randomString}
  * @param {string} sessionId - 会话 ID
@@ -258,9 +275,9 @@ function validateRequestBody(body) {
     return { valid: false, error: 'checksum must be a non-empty string' };
   }
   
-  // 验证 checksum 格式（SHA-256 十六进制，64 字符）
-  if (!/^[a-f0-9]{64}$/i.test(body.checksum)) {
-    return { valid: false, error: 'checksum must be a valid SHA-256 hex string (64 characters)' };
+  // 验证 checksum 格式（SHA-256 64字符 或 FNV fallback 16字符）
+  if (!/^[a-f0-9]{16}$/i.test(body.checksum) && !/^[a-f0-9]{64}$/i.test(body.checksum)) {
+    return { valid: false, error: 'checksum must be a valid hex string (16 or 64 characters)' };
   }
   
   return { valid: true };
@@ -297,8 +314,12 @@ export async function onRequestPost(context) {
     // 清理数据中的字符串字段
     const sanitizedData = sanitizeObject(data);
 
-    // 验证 checksum
-    const calculatedChecksum = await calculateChecksum(sanitizedData);
+    // 验证 checksum，根据长度选择对应算法
+    // 64字符 = SHA-256（安全上下文），16字符 = FNV fallback（非安全上下文，如 0.0.0.0）
+    const isFallback = checksum.length === 16;
+    const calculatedChecksum = isFallback
+      ? calculateFallbackChecksum(sanitizedData)
+      : await calculateChecksum(sanitizedData);
     if (calculatedChecksum.toLowerCase() !== checksum.toLowerCase()) {
       return errorResponse('Checksum mismatch', 400, 'The provided checksum does not match the data');
     }
