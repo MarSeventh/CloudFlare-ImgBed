@@ -426,7 +426,19 @@ export class HuggingFaceAPI {
     async commitDirectFile(filePath, file, commitMessage) {
         const url = `${this.baseURL}/api/datasets/${this.repo}/commit/main`;
         
-        const content = btoa(String.fromCharCode(...new Uint8Array(await file.arrayBuffer())));
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        // 分块转换，避免大文件导致 Maximum call stack size exceeded
+        const chunkSize = 4096;
+        const parts = [];
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+            const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+            let s = '';
+            for (let j = 0; j < chunk.length; j++) {
+                s += String.fromCharCode(chunk[j]);
+            }
+            parts.push(s);
+        }
+        const content = btoa(parts.join(''));
         
         const body = [
             JSON.stringify({
