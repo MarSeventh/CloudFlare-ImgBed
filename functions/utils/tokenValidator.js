@@ -1,5 +1,6 @@
 // API Token权限验证工具函数
-import { getTokenPermissions } from '../api/manage/apiTokens.js';
+import { getTokenData } from '../api/manage/apiTokens.js';
+import { isExpired } from './tokenExpiration.js';
 
 /**
  * 验证API Token权限
@@ -28,15 +29,20 @@ export async function validateApiToken(request, db, requiredPermission) {
         return { valid: false, error: '无效的Token格式' };
     }
 
-    // 获取Token权限
-    const permissions = await getTokenPermissions(db, token);
+    // 获取完整Token数据
+    const tokenData = await getTokenData(db, token);
     
-    if (!permissions) {
+    if (!tokenData) {
         return { valid: false, error: '无效的Token' };
     }
 
+    // 检查Token是否已过期
+    if (isExpired(tokenData.expiresAt)) {
+        return { valid: false, error: 'Token 已过期' };
+    }
+
     // 检查权限，如果不需要特定权限（requiredPermission为null），则只要token有效就通过
-    if (requiredPermission !== null && !permissions.includes(requiredPermission)) {
+    if (requiredPermission !== null && !tokenData.permissions.includes(requiredPermission)) {
         return { valid: false, error: `缺少${requiredPermission}权限` };
     }
 
@@ -76,7 +82,12 @@ export async function getTokenInfo(request, kv) {
     // 查找匹配的token
     for (const tokenId in tokens) {
         if (tokens[tokenId].token === token) {
-            return tokens[tokenId];
+            const t = tokens[tokenId];
+            return {
+                ...t,
+                expiresAt: t.expiresAt ?? null,
+                autoDelete: t.autoDelete ?? false
+            };
         }
     }
     
