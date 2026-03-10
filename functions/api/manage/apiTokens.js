@@ -1,4 +1,5 @@
 import { getDatabase } from '../../utils/databaseAdapter.js';
+import { filterAutoDeleteTokens } from '../../utils/tokenExpiration.js';
 
 export async function onRequest(context) {
     // API Token管理，支持创建、删除、列出Token
@@ -24,7 +25,7 @@ export async function onRequest(context) {
     // POST - 创建新Token
     if (method === 'POST') {
         const body = await request.json()
-        const { name, permissions, owner } = body
+        const { name, permissions, owner, expiresAt = null, autoDelete = false } = body
 
         if (!name || !permissions || !owner) {
             return new Response(JSON.stringify({ error: '缺少必要参数' }), {
@@ -35,7 +36,7 @@ export async function onRequest(context) {
             })
         }
 
-        const token = await createApiToken(db, name, permissions, owner)
+        const token = await createApiToken(db, name, permissions, owner, expiresAt, autoDelete)
         return new Response(JSON.stringify(token), {
             headers: {
                 'content-type': 'application/json',
@@ -67,7 +68,7 @@ export async function onRequest(context) {
     // PUT - 更新Token权限
     if (method === 'PUT') {
         const body = await request.json()
-        const { tokenId, permissions } = body
+        const { tokenId, permissions, expiresAt = null, autoDelete = false } = body
 
         if (!tokenId || !permissions) {
             return new Response(JSON.stringify({ error: '缺少必要参数' }), {
@@ -78,7 +79,7 @@ export async function onRequest(context) {
             })
         }
 
-        const result = await updateApiToken(db, tokenId, permissions)
+        const result = await updateApiToken(db, tokenId, permissions, expiresAt, autoDelete)
         return new Response(JSON.stringify(result), {
             headers: {
                 'content-type': 'application/json',
@@ -95,8 +96,8 @@ async function getApiTokens(db) {
     const settings = settingsStr ? JSON.parse(settingsStr) : {}
     const tokens = settings.apiTokens?.tokens || {}
     
-    // 返回时不包含实际token值，只返回基本信息
-    const tokenList = Object.keys(tokens).map(id => {
+    // 将 tokens 对象转为数组，并应用向后兼容默认值
+    const tokenArray = Object.keys(tokens).map(id => {
         const token = tokens[id]
         return {
             id,
@@ -105,15 +106,41 @@ async function getApiTokens(db) {
             permissions: token.permissions,
             createdAt: token.createdAt,
             updatedAt: token.updatedAt,
-            token: token.token.substr(0, 15) + '...' // 只显示前15位
+            token: token.token,
+            expiresAt: token.expiresAt ?? null,
+            autoDelete: token.autoDelete ?? false
         }
     })
+    
+    // 使用 filterAutoDeleteTokens 识别需要自动删除的 Token
+    const { toDelete, toKeep } = filterAutoDeleteTokens(tokenArray)
+    
+    // 从数据库中删除符合自动删除条件的 Token
+    if (toDelete.length > 0) {
+        for (const t of toDelete) {
+            delete settings.apiTokens.tokens[t.id]
+        }
+        await db.put('manage@sysConfig@security', JSON.stringify(settings))
+    }
+    
+    // 返回时不包含实际token值，只返回基本信息
+    const tokenList = toKeep.map(t => ({
+        id: t.id,
+        name: t.name,
+        owner: t.owner,
+        permissions: t.permissions,
+        createdAt: t.createdAt,
+        updatedAt: t.updatedAt,
+        token: t.token.substr(0, 15) + '...', // 只显示前15位
+        expiresAt: t.expiresAt,
+        autoDelete: t.autoDelete
+    }))
     
     return { tokens: tokenList }
 }
 
 // 创建新的API Token
-async function createApiToken(db, name, permissions, owner) {
+async function createApiToken(db, name, permissions, owner, expiresAt = null, autoDelete = false) {
     const settingsStr = await db.get('manage@sysConfig@security')
     const settings = settingsStr ? JSON.parse(settingsStr) : {}
     
@@ -132,7 +159,9 @@ async function createApiToken(db, name, permissions, owner) {
         owner,
         permissions,
         createdAt: now,
-        updatedAt: now
+        updatedAt: now,
+        expiresAt: expiresAt ?? null,
+        autoDelete: autoDelete === true
     }
     
     settings.apiTokens.tokens[tokenId] = tokenData
@@ -147,7 +176,9 @@ async function createApiToken(db, name, permissions, owner) {
         owner,
         permissions,
         createdAt: now,
-        updatedAt: now
+        updatedAt: now,
+        expiresAt: tokenData.expiresAt,
+        autoDelete: tokenData.autoDelete
     }
 }
 
@@ -168,8 +199,8 @@ async function deleteApiToken(db, tokenId) {
     return { success: true, message: 'Token 已删除' }
 }
 
-// 更新API Token权限
-async function updateApiToken(db, tokenId, permissions) {
+// 更新API Token
+async function updateApiToken(db, tokenId, permissions, expiresAt = null, autoDelete = false) {
     const settingsStr = await db.get('manage@sysConfig@security')
     const settings = settingsStr ? JSON.parse(settingsStr) : {}
     
@@ -179,13 +210,15 @@ async function updateApiToken(db, tokenId, permissions) {
     
     settings.apiTokens.tokens[tokenId].permissions = permissions
     settings.apiTokens.tokens[tokenId].updatedAt = new Date().toISOString()
+    settings.apiTokens.tokens[tokenId].expiresAt = expiresAt ?? null
+    settings.apiTokens.tokens[tokenId].autoDelete = autoDelete === true
     
     // 保存到数据库
     await db.put('manage@sysConfig@security', JSON.stringify(settings))
     
     return { 
         success: true, 
-        message: 'Token 权限已更新',
+        message: 'Token 已更新',
         token: settings.apiTokens.tokens[tokenId]
     }
 }
@@ -215,6 +248,33 @@ export async function getTokenPermissions(db, token) {
     for (const tokenId in tokens) {
         if (tokens[tokenId].token === token) {
             return tokens[tokenId].permissions
+        }
+    }
+    
+    return null
+}
+
+// 根据Token获取完整数据对象（供tokenValidator使用）
+export async function getTokenData(db, token) {
+    const settingsStr = await db.get('manage@sysConfig@security')
+    const settings = settingsStr ? JSON.parse(settingsStr) : {}
+    const tokens = settings.apiTokens?.tokens || {}
+    
+    // 查找匹配的token
+    for (const tokenId in tokens) {
+        if (tokens[tokenId].token === token) {
+            const t = tokens[tokenId]
+            return {
+                id: t.id,
+                name: t.name,
+                token: t.token,
+                owner: t.owner,
+                permissions: t.permissions,
+                createdAt: t.createdAt,
+                updatedAt: t.updatedAt,
+                expiresAt: t.expiresAt ?? null,
+                autoDelete: t.autoDelete ?? false
+            }
         }
     }
     
