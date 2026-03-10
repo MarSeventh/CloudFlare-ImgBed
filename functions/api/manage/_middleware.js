@@ -82,21 +82,18 @@ function BadRequestException(reason) {
  * @returns {string|null} 需要的权限类型或null
  */
 function extractRequiredPermission(pathname) {
-  // 提取路径中的关键部分
   const pathParts = pathname.toLowerCase().split('/');
 
-  // 检查是否包含delete路径
   if (pathParts.includes('delete')) {
     return 'delete';
   }
 
-  // 检查是否包含list路径
   if (pathParts.includes('list')) {
     return 'list';
   }
 
-  // 其他情况返回null
-  return null;
+  // 其他 /api/manage 下的操作需要管理权限
+  return 'manage';
 }
 
 // CORS 跨域响应头
