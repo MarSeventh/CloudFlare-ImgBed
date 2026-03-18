@@ -202,8 +202,10 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 
 # 6. Special Sponsors
 
-- **[CloudFlare](https://www.cloudflare.com) & [EdgeOne](https://edgeone.ai/?from=github)**：Provides CDN acceleration, and security protection
+- **[CloudFlare](https://www.cloudflare.com/) & [EdgeOne](https://edgeone.ai/?from=github)**：Provides CDN acceleration, and security protection
 
   <a href="https://www.cloudflare.com"><img src="static/readme/cloudflare-logo.png" alt="Cloudflare Logo" height="25"></a> <a href="https://edgeone.ai/?from=github"><img src="/static/readme/edgeone-logo.png" alt="Tencent Logo" height="25"></a>
 
 - **[svyun](https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC)**：Provides cloud computing resources support
+
+- **[Linux DO](https://linux.do/)**: Genuine · Friendly · United · Expert
