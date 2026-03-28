@@ -1,8 +1,9 @@
 <div align="center">
     <a href="https://github.com/MarSeventh/CloudFlare-ImgBed"><img width="80%" alt="logo" src="static/readme/banner.png"/></a>
-    <p><em>🗂️开源文件托管解决方案，支持 Docker 和无服务器部署，支持 Telegram、Discord、Cloudflare R2、S3、Huggingface 等多种存储渠道，支持 WebDAV 协议和多种 RESTful API</em></p>
+    <p><em>🗂️Open-source file hosting solution, supporting Docker and serverless deployment, supporting multiple storage channels such as Telegram, Discord, Cloudflare R2, S3, Huggingface, etc., supporting WebDAV protocol and various RESTful APIs.</em></p>
     <p>
-        <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README.md">简体中文</a> | <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README_en.md">English</a> | <a href="https://cfbed.sanyue.de">官方网站</a>
+        <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README_zh.md">简体中文</a> | <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README.md">English</a> | <a
+        href="https://cfbed.sanyue.de/en">Official Website</a>
     </p>
     <p align="center">
         <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/LICENSE">
@@ -26,7 +27,7 @@
         <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/network/members">
           <img src="https://img.shields.io/github/forks/MarSeventh/CloudFlare-ImgBed" alt="Forks" />
         </a>
-    </P>
+    </p>
     <p align="center">
       <a href="https://trendshift.io/repositories/14324" target="_blank">
         <img src="https://trendshift.io/api/badge/repositories/14324" alt="GitHub Trending" height="80">
@@ -37,73 +38,65 @@
 
 
 
-
-
-
-
 ---
 
 > [!IMPORTANT]
 >
-> **v2.0 版本升级注意事项请查看公告！**
-
+> **Please check the announcement for upgrade notes on version 2.0!**
 
 
 <details>
-    <summary>公告</summary>
+    <summary>Announcement</summary>
 
+## Pinned
 
+1. If you encounter issues during deployment or usage, please carefully read the documentation, FAQ, and existing issues first.
+2. **Note**: This repository is a remake of the [Telegraph-Image](https://github.com/cf-pages/Telegraph-Image) project. If you like this project, please support the original one as well.
 
-## 置顶
+## 2026.3.4 V2.6.2 Docker Image Rebuild Notice
 
-1. 部署使用出现问题，请先仔细查阅文档、常见问题解答以及已有issues。
-
-2. **注意**：本仓库为[Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，如果你觉得本项目不错，在支持本项目的同时，也请支持原项目。
-
-## 2026.3.4 V2.6.2 重构 Docker 镜像的说明
-
-> 本次版本对 Docker 镜像进行了重构，涉及基础镜像、目录结构和数据库等方面的变更，带来了并发、内存管理等方面的优化。为确保数据安全，请务必**先备份数据再进行升级**。
+> The Docker image has been rebuilt in this release, involving changes to the base image, directory structure, and database, bringing optimizations in concurrency, memory management, and more. To ensure data safety, please **back up your data before upgrading**.
 >
-> ### 升级前：备份数据
+> ### Before Upgrading: Back Up Data
 >
-> 1. 备份数据：在管理面板下载备份文件（若原来使用本地R2存储需要全部下载重传）
-> 2. 备份data文件夹
+> 1. Back up data: Download the backup file from the admin panel (if you were using local R2 storage, you need to download and re-upload all files)
+> 2. Back up the data folder
 >
-> ### 升级步骤
+> ### Upgrade Steps
 >
-> 1. 拉取最新镜像：
+> 1. Pull the latest image:
 >
 >    ```bash
 >    docker compose pull
 >    ```
 >
-> 2. 使用新镜像启动容器：
+> 2. Start the container with the new image:
 >
 >    ```bash
 >    docker compose up -d
 >    ```
 >
-> 3. 检查容器是否正常运行：
+> 3. Verify the container is running properly:
 >
 >    ```bash
 >    docker compose logs -f
 >    ```
 >
->    确认日志中无报错信息后即可正常使用。
+>    Once you confirm there are no errors in the logs, you're good to go.
 >
-> 4. 恢复数据：在管理面板恢复全部数据（原来的R2文件需要重传）
+> 4. Restore data: Restore all data from the admin panel (R2 files from the old version need to be re-uploaded)
 > 
-> ### 升级异常：回退版本
+> ### Rollback to Previous Version
 >
-> 如果升级后出现异常，可通过以下步骤回退：
+> If something goes wrong after upgrading, follow these steps to roll back:
 >
-> 1. 停止容器：
+> 1. Stop the container:
 >
 >    ```bash
 >    docker compose down
 >    ```
 >
-> 2. 回退到旧版本镜像：
+> 2. Pull the previous image version:
 >
 >    ```bash
 >    # amd64
@@ -112,67 +105,62 @@
 >    docker pull marseventh/cloudflare-imgbed@sha256:b5442ccc198c
 >    ```
 >
->    同时修改 `docker-compose.yml` 中的 `image` 字段为对应旧版本 tag，然后重新启动：
+>    Also update the `image` field in `docker-compose.yml` to the old version tag, then restart:
 >
 >    ```bash
 >    docker compose up -d
 >    ```
 >
-> **注意事项**：
-> - 升级前请务必确认备份完整，必要时备份一份data文件夹
-> - 如果你使用了自定义的 `docker-compose.yml` 配置（如自定义端口、环境变量等），升级时请注意保留
-> - 遇到问题请先查阅文档和已有 issues，或提交新的 issue
+> **Notes**:
+> - Make sure the backup is complete before upgrading, and back up the data folder if necessary
+> - If you have a custom `docker-compose.yml` (e.g., custom ports, environment variables), preserve those settings during the upgrade
+> - For issues, please check the documentation and existing issues first, or submit a new issue
 
-## 2025.2.6  V2.0 版本升级注意事项
+## 2025.2.6 Version 2.0 Upgrade Notes
 
-> v2.0 版已发布，相较于 v1.0 版本进行了大量改动和优化，但 beta 版本可能存在潜在不稳定性，若您追求稳定，可选择暂缓更新。
+> The v2.0 version has been released, with many changes and optimizations compared to v1.0. However, the beta version may have potential instability. If you prefer stability, you may delay updating.
 >
-> 由于**构建命令发生了变化**，此次更新需要您**手动进行**，请按照以下步骤进行操作：
+> Due to **changes in the build command**, this update requires **manual operation**. Please follow these steps:
 >
-> - 同步fork的仓库至最新版（若已自动同步可忽略）
->
-> - 前往 pages 管理页面，进入`设置`->`构建`，编辑`构建配置`，在`构建命令`处填写`npm install`
->
-> - 新版本所有设置项已**迁移至 管理端->系统设置 界面**，原则上无需再通过环境变量的方式进行设置，通过系统设置界面进行的设置将**覆盖掉**环境变量中的设置，但为了保证 **Telegram渠道的图片** 能够与旧版本相兼容，**若您之前设置了 Telegram 渠道相关的环境变量，请将其保留！**
->
-> - 确保上述设置完成无误后，前往 pages 管理页面，进入`部署`，对最后一次不成功的部署进行`重试操作`
+> - Sync your forked repository to the latest version (ignore if already synced automatically)
+> - Go to the Pages management page, enter `Settings` -> `Build`, edit the `Build configuration`, and set the `Build command` to `npm install`
+> - All new version settings have been **migrated to the Admin Panel -> System Settings** interface, so generally no need to configure environment variables anymore. Settings made in the system settings interface will **override** environment variable settings. However, to ensure compatibility of images uploaded via the Telegram channel with the old version, **please keep any previously set Telegram-related environment variables!**
+> - After confirming the above settings are correct, go to the Pages management page, enter `Deployments`, and `Retry` the last failed deployment.
 
-## 关于切换到 Telegram 渠道的通知
+## Notification About Switching to Telegram Channel
 
-
-> 由于telegraph图床被滥用，该项目上传渠道已切换至Telegram Channel，请**更新至最新版（更新方式见第3.1章最后一节）**，按照文档中的部署要求**设置`TG_BOT_TOKEN`和`TG_CHAT_ID`**，否则将无法正常使用上传功能。
+> Due to abuse of the telegraph image hosting, the upload channel has switched to Telegram Channel. Please **update to the latest version (see the last section of chapter 3.1 for update instructions)** and set `TG_BOT_TOKEN` and `TG_CHAT_ID` according to the deployment requirements in the documentation, otherwise upload functionality will not work.
 >
-> 此外，目前**KV数据库为必须配置**，如果以前未配置请按照文档说明配置。
+> Also, the **KV database is now mandatory**; if not configured before, please configure it as per the documentation.
 >
-> 出现问题，请先查看第5节常见问题Q&A部分。
+> For issues, please check section 5 FAQ first.
 
 </details>
 
 
 
-
 # 1. Introduction
 
-免费文件托管解决方案，具有**上传**、**管理**、**读取**、**删除**等全链路功能，覆盖文件全生命周期，支持**鉴权**、**目录**、**图片审查**、**随机图**等各项特性（详见[功能文档](https://cfbed.sanyue.de/guide/features.html)）。
+Free file hosting solution with full lifecycle features including **upload**, **management**, **read**, and **delete**, supporting **authentication**, **directories**, **image moderation**, **random images**, and other features (see [Feature Docs](https://cfbed.sanyue.de/en/guide/features.html) for details).
 
 ![CloudFlare](static/readme/海报.png)
 
-# 2. [Document](https://cfbed.sanyue.de)
+# 2. [Document](https://cfbed.sanyue.de/en)
 
-提供详细的部署文档、功能文档、开发计划、更新日志、常见问题解答等，帮助您快速上手。
+Provides detailed deployment documentation, feature docs, development plans, update logs, FAQ, and more to help you get started quickly.
 
-[![更新日志](https://recent-update.cfbed.sanyue.de/cn)](https://cfbed.sanyue.de/guide/update-log.html)
+[![recent update](https://recent-update.cfbed.sanyue.de/en)](https://cfbed.sanyue.de/en/guide/update-log.html)
 
 # 3. Demo
 
-**演示站点**：[CloudFlare ImgBed](https://cfbed.1314883.xyz/) 访问密码：`cfbed`
+**Demo Address**: [CloudFlare ImgBed](https://cfbed.1314883.xyz/) Access Password: `cfbed`
 
 ![image-20250313204101984](static/readme/login.png)
 
-![image-20250313204101984](static/readme/upload.png)
+![image-20250313204138886](static/readme/upload.png)
 
 <details>
-    <summary>其他页面效果展示</summary>
+    <summary>Other page screenshots</summary>
 
 ![image-20250313204138886](static/readme/uploading.png)
 
@@ -190,34 +178,34 @@
 
 # 4. Tips
 
-- **前端开源**：参见[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)项目。
+- Frontend is open source, see [MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub).
 
-- **生态建设**：欢迎社区参与生态建设，欢迎提交 PR 或者 Issue，优质内容参见[官网生态建设页面](https://cfbed.sanyue.de/about/ecosystem.html)。
+- **Ecosystem**: We welcome community participation in the ecosystem construction. Feel free to submit PRs or Issues, and high-quality content can be found on the [official ecosystem page](https://cfbed.sanyue.de/en/about/ecosystem.html).
 
-- **赞助**：项目维护不易，喜欢本项目的话，可以作者大大一点小小的鼓励哦，您的每一份支持都是我前进的动力\~ 
+- **Sponsor**: Maintaining the project is not easy. If you like it, please support the author. Your support is the motivation to keep going~
 
   <a href="https://afdian.com/a/marseventh"><img width="200" src="https://pic1.afdiancdn.com/static/img/welcome/button-sponsorme.png" alt=""></a>
   
-- **Sponsors**：感谢以下赞助者对本项目的支持！
+- **Sponsors**: Thanks to the following sponsors for supporting this project!
 
-  [![赞助者](https://afdian-sponsors.sanyue.de/image?columns=12)](https://afdian.com/a/marseventh)
+  [![sponsors](https://afdian-sponsors.sanyue.de/image?columns=12)](https://afdian.com/a/marseventh)
   
-- **Contributors**：感谢以下贡献者对本项目的无私贡献！
+- **Contributors**: Thanks to the following contributors for their selfless contributions!
 
   [![Contributors](https://contrib.rocks/image?repo=Marseventh/Cloudflare-ImgBed)](https://github.com/MarSeventh/CloudFlare-ImgBed/graphs/contributors)
 
 # 5. Star History
 
-**如果觉得项目不错希望您能给个免费的star✨✨✨，非常感谢！**
+**If you like the project, please give a free star✨✨✨, thank you very much!**
 
 [![Star History Chart](https://api.star-history.com/svg?repos=MarSeventh/CloudFlare-ImgBed,MarSeventh/Sanyue-ImgHub&type=Date)](https://star-history.com/#MarSeventh/CloudFlare-ImgBed&MarSeventh/Sanyue-ImgHub&Date)
 
 # 6. Special Sponsors
 
-- **[CloudFlare](https://www.cloudflare.com) & [EdgeOne](https://edgeone.ai/?from=github)**：提供CDN加速和安全保护服务
+- **[CloudFlare](https://www.cloudflare.com/) & [EdgeOne](https://edgeone.ai/?from=github)**：Provides CDN acceleration, and security protection
 
   <a href="https://www.cloudflare.com"><img src="static/readme/cloudflare-logo.png" alt="Cloudflare Logo" height="25"></a> <a href="https://edgeone.ai/?from=github"><img src="/static/readme/edgeone-logo.png" alt="Tencent Logo" height="25"></a>
 
-- **[速维云](https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC)**：提供云计算服务资源支持
+- **[svyun](https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC)**：Provides cloud computing resources support
 
-- **[Linux DO](https://linux.do/)**：真诚 友善 团结 专业
+- **[Linux DO](https://linux.do/)**: Genuine · Friendly · United · Expert
