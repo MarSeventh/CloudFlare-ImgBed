@@ -46,18 +46,16 @@
     </style>
 </head>
 <body oncontextmenu="return false;" onselectstart="return false;" ondragstart="return false;">
-    
-    <noscript><strong>We're sorry but sanyue_imghub doesn't work properly without JavaScript enabled. Please enable it to continue.</strong></noscript>
 
     <canvas id="matrix-canvas"></canvas>
     <div class="cursor-dot"></div>
     <div class="cursor-outline"></div>
-    <div class="vertical-brand">IMAGE_HOSTING_HUB_v2.0</div>
+    <div class="vertical-brand">EDMS_DETECTION_SYS_v1.0</div>
 
     <nav>
         <div class="nav-logo">
             <a href="https://cloud.familyyee.com/index.html">
-                <img src="https://cloud.familyyee.com/asset/img/Cloud FAMILY YEE LOGO [White].png" style="width: 130px;" alt="Logo">
+                <img src="https://cloud.familyyee.com/asset/img/Cloud FAMILY YEE LOGO [White].png" style="width: 130px;">
             </a>
         </div>
         <div class="menu-toggle" id="mobile-menu">☰</div>
@@ -79,10 +77,12 @@
                 </ul>
             </li>
             <li class="nav-item">
-                <a class="nav-link" style="color: var(--primary);">/ 其他合作外网 [▾]</a>
+                <a class="nav-link">/ 其他合作外网 [▾]</a>
                 <ul class="dropdown">
-                    <li><a href="https://piclink.cloud.familyyee.com" class="nav-link" style="color: var(--primary);">图床创建</a></li>
-                    <li class="nav-disabled"><a href="#" class="nav-link">创建M365邮箱</a></li>
+                    <li><a href="https://piclink.cloud.familyyee.com" class="nav-link">图床创建</a></li>
+                    <div class="disabled" style="cursor: not-allowed;" disabled>
+                        <li><a href="https://cnfy.dpdns.org" class="nav-link">创建M365邮箱</a></li>
+                    </div>
                     <li><a href="https://www.familyyee.com" class="nav-link">FAMILY YEE</a></li>
                     <li><a href="https://www.davinchong.com" class="nav-link">Davinchong.com</a></li>
                     <li><a href="https://itcsi.familyyee.com" class="nav-link">ITCSI July 2024</a></li>
@@ -93,7 +93,7 @@
                 <a class="nav-link">/ 关于我们 [▾]</a>
                 <ul class="dropdown">
                     <li><a href="https://cloud.familyyee.com/about.html" class="nav-link">关于公司</a></li>
-                    <li><a href="mailto:cloudnetwork@cloud.familyyee.com" class="nav-link">电邮我们</a></li>
+                    <li><a href="/cdn-cgi/l/email-protection#fd9e919288999398898a928f96bd9e91928899d39b9c90949184849898d39e9290" class="nav-link">电邮我们</a></li>
                     <li><a href="#feedback" class="nav-link">提交反馈</a></li>
                 </ul>
             </li>
@@ -107,7 +107,9 @@
                     <li><a href="https://piclink.cloud.familyyee.com" class="nav-link">Piclink [Admin Only]</a></li>
                 </ul>
             </li>
+            <!-- <li class="nav-item"><a href="#creative" class="nav-link">/ 登录</a></li> -->
         </ul>
+
     </nav>
 
     <div class="sys-ticker">
@@ -158,18 +160,125 @@
         </div>
     </section>
 
+    <section id="contact">
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 50px;"
+            class="reveal">
+            <h2 class="section-header" style="margin-bottom: 0;">联络方式</h2>
+            <!-- <div style="color: var(--text-muted); font-size: 0.9rem;">[ SORT: DATE_DESC ]</div> -->
+        </div>
+
+
+        <div class="grid-layout" style="grid-template-columns: 1fr;" id="feedback">
+            <div class="glass-card reveal active">
+                <div class="grid-layout" style="grid-template-columns: 1fr;"
+                    style="max-width: 800px; margin: 0 auto; width: 100%; border-left: 4px solid var(--primary); display: flex; flex-direction: column; gap: 15px; padding-left: 20px;">
+                    <h3 style="color: var(--primary); font-size: 1.5rem; margin-bottom: 0px; ">>
+                        反馈表格</h3>
+                    <!-- <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 30px;">[ STATUS: ENCRYPTED
+                            ] 您的建议是我们系统升级的核心驱动力。请提交您的反馈或诉求。</p> -->
+
+                    <form id="feedback-form" class="cyber-form">
+                        <div class="form-group">
+                            <label for="name">> USER_ID [姓名]</label>
+                            <input type="text" id="name" name="Name" placeholder="请输入您的姓名" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="email">> CONTACT_RELAY [电邮]</label>
+                            <input type="email" id="email" name="Email" placeholder="请输入您的电子邮箱" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="message">> TRANSMISSION_DATA [反馈诉求]</label>
+                            <textarea id="message" name="Message" rows="5" placeholder="请详细说明您的反馈或诉求"
+                                required></textarea>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" id="submit-button" class="btn-cyber">提交反馈</button>
+                        </div>
+                        <div id="form-message" class="form-message"></div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="grid-layout" style="grid-template-columns: 1fr 1fr; margin-top: 10px;">
+
+                <div class="glass-card reveal">
+                    <h4 style="color: #fff; margin-bottom: 10px;">公司地址</h4>
+                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 15px;">
+                        Taman Universiti Indah, 43300 Seri Kembangan, Selangor, Malaysia。
+                    </p>
+                    <a href="https://maps.app.goo.gl/2qpMxnKtbjgYV9xb8"
+                        style="color: var(--primary); font-size: 0.85rem; text-decoration: none;">[ 开始导航
+                        ]</a>
+                </div>
+
+                <div class="glass-card reveal" style="transition-delay: 0.1s;">
+                    <h4 style="color: #fff; margin-bottom: 10px;">公司电邮与联络号码</h4>
+                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 15px;">
+                        <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="fa9996958f9e949f8e8d958891ba9996958f9ed49c9b97939683839f9fd4999597">[email&#160;protected]</a><br>
+                        <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="91e8f4f4ebf9f8e0e4f0ffa1a1d1f2fdfee4f5bff7f0fcf8fde8e8f4f4bff2fefc">[email&#160;protected]</a><br>
+                        +60 10-974 5887
+                    </p>
+                    <a href="/cdn-cgi/l/email-protection#d4b7b8bba1b0bab1a0a3bba6bf94b7b8bba1b0fab2b5b9bdb8adadb1b1fab7bbb9" style="color: var(--primary); font-size: 0.85rem; text-decoration: none;">[ 电邮我们
+                        ]</a>
+                </div>
+
+                <div class="glass-card reveal">
+                    <h4 style="color: #fff; margin-bottom: 10px;">运营时间</h4>
+                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 15px;">
+                        周一至周五 10:00 - 17:00<br>
+                        周末与公共假期休息
+                    </p>
+                    <!-- <a href="#" style="color: var(--primary); font-size: 0.85rem; text-decoration: none;">[ VIEW_LOGS
+                        ]</a> -->
+                </div>
+
+                <div class="glass-card reveal" style="transition-delay: 0.1s;">
+                    <h4 style="color: #fff; margin-bottom: 10px;">母公司联络方式</h4>
+                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 15px;">
+                        <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="5137303c383d282834341137303c383d282834347f323e3c">[email&#160;protected]</a></p>
+                    <a href="/cdn-cgi/l/email-protection#e98f8884808590908c8ca98f8884808590908c8cc78a8684" style="color: var(--primary); font-size: 0.85rem; text-decoration: none;">[ 电邮我们
+                        ]</a>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="partners reveal">
+            <h4 style="color: var(--text-muted); font-size: 0.9rem; letter-spacing: 3px; margin-bottom: 20px;">
+                THE COMPANY MANAGED BY
+            </h4>
+            <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 15px;">
+                <img src="https://www.familyyee.com/assets/img/FAMILY YEE Official Logo.png"
+                    style="width: 100px; margin-right: 20px;">
+            </div>
+            <div class="partner-logo">FAMILYYEE<span>.COM</span></div>
+            <p style="color: var(--text-muted); max-width: 600px; margin: 15px auto 0; font-size: 0.9rem;">
+                The company is a subsidiary of FAMILY YEE, and relevant qualifications and certifications can be
+                provided upon request.
+                For further compliance materials or licenses, please contact us using the contact information in the
+                footer.
+            </p>
+        </div>
+    </section>
+
+
     <footer>
         <div class="footer-grid">
             <div class="footer-col reveal">
                 <div class="nav-logo" style="margin-bottom: 15px;">
-                    <img src="https://www.familyyee.com/assets/img/FAMILY YEE Official Logo.png" style="width: 100px; margin-bottom: 10px;">
-                    <h3 style="color: var(--primary); font-size: 1.5rem; margin-top: 10px;">CLOUD NETWORK<br>FAMILY YEE</h3>
-                    <h4 style="color: #666; font-size: 0.9rem; margin-top: 5px;">Managed by FAMILY YEE</h4>
+                    <img src="https://www.familyyee.com/assets/img/FAMILY YEE Official Logo.png"
+                        style="width: 100px; margin-bottom: 10px;">
+                    <h3 style="color: var(--primary); font-size: 1.5rem;">CLOUD NETWORK FAMILY YEE</h3>
+                    <h4>Managed by FAMILY YEE</h4>
                 </div>
-                <p>构建具有弹性的数字基础设施，开发先进的网络应用程序，并执行毫不妥协的网络安全协议。</p>
+                <p>
+                    构建具有弹性的数字基础设施，开发先进的网络应用程序，并执行毫不妥协的网络安全协议。
+                </p>
                 <p style="color: var(--primary); margin-top: 15px;">> 连接安全_已获得加密</p>
             </div>
-            
             <div class="footer-col reveal" style="transition-delay: 0.1s;">
                 <h4>其他服务</h4>
                 <ul class="footer-links">
@@ -187,16 +296,22 @@
                 <p><strong>HQ:</strong> Kajang, Selangor, MY</p>
                 <p><strong>ENV:</strong> Ubuntu / Cloudflare</p>
                 <p><strong>SYS.DATE:</strong> 2026.04</p>
-                <a href="mailto:admin@familyyee.com" class="btn-cyber" style="padding: 10px 20px; font-size: 0.8rem; margin-top: 10px;">PING_ADMIN</a>
+                <a href="/cdn-cgi/l/email-protection#7312171e1a1d3315121e1a1f0a0a16165d101c1e" class="btn-cyber" style="padding: 10px 20px; font-size: 0.8rem; margin-top: 10px;">PING_ADMIN</a>
             </div>
-        </div>
-        
-        <div class="footer-bottom">
-            <div>© 2018-2026 CLOUD NETWORK FAMILY YEE. All Rights Reserved.</div>
-        </div>
-    </footer>
 
+        </div>
+        <div class="footer-bottom">
+            <div>&copy; 2018-2026 CLOUD NETWORK FAMILY YEE. All Rights Reserved.</div>
+            <!-- <div class="sys-status">
+                <span>Latency: 12ms</span>
+                <span>Node: KL-01</span>
+                <span>Uptime: 99.99%</span>
+            </div> -->
+        </div>
+
+    </footer>
     <script src="https://cloud.familyyee.com/asset/javascript/main.js"></script>
+    <script src="https://cloud.familyyee.com/asset/javascript/form-submittion.js"></script>
 
 </body>
 </html>
