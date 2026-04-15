@@ -1,1 +1,202 @@
-<!doctype html><html lang=""><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="/logo.png"><link rel="apple-touch-icon" href="/logo.png"><link rel="mask-icon" href="/logo.png" color="#f4b400"><meta name="description" content="Sanyue ImgHub - A modern file hosting platform"><meta name="keywords" content="Sanyue, ImgHub, file hosting, image hosting, cloud storage"><meta name="author" content="SanyueQi"><title>Sanyue ImgHub</title><script defer="defer" src="/js/chunk-vendors.8dadfdfd.js"></script><script defer="defer" src="/js/app.f0825045.js"></script><link href="/css/chunk-vendors.f9cd4701.css" rel="stylesheet"><link href="/css/app.75711fde.css" rel="stylesheet"></head><body><noscript><strong>We're sorry but sanyue_imghub doesn't work properly without JavaScript enabled. Please enable it to continue.</strong></noscript><div id="app"></div></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    
+    <link rel="icon" href="/logo.png">
+    <link rel="apple-touch-icon" href="/logo.png">
+    <link rel="mask-icon" href="/logo.png" color="#00A2FF">
+    <meta name="description" content="Sanyue ImgHub - A modern file hosting platform">
+    <meta name="keywords" content="Sanyue, ImgHub, file hosting, image hosting, cloud storage">
+    <meta name="author" content="SanyueQi">
+    
+    <title>图床创建节点 | Cloud FAMILY YEE</title>
+
+    <link rel="stylesheet" href="https://cloud.familyyee.com/asset/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script defer="defer" src="/js/chunk-vendors.8dadfdfd.js"></script>
+    <script defer="defer" src="/js/app.f0825045.js"></script>
+    <link href="/css/chunk-vendors.f9cd4701.css" rel="stylesheet">
+    <link href="/css/app.75711fde.css" rel="stylesheet">
+
+    <style>
+        /* * [防御性 CSS] 
+         * 因为 Vue app 自己的 CSS 可能会把整个网页背景变成白色，
+         * 这里强制保护 Cloud FAMILY YEE OS 的暗黑背景不被覆盖。
+         */
+        html, body {
+            background-color: var(--bg-dark) !important;
+            color: var(--text-main) !important;
+        }
+
+        /* * 给图床应用创造一个独立的“沙盒”空间，
+         * 保证它内部的颜色和布局正常显示，不受外部赛博风格干扰。
+         */
+        #app-sandbox {
+            width: 100%;
+            min-height: 70vh;
+            background: #ffffff; /* 给图床内部提供白底，防止文字看不清 */
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+    </style>
+</head>
+<body oncontextmenu="return false;" onselectstart="return false;" ondragstart="return false;">
+    
+    <noscript><strong>We're sorry but sanyue_imghub doesn't work properly without JavaScript enabled. Please enable it to continue.</strong></noscript>
+
+    <canvas id="matrix-canvas"></canvas>
+    <div class="cursor-dot"></div>
+    <div class="cursor-outline"></div>
+    <div class="vertical-brand">IMAGE_HOSTING_HUB_v2.0</div>
+
+    <nav>
+        <div class="nav-logo">
+            <a href="https://cloud.familyyee.com/index.html">
+                <img src="https://cloud.familyyee.com/asset/img/Cloud FAMILY YEE LOGO [White].png" style="width: 130px;" alt="Logo">
+            </a>
+        </div>
+        <div class="menu-toggle" id="mobile-menu">☰</div>
+
+        <ul class="nav-menu" id="nav-menu">
+            <li class="nav-item"><a href="https://cloud.familyyee.com/index.html" class="nav-link">/ 首页</a></li>
+            <li class="nav-item"><a href="https://cloud.familyyee.com/post.html" class="nav-link">/ 公司通告</a></li>
+            <li class="nav-item">
+                <a class="nav-link">/ 公司服务 [▾]</a>
+                <ul class="dropdown">
+                    <li><a href="https://cloud.familyyee.com/speedtest.html" class="nav-link">网络测速</a></li>
+                    <li><a href="https://cloud.familyyee.com/download.html" class="nav-link">软件下载</a></li>
+                    <li><a href="https://www.familyyee.com/qr-general" class="nav-link">二维码生成</a></li>
+                    <li><a href="https://cloud.familyyee.com/detect" class="nav-link">网络监控中心</a></li>
+                    <li><a href="https://cloud.familyyee.com/webstatus-detect" class="nav-link">实时服务监控</a></li>
+                    <li><a href="https://cloud.familyyee.com/weater" class="nav-link">实时天气监控</a></li>
+                    <li><a href="https://cloud.familyyee.com/Email-Signature.html" class="nav-link">邮件签名生成</a></li>
+                    <li><a href="https://cloud.familyyee.com/shortURL.html" class="nav-link">缩短网址服务</a></li>
+                </ul>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" style="color: var(--primary);">/ 其他合作外网 [▾]</a>
+                <ul class="dropdown">
+                    <li><a href="https://piclink.cloud.familyyee.com" class="nav-link" style="color: var(--primary);">图床创建</a></li>
+                    <li class="nav-disabled"><a href="#" class="nav-link">创建M365邮箱</a></li>
+                    <li><a href="https://www.familyyee.com" class="nav-link">FAMILY YEE</a></li>
+                    <li><a href="https://www.davinchong.com" class="nav-link">Davinchong.com</a></li>
+                    <li><a href="https://itcsi.familyyee.com" class="nav-link">ITCSI July 2024</a></li>
+                    <li><a href="https://blog.jimmymaomao.dpdns.org/" class="nav-link">JimmyMaoMao</a></li>
+                </ul>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link">/ 关于我们 [▾]</a>
+                <ul class="dropdown">
+                    <li><a href="https://cloud.familyyee.com/about.html" class="nav-link">关于公司</a></li>
+                    <li><a href="mailto:cloudnetwork@cloud.familyyee.com" class="nav-link">电邮我们</a></li>
+                    <li><a href="#feedback" class="nav-link">提交反馈</a></li>
+                </ul>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link">/ 用户登录 [▾]</a>
+                <ul class="dropdown">
+                    <li><a href="https://portal.familyyee.com" class="nav-link">Portal System</a></li>
+                    <li><a href="https://drive.google.com" class="nav-link">Google [Working User]</a></li>
+                    <li><a href="https://myapps.microsoft.com/cloud.familyyee.com" class="nav-link">Microsoft [Working User]</a></li>
+                    <li><a href="https://github.com" class="nav-link">GitHub [Working User]</a></li>
+                    <li><a href="https://piclink.cloud.familyyee.com" class="nav-link">Piclink [Admin Only]</a></li>
+                </ul>
+            </li>
+        </ul>
+    </nav>
+
+    <div class="sys-ticker">
+        <div class="ticker-wrapper">
+            <span class="ticker-item">[SYS.STORAGE] Image Hosting Hub module is mounted and ready.</span>
+            <span class="ticker-item">[NOTICE] 请勿上传包含敏感、非法或侵权的数据资产，系统已开启自动化审查。</span>
+        </div>
+        <div class="ticker-wrapper">
+            <span class="ticker-item">[SYS.STORAGE] Image Hosting Hub module is mounted and ready.</span>
+            <span class="ticker-item">[NOTICE] 请勿上传包含敏感、非法或侵权的数据资产，系统已开启自动化审查。</span>
+        </div>
+    </div>
+
+    <section id="imghub-hero" style="min-height: 30vh; padding-bottom: 0;">
+        <div class="reveal">
+            <div class="glitch-title" style="font-size: clamp(2.5rem, 5vw, 4rem);">
+                IMAGE_HOSTING<br><span class="highlight">HUB</span>
+            </div>
+            <p class="hero-desc">
+                Cloud FAMILY YEE 全球图床存储节点。支持极速图像分发与高速外链生成。
+            </p>
+        </div>
+    </section>
+
+    <section id="imghub-app" style="padding-top: 30px;">
+        <div class="grid-layout" style="grid-template-columns: 1fr;">
+            
+            <div class="glass-card reveal" style="padding: 0; overflow: hidden; border-top: 3px solid var(--primary); border-radius: 8px;">
+                
+                <div style="padding: 12px 20px; background: rgba(0,162,255,0.1); border-bottom: 1px solid var(--glass-border); display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-family: monospace; font-size: 0.85rem; color: var(--primary);">
+                        > MOUNTING_VUE_MODULE: SANYUE_IMGHUB (Running...)
+                    </span>
+                    <span class="status-active" style="background: rgba(0, 255, 0, 0.1); color: #0f0; border: 1px solid #0f0; padding: 3px 8px; font-size: 0.7rem;">STORAGE_ONLINE</span>
+                </div>
+
+                <div id="app-sandbox">
+                    <div id="app"></div>
+                </div>
+
+            </div>
+            
+            <div style="text-align: center; margin-top: 15px;">
+                <p style="color: var(--text-muted); font-size: 0.85rem; font-family: monospace;">
+                    [SYS.INFO] Frontend engine powered by Sanyue ImgHub. Hosted on Cloud FAMILY YEE infrastructure.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="footer-grid">
+            <div class="footer-col reveal">
+                <div class="nav-logo" style="margin-bottom: 15px;">
+                    <img src="https://www.familyyee.com/assets/img/FAMILY YEE Official Logo.png" style="width: 100px; margin-bottom: 10px;">
+                    <h3 style="color: var(--primary); font-size: 1.5rem; margin-top: 10px;">CLOUD NETWORK<br>FAMILY YEE</h3>
+                    <h4 style="color: #666; font-size: 0.9rem; margin-top: 5px;">Managed by FAMILY YEE</h4>
+                </div>
+                <p>构建具有弹性的数字基础设施，开发先进的网络应用程序，并执行毫不妥协的网络安全协议。</p>
+                <p style="color: var(--primary); margin-top: 15px;">> 连接安全_已获得加密</p>
+            </div>
+            
+            <div class="footer-col reveal" style="transition-delay: 0.1s;">
+                <h4>其他服务</h4>
+                <ul class="footer-links">
+                    <li><a href="https://cloud.familyyee.com/ShortURL">缩短网址服务</a></li>
+                    <li><a href="https://piclink.cloud.familyyee.com/">图床创建</a></li>
+                    <li><a href="https://cloud.familyyee.com/email">电邮我们</a></li>
+                    <li><a href="https://www.familyyee.com/">FAMILY YEE</a></li>
+                    <li><a href="https://itcsi.familyyee.com">ITCSI July 2024</a></li>
+                    <li><a href="https://www.familyyee.com/contact.html">Jimmy猫猫博客</a></li>
+                </ul>
+            </div>
+
+            <div class="footer-col reveal" style="transition-delay: 0.2s;">
+                <h4>Server_Info</h4>
+                <p><strong>HQ:</strong> Kajang, Selangor, MY</p>
+                <p><strong>ENV:</strong> Ubuntu / Cloudflare</p>
+                <p><strong>SYS.DATE:</strong> 2026.04</p>
+                <a href="mailto:admin@familyyee.com" class="btn-cyber" style="padding: 10px 20px; font-size: 0.8rem; margin-top: 10px;">PING_ADMIN</a>
+            </div>
+        </div>
+        
+        <div class="footer-bottom">
+            <div>© 2018-2026 CLOUD NETWORK FAMILY YEE. All Rights Reserved.</div>
+        </div>
+    </footer>
+
+    <script src="https://cloud.familyyee.com/asset/javascript/main.js"></script>
+
+</body>
+</html>
