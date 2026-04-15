@@ -44,48 +44,77 @@
             position: relative;
         }
 
-        /* 1. 修复：基础导航栏结构 */
-nav {
-    position: fixed; top: 0; width: 100%; padding: 15px 5vw;
-    display: flex; justify-content: space-between; align-items: center; 
-    background: var(--glass-bg); backdrop-filter: blur(12px); 
-    border-bottom: 1px solid var(--glass-border); z-index: 1000;
-}
+        /* --- 导航栏 --- */
+        nav {
+            position: fixed; top: 0; width: 100%; padding: 15px 5vw;
+            display: flex; justify-content: space-between; align-items: center; 
+            background: var(--glass-bg); backdrop-filter: blur(12px); border-bottom: 1px solid var(--glass-border); z-index: 1000;
+        }
+        .nav-logo { color: var(--primary); line-height: 1; display: flex; margin: 0; z-index: 1001; gap: 10px; align-items: center; font-weight: 700; font-size: 1.2rem; display: block; width: auto; height: auto;}
+        
+        
+        /* 移动端菜单切换按钮 (默认隐藏) */
+        .menu-toggle { display: none; color: var(--primary); font-size: 1.5rem; z-index: 1001; cursor: pointer; }
+        
+        .nav-menu { display: flex; list-style: none; gap: 30px; font-family: 'Fira Code', "Microsoft YaHei", "微软雅黑", "SimHei", "黑体", "STXihei", "华文细黑", sans-serif;}
+        .nav-item { position: relative; padding: 10px 0; }
+        .nav-item > a { color: var(--text-main); text-decoration: none; font-size: 0.9rem; text-transform: uppercase; transition: 0.3s; }
+        .nav-item:hover > a { color: var(--primary); text-shadow: 0 0 10px var(--primary-glow); }
+        
+        .dropdown {
+            position: absolute; top: 100%; left: -20px; background: rgba(10, 10, 10, 0.95); backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border); border-top: 2px solid var(--primary); min-width: 220px; list-style: none;
+            opacity: 0; visibility: hidden; transform: translateY(15px); transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 0 20px 40px rgba(0,0,0,0.8);
+        }
+        .nav-item:hover .dropdown { opacity: 1; visibility: visible; transform: translateY(0); }
+        .dropdown li a { display: block; padding: 12px 20px; color: var(--text-muted); text-decoration: none; font-size: 0.85rem; border-bottom: 1px solid #1a1a1a; transition: 0.3s; position: relative; overflow: hidden; }
+        .dropdown li a::before { content: '>'; position: absolute; left: -15px; color: var(--primary); transition: 0.3s; opacity: 0; }
+        .dropdown li a:hover { color: var(--primary); padding-left: 30px; background: rgba(0,162,255,0.05); }
+        .dropdown li a:hover::before { left: 10px; opacity: 1; }
+        
+        /* --- 页面结构与动画 --- */
+        section { padding: 120px 10vw 80px 10vw; min-height: 5vh; display: flex; flex-direction: column; justify-content: center;}
+        .section-header { font-size: clamp(2rem, 4vw, 3rem); color: #fff; margin-bottom: 30px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; font-family: 'Fira Code', "Microsoft YaHei", "微软雅黑", "SimHei", "黑体", "STXihei", "华文细黑", sans-serif; }
+        .section-header::before { content: '0' counter(section-counter); counter-increment: section-counter; font-size: 1.2rem; color: var(--primary); }
+        body { counter-reset: section-counter; }
+        
+        .reveal { opacity: 0; transform: translateY(40px); transition: all 0.8s ease-out; }
+        .reveal.active { opacity: 1; transform: translateY(0); }
 
-/* 2. 修复：大宽屏保护机制。屏幕越大，左右内边距越大，强行把元素往中间挤拢 */
-@media screen and (min-width: 1400px) {
-    nav {
-        padding: 15px 12vw; 
-    }
-}
-@media screen and (min-width: 1800px) {
-    nav {
-        padding: 15px 18vw; 
-    }
-}
-
-/* 3. 修复：清理冲突的 display 属性，确保垂直居中 */
-.nav-logo { 
-    color: var(--primary); 
-    line-height: 1; 
-    display: flex; /* 保持 flex，删除末尾的 block */
-    margin: 0; 
-    z-index: 1001; 
-    gap: 10px; 
-    align-items: center; 
-    font-weight: 700; 
-    font-size: 1.2rem; 
-    width: auto; 
-    height: auto;
-}
-
-/* 4. 修复：恢复极客代码字体感。去除了常规黑体，使用基础等宽字体兜底 */
-.nav-menu { 
-    display: flex; 
-    list-style: none; 
-    gap: 30px; 
-    font-family: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-}
+        @media screen and (max-width: 900px) {
+            /* 页面间距缩小，留出更多可视空间 */
+            section { padding: 100px 5vw 50px 5vw; }
+            
+            /* 隐藏对手机来说过于拥挤的装饰元素 */
+            .ascii-art, .vertical-brand { display: none; }
+            
+            /* 导航栏变身 */
+            .menu-toggle { display: block; }
+            .nav-menu {
+                position: fixed; top: 0; right: -100%; width: 70vw; max-width: 300px; height: 100vh;
+                background: rgba(5, 5, 5, 0.98); border-left: 1px solid var(--glass-border);
+                flex-direction: column; justify-content: center; align-items: center; gap: 40px;
+                transition: 0.4s cubic-bezier(0.77, 0, 0.175, 1); box-shadow: -10px 0 30px rgba(0,0,0,0.8);
+            }
+            /* 通过 JS 添加 active 类的滑出效果 */
+            .nav-menu.active { right: 0; }
+            
+            /* 手机端下拉菜单直接展开为列表，避免复杂的悬停操作 */
+            .nav-item { width: 100%; text-align: center; }
+            .dropdown {
+                position: static; opacity: 1; visibility: visible; transform: none;
+                box-shadow: none; border: none; background: transparent; padding-top: 15px;
+                display: none; /* 默认隐藏二级菜单，可以用JS做折叠，为了简洁这里直接平铺或者保持隐藏，视需求而定。 这里我们改为缩进显示 */
+            }
+            .nav-item:hover .dropdown { display: block; } /* 移动端点击时展开 */
+            .dropdown li a { border: none; padding: 8px 0; color: #555; }
+            
+            /* Footer 堆叠 */
+            .footer-grid { grid-template-columns: 1fr; gap: 30px; text-align: center; }
+            .footer-col { display: flex; flex-direction: column; align-items: center; }
+            .footer-bottom { flex-direction: column; text-align: center; justify-content: center; }
+            .sys-status { justify-content: center; }
+        }
     </style>
 </head>
 <body oncontextmenu="return false;" onselectstart="return false;" ondragstart="return false;">
