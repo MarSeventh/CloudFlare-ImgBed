@@ -15,7 +15,7 @@
     <title>图床创建节点 | Cloud FAMILY YEE</title>
 
     <link rel="stylesheet" href="https://cloud.familyyee.com/asset/css/main.css">
-    <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <script defer="defer" src="/js/chunk-vendors.8dadfdfd.js"></script>
     <script defer="defer" src="/js/app.f0825045.js"></script>
@@ -43,6 +43,49 @@
             overflow: hidden;
             position: relative;
         }
+
+        /* 1. 修复：基础导航栏结构 */
+nav {
+    position: fixed; top: 0; width: 100%; padding: 15px 5vw;
+    display: flex; justify-content: space-between; align-items: center; 
+    background: var(--glass-bg); backdrop-filter: blur(12px); 
+    border-bottom: 1px solid var(--glass-border); z-index: 1000;
+}
+
+/* 2. 修复：大宽屏保护机制。屏幕越大，左右内边距越大，强行把元素往中间挤拢 */
+@media screen and (min-width: 1400px) {
+    nav {
+        padding: 15px 12vw; 
+    }
+}
+@media screen and (min-width: 1800px) {
+    nav {
+        padding: 15px 18vw; 
+    }
+}
+
+/* 3. 修复：清理冲突的 display 属性，确保垂直居中 */
+.nav-logo { 
+    color: var(--primary); 
+    line-height: 1; 
+    display: flex; /* 保持 flex，删除末尾的 block */
+    margin: 0; 
+    z-index: 1001; 
+    gap: 10px; 
+    align-items: center; 
+    font-weight: 700; 
+    font-size: 1.2rem; 
+    width: auto; 
+    height: auto;
+}
+
+/* 4. 修复：恢复极客代码字体感。去除了常规黑体，使用基础等宽字体兜底 */
+.nav-menu { 
+    display: flex; 
+    list-style: none; 
+    gap: 30px; 
+    font-family: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
     </style>
 </head>
 <body oncontextmenu="return false;" onselectstart="return false;" ondragstart="return false;">
