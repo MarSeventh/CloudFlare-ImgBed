@@ -43,12 +43,14 @@
             overflow: hidden;
             position: relative;
         }
+        .code-block { background: #090909; border: 1px solid #222; border-left: 3px solid var(--primary); padding: 15px; 
+                     font-family: 'Fira Code', monospace; font-size: 0.8rem; color: #ccc; margin-top: 20px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;}
 
         /* --- 导航栏 --- */
         nav {
             position: fixed; top: 0; width: 100%; padding: 15px 5vw;
             display: flex; justify-content: space-between; align-items: center; 
-            background: var(--glass-bg); backdrop-filter: blur(12px); border-bottom: 1px solid var(--glass-border); z-index: 1000; background-color: black;
+            background: var(--glass-bg); border-bottom: 1px solid var(--glass-border); z-index: 1000; background-color: black; backdrop-filter: blur(20px)
         }
         .nav-logo { color: var(--primary); line-height: 1; display: flex; margin: 0; z-index: 1001; gap: 10px; align-items: center; font-weight: 700; font-size: 1.2rem; display: block; width: auto; height: auto;}
         
