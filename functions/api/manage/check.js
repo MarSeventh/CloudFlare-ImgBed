@@ -1,13 +1,21 @@
+import { createSession, validateSession } from "../../utils/sessionManager.js";
+
 export async function onRequest(context) {
-    // Contents of context object
-    const {
-      request, // same as existing Worker API
-      env, // same as existing Worker API
-      params, // if filename includes [id] or [[path]]
-      waitUntil, // same as ctx.waitUntil in existing Worker API
-      next, // used for middleware or to fetch assets
-      data, // arbitrary space for passing data between middlewares
-    } = context;
-    
-    return new Response('true', { status: 200 });
+    const { request, env } = context;
+
+    // 如果已经有有效会话，直接返回成功
+    const sessionResult = await validateSession(env, request, 'admin');
+    if (sessionResult.valid) {
+        return new Response('true', { status: 200 });
+    }
+
+    // 认证已通过（由 middleware 保证），创建会话 Cookie
+    const { cookie } = await createSession(env, 'admin');
+
+    return new Response('true', {
+        status: 200,
+        headers: {
+            'Set-Cookie': cookie,
+        },
+    });
 }
