@@ -2,6 +2,8 @@ import { userAuthCheck } from './userAuth';
 import { fetchSecurityConfig } from './sysConfig';
 import { validateApiToken } from './tokenValidator';
 import { getDatabase } from './databaseAdapter.js';
+import { verifyPassword } from './passwordHash.js';
+import { validateSession } from './sessionManager.js';
 
 /**
  * 双重鉴权检查：管理端或用户端任意一个通过即可
@@ -43,6 +45,12 @@ async function adminAuthCheck(env, request) {
     if (typeof basicUser === 'undefined' || basicUser === null || basicUser === '') {
         return true;
     }
+
+    // 检查会话 Cookie
+    const sessionResult = await validateSession(env, request, 'admin');
+    if (sessionResult.valid) {
+        return true;
+    }
     
     // 检查是否有 Authorization 头
     if (!request.headers.has('Authorization')) {
@@ -59,7 +67,8 @@ async function adminAuthCheck(env, request) {
     // 尝试 Basic Auth 验证
     try {
         const { user, pass } = parseBasicAuth(request);
-        return user === basicUser && pass === basicPass;
+        const passwordMatch = await verifyPassword(pass, basicPass);
+        return user === basicUser && passwordMatch;
     } catch {
         return false;
     }
