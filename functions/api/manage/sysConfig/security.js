@@ -49,27 +49,38 @@ export async function onRequest(context) {
         settings.upload = newSettings.upload || settings.upload
         settings.access = newSettings.access || settings.access
 
-        // 处理认证设置：空密码表示不修改
+        // 处理认证设置：空密码表示不修改，_clear 标记表示清除密码
         let userPasswordChanged = false;
         let adminPasswordChanged = false;
 
         if (newSettings.auth) {
             if (newSettings.auth.user) {
-                if (newSettings.auth.user.authCode === '' || newSettings.auth.user.authCode === undefined) {
+                if (newSettings.auth.user._clear) {
+                    // 显式清除密码
+                    newSettings.auth.user.authCode = '';
+                    userPasswordChanged = true;
+                } else if (newSettings.auth.user.authCode === '' || newSettings.auth.user.authCode === undefined) {
                     // 密码为空，保留原密码
                     newSettings.auth.user.authCode = settings.auth.user.authCode;
                 } else {
                     userPasswordChanged = true;
                 }
+                delete newSettings.auth.user._clear;
                 settings.auth.user = newSettings.auth.user;
             }
             if (newSettings.auth.admin) {
-                if (newSettings.auth.admin.adminPassword === '' || newSettings.auth.admin.adminPassword === undefined) {
+                if (newSettings.auth.admin._clear) {
+                    // 显式清除密码和用户名
+                    newSettings.auth.admin.adminPassword = '';
+                    newSettings.auth.admin.adminUsername = '';
+                    adminPasswordChanged = true;
+                } else if (newSettings.auth.admin.adminPassword === '' || newSettings.auth.admin.adminPassword === undefined) {
                     // 密码为空，保留原密码
                     newSettings.auth.admin.adminPassword = settings.auth.admin.adminPassword;
                 } else {
                     adminPasswordChanged = true;
                 }
+                delete newSettings.auth.admin._clear;
                 if (newSettings.auth.admin.adminUsername !== undefined) {
                     settings.auth.admin.adminUsername = newSettings.auth.admin.adminUsername;
                 }
@@ -123,11 +134,11 @@ export async function getSecurityConfig(db, env) {
     const kvAuth = settingsKV.auth || {}
     const auth = {
         user: {
-            authCode: kvAuth.user?.authCode || env.AUTH_CODE || '',
+            authCode: kvAuth.user?.authCode ?? env.AUTH_CODE ?? '',
         },
         admin: {
-            adminUsername: kvAuth.admin?.adminUsername || env.BASIC_USER || '',
-            adminPassword: kvAuth.admin?.adminPassword || env.BASIC_PASS || '',
+            adminUsername: kvAuth.admin?.adminUsername ?? env.BASIC_USER ?? '',
+            adminPassword: kvAuth.admin?.adminPassword ?? env.BASIC_PASS ?? '',
         }
     }
     settings.auth = auth
