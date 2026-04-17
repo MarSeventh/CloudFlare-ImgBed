@@ -1,5 +1,5 @@
-import { validateAnySession } from "../utils/sessionManager.js";
-import { fetchSecurityConfig } from "../utils/sysConfig.js";
+import { validateAnySession } from "../../utils/sessionManager.js";
+import { fetchSecurityConfig } from "../../utils/sysConfig.js";
 
 /**
  * 会话检查接口

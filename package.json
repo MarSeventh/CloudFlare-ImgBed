@@ -1,6 +1,6 @@
 {
   "name": "cloudflare-imgbed",
-  "version": "2.6.4",
+  "version": "2.6.5",
   "type": "module",
   "scripts": {
     "ci-test": "concurrently --kill-others \"npm start\" \"wait-on http://localhost:8080 && mocha\"",
