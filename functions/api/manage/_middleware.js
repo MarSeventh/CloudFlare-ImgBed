@@ -2,7 +2,7 @@ import { fetchSecurityConfig } from "../../utils/sysConfig";
 import { checkDatabaseConfig } from "../../utils/middleware";
 import { validateApiToken } from "../../utils/tokenValidator";
 import { getDatabase } from "../../utils/databaseAdapter.js";
-import { verifyPassword } from "../../utils/passwordHash.js";
+import { verifyPassword, needsRehash, hashPassword } from "../../utils/passwordHash.js";
 import { validateSession } from "../../utils/sessionManager.js";
 
 let securityConfig = {}
@@ -151,9 +151,27 @@ async function authentication(context) {
       const passwordMatch = await verifyPassword(pass, basicPass);
       if (basicUser !== user || !passwordMatch) {
         return UnauthorizedException('Invalid credentials.');
-      } else {
-        return context.next();
       }
+
+      // Basic Auth 验证通过后，如果密码使用旧版哈希或明文存储，自动升级为 PBKDF2
+      if (passwordMatch && (needsRehash(basicPass) || !basicPass.startsWith('$pbkdf2$'))) {
+        try {
+          const db = getDatabase(context.env);
+          const settingsStr = await db.get('manage@sysConfig@security');
+          if (settingsStr) {
+            const settings = JSON.parse(settingsStr);
+            if (settings.auth?.admin) {
+              settings.auth.admin.adminPassword = await hashPassword(pass);
+              await db.put('manage@sysConfig@security', JSON.stringify(settings));
+            }
+          }
+        } catch (e) {
+          // rehash 失败不影响登录流程
+          console.error('Failed to rehash admin password:', e);
+        }
+      }
+
+      return context.next();
 
     } else {
       // 没有 Authorization 头也没有有效 session，返回 401
