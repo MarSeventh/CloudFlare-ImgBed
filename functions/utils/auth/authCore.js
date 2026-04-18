@@ -6,12 +6,12 @@
 import { fetchSecurityConfig } from '../sysConfig.js';
 import { validateApiToken } from './tokenValidator.js';
 import { getDatabase } from '../databaseAdapter.js';
-import { verifyPassword, needsRehash, hashPassword } from './passwordHash.js';
+import { verifyPassword } from './passwordHash.js';
 import { validateSession } from './sessionManager.js';
 
 /**
  * 认证范围常量
- * - 'admin'  : 仅管理员（admin session / API Token / Basic Auth）
+ * - 'admin'  : 仅管理员（admin session / API Token）
  * - 'user'   : 仅用户（user session / admin session / API Token / authCode）
  * - 'either' : 管理员或用户任一通过即可（所有认证方式）
  */
@@ -45,7 +45,7 @@ export async function authenticate({
     const adminPassword = securityConfig.auth.admin.adminPassword;
     const userAuthCode = securityConfig.auth.user.authCode;
 
-    const adminConfigured = !!(adminUsername && adminUsername.trim());
+    const adminConfigured = !!(adminUsername && adminUsername.trim()) || !!(adminPassword && adminPassword.trim());
     const authCodeConfigured = !!(userAuthCode && userAuthCode.trim());
 
     const checkAdmin = authScope === AUTH_SCOPE.ADMIN || authScope === AUTH_SCOPE.EITHER;
@@ -83,15 +83,7 @@ export async function authenticate({
 
     // --- 凭据验证 ---
 
-    // 4. Basic Auth（仅管理员场景）
-    if (checkAdmin && adminConfigured && request.headers.has('Authorization')) {
-        const basicResult = await verifyBasicAuth(request, adminUsername, adminPassword, env);
-        if (basicResult.valid) {
-            return { authorized: true, authType: 'admin' };
-        }
-    }
-
-    // 5. authCode（仅用户场景）
+    // 4. authCode（仅用户场景）
     if (checkUser) {
         if (authCodeConfigured) {
             if (url) {
@@ -117,68 +109,6 @@ export async function authenticate({
     }
 
     return { authorized: false, authType: null };
-}
-
-/**
- * Basic Auth 验证 + 自动 rehash
- */
-async function verifyBasicAuth(request, expectedUser, expectedPass, env) {
-    try {
-        const { user, pass } = parseBasicAuth(request);
-        const passwordMatch = await verifyPassword(pass, expectedPass);
-        if (user !== expectedUser || !passwordMatch) {
-            return { valid: false };
-        }
-
-        // 验证通过后，自动升级旧版哈希为 PBKDF2
-        if (needsRehash(expectedPass) || !expectedPass.startsWith('$pbkdf2$')) {
-            try {
-                const db = getDatabase(env);
-                const settingsStr = await db.get('manage@sysConfig@security');
-                if (settingsStr) {
-                    const settings = JSON.parse(settingsStr);
-                    if (settings.auth?.admin) {
-                        settings.auth.admin.adminPassword = await hashPassword(pass);
-                        await db.put('manage@sysConfig@security', JSON.stringify(settings));
-                    }
-                }
-            } catch (e) {
-                console.error('Failed to rehash admin password:', e);
-            }
-        }
-
-        return { valid: true };
-    } catch {
-        return { valid: false };
-    }
-}
-
-/**
- * 解析 Basic Auth 头
- */
-function parseBasicAuth(request) {
-    const auth = request.headers.get('Authorization');
-    if (!auth) {
-        throw new Error('No Authorization header');
-    }
-
-    const [scheme, encoded] = auth.split(' ');
-    if (scheme !== 'Basic' || !encoded) {
-        throw new Error('Invalid auth scheme');
-    }
-
-    const buffer = Uint8Array.from(atob(encoded), c => c.charCodeAt(0));
-    const decoded = new TextDecoder().decode(buffer).normalize();
-
-    const index = decoded.indexOf(':');
-    if (index === -1 || /[\0-\x1F\x7F]/.test(decoded)) {
-        throw new Error('Invalid authorization value');
-    }
-
-    return {
-        user: decoded.substring(0, index),
-        pass: decoded.substring(index + 1),
-    };
 }
 
 /**
