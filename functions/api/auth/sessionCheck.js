@@ -12,9 +12,10 @@ export async function onRequestGet(context) {
     // 读取安全配置，判断是否需要认证
     const securityConfig = await fetchSecurityConfig(env);
     const adminUsername = securityConfig.auth.admin.adminUsername;
+    const adminPassword = securityConfig.auth.admin.adminPassword;
     const userAuthCode = securityConfig.auth.user.authCode;
 
-    const adminRequired = !!(adminUsername && adminUsername.trim());
+    const adminRequired = !!(adminUsername && adminUsername.trim()) || !!(adminPassword && adminPassword.trim());
     const userRequired = !!(userAuthCode && userAuthCode.trim());
 
     // 检查会话
