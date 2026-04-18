@@ -5,7 +5,7 @@
  */
 
 import { generateSessionToken } from './passwordHash.js';
-import { getDatabase } from './databaseAdapter.js';
+import { getDatabase } from '../databaseAdapter.js';
 
 const SESSION_PREFIX = 'session@';
 const SESSION_MAX_AGE = 14 * 24 * 60 * 60; // 14天（秒）

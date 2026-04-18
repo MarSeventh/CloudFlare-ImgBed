@@ -1,4 +1,4 @@
-import { validateAnySession } from "../../utils/sessionManager.js";
+import { validateAnySession } from "../../utils/auth/sessionManager.js";
 import { fetchSecurityConfig } from "../../utils/sysConfig.js";
 
 /**

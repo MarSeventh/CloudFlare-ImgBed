@@ -1,6 +1,6 @@
 import { fetchSecurityConfig } from "../../utils/sysConfig";
-import { verifyPassword, needsRehash, hashPassword } from "../../utils/passwordHash.js";
-import { createSession } from "../../utils/sessionManager.js";
+import { verifyPassword, needsRehash, hashPassword } from "../../utils/auth/passwordHash.js";
+import { createSession } from "../../utils/auth/sessionManager.js";
 import { getDatabase } from "../../utils/databaseAdapter.js";
 
 export async function onRequestPost(context) {

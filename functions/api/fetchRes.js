@@ -1,4 +1,4 @@
-import { dualAuthCheck } from '../utils/dualAuth.js';
+import { dualAuthCheck } from '../utils/auth/dualAuth.js';
 
 export async function onRequest(context) {
     // 获取请求体中URL的内容

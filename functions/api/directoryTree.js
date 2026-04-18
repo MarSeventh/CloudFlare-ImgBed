@@ -1,5 +1,5 @@
 import { getDirectoryTree } from '../utils/indexManager';
-import { dualAuthCheck } from '../utils/dualAuth';
+import { dualAuthCheck } from '../utils/auth/dualAuth';
 import { fetchPageConfig } from '../utils/sysConfig';
 
 /**

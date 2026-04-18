@@ -1,4 +1,4 @@
-import { createSession, validateSession } from "../../utils/sessionManager.js";
+import { createSession, validateSession } from "../../utils/auth/sessionManager.js";
 
 export async function onRequest(context) {
     const { request, env } = context;
