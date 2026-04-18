@@ -1,9 +1,7 @@
 import { fetchSecurityConfig } from "../../utils/sysConfig.js";
-import { verifyPassword, needsRehash, hashPassword } from "../../utils/auth/passwordHash.js";
+import { verifyPassword, rehashIfNeeded } from "../../utils/auth/passwordHash.js";
 import { createSession } from "../../utils/auth/sessionManager.js";
 import { getDatabase } from "../../utils/databaseAdapter.js";
-
-const PBKDF2_PREFIX = '$pbkdf2$';
 
 export async function onRequestPost(context) {
     const { request, env } = context;
@@ -50,21 +48,7 @@ export async function onRequestPost(context) {
         }
 
         // 登录成功后，自动升级旧版哈希为 PBKDF2
-        if (needsRehash(adminPassword) || !adminPassword.startsWith(PBKDF2_PREFIX)) {
-            try {
-                const db = getDatabase(env);
-                const settingsStr = await db.get('manage@sysConfig@security');
-                if (settingsStr) {
-                    const settings = JSON.parse(settingsStr);
-                    if (settings.auth?.admin) {
-                        settings.auth.admin.adminPassword = await hashPassword(password);
-                        await db.put('manage@sysConfig@security', JSON.stringify(settings));
-                    }
-                }
-            } catch (e) {
-                console.error('Failed to rehash admin password:', e);
-            }
-        }
+        await rehashIfNeeded(getDatabase(env), password, adminPassword, 'auth.admin.adminPassword');
     }
 
     // 创建会话并通过 HttpOnly Cookie 返回

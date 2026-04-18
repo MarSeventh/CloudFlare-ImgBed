@@ -172,3 +172,34 @@ export function generateSessionToken() {
     crypto.getRandomValues(array);
     return Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('');
 }
+
+/**
+ * 如果密码使用旧版哈希或明文存储，自动升级为 PBKDF2
+ * @param {Object} db - 数据库实例
+ * @param {string} plainPassword - 用户输入的明文密码
+ * @param {string} storedPassword - 当前存储的密码/哈希
+ * @param {string} configPath - 配置路径，如 'auth.admin.adminPassword' 或 'auth.user.authCode'
+ */
+export async function rehashIfNeeded(db, plainPassword, storedPassword, configPath) {
+    if (!storedPassword || (storedPassword.startsWith(HASH_PREFIX_PBKDF2) && !needsRehash(storedPassword))) {
+        return;
+    }
+    try {
+        const settingsStr = await db.get('manage@sysConfig@security');
+        if (!settingsStr) return;
+        const settings = JSON.parse(settingsStr);
+
+        // 按路径定位字段，如 'auth.admin.adminPassword'
+        const keys = configPath.split('.');
+        let target = settings;
+        for (let i = 0; i < keys.length - 1; i++) {
+            target = target?.[keys[i]];
+        }
+        if (!target) return;
+
+        target[keys[keys.length - 1]] = await hashPassword(plainPassword);
+        await db.put('manage@sysConfig@security', JSON.stringify(settings));
+    } catch (e) {
+        console.error(`Failed to rehash password at ${configPath}:`, e);
+    }
+}
