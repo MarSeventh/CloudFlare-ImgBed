@@ -21,6 +21,64 @@ export const AUTH_SCOPE = {
     EITHER: 'either',
 };
 
+const AUTHORIZED = (authType) => ({ authorized: true, authType });
+const UNAUTHORIZED = { authorized: false, authType: null };
+
+/**
+ * 管理员会话认证
+ * 检查 admin session
+ *
+ * @returns {Promise<{authorized: boolean, authType: string|null}|null>}
+ *          认证通过返回结果，未通过返回 null（交给调用方继续）
+ */
+async function checkAdmin({ env, request, adminConfigured }) {
+    if (!adminConfigured) {
+        return AUTHORIZED(null);
+    }
+
+    const session = await validateSession(env, request, 'admin');
+    if (session.valid) {
+        return AUTHORIZED('admin');
+    }
+
+    return null;
+}
+
+/**
+ * 用户会话/凭据认证
+ * 优先级：admin session → user session → authCode
+ *
+ * @returns {Promise<{authorized: boolean, authType: string|null}|null>}
+ *          认证通过/失败返回结果，无法判定返回 null
+ */
+async function checkUser({ env, request, url, authCodeConfigured, userAuthCode }) {
+    // admin session（管理员身份也可访问用户资源）
+    const adminSession = await validateSession(env, request, 'admin');
+    if (adminSession.valid) {
+        return AUTHORIZED('admin');
+    }
+
+    // user session
+    const userSession = await validateSession(env, request, 'user');
+    if (userSession.valid) {
+        return AUTHORIZED('user');
+    }
+
+    // authCode
+    if (!authCodeConfigured) {
+        return AUTHORIZED(null); // 未配置，视为不需要用户端认证
+    }
+
+    if (url) {
+        const authCode = extractAuthCode(url, request);
+        if (authCode && await verifyPassword(authCode, userAuthCode)) {
+            return AUTHORIZED('user');
+        }
+    }
+
+    return UNAUTHORIZED;
+}
+
 /**
  * 统一认证函数
  *
@@ -48,67 +106,30 @@ export async function authenticate({
     const adminConfigured = !!(adminUsername && adminUsername.trim()) || !!(adminPassword && adminPassword.trim());
     const authCodeConfigured = !!(userAuthCode && userAuthCode.trim());
 
-    const checkAdmin = authScope === AUTH_SCOPE.ADMIN || authScope === AUTH_SCOPE.EITHER;
-    const checkUser = authScope === AUTH_SCOPE.USER || authScope === AUTH_SCOPE.EITHER;
-
-    // 管理员未配置时，管理端认证视为不需要，直接放行
-    if (checkAdmin && !checkUser && !adminConfigured) {
-        return { authorized: true, authType: null };
-    }
-
-    // --- Session 验证 ---
-
-    // 1. admin session（管理员和用户场景都接受 admin session）
-    const adminSession = await validateSession(env, request, 'admin');
-    if (adminSession.valid) {
-        return { authorized: true, authType: 'admin' };
-    }
-
-    // 2. user session（仅用户场景接受，管理端不接受 user session）
-    if (checkUser) {
-        const userSession = await validateSession(env, request, 'user');
-        if (userSession.valid) {
-            return { authorized: true, authType: 'user' };
-        }
-    }
-
-    // --- Token 验证 ---
-
-    // 3. API Token
+    // --- API Token 验证（公共层，所有 scope 通用） ---
     const db = getDatabase(env);
     const tokenResult = await validateApiToken(request, db, requiredPermission);
     if (tokenResult.valid) {
-        return { authorized: true, authType: 'admin' };
+        return AUTHORIZED('admin');
     }
 
-    // --- 凭据验证 ---
+    // --- 会话/凭据验证 ---
+    const adminCtx = { env, request, adminConfigured };
+    const userCtx = { env, request, url, authCodeConfigured, userAuthCode };
 
-    // 4. authCode（仅用户场景）
-    if (checkUser) {
-        if (authCodeConfigured) {
-            if (url) {
-                const authCode = extractAuthCode(url, request);
-                if (authCode && await verifyPassword(authCode, userAuthCode)) {
-                    return { authorized: true, authType: 'user' };
-                }
-            }
-            // authCode 已配置但验证失败，拒绝访问
-            return { authorized: false, authType: null };
-        }
-        // authCode 未配置，视为不需要用户端认证
+    if (authScope === AUTH_SCOPE.ADMIN) {
+        return (await checkAdmin(adminCtx)) || UNAUTHORIZED;
     }
 
-    // --- 兜底判断 ---
-
-    // 如果所有启用的认证方式都未配置凭据，视为无需认证
-    const needsAdmin = checkAdmin && adminConfigured;
-    const needsUser = checkUser && authCodeConfigured;
-
-    if (!needsAdmin && !needsUser) {
-        return { authorized: true, authType: null };
+    if (authScope === AUTH_SCOPE.USER) {
+        return await checkUser(userCtx);
     }
 
-    return { authorized: false, authType: null };
+    // EITHER: 任一通过即可
+    const adminResult = await checkAdmin(adminCtx);
+    if (adminResult?.authorized) return adminResult;
+
+    return await checkUser(userCtx);
 }
 
 /**
