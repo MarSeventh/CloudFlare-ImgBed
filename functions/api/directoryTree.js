@@ -1,5 +1,5 @@
 import { getDirectoryTree } from '../utils/indexManager';
-import { dualAuthCheck } from '../utils/dualAuth';
+import { dualAuthCheck } from '../utils/auth/dualAuth';
 import { fetchPageConfig } from '../utils/sysConfig';
 
 /**
@@ -27,8 +27,8 @@ export async function onRequestGet(context) {
         return new Response('Unauthorized', { status: 401 });
     }
     
-    // 如果是用户端鉴权，检查 showDirectorySuggestions 设置
-    if (authResult.authType === 'user') {
+    // 非管理员身份（用户端或未配置认证的匿名访问），检查 showDirectorySuggestions 设置
+    if (authResult.authType !== 'admin') {
         const pageConfig = await fetchPageConfig(env);
         // 从 config 数组中查找 showDirectorySuggestions 设置
         const showDirSetting = pageConfig.config?.find(c => c.id === 'showDirectorySuggestions');

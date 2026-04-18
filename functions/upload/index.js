@@ -1,4 +1,4 @@
-import { userAuthCheck, UnauthorizedResponse } from "../utils/userAuth";
+import { userAuthCheck, UnauthorizedResponse } from "../utils/auth/userAuth";
 import { fetchUploadConfig, fetchSecurityConfig } from "../utils/sysConfig";
 import {
     createResponse, getUploadIp, getIPAddress, resolveFileExt,

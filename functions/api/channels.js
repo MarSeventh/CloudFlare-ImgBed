@@ -2,7 +2,7 @@
 import { fetchUploadConfig } from '../utils/sysConfig.js';
 import { getUploadConfig } from './manage/sysConfig/upload.js';
 import { getDatabase } from '../utils/databaseAdapter.js';
-import { dualAuthCheck } from '../utils/dualAuth.js';
+import { dualAuthCheck } from '../utils/auth/dualAuth.js';
 
 export async function onRequest(context) {
     const { request, env } = context;
