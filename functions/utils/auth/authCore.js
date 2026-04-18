@@ -33,7 +33,7 @@ const UNAUTHORIZED = { authorized: false, authType: null };
  */
 async function checkAdmin({ env, request, adminConfigured }) {
     if (!adminConfigured) {
-        return AUTHORIZED(null);
+        return AUTHORIZED('admin'); // 未配置管理员认证，视为管理员身份放行
     }
 
     const session = await validateSession(env, request, 'admin');
@@ -66,7 +66,7 @@ async function checkUser({ env, request, url, authCodeConfigured, userAuthCode }
 
     // authCode
     if (!authCodeConfigured) {
-        return AUTHORIZED(null); // 未配置，视为不需要用户端认证
+        return AUTHORIZED('user'); // 未配置用户认证，视为用户身份放行
     }
 
     if (url) {
