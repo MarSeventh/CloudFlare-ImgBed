@@ -1,5 +1,5 @@
 import { getDatabase } from "../../utils/databaseAdapter.js";
-import { destroySessionsByAuthType } from "../../utils/sessionManager.js";
+import { destroySessionsByAuthType } from "../../utils/auth/sessionManager.js";
 
 /**
  * 认证重置接口

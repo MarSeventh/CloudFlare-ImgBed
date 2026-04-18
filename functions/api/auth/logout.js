@@ -1,4 +1,4 @@
-import { destroySession } from "../../utils/sessionManager.js";
+import { destroySession } from "../../utils/auth/sessionManager.js";
 
 export async function onRequestPost(context) {
     const { request, env } = context;

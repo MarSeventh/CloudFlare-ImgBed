@@ -1,6 +1,6 @@
 import { getDatabase } from '../../../utils/databaseAdapter.js';
-import { hashPassword, isHashed } from '../../../utils/passwordHash.js';
-import { destroySessionsByAuthType } from '../../../utils/sessionManager.js';
+import { hashPassword, isHashed } from '../../../utils/auth/passwordHash.js';
+import { destroySessionsByAuthType } from '../../../utils/auth/sessionManager.js';
 
 export async function onRequest(context) {
     // 安全设置相关，GET方法读取设置，POST方法保存设置

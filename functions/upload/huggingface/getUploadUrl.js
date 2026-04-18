@@ -12,7 +12,7 @@
 
 import { HuggingFaceAPI } from '../../utils/huggingfaceAPI.js';
 import { fetchUploadConfig } from '../../utils/sysConfig.js';
-import { userAuthCheck, UnauthorizedResponse } from '../../utils/userAuth.js';
+import { userAuthCheck, UnauthorizedResponse } from '../../utils/auth/userAuth.js';
 import { buildUniqueFileId, getUploadIp, isBlockedUploadIp } from '../uploadTools.js';
 
 export async function onRequestPost(context) {

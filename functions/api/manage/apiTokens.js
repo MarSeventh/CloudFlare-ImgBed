@@ -1,5 +1,5 @@
 import { getDatabase } from '../../utils/databaseAdapter.js';
-import { filterAutoDeleteTokens } from '../../utils/tokenExpiration.js';
+import { filterAutoDeleteTokens } from '../../utils/auth/tokenExpiration.js';
 
 export async function onRequest(context) {
     // API Token管理，支持创建、删除、列出Token

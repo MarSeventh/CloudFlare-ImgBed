@@ -8,7 +8,7 @@ import { HuggingFaceAPI } from '../../utils/huggingfaceAPI.js';
 import { fetchUploadConfig } from '../../utils/sysConfig.js';
 import { getDatabase } from '../../utils/databaseAdapter.js';
 import { moderateContent, endUpload, getUploadIp, getIPAddress, sanitizeUploadFolder } from '../uploadTools.js';
-import { userAuthCheck, UnauthorizedResponse } from '../../utils/userAuth.js';
+import { userAuthCheck, UnauthorizedResponse } from '../../utils/auth/userAuth.js';
 
 export async function onRequestPost(context) {
     const { request, env, waitUntil } = context;

@@ -1,5 +1,5 @@
 // API Token权限验证工具函数
-import { getTokenData } from '../api/manage/apiTokens.js';
+import { getTokenData } from '../../api/manage/apiTokens.js';
 import { isExpired } from './tokenExpiration.js';
 
 /**
