@@ -200,6 +200,5 @@ function buildSessionCookie(name, token, maxAge) {
         `SameSite=Strict`,
         `Max-Age=${maxAge}`,
     ];
-    parts.push('Secure');
     return parts.join('; ');
 }
