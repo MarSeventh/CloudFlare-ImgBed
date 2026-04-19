@@ -7,7 +7,7 @@
 import { HuggingFaceAPI } from '../../utils/huggingfaceAPI.js';
 import { fetchUploadConfig } from '../../utils/sysConfig.js';
 import { getDatabase } from '../../utils/databaseAdapter.js';
-import { moderateContent, endUpload, getUploadIp, getIPAddress, sanitizeUploadFolder } from '../uploadTools.js';
+import { moderateContent, endUpload, getUploadIp, getIPAddress, sanitizeUploadFolder, createResponse } from '../uploadTools.js';
 import { userAuthCheck, UnauthorizedResponse } from '../../utils/auth/userAuth.js';
 
 export async function onRequestPost(context) {
@@ -25,7 +25,7 @@ export async function onRequestPost(context) {
         const { fullId, filePath, sha256, fileSize, fileName, fileType, channelName, multipartParts } = body;
 
         if (!fullId || !filePath || !sha256 || !fileSize) {
-            return new Response(JSON.stringify({
+            return createResponse(JSON.stringify({
                 error: 'Missing required fields: fullId, filePath, sha256, fileSize'
             }), {
                 status: 400,
@@ -36,7 +36,7 @@ export async function onRequestPost(context) {
         // 路径安全处理：使用统一的路径安全函数
         const sanitizedFullId = sanitizeUploadFolder(fullId);
         if (sanitizedFullId !== fullId) {
-            return new Response(JSON.stringify({
+            return createResponse(JSON.stringify({
                 error: 'Invalid fullId: contains illegal path characters'
             }), {
                 status: 400,
@@ -49,7 +49,7 @@ export async function onRequestPost(context) {
         const hfSettings = uploadConfig.huggingface;
 
         if (!hfSettings || !hfSettings.channels || hfSettings.channels.length === 0) {
-            return new Response(JSON.stringify({ error: 'No HuggingFace channel configured' }), {
+            return createResponse(JSON.stringify({ error: 'No HuggingFace channel configured' }), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -65,7 +65,7 @@ export async function onRequestPost(context) {
         }
 
         if (!hfChannel || !hfChannel.token || !hfChannel.repo) {
-            return new Response(JSON.stringify({ error: 'HuggingFace channel not properly configured' }), {
+            return createResponse(JSON.stringify({ error: 'HuggingFace channel not properly configured' }), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -145,7 +145,7 @@ export async function onRequestPost(context) {
 
         // 返回成功响应
         const returnLink = `/file/${fullId}`;
-        return new Response(JSON.stringify({
+        return createResponse(JSON.stringify({
             success: true,
             src: returnLink,
             fileUrl,
@@ -157,7 +157,7 @@ export async function onRequestPost(context) {
 
     } catch (error) {
         console.error('commitUpload error:', error.message);
-        return new Response(JSON.stringify({ error: error.message }), {
+        return createResponse(JSON.stringify({ error: error.message }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' }
         });
