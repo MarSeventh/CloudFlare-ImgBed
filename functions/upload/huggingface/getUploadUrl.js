@@ -13,7 +13,7 @@
 import { HuggingFaceAPI } from '../../utils/huggingfaceAPI.js';
 import { fetchUploadConfig } from '../../utils/sysConfig.js';
 import { userAuthCheck, UnauthorizedResponse } from '../../utils/auth/userAuth.js';
-import { buildUniqueFileId, getUploadIp, isBlockedUploadIp } from '../uploadTools.js';
+import { buildUniqueFileId, getUploadIp, isBlockedUploadIp, createResponse } from '../uploadTools.js';
 
 export async function onRequestPost(context) {
     const { request, env } = context;
@@ -30,7 +30,7 @@ export async function onRequestPost(context) {
         // 检查上传IP是否被封禁
         const uploadIp = getUploadIp(request);
         if (await isBlockedUploadIp(env, uploadIp)) {
-            return new Response(JSON.stringify({ error: 'IP blocked' }), {
+            return createResponse(JSON.stringify({ error: 'IP blocked' }), {
                 status: 403,
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -40,7 +40,7 @@ export async function onRequestPost(context) {
         const { fileSize, fileName, fileType, sha256, fileSample, channelName, uploadNameType, uploadFolder } = body;
 
         if (!fileSize || !fileName || !fileType || !sha256 || !fileSample) {
-            return new Response(JSON.stringify({
+            return createResponse(JSON.stringify({
                 error: 'Missing required fields: fileSize, fileName, fileType, sha256, fileSample'
             }), {
                 status: 400,
@@ -53,7 +53,7 @@ export async function onRequestPost(context) {
         const hfSettings = uploadConfig.huggingface;
 
         if (!hfSettings || !hfSettings.channels || hfSettings.channels.length === 0) {
-            return new Response(JSON.stringify({ error: 'No HuggingFace channel configured' }), {
+            return createResponse(JSON.stringify({ error: 'No HuggingFace channel configured' }), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -71,7 +71,7 @@ export async function onRequestPost(context) {
         }
 
         if (!hfChannel || !hfChannel.token || !hfChannel.repo) {
-            return new Response(JSON.stringify({ error: 'HuggingFace channel not properly configured' }), {
+            return createResponse(JSON.stringify({ error: 'HuggingFace channel not properly configured' }), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -100,7 +100,7 @@ export async function onRequestPost(context) {
         const uploadInfo = await huggingfaceAPI.getLfsUploadInfo(fileSize, filePath, sha256, fileSample);
 
         // 返回上传信息
-        return new Response(JSON.stringify({
+        return createResponse(JSON.stringify({
             success: true,
             fullId,
             filePath,
@@ -115,7 +115,7 @@ export async function onRequestPost(context) {
 
     } catch (error) {
         console.error('getUploadUrl error:', error.message);
-        return new Response(JSON.stringify({ error: error.message }), {
+        return createResponse(JSON.stringify({ error: error.message }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' }
         });
