@@ -226,6 +226,7 @@ async function uploadChunkToStorageWithTimeout(context, chunkIndex, totalChunks,
 
         // 超时或失败时，更新状态为超时/失败
         try {
+            const { usingD1 } = checkDatabaseConfig(env);
             const chunkRecord = await db.getWithMetadata(chunkKey, { type: 'arrayBuffer' });
             if (chunkRecord && chunkRecord.metadata) {
                 const isTimeout = error.message === 'Upload timeout';
@@ -237,8 +238,8 @@ async function uploadChunkToStorageWithTimeout(context, chunkIndex, totalChunks,
                     isTimeout: isTimeout
                 };
 
-                // 保留原始数据以便重试
-                await db.put(chunkKey, chunkRecord.value, {
+                // 保留原始数据以便重试（D1模式下不保存二进制数据，避免SQLITE_TOOBIG）
+                await db.put(chunkKey, usingD1 ? '' : chunkRecord.value, {
                     metadata: errorMetadata,
                     expirationTtl: 3600
                 });
@@ -317,8 +318,9 @@ async function uploadChunkToStorage(context, chunkIndex, totalChunks, uploadId, 
                     failedTime: Date.now()
                 };
 
-                // 保留原始数据以便重试，设置过期时间
-                await db.put(chunkKey, chunkData, {
+                // 保留原始数据以便重试（D1模式下不保存二进制数据，避免SQLITE_TOOBIG）
+                const { usingD1: isD1 } = checkDatabaseConfig(env);
+                await db.put(chunkKey, isD1 ? '' : chunkData, {
                     metadata: failedMetadata,
                     expirationTtl: 3600 // 1小时过期
                 });
@@ -332,6 +334,7 @@ async function uploadChunkToStorage(context, chunkIndex, totalChunks, uploadId, 
 
         // 发生异常时，确保保留原始数据并标记为失败
         try {
+            const { usingD1: isD1 } = checkDatabaseConfig(env);
             const chunkRecord = await db.getWithMetadata(chunkKey, { type: 'arrayBuffer' });
             if (chunkRecord && chunkRecord.metadata) {
                 const errorMetadata = {
@@ -341,7 +344,8 @@ async function uploadChunkToStorage(context, chunkIndex, totalChunks, uploadId, 
                     failedTime: Date.now()
                 };
 
-                await db.put(chunkKey, chunkRecord.value, {
+                // D1模式下不保存二进制数据，避免SQLITE_TOOBIG
+                await db.put(chunkKey, isD1 ? '' : chunkRecord.value, {
                     metadata: errorMetadata,
                     expirationTtl: 3600 // 1小时过期
                 });
@@ -853,12 +857,13 @@ async function retrySingleChunk(context, chunk, uploadChannel, maxRetries = 5, r
         const totalChunks = chunkRecord.metadata?.totalChunks || 1;
 
         // 更新重试状态
+        const { usingD1: isD1 } = checkDatabaseConfig(env);
         const retryMetadata = {
             ...chunkRecord.metadata,
             status: 'retrying',
         };
 
-        await db.put(chunk.key, chunkData, {
+        await db.put(chunk.key, isD1 ? '' : chunkData, {
             metadata: retryMetadata,
             expirationTtl: 3600
         });
@@ -920,6 +925,7 @@ async function retrySingleChunk(context, chunk, uploadChannel, maxRetries = 5, r
 
         // 更新重试失败状态
         try {
+            const { usingD1: isD1Retry } = checkDatabaseConfig(env);
             const chunkRecord = await db.getWithMetadata(chunk.key, { type: 'arrayBuffer' });
             if (chunkRecord) {
                 const failedRetryMetadata = {
@@ -927,7 +933,8 @@ async function retrySingleChunk(context, chunk, uploadChannel, maxRetries = 5, r
                     status: isTimeout ? 'retry_timeout' : 'retry_failed'
                 };
 
-                await db.put(chunk.key, chunkRecord.value, {
+                // D1模式下不保存二进制数据，避免SQLITE_TOOBIG
+                await db.put(chunk.key, isD1Retry ? '' : chunkRecord.value, {
                     metadata: failedRetryMetadata,
                     expirationTtl: 3600
                 });
@@ -1031,6 +1038,7 @@ export async function checkChunkUploadStatuses(env, uploadId, totalChunks) {
                     status = 'timeout';
 
                     // 更新状态为超时
+                    const { usingD1: isD1Status } = checkDatabaseConfig(env);
                     const timeoutMetadata = {
                         ...chunkRecord.metadata,
                         status: 'timeout',
@@ -1038,7 +1046,8 @@ export async function checkChunkUploadStatuses(env, uploadId, totalChunks) {
                         timeoutDetectedTime: currentTime
                     };
 
-                    await db.put(chunkKey, chunkRecord.value, {
+                    // D1模式下不保存二进制数据，避免SQLITE_TOOBIG
+                    await db.put(chunkKey, isD1Status ? '' : chunkRecord.value, {
                         metadata: timeoutMetadata,
                         expirationTtl: 3600
                     }).catch(err => console.warn(`Failed to update timeout status for chunk ${i}:`, err));
