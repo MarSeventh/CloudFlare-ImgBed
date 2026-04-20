@@ -180,6 +180,8 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 
 - Frontend is open source, see [MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub).
 
+- Desktop software is open source, see [MarSeventh/satellite](https://github.com/MarSeventh/satellite).
+
 - **Ecosystem**: We welcome community participation in the ecosystem construction. Feel free to submit PRs or Issues, and high-quality content can be found on the [official ecosystem page](https://cfbed.sanyue.de/en/about/ecosystem.html).
 
 - **Sponsor**: Maintaining the project is not easy. If you like it, please support the author. Your support is the motivation to keep going~
