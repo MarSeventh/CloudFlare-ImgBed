@@ -6,9 +6,9 @@
 
 import { generateSessionToken } from './passwordHash.js';
 import { getDatabase } from '../databaseAdapter.js';
+import { fetchSecurityConfig } from '../sysConfig.js';
 
 const SESSION_PREFIX = 'session@';
-const SESSION_MAX_AGE = 14 * 24 * 60 * 60; // 14天（秒）
 
 // Cookie 名称映射
 const COOKIE_NAMES = {
@@ -24,19 +24,28 @@ const COOKIE_NAMES = {
  * @returns {Promise<{token: string, cookie: string}>}
  */
 export async function createSession(env, authType, username = '') {
+    // 读取安全策略配置
+    const securityConfig = await fetchSecurityConfig(env);
+    const accessConfig = securityConfig.access || {};
+    const secure = accessConfig.sessionSecure ?? false;
+    const maxAgeDays = authType === 'admin'
+        ? (accessConfig.adminSessionMaxAge ?? 14)
+        : (accessConfig.userSessionMaxAge ?? 14);
+    const maxAge = maxAgeDays * 86400;
+
     const db = getDatabase(env);
     const token = generateSessionToken();
     const sessionData = {
         authType,
         username,
         createdAt: Date.now(),
-        expiresAt: Date.now() + SESSION_MAX_AGE * 1000,
+        expiresAt: Date.now() + maxAge * 1000,
     };
 
     await db.put(`${SESSION_PREFIX}${token}`, JSON.stringify(sessionData));
 
     const cookieName = COOKIE_NAMES[authType] || 'session';
-    const cookie = buildSessionCookie(cookieName, token, SESSION_MAX_AGE);
+    const cookie = buildSessionCookie(cookieName, token, maxAge, secure);
     return { token, cookie };
 }
 
@@ -101,6 +110,10 @@ export async function validateAnySession(env, request) {
  * @returns {Promise<string|string[]>} 清除 Cookie 的 Set-Cookie 头
  */
 export async function destroySession(env, request, authType) {
+    // 读取安全策略配置
+    const securityConfig = await fetchSecurityConfig(env);
+    const secure = securityConfig.access?.sessionSecure ?? false;
+
     const db = getDatabase(env);
 
     if (authType) {
@@ -110,7 +123,7 @@ export async function destroySession(env, request, authType) {
         if (token) {
             await db.delete(`${SESSION_PREFIX}${token}`);
         }
-        return buildSessionCookie(cookieName, '', 0);
+        return buildSessionCookie(cookieName, '', 0, secure);
     } else {
         // 销毁所有类型的会话
         const cookies = [];
@@ -119,7 +132,7 @@ export async function destroySession(env, request, authType) {
             if (token) {
                 await db.delete(`${SESSION_PREFIX}${token}`);
             }
-            cookies.push(buildSessionCookie(cookieName, '', 0));
+            cookies.push(buildSessionCookie(cookieName, '', 0, secure));
         }
         return cookies;
     }
@@ -190,9 +203,10 @@ function getCookieValue(request, name) {
  * @param {string} name - Cookie 名称
  * @param {string} token - 会话 Token
  * @param {number} maxAge - 最大存活时间（秒）
+ * @param {boolean} secure - 是否添加 Secure 属性
  * @returns {string}
  */
-function buildSessionCookie(name, token, maxAge) {
+function buildSessionCookie(name, token, maxAge, secure = false) {
     const parts = [
         `${name}=${token}`,
         `Path=/`,
@@ -200,5 +214,8 @@ function buildSessionCookie(name, token, maxAge) {
         `SameSite=Strict`,
         `Max-Age=${maxAge}`,
     ];
+    if (secure) {
+        parts.push('Secure');
+    }
     return parts.join('; ');
 }

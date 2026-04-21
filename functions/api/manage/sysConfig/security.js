@@ -160,6 +160,10 @@ export async function getSecurityConfig(db, env) {
     const access = {
         allowedDomains: kvAccess.allowedDomains || env.ALLOWED_DOMAINS || '',
         whiteListMode: kvAccess.whiteListMode ?? env.WhiteList_Mode === 'true',
+        // 新增会话安全策略字段
+        sessionSecure: kvAccess.sessionSecure ?? false,
+        userSessionMaxAge: kvAccess.userSessionMaxAge ?? 14,
+        adminSessionMaxAge: kvAccess.adminSessionMaxAge ?? 14,
     }
     settings.access = access
 

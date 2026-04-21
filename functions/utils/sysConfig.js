@@ -101,7 +101,7 @@ export async function fetchSecurityConfig(env) {
             upload: {
                 moderate: { enabled: false, channel: "default", moderateContentApiKey: "", nsfwApiPath: "" }
             },
-            access: { allowedDomains: "", whiteListMode: false }
+            access: { allowedDomains: "", whiteListMode: false, sessionSecure: false, userSessionMaxAge: 14, adminSessionMaxAge: 14 }
         };
     }
 }
