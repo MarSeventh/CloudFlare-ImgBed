@@ -26,7 +26,7 @@ main = "worker/index.js"
 compatibility_date = "2024-08-21"
 
 [assets]
-directory = "./.worker-assets"
+directory = "./frontend-dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 `;
