@@ -139,4 +139,46 @@ export class TelegramAPI {
         return response;
     }
 
+    /**
+     * 获取 Telegram 文件内容
+     *
+     * @param {string} fileId - Telegram 文件ID (file_id)
+     * @param {string} botToken - Telegram Bot Token
+     * @returns {Promise<Response>} 返回 fetch Response 对象，可通过 response.arrayBuffer() 或 response.text() 获取内容
+     */
+    async getTelegramFileContent(fileId, botToken) {
+        const TELEGRAM_API_BASE = 'https://api.telegram.org';
+
+        // 第一步：调用 getFile 接口获取文件路径 (file_path)
+        // 文档参考: https://core.telegram.org/bots/api#getfile
+        const getFileUrl = `${TELEGRAM_API_BASE}/bot${botToken}/getFile?file_id=${fileId}`;
+
+        const infoResponse = await fetch(getFileUrl);
+
+        if (!infoResponse.ok) {
+            throw new Error(`Failed to get file info: ${infoResponse.statusText}`);
+        }
+
+        const infoData = await infoResponse.json();
+
+        // 检查 API 返回是否成功
+        if (!infoData.ok || !infoData.result || !infoData.result.file_path) {
+            throw new Error(`File path not found for fileId: ${fileId}. API Response: ${JSON.stringify(infoData)}`);
+        }
+
+        const filePath = infoData.result.file_path;
+
+        // 第二步：构建文件下载链接并获取文件内容
+        // 下载链接格式: https://api.telegram.org/file/bot<token>/<file_path>
+        const downloadUrl = `${TELEGRAM_API_BASE}/file/bot${botToken}/${filePath}`;
+
+        const fileResponse = await fetch(downloadUrl);
+
+        if (!fileResponse.ok) {
+            throw new Error(`Failed to download file content: ${fileResponse.statusText}`);
+        }
+
+        return fileResponse;
+    }
+
 }
