@@ -17,7 +17,7 @@ on:
 #   CLOUDFLARE_ACCOUNT_ID - Cloudflare Account ID
 #
 # 数据库（二选一）：
-#   D1_DATABASE_ID        - D1 数据库 ID（推荐）
+#   D1_DATABASE_ID        - D1 数据库 ID
 #   KV_NAMESPACE_ID       - KV 命名空间 ID
 #
 # 可选：
