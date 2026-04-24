@@ -17,7 +17,7 @@ compatibility_date = "2024-08-21"
 # 静态资源（前端文件）
 # deploy:worker 脚本会自动将前端文件收集到 .worker-assets/ 目录
 [assets]
-directory = "./.worker-assets"
+directory = "./frontend-dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 
