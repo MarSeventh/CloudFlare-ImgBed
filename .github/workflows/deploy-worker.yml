@@ -22,7 +22,8 @@ on:
 #
 # 可选：
 #   R2_BUCKET_NAME        - R2 存储桶名称
-#   WORKER_VARS           - JSON 格式的业务环境变量，仅作为兼容入口，建议所有设置都在项目管理面板进行
+#   WORKER_VARS           - JSON 格式的业务环境变量（非必要不建议配置，
+#                           部署完成后请在管理面板中配置所有设置）
 
 jobs:
   deploy:
