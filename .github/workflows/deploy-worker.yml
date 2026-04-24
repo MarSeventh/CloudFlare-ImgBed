@@ -1,0 +1,62 @@
+name: Deploy to Cloudflare Workers
+
+on:
+  workflow_dispatch:
+    inputs:
+      worker_name:
+        description: 'Worker 名称'
+        required: false
+        default: 'cloudflare-imgbed'
+
+# 所有配置均通过 Secrets 传入（public 仓库的 Variables 对所有人可见，不安全）
+#
+# 在仓库 Settings → Secrets and variables → Actions → Secrets 中配置：
+#
+# 必填：
+#   CLOUDFLARE_API_TOKEN  - Cloudflare API Token（需要 Workers 编辑权限）
+#   CLOUDFLARE_ACCOUNT_ID - Cloudflare Account ID
+#
+# 数据库（二选一）：
+#   D1_DATABASE_ID        - D1 数据库 ID（推荐）
+#   KV_NAMESPACE_ID       - KV 命名空间 ID
+#
+# 可选：
+#   R2_BUCKET_NAME        - R2 存储桶名称
+#   WORKER_VARS           - JSON 格式的业务环境变量，仅作为兼容入口，建议所有设置都在项目管理面板进行
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci --omit=dev --ignore-scripts
+
+      - name: Generate worker routes
+        run: node worker/generate-routes.js
+
+      - name: Prepare static assets
+        run: node worker/prepare-assets.js
+
+      - name: Generate wrangler.worker.toml
+        env:
+          WORKER_NAME: ${{ inputs.worker_name }}
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          KV_NAMESPACE_ID: ${{ secrets.KV_NAMESPACE_ID }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          WORKER_VARS: ${{ secrets.WORKER_VARS }}
+        run: node worker/generate-toml.js
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config wrangler.worker.toml

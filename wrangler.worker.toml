@@ -1,0 +1,39 @@
+# Cloudflare Workers 部署配置
+# 使用方式: npx wrangler deploy --config wrangler.worker.toml
+#
+# 部署前需要配置以下 binding：
+# 1. D1 数据库 - 取消注释并填入你的 database_id
+# 2. R2 存储桶 - 取消注释并填入你的 bucket_name
+# 3. KV 命名空间 - 如果使用 KV 而非 D1，取消注释并填入 id
+# 4. 环境变量 - 在 [vars] 中配置
+#
+# GitHub Actions 部署时会自动从 Secrets/Variables 生成此文件，
+# 无需手动编辑。详见 .github/workflows/deploy-worker.yml
+
+name = "cloudflare-imgbed"
+main = "worker/index.js"
+compatibility_date = "2024-08-21"
+
+# 静态资源（前端文件）
+# deploy:worker 脚本会自动将前端文件收集到 .worker-assets/ 目录
+[assets]
+directory = "./.worker-assets"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+[vars]
+# TG_BOT_TOKEN = ""
+# TG_CHAT_ID = ""
+
+# [[d1_databases]]
+# binding = "img_d1"
+# database_name = "img_d1"
+# database_id = ""
+
+# [[r2_buckets]]
+# binding = "img_r2"
+# bucket_name = ""
+
+# [[kv_namespaces]]
+# binding = "img_url"
+# id = ""
