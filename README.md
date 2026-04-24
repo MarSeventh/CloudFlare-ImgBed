@@ -53,6 +53,16 @@
 1. If you encounter issues during deployment or usage, please carefully read the documentation, FAQ, and existing issues first.
 2. **Note**: This repository is a remake of the [Telegraph-Image](https://github.com/cf-pages/Telegraph-Image) project. If you like this project, please support the original one as well.
 
+## V2.7.1+ Cloudflare Pages Build Output Directory Change
+
+> Starting from v2.7.1, frontend build output has been moved to the `frontend-dist` directory. **Cloudflare Pages users** need to manually update the build configuration:
+>
+> 1. Go to Cloudflare Dashboard → Your Pages project → `Settings` → `Build`
+> 2. Edit `Build configuration`, change `Build output directory` from `/` to `/frontend-dist`
+> 3. Save and redeploy
+>
+> Docker and Workers users are not affected.
+
 ## 2026.3.4 V2.6.2 Docker Image Rebuild Notice
 
 > The Docker image has been rebuilt in this release, involving changes to the base image, directory structure, and database, bringing optimizations in concurrency, memory management, and more. To ensure data safety, please **back up your data before upgrading**.
