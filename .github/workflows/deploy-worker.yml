@@ -43,9 +43,6 @@ jobs:
       - name: Generate worker routes
         run: node worker/generate-routes.js
 
-      - name: Prepare static assets
-        run: node worker/prepare-assets.js
-
       - name: Generate wrangler.worker.toml
         env:
           WORKER_NAME: ${{ inputs.worker_name }}

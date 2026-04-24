@@ -8,7 +8,7 @@
     "test": "mocha",
     "start": "npx wrangler pages dev ./frontend-dist --kv \"img_url\" --r2 \"img_r2\" --ip 0.0.0.0 --port 8080 --persist-to ./data",
     "start:docker": "node --import ./server/register.mjs server/index.js",
-    "deploy:worker": "node worker/generate-routes.js && node worker/prepare-assets.js && npx wrangler deploy --config wrangler.worker.toml"
+    "deploy:worker": "node worker/generate-routes.js && npx wrangler deploy --config wrangler.worker.toml"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.726.1",
