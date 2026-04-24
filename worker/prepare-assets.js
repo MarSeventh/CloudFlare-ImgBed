@@ -1,6 +1,6 @@
 /**
  * Worker 部署前的静态资源收集脚本
- * 将前端构建产物复制到 .worker-assets/ 目录
+ * 将 frontend-dist/ 目录复制到 .worker-assets/
  * 避免 wrangler 扫描 node_modules 等无关文件
  */
 
@@ -10,37 +10,18 @@ import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
+const SRC = resolve(ROOT, 'frontend-dist');
 const OUT = resolve(ROOT, '.worker-assets');
 
-// 需要收集的前端资源（目录和文件）
-const assets = [
-    'css',
-    'js',
-    'fonts',
-    'img',
-    'static',
-    'index.html',
-    'logo.png',
-    'logo-dark.png',
-];
+if (!existsSync(SRC)) {
+    console.error('Error: frontend-dist/ directory not found');
+    process.exit(1);
+}
 
-// 清理并重建输出目录
+// 清理并复制
 if (existsSync(OUT)) {
     rmSync(OUT, { recursive: true, force: true });
 }
-mkdirSync(OUT, { recursive: true });
 
-let count = 0;
-for (const name of assets) {
-    const src = resolve(ROOT, name);
-    if (!existsSync(src)) {
-        console.log(`  skip: ${name} (not found)`);
-        continue;
-    }
-    const dest = resolve(OUT, name);
-    cpSync(src, dest, { recursive: true });
-    count++;
-    console.log(`  copy: ${name}`);
-}
-
-console.log(`\nCollected ${count} asset(s) into .worker-assets/`);
+cpSync(SRC, OUT, { recursive: true });
+console.log('Copied frontend-dist/ → .worker-assets/');
