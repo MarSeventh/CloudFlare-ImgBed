@@ -10,4 +10,3 @@ wrangler.toml
 .kiro/
 .vscode/
 .claude/
-.worker-assets/
