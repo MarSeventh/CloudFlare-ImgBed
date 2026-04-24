@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     # 仅在 fork 仓库且配置了 Cloudflare secrets 时运行
     # 原仓库 push 和未配置 secrets 的 fork 不会触发部署
-    if: ${{ github.event.repository.fork && secrets.CLOUDFLARE_API_TOKEN != '' }}
+    if: ${{ github.event.repository.fork }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
