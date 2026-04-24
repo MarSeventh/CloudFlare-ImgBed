@@ -36,21 +36,36 @@ jobs:
     # 原仓库 push 和未配置 secrets 的 fork 不会触发部署
     if: ${{ github.event.repository.fork }}
     steps:
+      - name: Check deployment config
+        id: check
+        run: |
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
+            echo "CLOUDFLARE_API_TOKEN not configured, skipping Worker deployment"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Checkout
+        if: steps.check.outputs.skip != 'true'
         uses: actions/checkout@v4
 
       - name: Setup Node.js
+        if: steps.check.outputs.skip != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '22'
 
       - name: Install dependencies
+        if: steps.check.outputs.skip != 'true'
         run: npm ci --omit=dev --omit=optional
 
       - name: Generate worker routes
+        if: steps.check.outputs.skip != 'true'
         run: node worker/generate-routes.js
 
       - name: Generate wrangler.worker.toml
+        if: steps.check.outputs.skip != 'true'
         env:
           WORKER_NAME: ${{ inputs.worker_name || secrets.WORKER_NAME }}
           D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
@@ -60,6 +75,7 @@ jobs:
         run: node worker/generate-toml.js
 
       - name: Deploy to Cloudflare Workers
+        if: steps.check.outputs.skip != 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
