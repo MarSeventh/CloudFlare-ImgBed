@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       worker_name:
-        description: 'Worker 名称'
+        description: 'Worker Name'
         required: false
         default: 'cloudflare-imgbed'
 
