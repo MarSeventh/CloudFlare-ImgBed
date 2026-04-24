@@ -1,5 +1,5 @@
 // getTelegramFile.js
-import { TelegramAPI } from '../utils/telegramAPI.js'
+import { TelegramAPI } from '../../utils/telegramAPI.js'
 
 // CORS 跨域响应头（可按需扩展）
 const corsHeaders = {
