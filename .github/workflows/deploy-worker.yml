@@ -25,6 +25,7 @@ on:
 #
 # 可选：
 #   R2_BUCKET_NAME        - R2 存储桶名称
+#   WORKER_NAME           - Worker 名称（默认 cloudflare-imgbed，手动触发时可在界面覆盖）
 #   WORKER_VARS           - JSON 格式的业务环境变量（非必要不建议配置，
 #                           部署完成后请在管理面板中配置所有设置）
 
@@ -51,7 +52,7 @@ jobs:
 
       - name: Generate wrangler.worker.toml
         env:
-          WORKER_NAME: ${{ inputs.worker_name }}
+          WORKER_NAME: ${{ inputs.worker_name || secrets.WORKER_NAME }}
           D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
           KV_NAMESPACE_ID: ${{ secrets.KV_NAMESPACE_ID }}
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
