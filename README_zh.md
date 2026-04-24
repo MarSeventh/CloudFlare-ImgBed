@@ -60,6 +60,16 @@
 
 2. **注意**：本仓库为[Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，如果你觉得本项目不错，在支持本项目的同时，也请支持原项目。
 
+## V2.7.1+ Cloudflare Pages 构建输出目录变更
+
+> 自 v2.7.1 版本起，前端构建产物已迁移至 `frontend-dist` 目录。**Cloudflare Pages 用户**需要手动修改构建配置：
+>
+> 1. 前往 Cloudflare Dashboard → 您的 Pages 项目 → `设置` → `构建`
+> 2. 编辑`构建配置`，将`构建输出目录`从 `/` 修改为 `/frontend-dist`
+> 3. 保存后重新部署
+>
+> Docker 用户和 Workers 用户无需操作。
+
 ## 2026.3.4 V2.6.2 重构 Docker 镜像的说明
 
 > 本次版本对 Docker 镜像进行了重构，涉及基础镜像、目录结构和数据库等方面的变更，带来了并发、内存管理等方面的优化。为确保数据安全，请务必**先备份数据再进行升级**。
