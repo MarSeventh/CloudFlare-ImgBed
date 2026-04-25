@@ -1,4 +1,3 @@
-import { checkDatabaseConfig } from "../../utils/middleware";
 import { authenticate, AUTH_SCOPE } from "../../utils/auth/authCore.js";
 
 async function errorHandling(context) {
@@ -75,4 +74,4 @@ async function authentication(context) {
   return context.next();
 }
 
-export const onRequest = [checkDatabaseConfig, errorHandling, authentication];
+export const onRequest = [errorHandling, authentication];
