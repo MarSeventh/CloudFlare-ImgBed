@@ -1,7 +1,7 @@
 .wrangler/*
 data/*
 node_modules
-wrangler.toml
+/wrangler.toml
 .DS_Store
 
 *.sqlite

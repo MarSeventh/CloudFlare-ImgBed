@@ -64,7 +64,7 @@ jobs:
         if: steps.check.outputs.skip != 'true'
         run: node worker/generate-routes.js
 
-      - name: Generate wrangler.worker.toml
+      - name: Generate wrangler config
         if: steps.check.outputs.skip != 'true'
         env:
           WORKER_NAME: ${{ inputs.worker_name || secrets.WORKER_NAME }}
@@ -80,4 +80,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --config wrangler.worker.toml
+          command: deploy --config worker/wrangler.toml
