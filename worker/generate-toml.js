@@ -1,5 +1,5 @@
 /**
- * 根据环境变量生成 wrangler.worker.toml
+ * 根据环境变量生成 worker/wrangler.toml
  * 用于 GitHub Actions 部署，从 Secrets/Variables 读取配置
  * 
  * 环境变量：
@@ -15,18 +15,17 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, '..');
-const outputPath = join(ROOT, 'wrangler.worker.toml');
+const outputPath = join(__dirname, 'wrangler.toml');
 
 const env = process.env;
 const name = env.WORKER_NAME || 'cloudflare-imgbed';
 
 let toml = `name = "${name}"
-main = "worker/index.js"
+main = "index.js"
 compatibility_date = "2024-08-21"
 
 [assets]
-directory = "./frontend-dist"
+directory = "../frontend-dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 `;
@@ -85,5 +84,5 @@ const safeToml = toml
     .replace(/(KEY.*= )".*"/gi, '$1"***"')
     .replace(/(SECRET.*= )".*"/gi, '$1"***"');
 
-console.log('Generated wrangler.worker.toml:');
+console.log('Generated worker/wrangler.toml:');
 console.log(safeToml);

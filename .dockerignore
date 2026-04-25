@@ -8,5 +8,4 @@ Dockerfile
 data
 readme
 worker
-wrangler.worker.toml
 *.md
