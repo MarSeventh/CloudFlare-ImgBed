@@ -1,5 +1,5 @@
 <div align="center">
-    <a href="https://github.com/MarSeventh/CloudFlare-ImgBed"><img width="80%" alt="logo" src="static/readme/banner.png"/></a>
+    <a href="https://github.com/MarSeventh/CloudFlare-ImgBed"><img width="80%" alt="logo" src="readme/banner.png"/></a>
     <p><em>🗂️开源文件托管解决方案，支持 Docker 和无服务器部署，支持 Telegram、Discord、Cloudflare R2、S3、Huggingface 等多种存储渠道，支持 WebDAV 协议和多种 RESTful API</em></p>
     <p>
         <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README_zh.md">简体中文</a> | <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README.md">English</a> | <a href="https://cfbed.sanyue.de">官方网站</a>
@@ -165,7 +165,7 @@
 
 免费文件托管解决方案，具有**上传**、**管理**、**读取**、**删除**等全链路功能，覆盖文件全生命周期，支持**鉴权**、**目录**、**图片审查**、**随机图**等各项特性（详见[功能文档](https://cfbed.sanyue.de/guide/features.html)）。
 
-![CloudFlare](static/readme/海报.png)
+![CloudFlare](readme/海报.png)
 
 # 2. [Document](https://cfbed.sanyue.de)
 
@@ -177,22 +177,22 @@
 
 **演示站点**：[CloudFlare ImgBed](https://cfbed.1314883.xyz/) 访问密码：`cfbed`
 
-![image-20250313204101984](static/readme/login.png)
+![image-20250313204101984](readme/login.png)
 
-![image-20250313204101984](static/readme/upload.png)
+![image-20250313204101984](readme/upload.png)
 
 <details>
     <summary>其他页面效果展示</summary>
 
-![image-20250313204138886](static/readme/uploading.png)
+![image-20250313204138886](readme/uploading.png)
 
-![image-20250313204308225](static/readme/dashboard.png)
+![image-20250313204308225](readme/dashboard.png)
 
-![image-20250314152355339](static/readme/customer-config.png)
+![image-20250314152355339](readme/customer-config.png)
 
-![status-page](static/readme/status-page.png)
+![status-page](readme/status-page.png)
 
-![public-gallery](static/readme/public-gallery.png)
+![public-gallery](readme/public-gallery.png)
 
 
 
@@ -228,7 +228,7 @@
 
 - **[CloudFlare](https://www.cloudflare.com) & [EdgeOne](https://edgeone.ai/?from=github)**：提供CDN加速和安全保护服务
 
-  <a href="https://www.cloudflare.com"><img src="static/readme/cloudflare-logo.png" alt="Cloudflare Logo" height="25"></a> <a href="https://edgeone.ai/?from=github"><img src="/static/readme/edgeone-logo.png" alt="Tencent Logo" height="25"></a>
+  <a href="https://www.cloudflare.com"><img src="readme/cloudflare-logo.png" alt="Cloudflare Logo" height="25"></a> <a href="https://edgeone.ai/?from=github"><img src="/readme/edgeone-logo.png" alt="Tencent Logo" height="25"></a>
 
 - **[速维云](https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC)**：提供云计算服务资源支持
 
