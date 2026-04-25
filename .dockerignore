@@ -6,3 +6,7 @@ Dockerfile
 .gitignore
 .github
 data
+static/readme
+worker
+wrangler.worker.toml
+*.md
