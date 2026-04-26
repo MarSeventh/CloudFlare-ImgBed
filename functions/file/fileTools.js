@@ -164,7 +164,7 @@ export async function returnWithCheck(context, imgRecord) {
 }
 
 export async function return404(url) {
-    const Img404 = await fetch(url.origin + "/static/404.png");
+    const Img404 = await fetch(url.origin + "/static/media/404.png");
     if (!Img404.ok) {
         return new Response('Error: Image Not Found',
             {
@@ -187,7 +187,7 @@ export async function return404(url) {
 }
 
 export async function returnBlockImg(url) {
-    const blockImg = await fetch(url.origin + "/static/BlockImg.png");
+    const blockImg = await fetch(url.origin + "/static/media/BlockImg.png");
     if (!blockImg.ok) {
         return new Response(null, {
             status: 302,
@@ -209,7 +209,7 @@ export async function returnBlockImg(url) {
 }
 
 export async function returnWhiteListImg(url) {
-    const WhiteListImg = await fetch(url.origin + "/static/WhiteListOn.png");
+    const WhiteListImg = await fetch(url.origin + "/static/media/WhiteListOn.png");
     if (!WhiteListImg.ok) {
         return new Response(null, {
             status: 302,
