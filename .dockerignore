@@ -7,5 +7,5 @@ Dockerfile
 .github
 data
 readme
-worker
+deploy/worker
 *.md

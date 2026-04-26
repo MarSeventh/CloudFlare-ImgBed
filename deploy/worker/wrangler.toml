@@ -1,5 +1,5 @@
 # Cloudflare Workers 部署配置
-# 使用方式: npx wrangler deploy --config worker/wrangler.toml
+# 使用方式: npx wrangler deploy --config deploy/worker/wrangler.toml
 #
 # 部署前需要配置以下 binding：
 # 1. D1 数据库 - 取消注释并填入你的 database_id
@@ -16,7 +16,7 @@ compatibility_date = "2024-08-21"
 
 # 静态资源（前端文件）
 [assets]
-directory = "../frontend-dist"
+directory = "../../frontend-dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 

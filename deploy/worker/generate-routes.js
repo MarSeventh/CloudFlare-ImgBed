@@ -1,5 +1,5 @@
 /**
- * 自动扫描 functions/ 目录，生成 worker/index.js
+ * 自动扫描 functions/ 目录，生成 deploy/worker/index.js
  * 
  * 扫描规则（与 Cloudflare Pages Functions 一致）：
  * - _middleware.js  → 中间件，按目录层级链式执行
@@ -9,7 +9,7 @@
  * - utils/ 目录跳过（工具模块，不是路由）
  * - 不含 onRequest 导出的文件跳过（工具模块）
  * 
- * 使用方式: node worker/generate-routes.js
+ * 使用方式: node deploy/worker/generate-routes.js
  */
 
 import { readdirSync, statSync, readFileSync, writeFileSync } from 'fs';
@@ -17,7 +17,7 @@ import { join, relative, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, '..');
+const ROOT = join(__dirname, '../..');
 const FUNCTIONS_DIR = join(ROOT, 'functions');
 
 // 跳过的目录名（工具模块，不参与路由）
@@ -75,7 +75,7 @@ function toUrlPath(filePath) {
 }
 
 /**
- * 获取文件相对于 worker/ 目录的导入路径
+ * 获取文件相对于 deploy/worker/ 目录的导入路径
  */
 function toImportPath(filePath) {
     let rel = relative(__dirname, filePath).replace(/\\/g, '/');
@@ -201,7 +201,7 @@ for (const route of routes) {
 // 组装完整文件
 const output = `/**
  * Cloudflare Workers 部署适配层（自动生成，请勿手动编辑）
- * 生成命令: node worker/generate-routes.js
+ * 生成命令: node deploy/worker/generate-routes.js
  * 
  * 复用 functions/ 下的全部业务逻辑，不修改任何业务代码
  */
@@ -342,6 +342,6 @@ export default {
 const outputPath = join(__dirname, 'index.js');
 writeFileSync(outputPath, output, 'utf8');
 
-console.log(`Generated worker/index.js`);
+console.log(`Generated deploy/worker/index.js`);
 console.log(`  Middlewares: ${middlewares.length}`);
 console.log(`  Routes: ${routes.length} (${routes.filter(r => r.isCatchAll).length} catch-all)`);

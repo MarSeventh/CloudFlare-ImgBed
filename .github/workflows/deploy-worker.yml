@@ -62,7 +62,7 @@ jobs:
 
       - name: Generate worker routes
         if: steps.check.outputs.skip != 'true'
-        run: node worker/generate-routes.js
+        run: node deploy/worker/generate-routes.js
 
       - name: Generate wrangler config
         if: steps.check.outputs.skip != 'true'
@@ -72,7 +72,7 @@ jobs:
           KV_NAMESPACE_ID: ${{ secrets.KV_NAMESPACE_ID }}
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
           WORKER_VARS: ${{ secrets.WORKER_VARS }}
-        run: node worker/generate-toml.js
+        run: node deploy/worker/generate-toml.js
 
       - name: Deploy to Cloudflare Workers
         if: steps.check.outputs.skip != 'true'
@@ -80,4 +80,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --config worker/wrangler.toml
+          command: deploy --config deploy/worker/wrangler.toml
