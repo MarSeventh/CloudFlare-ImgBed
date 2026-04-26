@@ -7,8 +7,8 @@
     "ci-test:docker": "concurrently --kill-others \"npm run start:docker\" \"wait-on http://localhost:8080 && mocha\"",
     "test": "mocha",
     "start": "npx wrangler pages dev ./frontend-dist --kv \"img_url\" --r2 \"img_r2\" --ip 0.0.0.0 --port 8080 --persist-to ./data",
-    "start:docker": "node --import ./server/register.mjs server/index.js",
-    "deploy:worker": "node worker/generate-routes.js && npx wrangler deploy --config worker/wrangler.toml"
+    "start:docker": "node --import ./deploy/server/register.mjs deploy/server/index.js",
+    "deploy:worker": "node deploy/worker/generate-routes.js && npx wrangler deploy --config deploy/worker/wrangler.toml"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.726.1",

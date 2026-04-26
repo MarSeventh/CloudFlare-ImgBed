@@ -1,5 +1,5 @@
 /**
- * 根据环境变量生成 worker/wrangler.toml
+ * 根据环境变量生成 deploy/worker/wrangler.toml
  * 用于 GitHub Actions 部署，从 Secrets/Variables 读取配置
  * 
  * 环境变量：
@@ -25,7 +25,7 @@ main = "index.js"
 compatibility_date = "2024-08-21"
 
 [assets]
-directory = "../frontend-dist"
+directory = "../../frontend-dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 `;
@@ -84,5 +84,5 @@ const safeToml = toml
     .replace(/(KEY.*= )".*"/gi, '$1"***"')
     .replace(/(SECRET.*= )".*"/gi, '$1"***"');
 
-console.log('Generated worker/wrangler.toml:');
+console.log('Generated deploy/worker/wrangler.toml:');
 console.log(safeToml);
