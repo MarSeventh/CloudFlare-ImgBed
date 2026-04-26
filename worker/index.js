@@ -146,10 +146,23 @@ function collectMiddlewares(middlewareModules) {
     return handlers;
 }
 
+function createNextRequest(input, init, baseRequest) {
+    if (input instanceof Request) {
+        return init ? new Request(input, init) : input;
+    }
+
+    const url = new URL(input, baseRequest.url).toString();
+    return new Request(url, init);
+}
+
 async function executeChain(middlewares, handler, context) {
     const chain = [...middlewares, handler];
     let index = 0;
-    context.next = async function () {
+    context.next = async function (input, init) {
+        if (input !== undefined) {
+            context.request = createNextRequest(input, init, context.request);
+        }
+
         if (index < chain.length) {
             return await chain[index++](context);
         }
@@ -205,7 +218,11 @@ export default {
             request,
             env,
             params,
+            functionPath: route.path.endsWith('/') && route.path !== '/'
+                ? route.path.slice(0, -1)
+                : route.path,
             waitUntil: ctx.waitUntil.bind(ctx),
+            passThroughOnException: () => {},
             next: null,
             data: {},
         };
