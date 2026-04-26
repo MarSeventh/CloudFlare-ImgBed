@@ -376,13 +376,13 @@ app.all('*', async (c, next) => {
 
 // 静态文件服务
 app.use('/*', serveStatic({
-    root: './',
+    root: './frontend-dist',
     rewriteRequestPath: (path) => path,
 }));
 
 // 默认返回 index.html（SPA 支持）
 app.get('*', async (c) => {
-    const indexPath = join(ROOT_DIR, 'index.html');
+    const indexPath = join(ROOT_DIR, 'frontend-dist', 'index.html');
     if (existsSync(indexPath)) {
         const content = readFileSync(indexPath, 'utf8');
         return c.html(content);
