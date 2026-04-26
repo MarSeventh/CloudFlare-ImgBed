@@ -1,0 +1,7 @@
+name = "cloudflare-imgbed"
+compatibility_date = "2024-01-01"
+
+[[r2_buckets]]
+binding = "img_r2"
+bucket_name = "mypayhip"
+jurisdiction = "wnam"
