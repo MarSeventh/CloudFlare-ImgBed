@@ -55,6 +55,10 @@ export async function onRequest(context) {
             huggingface: uploadConfig.huggingface.channels.map(ch => ({
                 name: ch.name,
                 type: 'HuggingFace'
+            })),
+            webdav: uploadConfig.webdav.channels.map(ch => ({
+                name: ch.name,
+                type: 'WebDAV'
             }))
         };
 

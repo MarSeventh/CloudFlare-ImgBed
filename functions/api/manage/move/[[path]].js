@@ -3,6 +3,7 @@ import { purgeCFCache, purgeRandomFileListCache, purgePublicFileListCache } from
 import { moveFileInIndex, batchMoveFilesInIndex } from "../../../utils/indexManager.js";
 import { getDatabase } from '../../../utils/databaseAdapter.js';
 import { sanitizeUploadFolder } from "../../../upload/uploadTools.js";
+import { WebDAVAPI } from "../../../utils/webdavAPI.js";
 
 export async function onRequest(context) {
     const { request, env, params, waitUntil } = context;
@@ -161,6 +162,27 @@ async function moveFile(env, fileId, newFileId, cdnUrl, url) {
             }
         }
 
+        // WebDAV 渠道的图片，需要移动 WebDAV 中对应的文件
+        if (img.metadata?.Channel === 'WebDAV') {
+            const { success, error } = await moveWebDAVFile(img, newFileId);
+            if (!success) {
+                throw new Error(error || 'WebDAV Move Failed');
+            }
+            img.metadata.WebDAVFilePath = newFileId;
+            if (img.metadata.WebDAVPublicBaseUrl || img.metadata.WebDAVPublicUrl) {
+                const webdavAPI = new WebDAVAPI({
+                    baseUrl: img.metadata.WebDAVBaseUrl,
+                    username: img.metadata.WebDAVUsername || '',
+                    password: img.metadata.WebDAVPassword || '',
+                    headers: img.metadata.WebDAVHeaders || {},
+                    createDirectory: img.metadata.WebDAVCreateDirectory !== false,
+                });
+                const publicBaseUrl = img.metadata.WebDAVPublicBaseUrl
+                    || img.metadata.WebDAVPublicUrl.slice(0, img.metadata.WebDAVPublicUrl.length - fileId.split('/').map(encodeURIComponent).join('/').length);
+                img.metadata.WebDAVPublicUrl = webdavAPI.buildPublicUrl(newFileId, publicBaseUrl);
+            }
+        }
+
         // 旧版 Telegram 渠道和 Telegraph 渠道不支持移动
         if (img.metadata?.Channel === 'Telegram' || img.metadata?.Channel === undefined) {
             throw new Error('Unsupported Channel');
@@ -224,6 +246,31 @@ async function moveS3File(img, newFileId) {
         return { success: true, newKey };
     } catch (error) {
         console.error("S3 Move Failed:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+// 移动 WebDAV 渠道的图片
+async function moveWebDAVFile(img, newFileId) {
+    const baseUrl = img.metadata?.WebDAVBaseUrl;
+    const oldPath = img.metadata?.WebDAVFilePath;
+
+    if (!baseUrl || !oldPath) {
+        return { success: false, error: 'WebDAV file missing required metadata for move' };
+    }
+
+    try {
+        const webdavAPI = new WebDAVAPI({
+            baseUrl,
+            username: img.metadata?.WebDAVUsername || '',
+            password: img.metadata?.WebDAVPassword || '',
+            headers: img.metadata?.WebDAVHeaders || {},
+            createDirectory: img.metadata?.WebDAVCreateDirectory !== false,
+        });
+        await webdavAPI.moveFile(oldPath, newFileId, true);
+        return { success: true, newKey: newFileId };
+    } catch (error) {
+        console.error("WebDAV Move Failed:", error);
         return { success: false, error: error.message };
     }
 }
