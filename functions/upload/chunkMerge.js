@@ -46,6 +46,9 @@ export async function handleChunkMerge(context) {
 
         // 使用会话中的上传渠道，或者从URL参数获取
         uploadChannel = url.searchParams.get('uploadChannel') || sessionInfo.uploadChannel || 'telegram';
+        if (uploadChannel === 'webdav') {
+            return createResponse('Error: WebDAV channel does not support chunked uploads. Please use non-chunked upload within your Cloudflare request body limit.', { status: 400 });
+        }
 
         // 获取指定的渠道名称（优先URL参数，其次会话信息）
         const channelName = url.searchParams.get('channelName') || sessionInfo.channelName || '';
