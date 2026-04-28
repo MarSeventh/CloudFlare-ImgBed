@@ -116,8 +116,8 @@ export async function onRequestGet(context) {
         continue;
       }
 
-      // 跳过没有元数据的文件
-      if (!item.metadata) {
+      // 跳过没有元数据或有效时间戳的记录
+      if (!item.metadata || !item.metadata.TimeStamp) {
         continue;
       }
 
