@@ -33,6 +33,9 @@ export async function initializeChunkedUpload(context) {
 
         // 获取上传渠道
         const uploadChannel = url.searchParams.get('uploadChannel') || 'telegram';
+        if (uploadChannel === 'webdav') {
+            return createResponse('Error: WebDAV channel does not support chunked uploads. Please use non-chunked upload within your Cloudflare request body limit.', { status: 400 });
+        }
         // 获取指定的渠道名称
         const channelName = url.searchParams.get('channelName') || '';
 
@@ -121,6 +124,9 @@ export async function handleChunkUpload(context) {
 
         // 获取上传渠道
         const uploadChannel = url.searchParams.get('uploadChannel') || sessionInfo.uploadChannel || 'telegram';
+        if (uploadChannel === 'webdav') {
+            return createResponse('Error: WebDAV channel does not support chunked uploads. Please use non-chunked upload within your Cloudflare request body limit.', { status: 400 });
+        }
         // 获取指定的渠道名称
         const channelName = url.searchParams.get('channelName') || sessionInfo.channelName || '';
 

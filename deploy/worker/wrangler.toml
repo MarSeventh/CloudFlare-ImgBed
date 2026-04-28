@@ -23,6 +23,13 @@ not_found_handling = "single-page-application"
 [vars]
 # TG_BOT_TOKEN = ""
 # TG_CHAT_ID = ""
+# Optional third-party WebDAV storage channel:
+# WEBDAV_BASE_URL = "https://dav.example.com/remote.php/dav/files/user/imgbed/"
+# WEBDAV_USERNAME = ""
+# WEBDAV_PASSWORD = ""
+# WEBDAV_PUBLIC_URL = ""
+# WEBDAV_HEADERS = "{\"X-Example\":\"value\"}"
+# WEBDAV_CREATE_DIRECTORY = "true"
 
 # [[d1_databases]]
 # binding = "img_d1"

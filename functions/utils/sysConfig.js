@@ -1,7 +1,7 @@
-import { getUploadConfig } from '../api/manage/sysConfig/upload';
-import { getSecurityConfig } from '../api/manage/sysConfig/security';
-import { getPageConfig } from '../api/manage/sysConfig/page';
-import { getOthersConfig } from '../api/manage/sysConfig/others';
+import { getUploadConfig } from '../api/manage/sysConfig/upload.js';
+import { getSecurityConfig } from '../api/manage/sysConfig/security.js';
+import { getPageConfig } from '../api/manage/sysConfig/page.js';
+import { getOthersConfig } from '../api/manage/sysConfig/others.js';
 import { getDatabase } from './databaseAdapter.js';
 import { getIndexMeta } from './indexManager.js';
 
@@ -63,12 +63,14 @@ export async function fetchUploadConfig(env, context = null) {
         settings.s3.channels = settings.s3.channels.filter((channel) => channel.enabled);
         settings.discord.channels = settings.discord.channels.filter((channel) => channel.enabled);
         settings.huggingface.channels = settings.huggingface.channels.filter((channel) => channel.enabled);
+        settings.webdav.channels = settings.webdav.channels.filter((channel) => channel.enabled);
 
-        // 根据容量限制过滤渠道（仅 R2 和 S3）
+        // 根据容量限制过滤渠道（可用于 R2、S3、WebDAV）
         // 需要 context 来调用 getIndexMeta
         if (context) {
             settings.cfr2.channels = await filterChannelsByQuota(context, settings.cfr2.channels);
             settings.s3.channels = await filterChannelsByQuota(context, settings.s3.channels);
+            settings.webdav.channels = await filterChannelsByQuota(context, settings.webdav.channels);
         }
 
         return settings;
@@ -80,7 +82,8 @@ export async function fetchUploadConfig(env, context = null) {
             cfr2: { channels: [] },
             s3: { channels: [] },
             discord: { channels: [] },
-            huggingface: { channels: [] }
+            huggingface: { channels: [] },
+            webdav: { channels: [] }
         };
     }
 }
