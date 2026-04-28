@@ -196,15 +196,7 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 
 - **Sponsor**: Maintaining the project is not easy. If you like it, please support the author. Your support is the motivation to keep going~
 
-  <a href="https://afdian.com/a/marseventh">
-    <img height="36" src="https://pic1.afdiancdn.com/static/img/welcome/button-sponsorme.png" alt="">
-  </a>&nbsp;&nbsp;
-  <a href="readme/weixin-reward.jpeg" target="_blank">
-    <img src="https://img.shields.io/badge/WeChat_Pay-07c160?style=for-the-badge&logo=wechat&logoColor=white" height="36" alt="WeChat Pay">
-  </a>&nbsp;&nbsp;
-  <a href="readme/alipay-reward.jpeg" target="_blank">
-    <img src="https://img.shields.io/badge/Alipay-1677FF?style=for-the-badge&logo=alipay&logoColor=white" height="36" alt="WeChat Pay">
-  </a>
+  <a href="https://afdian.com/a/marseventh"><img src="https://img.shields.io/badge/AFDIAN-946CE6?style=for-the-badge&logo=afdian&logoColor=white" height="36" alt="Afdian"></a>&nbsp;&nbsp;<a href="readme/weixin-reward.jpeg" target="_blank"><img src="https://img.shields.io/badge/WeChat_Pay-07c160?style=for-the-badge&logo=wechat&logoColor=white" height="36" alt="WeChat Pay"></a>&nbsp;&nbsp;<a href="readme/alipay-reward.jpeg" target="_blank"><img src="https://img.shields.io/badge/Alipay-1677FF?style=for-the-badge&logo=alipay&logoColor=white" height="36" alt="WeChat Pay"></a>
   
 - **Sponsors**: Thanks to the following sponsors for supporting this project!
 
