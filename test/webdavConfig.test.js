@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { getUploadConfig } from '../functions/api/manage/sysConfig/upload.js';
 import { fetchUploadConfig } from '../functions/utils/sysConfig.js';
+import { resolveWebDAVConfig } from '../functions/utils/webdavConfig.js';
 import { onRequest as channelsOnRequest } from '../functions/api/channels.js';
 
 function makeKV(initial = {}) {
@@ -66,5 +67,33 @@ describe('WebDAV upload config', () => {
 
         assert.equal(response.status, 200);
         assert.deepEqual(body.webdav, [{ name: 'dav-main', type: 'WebDAV' }]);
+    });
+
+    it('resolves WebDAV secrets from channel config by ChannelName', async () => {
+        const uploadSettings = JSON.stringify({
+            webdav: {
+                loadBalance: { enabled: false },
+                channels: [{
+                    name: 'dav-main',
+                    type: 'webdav',
+                    baseUrl: 'https://dav.example.com/root/',
+                    username: 'alice',
+                    password: 'secret',
+                    headers: { 'X-Test': '1' },
+                    enabled: true,
+                }],
+            },
+        });
+        const env = { img_url: makeKV({ 'manage@sysConfig@upload': uploadSettings }) };
+
+        const config = await resolveWebDAVConfig(env, {
+            ChannelName: 'dav-main',
+            WebDAVBaseUrl: 'https://dav.example.com/root/',
+            WebDAVFilePath: 'a.png',
+        });
+
+        assert.equal(config.username, 'alice');
+        assert.equal(config.password, 'secret');
+        assert.deepEqual(config.headers, { 'X-Test': '1' });
     });
 });
