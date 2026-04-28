@@ -188,25 +188,6 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 
 # 4. Tips
 
-- **WebDAV storage channel**: Besides the built-in `/dav` WebDAV server, this project can also use a third-party WebDAV server as an upload storage channel. Configure a fixed channel with `WEBDAV_BASE_URL`; optional variables are `WEBDAV_USERNAME`, `WEBDAV_PASSWORD`, `WEBDAV_PUBLIC_URL`, `WEBDAV_HEADERS` (JSON object string), and `WEBDAV_CREATE_DIRECTORY=false`. Runtime channel config uses:
-  ```json
-  {
-    "webdav": {
-      "loadBalance": { "enabled": false },
-      "channels": [{
-        "name": "dav-main",
-        "type": "webdav",
-        "baseUrl": "https://dav.example.com/remote.php/dav/files/user/imgbed/",
-        "username": "user",
-        "password": "pass",
-        "publicUrl": "https://cdn.example.com/imgbed/",
-        "enabled": true
-      }]
-    }
-  }
-  ```
-  The implementation uses Fetch/Web APIs only, so it is compatible with Cloudflare Pages Functions and Workers deployments. Basic authentication and no-auth WebDAV endpoints are supported; Digest-only providers are not supported. WebDAV chunked uploads are intentionally disabled, so large uploads must stay within your Cloudflare request body limits.
-
 - Frontend is open source, see [MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub).
 
 - Desktop software is open source, see [MarSeventh/satellite](https://github.com/MarSeventh/satellite).
