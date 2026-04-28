@@ -42,16 +42,17 @@ function errorResponse(message, status = 400) {
 }
 
 /**
- * 检查键是否为索引相关键（需要排除）
+ * 检查键是否为索引相关键或会话键（需要排除）
  * 
  * 排除的键模式：
  * - manage@index (主索引)
  * - manage@index_* (索引分块)
  * - manage@index@meta (索引元数据)
  * - manage@indexMeta (旧版索引元数据)
+ * - manage@session@* (会话数据)
  * 
  * @param {string} key - KV 键名
- * @returns {boolean} 是否为索引相关键
+ * @returns {boolean} 是否为需要排除的键
  */
 function isIndexRelatedKey(key) {
   // 精确匹配 manage@index
@@ -71,6 +72,11 @@ function isIndexRelatedKey(key) {
   
   // 匹配旧版索引元数据键
   if (key === 'manage@indexMeta') {
+    return true;
+  }
+
+  // 匹配会话数据键 (manage@session@*)
+  if (key.startsWith('manage@session@')) {
     return true;
   }
   
