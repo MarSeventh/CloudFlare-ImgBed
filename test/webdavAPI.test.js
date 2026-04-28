@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { WebDAVAPI, buildWebDAVUrl, normalizeBaseUrl } from '../functions/utils/webdavAPI.js';
+import { WebDAVAPI, buildWebDAVUrl, normalizeBaseUrl } from '../functions/utils/storage/webdavAPI.js';
 
 describe('WebDAVAPI', () => {
     let originalFetch;

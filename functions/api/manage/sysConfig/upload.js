@@ -1,5 +1,5 @@
 import { getDatabase } from '../../../utils/databaseAdapter.js';
-import { normalizeWebDAVHeaders } from '../../../utils/webdavAPI.js';
+import { normalizeWebDAVHeaders } from '../../../utils/storage/webdavAPI.js';
 
 export async function onRequest(context) {
     // 上传设置相关，GET方法读取设置，POST方法保存设置
