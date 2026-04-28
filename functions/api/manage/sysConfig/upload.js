@@ -29,14 +29,6 @@ export async function onRequest(context) {
     if (request.method === 'POST') {
         const body = await request.json()
         const settings = body
-        // 兼容旧前端包：如果旧包尚未提交 webdav 配置，保留已有 WebDAV 渠道，避免保存其他上传设置时被清空。
-        if (settings.webdav === undefined) {
-            const existingSettingsStr = await db.get('manage@sysConfig@upload')
-            const existingSettings = existingSettingsStr ? JSON.parse(existingSettingsStr) : {}
-            if (existingSettings.webdav !== undefined) {
-                settings.webdav = existingSettings.webdav
-            }
-        }
 
         // 写入数据库
         await db.put('manage@sysConfig@upload', JSON.stringify(settings))
