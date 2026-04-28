@@ -1,4 +1,5 @@
 import { getDatabase } from '../../../utils/databaseAdapter.js';
+import { normalizeWebDAVHeaders } from '../../../utils/webdavAPI.js';
 
 export async function onRequest(context) {
     // 上传设置相关，GET方法读取设置，POST方法保存设置
@@ -28,6 +29,14 @@ export async function onRequest(context) {
     if (request.method === 'POST') {
         const body = await request.json()
         const settings = body
+        // 兼容旧前端包：如果旧包尚未提交 webdav 配置，保留已有 WebDAV 渠道，避免保存其他上传设置时被清空。
+        if (settings.webdav === undefined) {
+            const existingSettingsStr = await db.get('manage@sysConfig@upload')
+            const existingSettings = existingSettingsStr ? JSON.parse(existingSettingsStr) : {}
+            if (existingSettings.webdav !== undefined) {
+                settings.webdav = existingSettings.webdav
+            }
+        }
 
         // 写入数据库
         await db.put('manage@sysConfig@upload', JSON.stringify(settings))
@@ -264,11 +273,63 @@ export async function getUploadConfig(db, env) {
     huggingface.loadBalance = huggingfaceLoadBalance
 
 
+    // =====================读取 WebDAV 渠道配置=====================
+    const webdav = {}
+    const webdavChannels = []
+    webdav.channels = webdavChannels
+
+    // 从环境变量读取 WebDAV 配置
+    if (env.WEBDAV_BASE_URL) {
+        webdavChannels.push({
+            id: 1,
+            name: 'WebDAV_env',
+            type: 'webdav',
+            savePath: 'environment variable',
+            baseUrl: env.WEBDAV_BASE_URL,
+            username: env.WEBDAV_USERNAME || '',
+            password: env.WEBDAV_PASSWORD || '',
+            publicUrl: env.WEBDAV_PUBLIC_URL || '',
+            headers: normalizeWebDAVHeaders(env.WEBDAV_HEADERS || {}),
+            createDirectory: env.WEBDAV_CREATE_DIRECTORY !== 'false',
+            enabled: true,
+            fixed: true,
+        })
+    }
+
+    for (const wd of settingsKV.webdav?.channels || []) {
+        // 如果 savePath 是 environment variable，修改可变参数
+        if (wd.savePath === 'environment variable') {
+            // 如果环境变量未删除，进行覆盖操作
+            if (webdavChannels[0]) {
+                webdavChannels[0].enabled = wd.enabled
+                webdavChannels[0].publicUrl = wd.publicUrl || webdavChannels[0].publicUrl
+                webdavChannels[0].headers = normalizeWebDAVHeaders(wd.headers || wd.customHeaders || webdavChannels[0].headers)
+                webdavChannels[0].createDirectory = wd.createDirectory !== false
+                webdavChannels[0].quota = wd.quota
+            }
+            continue
+        }
+        // id 自增
+        wd.id = webdavChannels.length + 1
+        wd.headers = normalizeWebDAVHeaders(wd.headers || wd.customHeaders || {})
+        wd.createDirectory = wd.createDirectory !== false
+        webdavChannels.push(wd)
+    }
+
+    // 负载均衡
+    const webdavLoadBalance = settingsKV.webdav?.loadBalance || {
+        enabled: false,
+        channels: [],
+    }
+    webdav.loadBalance = webdavLoadBalance
+
+
     settings.telegram = telegram
     settings.cfr2 = cfr2
     settings.s3 = s3
     settings.discord = discord
     settings.huggingface = huggingface
+    settings.webdav = webdav
 
     return settings;
 }
