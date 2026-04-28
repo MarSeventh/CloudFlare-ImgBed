@@ -5,6 +5,7 @@ import { getDatabase } from '../../../utils/databaseAdapter.js';
 import { DiscordAPI } from '../../../utils/discordAPI.js';
 import { HuggingFaceAPI } from '../../../utils/huggingfaceAPI.js';
 import { WebDAVAPI } from '../../../utils/webdavAPI.js';
+import { resolveWebDAVConfig } from '../../../utils/webdavConfig.js';
 
 // CORS 跨域响应头
 const corsHeaders = {
@@ -159,7 +160,7 @@ async function deleteFile(env, fileId, cdnUrl, url) {
 
         // WebDAV 渠道的图片，需要删除 WebDAV 中对应的文件
         if (img.metadata?.Channel === 'WebDAV') {
-            await deleteWebDAVFile(img);
+            await deleteWebDAVFile(env, img);
         }
 
         // 删除数据库中的记录
@@ -260,23 +261,22 @@ async function deleteHuggingFaceFile(img) {
 
 
 // 删除 WebDAV 渠道的图片
-async function deleteWebDAVFile(img) {
-    const baseUrl = img.metadata?.WebDAVBaseUrl;
+async function deleteWebDAVFile(env, img) {
     const filePath = img.metadata?.WebDAVFilePath;
 
-    if (!baseUrl || !filePath) {
+    if (!filePath) {
         console.warn('WebDAV file missing required metadata for deletion');
         return false;
     }
 
     try {
-        const webdavAPI = new WebDAVAPI({
-            baseUrl,
-            username: img.metadata?.WebDAVUsername || '',
-            password: img.metadata?.WebDAVPassword || '',
-            headers: img.metadata?.WebDAVHeaders || {},
-            createDirectory: img.metadata?.WebDAVCreateDirectory !== false,
-        });
+        const webdavConfig = await resolveWebDAVConfig(env, img.metadata);
+        if (!webdavConfig) {
+            console.warn('WebDAV channel config not found for deletion');
+            return false;
+        }
+
+        const webdavAPI = new WebDAVAPI(webdavConfig);
         return await webdavAPI.deleteFile(filePath);
     } catch (error) {
         console.error("WebDAV Delete Failed:", error);

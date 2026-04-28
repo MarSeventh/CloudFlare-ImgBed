@@ -4,6 +4,7 @@ import { TelegramAPI } from "../utils/telegramAPI";
 import { DiscordAPI } from "../utils/discordAPI";
 import { HuggingFaceAPI } from "../utils/huggingfaceAPI";
 import { WebDAVAPI } from "../utils/webdavAPI";
+import { resolveWebDAVConfig } from "../utils/webdavConfig";
 import {
     setCommonHeaders, setRangeHeaders, handleHeadRequest, getFileContent, isTgChannel,
     returnWithCheck, return404, returnBlockImg, isDomainAllowed
@@ -927,13 +928,12 @@ async function handleWebDAVFile(context, metadata, encodedFileName, fileType) {
                 headers: fetchHeaders,
             });
         } else {
-            const webdavAPI = new WebDAVAPI({
-                baseUrl: metadata.WebDAVBaseUrl,
-                username: metadata.WebDAVUsername || '',
-                password: metadata.WebDAVPassword || '',
-                headers: metadata.WebDAVHeaders || {},
-                createDirectory: metadata.WebDAVCreateDirectory !== false,
-            });
+            const webdavConfig = await resolveWebDAVConfig(context.env, metadata);
+            if (!webdavConfig) {
+                return new Response('Error: WebDAV channel config not found', { status: 500 });
+            }
+
+            const webdavAPI = new WebDAVAPI(webdavConfig);
             response = await webdavAPI.getFile(filePath, {
                 method: request.method === 'HEAD' ? 'HEAD' : 'GET',
                 headers: fetchHeaders,

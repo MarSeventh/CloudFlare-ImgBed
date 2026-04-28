@@ -880,12 +880,6 @@ async function uploadFileToWebDAV(context, fullId, metadata, returnLink) {
         metadata.ChannelName = webdavChannel.name || "WebDAV_env";
         metadata.WebDAVBaseUrl = baseUrl;
         metadata.WebDAVFilePath = fullId;
-        metadata.WebDAVUsername = webdavChannel.username || '';
-        metadata.WebDAVPassword = webdavChannel.password || '';
-        metadata.WebDAVCreateDirectory = webdavChannel.createDirectory !== false;
-        if (webdavChannel.headers || webdavChannel.customHeaders) {
-            metadata.WebDAVHeaders = webdavChannel.headers || webdavChannel.customHeaders;
-        }
         if (webdavChannel.publicUrl) {
             metadata.WebDAVPublicBaseUrl = webdavChannel.publicUrl;
             metadata.WebDAVPublicUrl = webdavAPI.buildPublicUrl(fullId, webdavChannel.publicUrl);
