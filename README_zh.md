@@ -200,25 +200,6 @@
 
 # 4. Tips
 
-- **WebDAV 存储渠道**：除了内置 `/dav` WebDAV 服务外，本项目也可以把第三方 WebDAV 服务作为上传存储渠道使用。固定环境变量渠道可配置 `WEBDAV_BASE_URL`；可选变量包括 `WEBDAV_USERNAME`、`WEBDAV_PASSWORD`、`WEBDAV_PUBLIC_URL`、`WEBDAV_HEADERS`（JSON 对象字符串）和 `WEBDAV_CREATE_DIRECTORY=false`。运行时渠道配置结构如下：
-  ```json
-  {
-    "webdav": {
-      "loadBalance": { "enabled": false },
-      "channels": [{
-        "name": "dav-main",
-        "type": "webdav",
-        "baseUrl": "https://dav.example.com/remote.php/dav/files/user/imgbed/",
-        "username": "user",
-        "password": "pass",
-        "publicUrl": "https://cdn.example.com/imgbed/",
-        "enabled": true
-      }]
-    }
-  }
-  ```
-  实现仅使用 Fetch/Web API，因此可用于 Cloudflare Pages Functions 和 Workers 部署。支持 Basic 认证或无认证 WebDAV 端点；暂不支持仅 Digest 认证的服务。WebDAV 分片上传已明确禁用，大文件需在 Cloudflare 请求体限制范围内直接上传。
-
 - **前端开源**：参见[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)项目。
 
 - **桌面端开源**：参见[MarSeventh/satellite](https://github.com/MarSeventh/satellite)项目。
