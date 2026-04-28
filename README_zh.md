@@ -5,27 +5,7 @@
         <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README_zh.md">简体中文</a> | <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README.md">English</a> | <a href="https://cfbed.sanyue.de">官方网站</a>
     </p>
     <p align="center">
-        <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/LICENSE">
-        <img src="https://img.shields.io/github/license/MarSeventh/CloudFlare-ImgBed" alt="License" />
-        </a>
-        <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/releases">
-        <img src="https://img.shields.io/github/release/MarSeventh/CloudFlare-ImgBed" alt="latest version" />
-        </a>
-        <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/releases">
-        <img src="https://img.shields.io/github/downloads/MarSeventh/CloudFlare-ImgBed/total?color=%239F7AEA&logo=github" alt="Downloads" />
-        </a>
-        <a href="https://hub.docker.com/r/marseventh/cloudflare-imgbed">
-  		  <img src="https://img.shields.io/docker/pulls/marseventh/cloudflare-imgbed?style=flat-square" alt="Docker Pulls" />
-		</a>
-        <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/issues">
-          <img src="https://img.shields.io/github/issues/MarSeventh/CloudFlare-ImgBed" alt="Issues" />
-        </a>
-        <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/stargazers">
-          <img src="https://img.shields.io/github/stars/MarSeventh/CloudFlare-ImgBed" alt="Stars" />
-        </a>
-        <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/network/members">
-          <img src="https://img.shields.io/github/forks/MarSeventh/CloudFlare-ImgBed" alt="Forks" />
-        </a>
+        <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/LICENSE"><img src="https://img.shields.io/github/license/MarSeventh/CloudFlare-ImgBed" alt="License" /></a>&nbsp;<a href="https://github.com/MarSeventh/CloudFlare-ImgBed/releases"><img src="https://img.shields.io/github/release/MarSeventh/CloudFlare-ImgBed" alt="latest version" /></a>&nbsp;<a href="https://github.com/MarSeventh/CloudFlare-ImgBed/releases"><img src="https://img.shields.io/github/downloads/MarSeventh/CloudFlare-ImgBed/total?color=%239F7AEA&logo=github" alt="Downloads" /></a>&nbsp;<a href="https://hub.docker.com/r/marseventh/cloudflare-imgbed"><img src="https://img.shields.io/docker/pulls/marseventh/cloudflare-imgbed?style=flat-square" alt="Docker Pulls" /></a>&nbsp;<a href="https://github.com/MarSeventh/CloudFlare-ImgBed/issues"><img src="https://img.shields.io/github/issues/MarSeventh/CloudFlare-ImgBed" alt="Issues" /></a>&nbsp;<a href="https://github.com/MarSeventh/CloudFlare-ImgBed/stargazers"><img src="https://img.shields.io/github/stars/MarSeventh/CloudFlare-ImgBed" alt="Stars" /></a>&nbsp;<a href="https://github.com/MarSeventh/CloudFlare-ImgBed/network/members"><img src="https://img.shields.io/github/forks/MarSeventh/CloudFlare-ImgBed" alt="Forks" /></a>
     </P>
     <p align="center">
       <a href="https://trendshift.io/repositories/14324" target="_blank">
@@ -209,7 +189,7 @@
 - **赞助**：项目维护不易，喜欢本项目的话，可以作者大大一点小小的鼓励哦，您的每一份支持都是我前进的动力\~ 
 
 
-  <a href="https://afdian.com/a/marseventh"><img src="https://img.shields.io/badge/AFDIAN-946CE6?style=for-the-badge&logo=afdian&logoColor=white" height="36" alt="Afdian"></a>&nbsp;&nbsp;<a href="readme/weixin-reward.jpeg" target="_blank"><img src="https://img.shields.io/badge/WeChat_Pay-07c160?style=for-the-badge&logo=wechat&logoColor=white" height="36" alt="WeChat Pay"></a>&nbsp;&nbsp;<a href="readme/alipay-reward.jpeg" target="_blank"><img src="https://img.shields.io/badge/Alipay-1677FF?style=for-the-badge&logo=alipay&logoColor=white" height="36" alt="WeChat Pay"></a>
+  <a href="https://afdian.com/a/marseventh"><img src="https://img.shields.io/badge/AFDIAN-946CE6?style=for-the-badge&logo=afdian&logoColor=white" height="36" alt="Afdian"></a>&nbsp;&nbsp;<a href="readme/weixin-reward.png" target="_blank"><img src="https://img.shields.io/badge/WeChat_Pay-07c160?style=for-the-badge&logo=wechat&logoColor=white" height="36" alt="WeChat Pay"></a>&nbsp;&nbsp;<a href="readme/alipay-reward.png" target="_blank"><img src="https://img.shields.io/badge/Alipay-1677FF?style=for-the-badge&logo=alipay&logoColor=white" height="36" alt="WeChat Pay"></a>
 
 - **Sponsors**：感谢以下赞助者对本项目的支持！
 
