@@ -2,9 +2,9 @@ import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { purgeCFCache, purgeRandomFileListCache, purgePublicFileListCache } from "../../../utils/purgeCache";
 import { removeFileFromIndex, batchRemoveFilesFromIndex } from "../../../utils/indexManager.js";
 import { getDatabase } from '../../../utils/databaseAdapter.js';
-import { DiscordAPI } from '../../../utils/discordAPI.js';
-import { HuggingFaceAPI } from '../../../utils/huggingfaceAPI.js';
-import { WebDAVAPI } from '../../../utils/webdavAPI.js';
+import { DiscordAPI } from '../../../utils/storage/discordAPI.js';
+import { HuggingFaceAPI } from '../../../utils/storage/huggingfaceAPI.js';
+import { WebDAVAPI } from '../../../utils/storage/webdavAPI.js';
 import { resolveWebDAVConfig } from '../../../utils/webdavConfig.js';
 
 // CORS 跨域响应头

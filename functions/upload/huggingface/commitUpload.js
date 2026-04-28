@@ -4,7 +4,7 @@
  * 在前端直接上传文件到 S3 后，调用此 API 提交 LFS 文件引用
  */
 
-import { HuggingFaceAPI } from '../../utils/huggingfaceAPI.js';
+import { HuggingFaceAPI } from '../../utils/storage/huggingfaceAPI.js';
 import { fetchUploadConfig } from '../../utils/sysConfig.js';
 import { getDatabase } from '../../utils/databaseAdapter.js';
 import { moderateContent, endUpload, getUploadIp, getIPAddress, sanitizeUploadFolder, createResponse } from '../uploadTools.js';

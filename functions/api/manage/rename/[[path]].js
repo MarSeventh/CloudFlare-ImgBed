@@ -3,7 +3,7 @@ import { purgeCFCache, purgeRandomFileListCache, purgePublicFileListCache } from
 import { moveFileInIndex } from "../../../utils/indexManager.js";
 import { getDatabase } from '../../../utils/databaseAdapter.js';
 import { sanitizeUploadFolder } from "../../../upload/uploadTools.js";
-import { WebDAVAPI } from "../../../utils/webdavAPI.js";
+import { WebDAVAPI } from "../../../utils/storage/webdavAPI.js";
 import { resolveWebDAVConfig } from "../../../utils/webdavConfig.js";
 
 // CORS 跨域响应头

@@ -1,6 +1,6 @@
 import { getUploadConfig } from '../api/manage/sysConfig/upload.js';
 import { getDatabase } from './databaseAdapter.js';
-import { normalizeWebDAVHeaders } from './webdavAPI.js';
+import { normalizeWebDAVHeaders } from './storage/webdavAPI.js';
 
 export async function resolveWebDAVConfig(env, metadata = {}) {
     const channelName = metadata.ChannelName;
