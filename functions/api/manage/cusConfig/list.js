@@ -19,14 +19,10 @@ export async function onRequest(context) {
     start = Math.max(0, start);  // start 不能小于 0
     count = Math.max(1, count);  // count 不能小于 1
 
-    let allRecords = [];
+    const allRecords = await readIndex(context, { count: -1, includeSubdirFiles: true });
 
-    allRecords = await readIndex(context, { count: -1, includeSubdirFiles: true });
+    const dealedData = dealByIP(allRecords.files);
 
-    // 按照 IP 分组
-    const dealedData = await dealByIP(allRecords.files);
-
-    // 按照分组中的count倒序排序
     dealedData.sort((a, b) => {
         return b.count - a.count;
     });
@@ -41,23 +37,26 @@ export async function onRequest(context) {
 }
 
 
-async function dealByIP(data) {
-    let dealedData = [];
-    let ipSet = new Set();
+function dealByIP(data) {
+    const groups = new Map();
 
-    data.forEach(item => {
-        if (item.metadata?.UploadIP) {
-            ipSet.add(item.metadata.UploadIP);
+    for (const item of data) {
+        const ip = item.metadata?.UploadIP;
+        if (!ip) continue;
+
+        const group = groups.get(ip);
+        if (group) {
+            group.count++;
+            continue;
         }
-    });
 
-    ipSet.forEach(async ip => {
-        let ipData = data.filter(item => item.metadata?.UploadIP === ip);
-        let count = ipData.length;
-        let address = ipData[0].metadata?.UploadAddress || '未知';
-        dealedData.push({ip, address, count, data: ipData});
-    });
+        groups.set(ip, {
+            ip,
+            address: item.metadata?.UploadAddress || '未知',
+            count: 1,
+        });
+    }
 
-    return dealedData;
+    return Array.from(groups.values());
 }
 

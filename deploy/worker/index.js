@@ -24,6 +24,7 @@ import * as apiManageBatchList from '../../functions/api/manage/batch/list.js';
 import * as apiManageBatchSettings from '../../functions/api/manage/batch/settings.js';
 import * as apiManageCusConfigBlockip from '../../functions/api/manage/cusConfig/blockip.js';
 import * as apiManageCusConfigBlockipList from '../../functions/api/manage/cusConfig/blockipList.js';
+import * as apiManageCusConfigFiles from '../../functions/api/manage/cusConfig/files.js';
 import * as apiManageCusConfigList from '../../functions/api/manage/cusConfig/list.js';
 import * as apiManageCusConfigWhiteip from '../../functions/api/manage/cusConfig/whiteip.js';
 import * as apiManageSysConfigOthers from '../../functions/api/manage/sysConfig/others.js';
@@ -72,6 +73,7 @@ const routes = [
     { path: '/api/manage/batch/settings', module: apiManageBatchSettings, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/manage/cusConfig/blockip', module: apiManageCusConfigBlockip, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/manage/cusConfig/blockipList', module: apiManageCusConfigBlockipList, middlewares: [mw_api, mw_api_manage] },
+    { path: '/api/manage/cusConfig/files', module: apiManageCusConfigFiles, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/manage/cusConfig/list', module: apiManageCusConfigList, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/manage/cusConfig/whiteip', module: apiManageCusConfigWhiteip, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/manage/sysConfig/others', module: apiManageSysConfigOthers, middlewares: [mw_api, mw_api_manage] },
