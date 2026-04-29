@@ -198,6 +198,6 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 
   <a href="https://www.cloudflare.com"><img src="readme/cloudflare-logo.png" alt="Cloudflare Logo" height="25"></a> <a href="https://edgeone.ai/?from=github"><img src="readme/edgeone-logo.png" alt="Tencent Logo" height="25"></a>
 
-- **[svyun](https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC)**：Provides cloud computing resources support
+- **[Svyun](https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC)**：Provides cloud computing resources support
 
 - **[Linux DO](https://linux.do/)**: Genuine · Friendly · United · Expert
