@@ -7,9 +7,10 @@ import {
 } from "./uploadTools";
 import { initializeChunkedUpload, handleChunkUpload, uploadLargeFileToTelegram, handleCleanupRequest } from "./chunkUpload";
 import { handleChunkMerge } from "./chunkMerge";
-import { TelegramAPI } from "../utils/telegramAPI";
-import { DiscordAPI } from "../utils/discordAPI";
-import { HuggingFaceAPI } from "../utils/huggingfaceAPI";
+import { TelegramAPI } from "../utils/storage/telegramAPI";
+import { DiscordAPI } from "../utils/storage/discordAPI";
+import { HuggingFaceAPI } from "../utils/storage/huggingfaceAPI";
+import { WebDAVAPI } from "../utils/storage/webdavAPI";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getDatabase } from '../utils/databaseAdapter.js';
 
@@ -114,6 +115,9 @@ async function processFileUpload(context, formdata = null) {
             break;
         case 'huggingface':
             uploadChannel = 'HuggingFace';
+            break;
+        case 'webdav':
+            uploadChannel = 'WebDAV';
             break;
         case 'external':
             uploadChannel = 'External';
@@ -229,6 +233,14 @@ async function processFileUpload(context, formdata = null) {
     } else if (uploadChannel === 'HuggingFace') {
         // ---------------------HuggingFace 渠道------------------
         const res = await uploadFileToHuggingFace(context, fullId, metadata, returnLink);
+        if (res.status === 200 || !autoRetry) {
+            return res;
+        } else {
+            err = await res.text();
+        }
+    } else if (uploadChannel === 'WebDAV') {
+        // ---------------------WebDAV 渠道------------------
+        const res = await uploadFileToWebDAV(context, fullId, metadata, returnLink);
         if (res.status === 200 || !autoRetry) {
             return res;
         } else {
@@ -829,12 +841,95 @@ async function uploadFileToHuggingFace(context, fullId, metadata, returnLink) {
 }
 
 
+// 上传到 WebDAV
+async function uploadFileToWebDAV(context, fullId, metadata, returnLink) {
+    const { env, waitUntil, uploadConfig, securityConfig, url, formdata, specifiedChannelName } = context;
+    const db = getDatabase(env);
+
+    const webdavSettings = uploadConfig.webdav;
+    if (!webdavSettings || !webdavSettings.channels || webdavSettings.channels.length === 0) {
+        return createResponse('Error: No WebDAV channel configured', { status: 400 });
+    }
+
+    const webdavChannels = webdavSettings.channels;
+    let webdavChannel;
+    if (specifiedChannelName) {
+        webdavChannel = webdavChannels.find(ch => ch.name === specifiedChannelName);
+    }
+    if (!webdavChannel) {
+        webdavChannel = webdavSettings.loadBalance?.enabled
+            ? webdavChannels[Math.floor(Math.random() * webdavChannels.length)]
+            : webdavChannels[0];
+    }
+
+    const baseUrl = webdavChannel?.baseUrl || webdavChannel?.endpoint || webdavChannel?.url;
+    if (!webdavChannel || !baseUrl) {
+        return createResponse('Error: WebDAV channel not properly configured', { status: 400 });
+    }
+
+    const file = formdata.get('file');
+    if (!file) {
+        return createResponse('Error: No file provided', { status: 400 });
+    }
+
+    try {
+        const webdavAPI = new WebDAVAPI(webdavChannel);
+        await webdavAPI.putFile(fullId, file, file.type || metadata.FileType || 'application/octet-stream');
+
+        metadata.Channel = "WebDAV";
+        metadata.ChannelName = webdavChannel.name || "WebDAV_env";
+        metadata.WebDAVBaseUrl = baseUrl;
+        metadata.WebDAVFilePath = fullId;
+        if (webdavChannel.publicUrl) {
+            metadata.WebDAVPublicBaseUrl = webdavChannel.publicUrl;
+            metadata.WebDAVPublicUrl = webdavAPI.buildPublicUrl(fullId, webdavChannel.publicUrl);
+        }
+
+        const uploadModerate = securityConfig.upload?.moderate;
+        if (uploadModerate && uploadModerate.enabled) {
+            if (metadata.WebDAVPublicUrl) {
+                metadata.Label = await moderateContent(env, metadata.WebDAVPublicUrl);
+            } else {
+                try {
+                    await db.put(fullId, "", { metadata });
+                } catch {
+                    return createResponse('Error: Failed to write to database', { status: 500 });
+                }
+
+                const moderateUrl = `https://${url.hostname}/file/${fullId}`;
+                await purgeCDNCache(env, moderateUrl, url);
+                metadata.Label = await moderateContent(env, moderateUrl);
+            }
+        }
+
+        try {
+            await db.put(fullId, "", { metadata });
+        } catch {
+            return createResponse('Error: Failed to write to database', { status: 500 });
+        }
+
+        waitUntil(endUpload(context, fullId, metadata));
+
+        return createResponse(
+            JSON.stringify([{ 'src': returnLink }]),
+            {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            }
+        );
+    } catch (error) {
+        console.error('WebDAV upload error:', error.message);
+        return createResponse(`Error: WebDAV upload failed - ${error.message}`, { status: 500 });
+    }
+}
+
+
 // 自动切换渠道重试
 async function tryRetry(err, context, uploadChannel, fullId, metadata, fileExt, fileName, fileType, returnLink) {
     const { env, url, formdata } = context;
 
     // 渠道列表（Discord 因为有 10MB 限制，放在最后尝试）
-    const channelList = ['CloudflareR2', 'TelegramNew', 'S3', 'HuggingFace', 'Discord'];
+    const channelList = ['CloudflareR2', 'TelegramNew', 'S3', 'HuggingFace', 'WebDAV', 'Discord'];
     const errMessages = {};
     errMessages[uploadChannel] = 'Error: ' + uploadChannel + err;
 
@@ -849,6 +944,8 @@ async function tryRetry(err, context, uploadChannel, fullId, metadata, fileExt, 
         retryRes = await uploadFileToS3(context, fullId, metadata, returnLink);
     } else if (uploadChannel === 'HuggingFace') {
         retryRes = await uploadFileToHuggingFace(context, fullId, metadata, returnLink);
+    } else if (uploadChannel === 'WebDAV') {
+        retryRes = await uploadFileToWebDAV(context, fullId, metadata, returnLink);
     } else if (uploadChannel === 'Discord') {
         retryRes = await uploadFileToDiscord(context, fullId, metadata, returnLink);
     }
@@ -872,6 +969,8 @@ async function tryRetry(err, context, uploadChannel, fullId, metadata, fileExt, 
                 res = await uploadFileToS3(context, fullId, metadata, returnLink);
             } else if (channelList[i] === 'HuggingFace') {
                 res = await uploadFileToHuggingFace(context, fullId, metadata, returnLink);
+            } else if (channelList[i] === 'WebDAV') {
+                res = await uploadFileToWebDAV(context, fullId, metadata, returnLink);
             } else if (channelList[i] === 'Discord') {
                 res = await uploadFileToDiscord(context, fullId, metadata, returnLink);
             }

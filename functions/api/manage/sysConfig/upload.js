@@ -1,4 +1,5 @@
 import { getDatabase } from '../../../utils/databaseAdapter.js';
+import { normalizeWebDAVHeaders } from '../../../utils/storage/webdavAPI.js';
 
 export async function onRequest(context) {
     // 上传设置相关，GET方法读取设置，POST方法保存设置
@@ -264,11 +265,63 @@ export async function getUploadConfig(db, env) {
     huggingface.loadBalance = huggingfaceLoadBalance
 
 
+    // =====================读取 WebDAV 渠道配置=====================
+    const webdav = {}
+    const webdavChannels = []
+    webdav.channels = webdavChannels
+
+    // 从环境变量读取 WebDAV 配置
+    if (env.WEBDAV_BASE_URL) {
+        webdavChannels.push({
+            id: 1,
+            name: 'WebDAV_env',
+            type: 'webdav',
+            savePath: 'environment variable',
+            baseUrl: env.WEBDAV_BASE_URL,
+            username: env.WEBDAV_USERNAME || '',
+            password: env.WEBDAV_PASSWORD || '',
+            publicUrl: env.WEBDAV_PUBLIC_URL || '',
+            headers: normalizeWebDAVHeaders(env.WEBDAV_HEADERS || {}),
+            createDirectory: env.WEBDAV_CREATE_DIRECTORY !== 'false',
+            enabled: true,
+            fixed: true,
+        })
+    }
+
+    for (const wd of settingsKV.webdav?.channels || []) {
+        // 如果 savePath 是 environment variable，修改可变参数
+        if (wd.savePath === 'environment variable') {
+            // 如果环境变量未删除，进行覆盖操作
+            if (webdavChannels[0]) {
+                webdavChannels[0].enabled = wd.enabled
+                webdavChannels[0].publicUrl = wd.publicUrl || webdavChannels[0].publicUrl
+                webdavChannels[0].headers = normalizeWebDAVHeaders(wd.headers || wd.customHeaders || webdavChannels[0].headers)
+                webdavChannels[0].createDirectory = wd.createDirectory !== false
+                webdavChannels[0].quota = wd.quota
+            }
+            continue
+        }
+        // id 自增
+        wd.id = webdavChannels.length + 1
+        wd.headers = normalizeWebDAVHeaders(wd.headers || wd.customHeaders || {})
+        wd.createDirectory = wd.createDirectory !== false
+        webdavChannels.push(wd)
+    }
+
+    // 负载均衡
+    const webdavLoadBalance = settingsKV.webdav?.loadBalance || {
+        enabled: false,
+        channels: [],
+    }
+    webdav.loadBalance = webdavLoadBalance
+
+
     settings.telegram = telegram
     settings.cfr2 = cfr2
     settings.s3 = s3
     settings.discord = discord
     settings.huggingface = huggingface
+    settings.webdav = webdav
 
     return settings;
 }

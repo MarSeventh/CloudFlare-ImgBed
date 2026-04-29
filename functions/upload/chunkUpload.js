@@ -1,7 +1,7 @@
 /* ======= 客户端分块上传处理 ======= */
 import { createResponse, selectConsistentChannel, getUploadIp, getIPAddress, buildUniqueFileId, endUpload } from './uploadTools';
-import { TelegramAPI } from '../utils/telegramAPI';
-import { DiscordAPI } from '../utils/discordAPI';
+import { TelegramAPI } from '../utils/storage/telegramAPI';
+import { DiscordAPI } from '../utils/storage/discordAPI';
 import { S3Client, CreateMultipartUploadCommand, UploadPartCommand, AbortMultipartUploadCommand } from "@aws-sdk/client-s3";
 import { getDatabase, checkDatabaseConfig } from '../utils/databaseAdapter.js';
 
@@ -33,6 +33,9 @@ export async function initializeChunkedUpload(context) {
 
         // 获取上传渠道
         const uploadChannel = url.searchParams.get('uploadChannel') || 'telegram';
+        if (uploadChannel === 'webdav') {
+            return createResponse('Error: WebDAV channel does not support chunked uploads. Please use non-chunked upload within your Cloudflare request body limit.', { status: 400 });
+        }
         // 获取指定的渠道名称
         const channelName = url.searchParams.get('channelName') || '';
 
@@ -121,6 +124,9 @@ export async function handleChunkUpload(context) {
 
         // 获取上传渠道
         const uploadChannel = url.searchParams.get('uploadChannel') || sessionInfo.uploadChannel || 'telegram';
+        if (uploadChannel === 'webdav') {
+            return createResponse('Error: WebDAV channel does not support chunked uploads. Please use non-chunked upload within your Cloudflare request body limit.', { status: 400 });
+        }
         // 获取指定的渠道名称
         const channelName = url.searchParams.get('channelName') || sessionInfo.channelName || '';
 
