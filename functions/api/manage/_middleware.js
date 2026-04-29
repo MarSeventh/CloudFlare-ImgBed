@@ -1,10 +1,32 @@
 import { authenticate, AUTH_SCOPE } from "../../utils/auth/authCore.js";
 
+const DEFAULT_MANAGE_CACHE_CONTROL = 'private, no-store, max-age=0';
+
+function withDefaultCacheControl(response) {
+  if (response.headers.has('Cache-Control')) {
+    return response;
+  }
+
+  const headers = new Headers(response.headers);
+  headers.set('Cache-Control', DEFAULT_MANAGE_CACHE_CONTROL);
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 async function errorHandling(context) {
   try {
-    return await context.next();
+    return withDefaultCacheControl(await context.next());
   } catch (err) {
-    return new Response(`${err.message}\n${err.stack}`, { status: 500 });
+    return new Response(`${err.message}\n${err.stack}`, {
+      status: 500,
+      headers: {
+        'Cache-Control': DEFAULT_MANAGE_CACHE_CONTROL,
+      },
+    });
   }
 }
 
