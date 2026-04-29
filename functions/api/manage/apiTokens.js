@@ -216,10 +216,10 @@ async function updateApiToken(db, tokenId, permissions, expiresAt = null, autoDe
     // 保存到数据库
     await db.put('manage@sysConfig@security', JSON.stringify(settings))
     
-    return { 
-        success: true, 
+    return {
+        success: true,
         message: 'Token 已更新',
-        token: settings.apiTokens.tokens[tokenId]
+        tokenId
     }
 }
 
