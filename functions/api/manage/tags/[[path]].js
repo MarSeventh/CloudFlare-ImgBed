@@ -185,8 +185,7 @@ async function handleUpdateTags(context, db, fileId, hostname) {
             success: true,
             fileId: fileId,
             action: action,
-            tags: updatedTags,
-            metadata: fileData.metadata
+            tags: updatedTags
         }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
