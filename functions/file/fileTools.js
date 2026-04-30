@@ -48,8 +48,14 @@ export function isFromPublicBrowse(Referer, origin) {
     return false;
 }
 
+export const FILE_CACHE_CONTROL = {
+    PUBLIC: 'public, max-age=2592000',
+    PRIVATE: 'private, max-age=86400',
+    NO_STORE: 'private, no-store, max-age=0',
+};
+
 // 公共响应头设置函数
-export function setCommonHeaders(headers, encodedFileName, fileType, Referer, url) {
+export function setCommonHeaders(headers, encodedFileName, fileType, cacheControl = FILE_CACHE_CONTROL.PUBLIC) {
     headers.set('Content-Disposition', `inline; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
     headers.set('Access-Control-Allow-Origin', '*');
     headers.set('Accept-Ranges', 'bytes');
@@ -59,12 +65,7 @@ export function setCommonHeaders(headers, encodedFileName, fileType, Referer, ur
         headers.set('Content-Type', fileType);
     }
 
-    // 根据Referer设置CDN缓存策略（排除公开图库页面的请求）
-    if (Referer && Referer.includes(url.origin) && !isFromPublicBrowse(Referer, url.origin)) {
-        headers.set('Cache-Control', 'private, max-age=86400'); // 本地缓存 1天
-    } else {
-        headers.set('Cache-Control', 'public, max-age=2592000'); // CDN缓存 30天
-    }
+    headers.set('Cache-Control', cacheControl || FILE_CACHE_CONTROL.PUBLIC);
 }
 
 // 设置Range请求相关头部
@@ -125,42 +126,53 @@ export function isTgChannel(imgRecord) {
 
 // 图片可访问性检查
 export async function returnWithCheck(context, imgRecord) {
-    const { request, env, url, securityConfig } = context;
+    const { url, securityConfig } = context;
     const whiteListMode = securityConfig.access.whiteListMode;
-
+    const isAdminPreview = context.fileAccess?.isAdminPreview === true;
+    const adminAuthorized = context.fileAccess?.adminAuthResult?.authorized === true;
     const response = new Response('success', { status: 200 });
 
-    // Referer header equal to the dashboard page or upload page (排除公开图库页面的请求)
-    const referer = request.headers.get('Referer');
-    if (referer && referer.includes(url.origin) && !isFromPublicBrowse(referer, url.origin)) {
-        //show the image
+    if (isAdminPreview && !adminAuthorized) {
+        return unauthorizedAdminPreviewResponse();
+    }
+
+    const record = imgRecord;
+    if (record.metadata === null) {
+        context.fileAccess.cacheControl = isAdminPreview ? FILE_CACHE_CONTROL.PRIVATE : FILE_CACHE_CONTROL.PUBLIC;
         return response;
     }
 
-    //check the record from kv
-    const record = imgRecord;
-    if (record.metadata === null) {
-    } else {
-        //if the record is not null, redirect to the image
-        if (record.metadata.ListType == "White") {
-            return response;
-        } else if (record.metadata.ListType == "Block") {
-            return await returnBlockImg(url);
-        } else if (record.metadata.Label == "adult") {
-            return await returnBlockImg(url);
-        }
-        //check if the env variables WhiteList_Mode are set
-        if (whiteListMode) {
-            //if the env variables WhiteList_Mode are set, redirect to the image
-            return await returnWhiteListImg(url);
-        } else {
-            //if the env variables WhiteList_Mode are not set, redirect to the image
-            return response;
-        }
+    if (isAdminPreview) {
+        context.fileAccess.cacheControl = FILE_CACHE_CONTROL.PRIVATE;
+        return response;
     }
 
-    // other cases
+    context.fileAccess.cacheControl = FILE_CACHE_CONTROL.PUBLIC;
+
+    if (record.metadata.ListType == "White") {
+        return response;
+    } else if (record.metadata.ListType == "Block") {
+        return await returnBlockImg(url);
+    } else if (record.metadata.Label == "adult") {
+        return await returnBlockImg(url);
+    }
+
+    if (whiteListMode) {
+        return await returnWhiteListImg(url);
+    }
+
     return response;
+}
+
+function unauthorizedAdminPreviewResponse() {
+    return new Response('Admin authentication required', {
+        status: 401,
+        statusText: 'Unauthorized',
+        headers: {
+            'Content-Type': 'text/plain;charset=UTF-8',
+            'Cache-Control': FILE_CACHE_CONTROL.NO_STORE,
+        },
+    });
 }
 
 export async function return404(url) {
