@@ -97,20 +97,23 @@ async function getApiTokens(db) {
     const tokens = settings.apiTokens?.tokens || {}
     
     // 将 tokens 对象转为数组，并应用向后兼容默认值
-    const tokenArray = Object.keys(tokens).map(id => {
-        const token = tokens[id]
-        return {
-            id,
-            name: token.name,
-            owner: token.owner,
-            permissions: token.permissions,
-            createdAt: token.createdAt,
-            updatedAt: token.updatedAt,
-            token: token.token,
-            expiresAt: token.expiresAt ?? null,
-            autoDelete: token.autoDelete ?? false
-        }
-    })
+    // 过滤掉 internal 类型的 token（不展示在安全设置的 token 列表中）
+    const tokenArray = Object.keys(tokens)
+        .filter(id => tokens[id].type !== 'internal')
+        .map(id => {
+            const token = tokens[id]
+            return {
+                id,
+                name: token.name,
+                owner: token.owner,
+                permissions: token.permissions,
+                createdAt: token.createdAt,
+                updatedAt: token.updatedAt,
+                token: token.token,
+                expiresAt: token.expiresAt ?? null,
+                autoDelete: token.autoDelete ?? false
+            }
+        })
     
     // 使用 filterAutoDeleteTokens 识别需要自动删除的 Token
     const { toDelete, toKeep } = filterAutoDeleteTokens(tokenArray)
@@ -140,7 +143,7 @@ async function getApiTokens(db) {
 }
 
 // 创建新的API Token
-async function createApiToken(db, name, permissions, owner, expiresAt = null, autoDelete = false) {
+export async function createApiToken(db, name, permissions, owner, expiresAt = null, autoDelete = false, type = 'user') {
     const settingsStr = await db.get('manage@sysConfig@security')
     const settings = settingsStr ? JSON.parse(settingsStr) : {}
     
@@ -158,6 +161,7 @@ async function createApiToken(db, name, permissions, owner, expiresAt = null, au
         token,
         owner,
         permissions,
+        type,
         createdAt: now,
         updatedAt: now,
         expiresAt: expiresAt ?? null,
@@ -183,7 +187,7 @@ async function createApiToken(db, name, permissions, owner, expiresAt = null, au
 }
 
 // 删除API Token
-async function deleteApiToken(db, tokenId) {
+export async function deleteApiToken(db, tokenId) {
     const settingsStr = await db.get('manage@sysConfig@security')
     const settings = settingsStr ? JSON.parse(settingsStr) : {}
     

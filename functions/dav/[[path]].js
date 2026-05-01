@@ -1,5 +1,7 @@
 // WebDAV 服务支持
-import { fetchSecurityConfig, fetchOthersConfig } from "../utils/sysConfig";
+import { fetchOthersConfig } from "../utils/sysConfig";
+import { getDatabase } from "../utils/databaseAdapter";
+import { createApiToken } from "../api/manage/apiTokens";
 
 export async function onRequest(context) {
     const { request, env } = context;
@@ -26,21 +28,34 @@ export async function onRequest(context) {
 // --- UTILITY FUNCTIONS ---
 
 async function getApiHeaders(env) {
-    const securityConfig = await fetchSecurityConfig(env);
+    const othersConfig = await fetchOthersConfig(env);
+    let token = othersConfig.webDAV.internalToken;
 
-    const adminUsername = securityConfig.auth.admin.adminUsername;
-    const adminPassword = securityConfig.auth.admin.adminPassword;
-    const authCode = securityConfig.auth.user.authCode;
+    // token 不存在时自动创建并更新 WebDAV 设置
+    if (!token) {
+        const db = getDatabase(env);
+        const tokenResult = await createApiToken(
+            db,
+            'WebDAV Internal Token',
+            ['list', 'upload', 'delete'],
+            'system',
+            null,
+            false,
+            'internal'
+        );
+        token = tokenResult.token;
 
-    let credentials = btoa('unset:unset');
-
-    if (adminUsername && adminPassword) {
-        credentials = btoa(`${adminUsername}:${adminPassword}`);
+        // 更新 others config 中的 WebDAV 设置
+        const settingsStr = await db.get('manage@sysConfig@others');
+        const settings = settingsStr ? JSON.parse(settingsStr) : {};
+        if (!settings.webDAV) settings.webDAV = {};
+        settings.webDAV.internalToken = token;
+        settings.webDAV.internalTokenId = tokenResult.id;
+        await db.put('manage@sysConfig@others', JSON.stringify(settings));
     }
 
     return {
-        'Authorization': `Basic ${credentials}`,
-        'authCode': authCode || ''
+        'Authorization': `Bearer ${token}`,
     };
 }
 
