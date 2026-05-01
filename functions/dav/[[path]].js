@@ -323,8 +323,19 @@ function createCollectionXml(path) {
 }
 
 function createFileXml(file) {
-    const now = new Date().toUTCString();
-    const fileSize = file.metadata && file.metadata['FileSizeBytes'] ? file.metadata['FileSizeBytes'] : "0";
+    // 文件大小：优先 FileSizeBytes（字节），回退到 FileSize（MB）转字节
+    let fileSize = "0";
+    if (file.metadata) {
+        if (file.metadata['FileSizeBytes']) {
+            fileSize = String(file.metadata['FileSizeBytes']);
+        } else if (file.metadata['FileSize']) {
+            fileSize = String(Math.round(parseFloat(file.metadata['FileSize']) * 1024 * 1024));
+        }
+    }
+    // 修改时间：使用上传时间戳，回退到当前时间
+    const timestamp = file.metadata && file.metadata['TimeStamp']
+        ? new Date(Number(file.metadata['TimeStamp'])).toUTCString()
+        : new Date().toUTCString();
     const contentType = file.metadata && file.metadata['FileType'] ? file.metadata['FileType'] : "application/octet-stream";
-    return `<D:response><D:href>${encodeURI(`/dav/${file.name}`)}</D:href><D:propstat><D:prop><D:displayname>${file.name.split('/').pop()}</D:displayname><D:resourcetype/><D:creationdate>${now}</D:creationdate><D:getlastmodified>${now}</D:getlastmodified><D:getcontentlength>${fileSize}</D:getcontentlength><D:getcontenttype>${contentType}</D:getcontenttype></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>`;
+    return `<D:response><D:href>${encodeURI(`/dav/${file.name}`)}</D:href><D:propstat><D:prop><D:displayname>${file.name.split('/').pop()}</D:displayname><D:resourcetype/><D:creationdate>${timestamp}</D:creationdate><D:getlastmodified>${timestamp}</D:getlastmodified><D:getcontentlength>${fileSize}</D:getcontentlength><D:getcontenttype>${contentType}</D:getcontenttype></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>`;
 }
