@@ -147,7 +147,7 @@ function findFunctionFile(pathname) {
     }
 
     // 3. 尝试 [[path]].js 通配符匹配（从深到浅）
-    for (let i = parts.length - 1; i >= 0; i--) {
+    for (let i = parts.length; i >= 0; i--) {
         const dirParts = parts.slice(0, i);
         const dirPath = join(FUNCTIONS_DIR, ...dirParts);
         if (existsSync(dirPath) && statSync(dirPath).isDirectory()) {

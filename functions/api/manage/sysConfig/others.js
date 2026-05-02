@@ -1,4 +1,5 @@
 import { getDatabase } from '../../../utils/databaseAdapter.js';
+import { createApiToken, deleteApiToken } from '../apiTokens.js';
 
 export async function onRequest(context) {
     // 其他设置相关，GET方法读取设置，POST方法保存设置
@@ -28,6 +29,32 @@ export async function onRequest(context) {
     if (request.method === 'POST') {
         const body = await request.json()
         const settings = body
+
+        // WebDAV internal token 管理
+        const webDAV = settings.webDAV || {};
+        const oldSettings = await getOthersConfig(db, env);
+        const wasEnabled = oldSettings.webDAV?.enabled;
+        const isEnabled = webDAV.enabled;
+
+        if (isEnabled && !webDAV.internalToken) {
+            // 启用 WebDAV 且没有 token，创建一个 internal 类型的 API Token
+            const tokenResult = await createApiToken(
+                db,
+                'WebDAV Internal Token',
+                ['list', 'upload', 'delete'],
+                'system',
+                null,   // 不过期
+                false,  // 不自动删除
+                'internal'
+            );
+            settings.webDAV.internalToken = tokenResult.token;
+            settings.webDAV.internalTokenId = tokenResult.id;
+        } else if (!isEnabled && oldSettings.webDAV?.internalTokenId) {
+            // 禁用 WebDAV，删除 internal token
+            await deleteApiToken(db, oldSettings.webDAV.internalTokenId);
+            settings.webDAV.internalToken = '';
+            settings.webDAV.internalTokenId = '';
+        }
 
         // 写入数据库
         await db.put('manage@sysConfig@others', JSON.stringify(settings))
@@ -79,6 +106,8 @@ export async function getOthersConfig(db, env) {
         password: kvWebDAV.password || '',
         uploadChannel: kvWebDAV.uploadChannel || '',
         channelName: kvWebDAV.channelName || '',
+        internalToken: kvWebDAV.internalToken || '',
+        internalTokenId: kvWebDAV.internalTokenId || '',
         fixed: false,
     }
 
