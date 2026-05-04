@@ -1,4 +1,12 @@
 .wrangler/*
 data/*
 node_modules
+/wrangler.toml
 .DS_Store
+
+*.sqlite
+*.sqlite-*
+
+.kiro/
+.vscode/
+.claude/

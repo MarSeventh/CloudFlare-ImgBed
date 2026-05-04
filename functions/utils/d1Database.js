@@ -318,12 +318,14 @@ D1Database.prototype.extractMetadataFields = function(metadata) {
 D1Database.prototype.put = function(key, value, options) {
     options = options || {};
 
-    if (key.startsWith('manage@sysConfig@')) {
-        return this.putSetting(key, value);
-    } else if (key.startsWith('manage@index@operation_')) {
+    if (key.startsWith('manage@index@operation_')) {
         var operationId = key.replace('manage@index@operation_', '');
         var operation = JSON.parse(value);
         return this.putIndexOperation(operationId, operation);
+    } else if (key.startsWith('manage@')) {
+        // 所有 manage@ 前缀的键统一存入 settings 表
+        var category = key.split('@')[1] || '';
+        return this.putSetting(key, value, category);
     } else {
         return this.putFile(key, value, options);
     }
@@ -335,13 +337,13 @@ D1Database.prototype.put = function(key, value, options) {
 D1Database.prototype.get = function(key) {
     var self = this;
 
-    if (key.startsWith('manage@sysConfig@')) {
-        return this.getSetting(key);
-    } else if (key.startsWith('manage@index@operation_')) {
+    if (key.startsWith('manage@index@operation_')) {
         var operationId = key.replace('manage@index@operation_', '');
         return this.getIndexOperation(operationId).then(function(operation) {
             return operation ? JSON.stringify(operation) : null;
         });
+    } else if (key.startsWith('manage@')) {
+        return this.getSetting(key);
     } else {
         return this.getFile(key).then(function(file) {
             return file ? file.value : null;
@@ -355,7 +357,7 @@ D1Database.prototype.get = function(key) {
 D1Database.prototype.getWithMetadata = function(key) {
     var self = this;
 
-    if (key.startsWith('manage@sysConfig@')) {
+    if (key.startsWith('manage@')) {
         return this.getSetting(key).then(function(value) {
             return value ? { value: value, metadata: {} } : null;
         });
@@ -368,11 +370,11 @@ D1Database.prototype.getWithMetadata = function(key) {
  * 通用的delete方法
  */
 D1Database.prototype.delete = function(key) {
-    if (key.startsWith('manage@sysConfig@')) {
-        return this.deleteSetting(key);
-    } else if (key.startsWith('manage@index@operation_')) {
+    if (key.startsWith('manage@index@operation_')) {
         var operationId = key.replace('manage@index@operation_', '');
         return this.deleteIndexOperation(operationId);
+    } else if (key.startsWith('manage@')) {
+        return this.deleteSetting(key);
     } else {
         return this.deleteFile(key);
     }
@@ -386,9 +388,7 @@ D1Database.prototype.list = function(options) {
     var prefix = options.prefix || '';
     var self = this;
 
-    if (prefix.startsWith('manage@sysConfig@')) {
-        return this.listSettings(options);
-    } else if (prefix.startsWith('manage@index@operation_')) {
+    if (prefix.startsWith('manage@index@operation_')) {
         return this.listIndexOperations(options).then(function(operations) {
             var keys = operations.map(function(op) {
                 return {
@@ -397,6 +397,8 @@ D1Database.prototype.list = function(options) {
             });
             return { keys: keys };
         });
+    } else if (prefix.startsWith('manage@')) {
+        return this.listSettings(options);
     } else {
         return this.listFiles(options);
     }

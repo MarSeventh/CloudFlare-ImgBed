@@ -5,7 +5,7 @@ export function isDomainAllowed(context) {
     const { Referer, securityConfig, url } = context;
 
     const allowedDomains = securityConfig.access.allowedDomains;
-    
+
     if (Referer) {
         try {
             const refererUrl = new URL(Referer);
@@ -17,7 +17,7 @@ export function isDomainAllowed(context) {
                     let domainPattern = new RegExp(`(^|\\.)${domain.replace('.', '\\.')}$`); // Escape dot in domain
                     return domainPattern.test(refererUrl.hostname);
                 });
-                
+
                 if (!isAllowed) {
                     return false;
                 }
@@ -30,23 +30,42 @@ export function isDomainAllowed(context) {
     return true;
 }
 
+// 判断请求是否来自公开图库页面 (/browse 或 /browse/*)
+export function isFromPublicBrowse(Referer, origin) {
+    if (!Referer) return false;
+    try {
+        const refererUrl = new URL(Referer);
+        // 检查是否来自同源的 /browse 或 /browse/* 路径
+        if (refererUrl.origin === origin) {
+            const pathname = refererUrl.pathname;
+            if (pathname === '/browse' || pathname.startsWith('/browse/')) {
+                return true;
+            }
+        }
+    } catch (e) {
+        return false;
+    }
+    return false;
+}
+
+export const FILE_CACHE_CONTROL = {
+    PUBLIC: 'public, max-age=2592000',
+    PRIVATE: 'private, max-age=86400',
+    NO_STORE: 'private, no-store, max-age=0',
+};
+
 // 公共响应头设置函数
-export function setCommonHeaders(headers, encodedFileName, fileType, Referer, url) {
+export function setCommonHeaders(headers, encodedFileName, fileType, cacheControl = FILE_CACHE_CONTROL.PUBLIC) {
     headers.set('Content-Disposition', `inline; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
     headers.set('Access-Control-Allow-Origin', '*');
     headers.set('Accept-Ranges', 'bytes');
     headers.set('Vary', 'Range');
-    
+
     if (fileType) {
         headers.set('Content-Type', fileType);
     }
-    
-    // 根据Referer设置CDN缓存策略
-    if (Referer && Referer.includes(url.origin)) {
-        headers.set('Cache-Control', 'private, max-age=86400'); // 本地缓存 1天
-    } else {
-        headers.set('Cache-Control', 'public, max-age=2592000'); // CDN缓存 30天
-    }
+
+    headers.set('Cache-Control', cacheControl || FILE_CACHE_CONTROL.PUBLIC);
 }
 
 // 设置Range请求相关头部
@@ -59,7 +78,7 @@ export function setRangeHeaders(headers, rangeStart, rangeEnd, totalSize) {
 // 处理HEAD请求的公共函数
 export function handleHeadRequest(headers, etag = null) {
     const responseHeaders = new Headers();
-    
+
     // 复制关键头部
     responseHeaders.set('Content-Length', headers.get('Content-Length') || '0');
     responseHeaders.set('Content-Type', headers.get('Content-Type') || 'application/octet-stream');
@@ -67,11 +86,11 @@ export function handleHeadRequest(headers, etag = null) {
     responseHeaders.set('Access-Control-Allow-Origin', headers.get('Access-Control-Allow-Origin') || '*');
     responseHeaders.set('Accept-Ranges', headers.get('Accept-Ranges') || 'bytes');
     responseHeaders.set('Cache-Control', headers.get('Cache-Control') || 'public, max-age=2592000');
-    
+
     if (etag) {
         responseHeaders.set('ETag', etag);
     }
-    
+
     return new Response(null, {
         status: 200,
         headers: responseHeaders,
@@ -107,45 +126,57 @@ export function isTgChannel(imgRecord) {
 
 // 图片可访问性检查
 export async function returnWithCheck(context, imgRecord) {
-    const { request, env, url, securityConfig } = context;
+    const { url, securityConfig } = context;
     const whiteListMode = securityConfig.access.whiteListMode;
-
+    const isAdminPreview = context.fileAccess?.isAdminPreview === true;
+    const adminAuthorized = context.fileAccess?.adminAuthResult?.authorized === true;
     const response = new Response('success', { status: 200 });
 
-    // Referer header equal to the dashboard page or upload page
-    if (request.headers.get('Referer') && request.headers.get('Referer').includes(url.origin)) {
-        //show the image
+    if (isAdminPreview && !adminAuthorized) {
+        return unauthorizedAdminPreviewResponse();
+    }
+
+    const record = imgRecord;
+    if (record.metadata === null) {
+        context.fileAccess.cacheControl = isAdminPreview ? FILE_CACHE_CONTROL.PRIVATE : FILE_CACHE_CONTROL.PUBLIC;
         return response;
     }
 
-    //check the record from kv
-    const record = imgRecord;
-    if (record.metadata === null) {
-    } else {
-        //if the record is not null, redirect to the image
-        if (record.metadata.ListType == "White") {
-            return response;
-        } else if (record.metadata.ListType == "Block") {
-            return await returnBlockImg(url);
-        } else if (record.metadata.Label == "adult") {
-            return await returnBlockImg(url);
-        }
-        //check if the env variables WhiteList_Mode are set
-        if (whiteListMode) {
-            //if the env variables WhiteList_Mode are set, redirect to the image
-            return await returnWhiteListImg(url);
-        } else {
-            //if the env variables WhiteList_Mode are not set, redirect to the image
-            return response;
-        }
+    if (isAdminPreview) {
+        context.fileAccess.cacheControl = FILE_CACHE_CONTROL.PRIVATE;
+        return response;
     }
-    
-    // other cases
+
+    context.fileAccess.cacheControl = FILE_CACHE_CONTROL.PUBLIC;
+
+    if (record.metadata.ListType == "White") {
+        return response;
+    } else if (record.metadata.ListType == "Block") {
+        return await returnBlockImg(url);
+    } else if (record.metadata.Label == "adult") {
+        return await returnBlockImg(url);
+    }
+
+    if (whiteListMode) {
+        return await returnWhiteListImg(url);
+    }
+
     return response;
 }
 
+function unauthorizedAdminPreviewResponse() {
+    return new Response('Admin authentication required', {
+        status: 401,
+        statusText: 'Unauthorized',
+        headers: {
+            'Content-Type': 'text/plain;charset=UTF-8',
+            'Cache-Control': FILE_CACHE_CONTROL.NO_STORE,
+        },
+    });
+}
+
 export async function return404(url) {
-    const Img404 = await fetch(url.origin + "/static/404.png");
+    const Img404 = await fetch(url.origin + "/static/media/404.png");
     if (!Img404.ok) {
         return new Response('Error: Image Not Found',
             {
@@ -168,7 +199,7 @@ export async function return404(url) {
 }
 
 export async function returnBlockImg(url) {
-    const blockImg = await fetch(url.origin + "/static/BlockImg.png");
+    const blockImg = await fetch(url.origin + "/static/media/BlockImg.png");
     if (!blockImg.ok) {
         return new Response(null, {
             status: 302,
@@ -190,7 +221,7 @@ export async function returnBlockImg(url) {
 }
 
 export async function returnWhiteListImg(url) {
-    const WhiteListImg = await fetch(url.origin + "/static/WhiteListOn.png");
+    const WhiteListImg = await fetch(url.origin + "/static/media/WhiteListOn.png");
     if (!WhiteListImg.ok) {
         return new Response(null, {
             status: 302,

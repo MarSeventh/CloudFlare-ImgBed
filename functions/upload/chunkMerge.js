@@ -1,5 +1,5 @@
 /* ========== 分块合并处理 ========== */
-import { createResponse, getUploadIp, getIPAddress, selectConsistentChannel, buildUniqueFileId, endUpload } from './uploadTools';
+import { createResponse, getUploadIp, getIPAddress, selectConsistentChannel, buildUniqueFileId, endUpload, sanitizeUploadFolder } from './uploadTools';
 import { retryFailedChunks, cleanupFailedMultipartUploads, checkChunkUploadStatuses, cleanupChunkData, cleanupUploadSession } from './chunkUpload';
 import { S3Client, CompleteMultipartUploadCommand } from "@aws-sdk/client-s3";
 import { getDatabase } from '../utils/databaseAdapter.js';
@@ -46,6 +46,13 @@ export async function handleChunkMerge(context) {
 
         // 使用会话中的上传渠道，或者从URL参数获取
         uploadChannel = url.searchParams.get('uploadChannel') || sessionInfo.uploadChannel || 'telegram';
+        if (uploadChannel === 'webdav') {
+            return createResponse('Error: WebDAV channel does not support chunked uploads. Please use non-chunked upload within your Cloudflare request body limit.', { status: 400 });
+        }
+
+        // 获取指定的渠道名称（优先URL参数，其次会话信息）
+        const channelName = url.searchParams.get('channelName') || sessionInfo.channelName || '';
+        context.specifiedChannelName = channelName;
 
         // 检查分块上传状态
         const chunkStatuses = await checkChunkUploadStatuses(env, uploadId, totalChunks);
@@ -137,7 +144,7 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
         // 获得上传IP
         const uploadIp = getUploadIp(request);
 
-        const normalizedFolder = (url.searchParams.get('uploadFolder') || '').replace(/^\/+/, '').replace(/\/{2,}/g, '/').replace(/\/$/, '');
+        const normalizedFolder = sanitizeUploadFolder(url.searchParams.get('uploadFolder') || '');
 
         // 构建基础metadata
         const metadata = {
@@ -204,6 +211,8 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
             result = await mergeS3ChunksInfo(context, uploadId, completedChunks, metadata);
         } else if (uploadChannel === 'telegram') {
             result = await mergeTelegramChunksInfo(context, uploadId, completedChunks, metadata);
+        } else if (uploadChannel === 'discord') {
+            result = await mergeDiscordChunksInfo(context, uploadId, completedChunks, metadata);
         } else {
             throw new Error(`Unsupported upload channel: ${uploadChannel}`);
         }
@@ -220,7 +229,7 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
 
 // 合并R2分块信息
 async function mergeR2ChunksInfo(context, uploadId, completedChunks, metadata) {
-    const { env, waitUntil, url } = context;
+    const { env, waitUntil, url, specifiedChannelName } = context;
     const db = getDatabase(env);
 
     try {
@@ -257,8 +266,20 @@ async function mergeR2ChunksInfo(context, uploadId, completedChunks, metadata) {
         // 使用multipart info中的finalFileId更新metadata
         const finalFileId = multipartInfo.key;
         metadata.Channel = "CloudflareR2";
-        metadata.ChannelName = "R2_env";
+        // 从 R2 设置中获取渠道名称（优先使用指定的渠道名称）
+        const r2Settings = context.uploadConfig.cfr2;
+        let r2ChannelName = "R2_env";
+        if (specifiedChannelName) {
+            const r2Channel = r2Settings.channels?.find(ch => ch.name === specifiedChannelName);
+            if (r2Channel) {
+                r2ChannelName = r2Channel.name;
+            }
+        } else if (r2Settings.channels?.[0]?.name) {
+            r2ChannelName = r2Settings.channels[0].name;
+        }
+        metadata.ChannelName = r2ChannelName;
         metadata.FileSize = (totalSize / 1024 / 1024).toFixed(2);
+        metadata.FileSizeBytes = totalSize;
 
         // 清理multipart info
         await db.delete(multipartKey);
@@ -290,13 +311,21 @@ async function mergeR2ChunksInfo(context, uploadId, completedChunks, metadata) {
 
 // 合并S3分块信息
 async function mergeS3ChunksInfo(context, uploadId, completedChunks, metadata) {
-    const { env, waitUntil, uploadConfig, url } = context;
+    const { env, waitUntil, uploadConfig, url, specifiedChannelName } = context;
     const db = getDatabase(env);
 
     try {
         const s3Settings = uploadConfig.s3;
         const s3Channels = s3Settings.channels;
-        const s3Channel = selectConsistentChannel(s3Channels, uploadId, s3Settings.loadBalance.enabled);
+        
+        // 优先使用指定的渠道名称
+        let s3Channel;
+        if (specifiedChannelName) {
+            s3Channel = s3Channels.find(ch => ch.name === specifiedChannelName);
+        }
+        if (!s3Channel) {
+            s3Channel = selectConsistentChannel(s3Channels, uploadId, s3Settings.loadBalance.enabled);
+        }
 
         console.log(`Merging S3 chunks for uploadId: ${uploadId}, selected channel: ${s3Channel.name || 'default'}`);
 
@@ -347,6 +376,7 @@ async function mergeS3ChunksInfo(context, uploadId, completedChunks, metadata) {
         metadata.Channel = "S3";
         metadata.ChannelName = s3Channel.name;
         metadata.FileSize = (totalSize / 1024 / 1024).toFixed(2);
+        metadata.FileSizeBytes = totalSize;
 
         const s3ServerDomain = endpoint.replace(/https?:\/\//, "");
         if (pathStyle) {
@@ -392,13 +422,21 @@ async function mergeS3ChunksInfo(context, uploadId, completedChunks, metadata) {
 
 // 合并Telegram分块信息
 async function mergeTelegramChunksInfo(context, uploadId, completedChunks, metadata) {
-    const { env, waitUntil, uploadConfig, url } = context;
+    const { env, waitUntil, uploadConfig, url, specifiedChannelName } = context;
     const db = getDatabase(env);
 
     try {
         const tgSettings = uploadConfig.telegram;
         const tgChannels = tgSettings.channels;
-        const tgChannel = selectConsistentChannel(tgChannels, uploadId, tgSettings.loadBalance.enabled);
+        
+        // 优先使用指定的渠道名称
+        let tgChannel;
+        if (specifiedChannelName) {
+            tgChannel = tgChannels.find(ch => ch.name === specifiedChannelName);
+        }
+        if (!tgChannel) {
+            tgChannel = selectConsistentChannel(tgChannels, uploadId, tgSettings.loadBalance.enabled);
+        }
 
         console.log(`Merging Telegram chunks for uploadId: ${uploadId}, selected channel: ${tgChannel.name || 'default'}`);
 
@@ -427,9 +465,11 @@ async function mergeTelegramChunksInfo(context, uploadId, completedChunks, metad
         metadata.ChannelName = tgChannel.name;
         metadata.TgChatId = tgChatId;
         metadata.TgBotToken = tgBotToken;
+        metadata.TgProxyUrl = tgChannel.proxyUrl || '';
         metadata.IsChunked = true;
         metadata.TotalChunks = completedChunks.length;
         metadata.FileSize = (totalSize / 1024 / 1024).toFixed(2);
+        metadata.FileSizeBytes = totalSize;
 
         // 将分片信息存储到value中
         const chunksData = JSON.stringify(chunks);
@@ -456,5 +496,85 @@ async function mergeTelegramChunksInfo(context, uploadId, completedChunks, metad
 
     } catch (error) {
         throw new Error(`Telegram merge failed: ${error.message}`);
+    }
+}
+
+// 合并Discord分块信息
+async function mergeDiscordChunksInfo(context, uploadId, completedChunks, metadata) {
+    const { env, waitUntil, uploadConfig, url, specifiedChannelName } = context;
+    const db = getDatabase(env);
+
+    try {
+        const discordSettings = uploadConfig.discord;
+        const discordChannels = discordSettings.channels;
+        
+        // 优先使用指定的渠道名称
+        let discordChannel;
+        if (specifiedChannelName) {
+            discordChannel = discordChannels.find(ch => ch.name === specifiedChannelName);
+        }
+        if (!discordChannel) {
+            discordChannel = selectConsistentChannel(discordChannels, uploadId, discordSettings.loadBalance?.enabled);
+        }
+
+        console.log(`Merging Discord chunks for uploadId: ${uploadId}, selected channel: ${discordChannel.name || 'default'}`);
+
+        const botToken = discordChannel.botToken;
+        const channelId = discordChannel.channelId;
+
+        // 按顺序排列分块
+        const sortedChunks = completedChunks.sort((a, b) => a.index - b.index);
+
+        // 计算总大小
+        const totalSize = sortedChunks.reduce((sum, chunk) => sum + chunk.uploadResult.size, 0);
+
+        // 构建分块信息数组（不存储 url 因为会过期，读取时通过 API 获取）
+        const chunks = sortedChunks.map(chunk => ({
+            index: chunk.index,
+            messageId: chunk.uploadResult.messageId,
+            // 注意：不存储 attachmentId 和 url，它们会在约24小时后过期
+            size: chunk.uploadResult.size,
+            fileName: chunk.uploadResult.fileName
+        }));
+
+        // 生成 finalFileId
+        const finalFileId = await buildUniqueFileId(context, metadata.FileName, metadata.FileType);
+
+        // 更新metadata
+        metadata.Channel = "Discord";
+        metadata.ChannelName = discordChannel.name;
+        metadata.DiscordChannelId = channelId;
+        metadata.DiscordBotToken = botToken;
+        metadata.DiscordProxyUrl = discordChannel.proxyUrl || '';
+        metadata.IsChunked = true;
+        metadata.TotalChunks = completedChunks.length;
+        metadata.FileSize = (totalSize / 1024 / 1024).toFixed(2);
+        metadata.FileSizeBytes = totalSize;
+
+        // 将分片信息存储到value中
+        const chunksData = JSON.stringify(chunks);
+
+        // 写入数据库
+        await db.put(finalFileId, chunksData, { metadata });
+
+        // 异步结束上传
+        waitUntil(endUpload(context, finalFileId, metadata));
+
+        // 生成返回链接
+        const returnFormat = url.searchParams.get('returnFormat') || 'default';
+        let updatedReturnLink = '';
+        if (returnFormat === 'full') {
+            updatedReturnLink = `${url.origin}/file/${finalFileId}`;
+        } else {
+            updatedReturnLink = `/file/${finalFileId}`;
+        }
+
+        return {
+            success: true,
+            result: [{ 'src': updatedReturnLink }]
+        };
+
+    } catch (error) {
+        throw new Error(`Discord merge failed: ${error.message}`);
     }
 }

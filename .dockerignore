@@ -5,3 +5,7 @@ Dockerfile
 .git
 .gitignore
 .github
+data
+readme
+deploy/worker
+*.md

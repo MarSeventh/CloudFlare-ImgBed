@@ -1,0 +1,46 @@
+name: Sync Release (Create & Update) to Frontend Repo
+
+on:
+  release:
+    # 创建、发布、更新
+    types: [created, published, edited]
+
+jobs:
+  sync-release:
+    if: github.repository == 'MarSeventh/CloudFlare-ImgBed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync or Update Release
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_SYNC_PAT }}
+          TARGET_REPO: "MarSeventh/Sanyue-ImgHub"
+          TAG_NAME: ${{ github.event.release.tag_name }}
+          RELEASE_TITLE: ${{ github.event.release.name }}
+          RELEASE_BODY: ${{ github.event.release.body }}
+          IS_DRAFT: ${{ github.event.release.draft }}
+          IS_PRERELEASE: ${{ github.event.release.prerelease }}
+
+        run: |
+          # 格式化参数
+          ARGS=""
+          if [ "$IS_DRAFT" = "true" ]; then ARGS="$ARGS --draft"; else ARGS="$ARGS --draft=false"; fi
+          if [ "$IS_PRERELEASE" = "true" ]; then ARGS="$ARGS --prerelease"; else ARGS="$ARGS --prerelease=false"; fi
+
+          echo "正在检查目标仓库 $TARGET_REPO 中是否存在 Tag: $TAG_NAME..."
+
+          # 检查目标仓库是否已有该 Release
+          if gh release view "$TAG_NAME" --repo "$TARGET_REPO" > /dev/null 2>&1; then
+            echo "检测到现有 Release，正在执行更新操作..."
+            gh release edit "$TAG_NAME" \
+              --repo "$TARGET_REPO" \
+              --title "$RELEASE_TITLE" \
+              --notes "$RELEASE_BODY" \
+              $ARGS
+          else
+            echo "未发现现有 Release，正在创建新 Release..."
+            gh release create "$TAG_NAME" \
+              --repo "$TARGET_REPO" \
+              --title "$RELEASE_TITLE" \
+              --notes "$RELEASE_BODY" \
+              $ARGS
+          fi

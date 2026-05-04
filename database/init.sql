@@ -10,9 +10,7 @@
 -- DROP TABLE IF EXISTS other_data;
 
 -- 执行主要的数据库架构创建
--- 这里会包含 schema.sql 的内容
 
--- 1. 文件表 - 存储文件元数据
 CREATE TABLE IF NOT EXISTS files (
     id TEXT PRIMARY KEY,
     value TEXT,
@@ -37,7 +35,6 @@ CREATE TABLE IF NOT EXISTS files (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. 系统配置表
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL,
@@ -47,7 +44,6 @@ CREATE TABLE IF NOT EXISTS settings (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. 索引操作表
 CREATE TABLE IF NOT EXISTS index_operations (
     id TEXT PRIMARY KEY,
     type TEXT NOT NULL,
@@ -57,7 +53,6 @@ CREATE TABLE IF NOT EXISTS index_operations (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 4. 索引元数据表
 CREATE TABLE IF NOT EXISTS index_metadata (
     key TEXT PRIMARY KEY,
     last_updated INTEGER,
@@ -69,7 +64,6 @@ CREATE TABLE IF NOT EXISTS index_metadata (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 5. 其他数据表
 CREATE TABLE IF NOT EXISTS other_data (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL,
@@ -79,7 +73,6 @@ CREATE TABLE IF NOT EXISTS other_data (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 创建索引
 CREATE INDEX IF NOT EXISTS idx_files_timestamp ON files(timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_files_directory ON files(directory);
 CREATE INDEX IF NOT EXISTS idx_files_channel ON files(channel);
@@ -96,7 +89,6 @@ CREATE INDEX IF NOT EXISTS idx_index_operations_type ON index_operations(type);
 
 CREATE INDEX IF NOT EXISTS idx_other_data_type ON other_data(type);
 
--- 创建触发器
 CREATE TRIGGER IF NOT EXISTS update_files_updated_at 
     AFTER UPDATE ON files
     BEGIN
@@ -121,8 +113,3 @@ CREATE TRIGGER IF NOT EXISTS update_other_data_updated_at
         UPDATE other_data SET updated_at = CURRENT_TIMESTAMP WHERE key = NEW.key;
     END;
 
--- 插入初始的索引元数据
-INSERT OR REPLACE INTO index_metadata (key, last_updated, total_count, last_operation_id)
-VALUES ('main_index', 0, 0, NULL);
-
--- 初始化完成

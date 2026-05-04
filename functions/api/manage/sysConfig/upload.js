@@ -1,14 +1,15 @@
 import { getDatabase } from '../../../utils/databaseAdapter.js';
+import { normalizeWebDAVHeaders } from '../../../utils/storage/webdavAPI.js';
 
 export async function onRequest(context) {
     // 上传设置相关，GET方法读取设置，POST方法保存设置
     const {
-      request, // same as existing Worker API
-      env, // same as existing Worker API
-      params, // if filename includes [id] or [[path]]
-      waitUntil, // same as ctx.waitUntil in existing Worker API
-      next, // used for middleware or to fetch assets
-      data, // arbitrary space for passing data between middlewares
+        request, // same as existing Worker API
+        env, // same as existing Worker API
+        params, // if filename includes [id] or [[path]]
+        waitUntil, // same as ctx.waitUntil in existing Worker API
+        next, // used for middleware or to fetch assets
+        data, // arbitrary space for passing data between middlewares
     } = context;
 
     const db = getDatabase(env);
@@ -60,6 +61,7 @@ export async function getUploadConfig(db, env) {
             savePath: 'environment variable',
             botToken: env.TG_BOT_TOKEN,
             chatId: env.TG_CHAT_ID,
+            proxyUrl: env.TG_PROXY_URL || '',  // 可选的代理 URL
             enabled: true,
             fixed: true,
         })
@@ -70,6 +72,7 @@ export async function getUploadConfig(db, env) {
             // 如果环境变量未删除，进行覆盖操作
             if (telegramChannels[0]) {
                 telegramChannels[0].enabled = tg.enabled
+                telegramChannels[0].proxyUrl = tg.proxyUrl
             }
 
             continue
@@ -85,7 +88,7 @@ export async function getUploadConfig(db, env) {
         channels: [],
     }
     telegram.loadBalance = tgLoadBalance
-    
+
 
 
     // =====================读取r2渠道配置=====================
@@ -95,7 +98,7 @@ export async function getUploadConfig(db, env) {
     if (env.img_r2) {
         cfr2Channels.push({
             id: 1,
-            name: 'Cloudflare R2_env',
+            name: 'R2_env',
             type: 'cfr2',
             savePath: 'environment variable',
             publicUrl: env.R2PublicUrl,
@@ -110,6 +113,7 @@ export async function getUploadConfig(db, env) {
             if (cfr2Channels[0]) {
                 cfr2Channels[0].publicUrl = r2.publicUrl
                 cfr2Channels[0].enabled = r2.enabled
+                cfr2Channels[0].quota = r2.quota  // 保留容量限制配置
             }
 
             continue
@@ -143,6 +147,7 @@ export async function getUploadConfig(db, env) {
             bucketName: env.S3_BUCKET_NAME,
             endpoint: env.S3_ENDPOINT,
             pathStyle: env.S3_PATH_STYLE === 'true',
+            cdnDomain: env.S3_CDN_DOMAIN || '',  // 可选的 CDN 域名
             enabled: true,
             fixed: true,
         })
@@ -153,8 +158,10 @@ export async function getUploadConfig(db, env) {
             // 如果环境变量未删除，进行覆盖操作
             if (s3Channels[0]) {
                 s3Channels[0].enabled = s.enabled
+                s3Channels[0].quota = s.quota  // 保留容量限制配置
+                s3Channels[0].cdnDomain = s.cdnDomain  // 保留 CDN 域名配置
             }
-            
+
             continue
         }
         // id自增
@@ -170,10 +177,151 @@ export async function getUploadConfig(db, env) {
     s3.loadBalance = s3LoadBalance
 
 
+    // =====================读取 Discord 渠道配置=====================
+    const discord = {}
+    const discordChannels = []
+    discord.channels = discordChannels
+
+    // 从环境变量读取 Discord 配置
+    if (env.DISCORD_BOT_TOKEN) {
+        discordChannels.push({
+            id: 1,
+            name: 'Discord_env',
+            type: 'discord',
+            savePath: 'environment variable',
+            botToken: env.DISCORD_BOT_TOKEN,
+            channelId: env.DISCORD_CHANNEL_ID,
+            proxyUrl: env.DISCORD_PROXY_URL || '',  // 可选的代理 URL
+            isNitro: env.DISCORD_IS_NITRO === 'true',  // Nitro 会员，支持 25MB
+            enabled: true,
+            fixed: true,
+        })
+    }
+
+    for (const dc of settingsKV.discord?.channels || []) {
+        // 如果 savePath 是 environment variable，修改可变参数
+        if (dc.savePath === 'environment variable') {
+            // 如果环境变量未删除，进行覆盖操作
+            if (discordChannels[0]) {
+                discordChannels[0].enabled = dc.enabled
+                discordChannels[0].proxyUrl = dc.proxyUrl
+                discordChannels[0].isNitro = dc.isNitro
+            }
+            continue
+        }
+        // id 自增
+        dc.id = discordChannels.length + 1
+        discordChannels.push(dc)
+    }
+
+    // 负载均衡
+    const discordLoadBalance = settingsKV.discord?.loadBalance || {
+        enabled: false,
+        channels: [],
+    }
+    discord.loadBalance = discordLoadBalance
+
+
+    // =====================读取 HuggingFace 渠道配置=====================
+    const huggingface = {}
+    const huggingfaceChannels = []
+    huggingface.channels = huggingfaceChannels
+
+    // 从环境变量读取 HuggingFace 配置
+    if (env.HF_TOKEN) {
+        huggingfaceChannels.push({
+            id: 1,
+            name: 'HuggingFace_env',
+            type: 'huggingface',
+            savePath: 'environment variable',
+            token: env.HF_TOKEN,
+            repo: env.HF_REPO,
+            isPrivate: env.HF_PRIVATE === 'true',
+            enabled: true,
+            fixed: true,
+        })
+    }
+
+    for (const hf of settingsKV.huggingface?.channels || []) {
+        // 如果 savePath 是 environment variable，修改可变参数
+        if (hf.savePath === 'environment variable') {
+            // 如果环境变量未删除，进行覆盖操作
+            if (huggingfaceChannels[0]) {
+                huggingfaceChannels[0].enabled = hf.enabled
+                huggingfaceChannels[0].isPrivate = hf.isPrivate
+            }
+            continue
+        }
+        // id 自增
+        hf.id = huggingfaceChannels.length + 1
+        huggingfaceChannels.push(hf)
+    }
+
+    // 负载均衡
+    const huggingfaceLoadBalance = settingsKV.huggingface?.loadBalance || {
+        enabled: false,
+        channels: [],
+    }
+    huggingface.loadBalance = huggingfaceLoadBalance
+
+
+    // =====================读取 WebDAV 渠道配置=====================
+    const webdav = {}
+    const webdavChannels = []
+    webdav.channels = webdavChannels
+
+    // 从环境变量读取 WebDAV 配置
+    if (env.WEBDAV_BASE_URL) {
+        webdavChannels.push({
+            id: 1,
+            name: 'WebDAV_env',
+            type: 'webdav',
+            savePath: 'environment variable',
+            baseUrl: env.WEBDAV_BASE_URL,
+            username: env.WEBDAV_USERNAME || '',
+            password: env.WEBDAV_PASSWORD || '',
+            publicUrl: env.WEBDAV_PUBLIC_URL || '',
+            headers: normalizeWebDAVHeaders(env.WEBDAV_HEADERS || {}),
+            createDirectory: env.WEBDAV_CREATE_DIRECTORY !== 'false',
+            enabled: true,
+            fixed: true,
+        })
+    }
+
+    for (const wd of settingsKV.webdav?.channels || []) {
+        // 如果 savePath 是 environment variable，修改可变参数
+        if (wd.savePath === 'environment variable') {
+            // 如果环境变量未删除，进行覆盖操作
+            if (webdavChannels[0]) {
+                webdavChannels[0].enabled = wd.enabled
+                webdavChannels[0].publicUrl = wd.publicUrl || webdavChannels[0].publicUrl
+                webdavChannels[0].headers = normalizeWebDAVHeaders(wd.headers || wd.customHeaders || webdavChannels[0].headers)
+                webdavChannels[0].createDirectory = wd.createDirectory !== false
+                webdavChannels[0].quota = wd.quota
+            }
+            continue
+        }
+        // id 自增
+        wd.id = webdavChannels.length + 1
+        wd.headers = normalizeWebDAVHeaders(wd.headers || wd.customHeaders || {})
+        wd.createDirectory = wd.createDirectory !== false
+        webdavChannels.push(wd)
+    }
+
+    // 负载均衡
+    const webdavLoadBalance = settingsKV.webdav?.loadBalance || {
+        enabled: false,
+        channels: [],
+    }
+    webdav.loadBalance = webdavLoadBalance
+
 
     settings.telegram = telegram
     settings.cfr2 = cfr2
     settings.s3 = s3
+    settings.discord = discord
+    settings.huggingface = huggingface
+    settings.webdav = webdav
 
     return settings;
 }
