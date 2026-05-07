@@ -14,6 +14,8 @@ import { fileURLToPath, pathToFileURL } from 'url';
 import { SqliteD1 } from './sqliteD1.js';
 import { LocalR2Storage } from './r2Storage.js';
 
+const NativeResponse = globalThis.Response;
+
 // ==================== 模拟 Cloudflare 全局 API ====================
 
 // 模拟 Cloudflare Cache API（Node.js 中不存在）
@@ -392,8 +394,20 @@ app.get('*', async (c) => {
 
 // ==================== 启动服务器 ====================
 
+async function fetchWithNativeResponse(request, env, executionCtx) {
+    const response = await app.fetch(request, env, executionCtx);
+    if (!response) {
+        return response;
+    }
+    return new NativeResponse(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+    });
+}
+
 serve({
-    fetch: app.fetch,
+    fetch: fetchWithNativeResponse,
     port,
 }, (info) => {
     console.log(`Server running at http://0.0.0.0:${info.port}`);
