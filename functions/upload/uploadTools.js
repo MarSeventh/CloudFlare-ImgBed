@@ -392,7 +392,7 @@ export async function buildUniqueFileId(context, fileName, fileType = 'applicati
 
     const fileExt = resolveFileExt(fileName, fileType);
 
-    const nameType = url.searchParams.get('uploadNameType') || 'default';
+    const nameType = url.searchParams.get('uploadNameType') || 'origin';
     const uploadFolder = url.searchParams.get('uploadFolder') || '';
     // 对上传路径进行安全处理
     const normalizedFolder = sanitizeUploadFolder(uploadFolder);
