@@ -1,4 +1,5 @@
 import { dualAuthCheck } from '../utils/auth/dualAuth.js';
+import { getUploadIp } from '../upload/uploadTools.js';
 
 export async function onRequest(context) {
     // 获取请求体中URL的内容
@@ -17,6 +18,19 @@ export async function onRequest(context) {
     if (!authorized) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), {
             status: 401,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+
+    const uploadIp = getUploadIp(request);
+    const allowedUploadIps = (env.ALLOWED_UPLOAD_IPS || "")
+        .split(",")
+        .map(ip => ip.trim())
+        .filter(Boolean);
+
+    if (allowedUploadIps.length > 0 && !allowedUploadIps.includes(uploadIp)) {
+        return new Response(JSON.stringify({ error: 'Upload IP is not allowed' }), {
+            status: 403,
             headers: { 'Content-Type': 'application/json' }
         });
     }
