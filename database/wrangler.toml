@@ -1,0 +1,5 @@
+name = "imgbed"
+
+[[kv_namespaces]]
+binding = "img_url"
+id = "eeae138dc41b40eb9ecfd3cbd4cb6808"
