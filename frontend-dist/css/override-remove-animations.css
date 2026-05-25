@@ -1,0 +1,39 @@
+/* Global override: remove heavy animations and force black background */
+:root, html, body, #app {
+  background: #000 !important;
+  background-image: none !important;
+  min-height: 100vh;
+  color: #fff !important;
+}
+
+/* Hide any injected background image elements used by the app */
+#bg1, #bg2, .background-image1, .background-image2 {
+  display: none !important;
+  opacity: 0 !important;
+  background-image: none !important;
+}
+
+/* Disable animations, transitions and transforms site-wide */
+*,
+*::before,
+*::after {
+  animation: none !important;
+  transition: none !important;
+  transform: none !important;
+  will-change: auto !important;
+  scroll-behavior: auto !important;
+  background-image: none !important;
+}
+
+/* Also stop animated icons and loading spinners */
+.el-icon.is-loading,
+.spinner,
+.loading {
+  animation: none !important;
+}
+
+/* Keep media elements visible but non-animated */
+img, video {
+  animation: none !important;
+  transition: none !important;
+}
