@@ -110,7 +110,15 @@ const routes = [
     { path: '/dav/', module: davCatchAll, middlewares: [mw_dav], catchAll: true },
     { path: '/file/', module: fileCatchAll, middlewares: [mw_file], catchAll: true },
 ];
+export default {
+  async fetch(request, env) {
+    await env.img_url.put("test", "working");
 
+    const value = await env.img_url.get("test");
+
+    return new Response(value);
+  },
+};
 
 // ==================== 路由匹配 ====================
 
