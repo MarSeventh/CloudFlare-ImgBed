@@ -861,8 +861,9 @@ export async function rebuildIndex(context, progressCallback = null) {
 /**
  * 获取索引信息
  * @param {Object} context - 上下文对象
+ * @param {Object} options - 统计选项
  */
-export async function getIndexInfo(context) {
+export async function getIndexInfo(context, options = {}) {
     try {
         const index = await getIndex(context);
 
@@ -876,29 +877,31 @@ export async function getIndexInfo(context) {
         }
 
         // 统计各渠道文件数量
-        const channelStats = {};
-        const directoryStats = {};
-        const typeStats = {};
+        const channelStats = Object.create(null);
+        const directoryStats = Object.create(null);
+        const typeStats = Object.create(null);
+        const uploadTrend = createUploadTrendAccumulator(index.files, options);
         
         index.files.forEach(file => {
+            const metadata = file.metadata || {};
+
             // 渠道统计
-            let channel = file.metadata.Channel || 'Telegraph';
-            if (channel === 'TelegramNew') {
-                channel = 'Telegram';
-            }
-            channelStats[channel] = (channelStats[channel] || 0) + 1;
+            const channel = normalizeChannel(metadata.Channel);
+            incrementStat(channelStats, channel);
 
             // 目录统计
-            const dir = file.metadata.Directory || extractDirectory(file.id) || '/';
-            directoryStats[dir] = (directoryStats[dir] || 0) + 1;
+            const dir = metadata.Directory || extractDirectory(file.id) || '/';
+            incrementStat(directoryStats, dir);
             
             // 类型统计
-            let listType = file.metadata.ListType || 'None';
-            const label = file.metadata.Label || 'None';
+            let listType = metadata.ListType || 'None';
+            const label = metadata.Label || 'None';
             if (listType !== 'White' && label === 'adult') {
                 listType = 'Block';
             }
-            typeStats[listType] = (typeStats[listType] || 0) + 1;
+            incrementStat(typeStats, listType);
+
+            addUploadTrendPoint(uploadTrend, metadata, channel);
         });
 
         return {
@@ -908,6 +911,7 @@ export async function getIndexInfo(context) {
             channelStats,
             directoryStats,
             typeStats,
+            uploadTrend: finalizeUploadTrend(uploadTrend),
             oldestFile: index.files[index.files.length - 1],
             newestFile: index.files[0]
         };
@@ -915,6 +919,331 @@ export async function getIndexInfo(context) {
         console.error('Error getting index info:', error);
         return null;
     }
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_TREND_MAX_POINTS = 90;
+const MAX_TREND_POINTS = 366;
+const DEFAULT_TREND_SERIES_LIMIT = 8;
+const MAX_TREND_SERIES_LIMIT = 20;
+
+function incrementStat(stats, key) {
+    const normalizedKey = normalizeTrendKey(key);
+    stats[normalizedKey] = (stats[normalizedKey] || 0) + 1;
+}
+
+function normalizeChannel(channel) {
+    if (channel === 'TelegramNew') {
+        return 'Telegram';
+    }
+    return normalizeTrendKey(channel, 'Telegraph');
+}
+
+function normalizeTrendKey(value, fallback = 'Unknown') {
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        return trimmed || fallback;
+    }
+    if (value === null || value === undefined) {
+        return fallback;
+    }
+    return String(value);
+}
+
+function normalizeInteger(value, defaultValue, min, max) {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) {
+        return defaultValue;
+    }
+    return Math.min(max, Math.max(min, parsed));
+}
+
+function getLocalDayNumber(timestamp, timezoneOffset) {
+    return Math.floor((timestamp - timezoneOffset * 60 * 1000) / DAY_MS);
+}
+
+function getValidTimestamp(metadata) {
+    const timestamp = Number(metadata?.TimeStamp);
+    return Number.isFinite(timestamp) && timestamp > 0 ? timestamp : null;
+}
+
+function formatTrendDay(dayNumber) {
+    return new Date(dayNumber * DAY_MS).toISOString().slice(0, 10);
+}
+
+function parseTrendDate(value) {
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) {
+        return null;
+    }
+
+    const year = Number.parseInt(match[1], 10);
+    const month = Number.parseInt(match[2], 10);
+    const day = Number.parseInt(match[3], 10);
+    const date = new Date(Date.UTC(year, month - 1, day));
+
+    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+        return null;
+    }
+
+    return Math.floor(date.getTime() / DAY_MS);
+}
+
+function getTrendDayRange(files, timezoneOffset, options = {}) {
+    let newestDay = null;
+    let oldestDay = null;
+    const optionStartDay = parseTrendDate(options.startDate);
+    const optionEndDay = parseTrendDate(options.endDate);
+
+    // The index is maintained in timestamp-desc order, so this avoids sorting.
+    for (let i = 0; i < files.length; i++) {
+        const timestamp = getValidTimestamp(files[i].metadata);
+        if (timestamp !== null) {
+            newestDay = getLocalDayNumber(timestamp, timezoneOffset);
+            break;
+        }
+    }
+
+    for (let i = files.length - 1; i >= 0; i--) {
+        const timestamp = getValidTimestamp(files[i].metadata);
+        if (timestamp !== null) {
+            oldestDay = getLocalDayNumber(timestamp, timezoneOffset);
+            break;
+        }
+    }
+
+    if (optionStartDay !== null || optionEndDay !== null) {
+        const startDay = optionStartDay !== null ? optionStartDay : (oldestDay !== null ? oldestDay : optionEndDay);
+        const endDay = optionEndDay !== null ? optionEndDay : (newestDay !== null ? newestDay : optionStartDay);
+        return startDay <= endDay
+            ? { startDay, endDay }
+            : { startDay: endDay, endDay: startDay };
+    }
+
+    if (newestDay === null || oldestDay === null) {
+        return null;
+    }
+
+    if (oldestDay > newestDay) {
+        return { startDay: newestDay, endDay: oldestDay };
+    }
+
+    return { startDay: oldestDay, endDay: newestDay };
+}
+
+function buildTrendBucketLabels(startDay, endDay, bucketSizeDays, bucketCount) {
+    const labels = [];
+    for (let i = 0; i < bucketCount; i++) {
+        const bucketStartDay = startDay + i * bucketSizeDays;
+        const bucketEndDay = Math.min(bucketStartDay + bucketSizeDays - 1, endDay);
+        labels.push(bucketStartDay === bucketEndDay
+            ? formatTrendDay(bucketStartDay)
+            : `${formatTrendDay(bucketStartDay)} - ${formatTrendDay(bucketEndDay)}`);
+    }
+    return labels;
+}
+
+function createUploadTrendAccumulator(files, options) {
+    const timezoneOffset = normalizeInteger(options.timezoneOffset, 0, -14 * 60, 14 * 60);
+    const maxPoints = normalizeInteger(options.maxPoints, DEFAULT_TREND_MAX_POINTS, 7, MAX_TREND_POINTS);
+    const seriesLimit = normalizeInteger(options.seriesLimit, DEFAULT_TREND_SERIES_LIMIT, 1, MAX_TREND_SERIES_LIMIT);
+    const range = getTrendDayRange(files, timezoneOffset, options);
+
+    if (!range) {
+        return {
+            enabled: false,
+            timezoneOffset,
+            maxPoints,
+            seriesLimit
+        };
+    }
+
+    const spanDays = range.endDay - range.startDay + 1;
+    const bucketSizeDays = Math.max(1, Math.ceil(spanDays / maxPoints));
+    const bucketCount = Math.ceil(spanDays / bucketSizeDays);
+
+    return {
+        enabled: true,
+        timezoneOffset,
+        maxPoints,
+        seriesLimit,
+        startDay: range.startDay,
+        endDay: range.endDay,
+        bucketSizeDays,
+        bucketCount,
+        labels: buildTrendBucketLabels(range.startDay, range.endDay, bucketSizeDays, bucketCount),
+        total: Array(bucketCount).fill(0),
+        channelGroups: new Map(),
+        channelNameGroups: new Map()
+    };
+}
+
+function addUploadTrendPoint(accumulator, metadata, channel) {
+    if (!accumulator.enabled) {
+        return;
+    }
+
+    const timestamp = getValidTimestamp(metadata);
+    if (timestamp === null) {
+        return;
+    }
+
+    const dayNumber = getLocalDayNumber(timestamp, accumulator.timezoneOffset);
+    const bucketIndex = Math.floor((dayNumber - accumulator.startDay) / accumulator.bucketSizeDays);
+    if (bucketIndex < 0 || bucketIndex >= accumulator.bucketCount) {
+        return;
+    }
+
+    const channelName = normalizeTrendKey(metadata.ChannelName, channel);
+
+    accumulator.total[bucketIndex] += 1;
+    addTrendGroupPoint(accumulator.channelGroups, channel, bucketIndex);
+    addTrendGroupPoint(accumulator.channelNameGroups, channelName, bucketIndex);
+}
+
+function addTrendGroupPoint(groups, key, bucketIndex) {
+    const normalizedKey = normalizeTrendKey(key);
+    let entry = groups.get(normalizedKey);
+    if (!entry) {
+        entry = {
+            total: 0,
+            buckets: new Map()
+        };
+        groups.set(normalizedKey, entry);
+    }
+
+    entry.total += 1;
+    entry.buckets.set(bucketIndex, (entry.buckets.get(bucketIndex) || 0) + 1);
+}
+
+function buildTrendSeries(groups, bucketCount, seriesLimit) {
+    const selectedEntries = selectTopTrendEntries(groups, seriesLimit);
+    const selectedNames = new Set(selectedEntries.map(([name]) => name));
+    const series = selectedEntries.map(([name, entry]) => ({
+        name,
+        total: entry.total,
+        data: buildTrendSeriesData(entry, bucketCount)
+    }));
+
+    if (groups.size > selectedEntries.length) {
+        const otherData = Array(bucketCount).fill(0);
+        let otherTotal = 0;
+
+        for (const [name, entry] of groups.entries()) {
+            if (selectedNames.has(name)) {
+                continue;
+            }
+            otherTotal += entry.total;
+            entry.buckets.forEach((count, bucketIndex) => {
+                otherData[bucketIndex] += count;
+            });
+        }
+
+        series.push({
+            name: '__other__',
+            isOther: true,
+            total: otherTotal,
+            data: otherData
+        });
+    }
+
+    return {
+        series,
+        totalSeries: groups.size,
+        limited: groups.size > selectedEntries.length
+    };
+}
+
+function selectTopTrendEntries(groups, seriesLimit) {
+    const topEntries = [];
+
+    for (const entry of groups.entries()) {
+        insertTopTrendEntry(topEntries, entry, seriesLimit);
+    }
+
+    return topEntries;
+}
+
+function insertTopTrendEntry(topEntries, candidate, seriesLimit) {
+    let insertIndex = -1;
+
+    for (let i = 0; i < topEntries.length; i++) {
+        if (compareTrendEntry(candidate, topEntries[i]) < 0) {
+            insertIndex = i;
+            break;
+        }
+    }
+
+    if (insertIndex === -1) {
+        if (topEntries.length < seriesLimit) {
+            topEntries.push(candidate);
+        }
+        return;
+    }
+
+    topEntries.splice(insertIndex, 0, candidate);
+    if (topEntries.length > seriesLimit) {
+        topEntries.pop();
+    }
+}
+
+function compareTrendEntry(left, right) {
+    if (right[1].total !== left[1].total) {
+        return right[1].total - left[1].total;
+    }
+    return left[0].localeCompare(right[0]);
+}
+
+function buildTrendSeriesData(entry, bucketCount) {
+    const data = Array(bucketCount).fill(0);
+    entry.buckets.forEach((count, bucketIndex) => {
+        data[bucketIndex] = count;
+    });
+    return data;
+}
+
+function finalizeUploadTrend(accumulator) {
+    const emptyGroup = {
+        series: [],
+        totalSeries: 0,
+        limited: false
+    };
+
+    if (!accumulator.enabled) {
+        return {
+            labels: [],
+            total: [],
+            bucketSizeDays: 1,
+            maxPoints: accumulator.maxPoints,
+            seriesLimit: accumulator.seriesLimit,
+            range: null,
+            groupBy: {
+                channel: emptyGroup,
+                channelName: emptyGroup
+            }
+        };
+    }
+
+    return {
+        labels: accumulator.labels,
+        total: accumulator.total,
+        bucketSizeDays: accumulator.bucketSizeDays,
+        maxPoints: accumulator.maxPoints,
+        seriesLimit: accumulator.seriesLimit,
+        range: {
+            startDate: formatTrendDay(accumulator.startDay),
+            endDate: formatTrendDay(accumulator.endDay),
+            timezoneOffset: accumulator.timezoneOffset
+        },
+        groupBy: {
+            channel: buildTrendSeries(accumulator.channelGroups, accumulator.bucketCount, accumulator.seriesLimit),
+            channelName: buildTrendSeries(accumulator.channelNameGroups, accumulator.bucketCount, accumulator.seriesLimit)
+        }
+    };
 }
 
 /**
