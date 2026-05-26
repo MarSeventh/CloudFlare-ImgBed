@@ -102,7 +102,13 @@ export async function onRequest(context) {
 
         // 特殊操作：获取索引信息
         if (action === 'info') {
-            const info = await getIndexInfo(context);
+            const info = await getIndexInfo(context, {
+                timezoneOffset: url.searchParams.get('timezoneOffset'),
+                maxPoints: url.searchParams.get('trendMaxPoints'),
+                seriesLimit: url.searchParams.get('trendSeriesLimit'),
+                startDate: url.searchParams.get('trendStartDate'),
+                endDate: url.searchParams.get('trendEndDate')
+            });
             return new Response(JSON.stringify(info), {
                 headers: { "Content-Type": "application/json", ...corsHeaders }
             });
