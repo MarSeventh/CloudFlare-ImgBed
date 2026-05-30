@@ -880,7 +880,8 @@ async function handleHuggingFaceFile(context, metadata, encodedFileName, fileTyp
 
         // 构建文件 URL
         const huggingfaceAPI = new HuggingFaceAPI(hfToken, hfRepo, hfIsPrivate);
-        const fileUrl = metadata.HfFileUrl || huggingfaceAPI.getFileURL(hfFilePath);
+        let fileUrl = metadata.HfFileUrl || huggingfaceAPI.getFileURL(hfFilePath);
+        fileUrl = await huggingfaceAPI.resolveFileURL(hfFilePath, { fileUrl });
         const fileSize = await huggingfaceAPI.getRemoteFileSize(hfFilePath, { fileUrl, metadata });
 
         // 构建响应头
@@ -915,9 +916,10 @@ async function handleHuggingFaceFile(context, metadata, encodedFileName, fileTyp
                     });
                 }
 
-                setRangeHeaders(headers, proxyRange.start, proxyRange.end, fileSize);
+                const rangeResponse = await huggingfaceAPI.fetchRange(hfFilePath, proxyRange.start, proxyRange.end, { fileUrl });
+                setRangeHeaders(headers, rangeResponse.start, rangeResponse.end, fileSize);
 
-                return new Response(huggingfaceAPI.createRangeStream(hfFilePath, proxyRange.start, proxyRange.end, { fileUrl }), {
+                return new Response(rangeResponse.body, {
                     status: 206,
                     headers
                 });
