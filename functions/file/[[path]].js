@@ -879,61 +879,41 @@ async function handleHuggingFaceFile(context, metadata, encodedFileName, fileTyp
         }
 
         // 构建文件 URL
-        const huggingfaceAPI = new HuggingFaceAPI(hfToken, hfRepo, hfIsPrivate);
-        let fileUrl = metadata.HfFileUrl || huggingfaceAPI.getFileURL(hfFilePath);
-        fileUrl = await huggingfaceAPI.resolveFileURL(hfFilePath, { fileUrl });
-        const fileSize = await huggingfaceAPI.getRemoteFileSize(hfFilePath, { fileUrl, metadata });
-
-        // 构建响应头
-        const headers = new Headers();
-        setCommonHeaders(headers, encodedFileName, fileType, getFileCacheControl(context));
-        if (fileSize) {
-            headers.set('Content-Length', fileSize.toString());
-        }
+        const fileUrl = metadata.HfFileUrl || `https://huggingface.co/datasets/${hfRepo}/resolve/main/${hfFilePath}`;
 
         // 处理 HEAD 请求
         if (request.method === 'HEAD') {
+            const headers = new Headers();
+            setCommonHeaders(headers, encodedFileName, fileType, getFileCacheControl(context));
             return handleHeadRequest(headers);
         }
 
         // 构建请求头
         const fetchHeaders = {};
 
+        // 私有仓库需要 Authorization
+        if (hfIsPrivate && hfToken) {
+            fetchHeaders['Authorization'] = `Bearer ${hfToken}`;
+        }
+
         // 支持 Range 请求
         const range = request.headers.get('Range');
         if (range) {
             fetchHeaders['Range'] = range;
-
-            if (fileSize) {
-                const proxyRange = huggingfaceAPI.getProxyRange(range, fileSize);
-                if (!proxyRange) {
-                    return new Response('Range Not Satisfiable', {
-                        status: 416,
-                        headers: {
-                            'Content-Range': `bytes */${fileSize}`,
-                            'Accept-Ranges': 'bytes'
-                        }
-                    });
-                }
-
-                const rangeResponse = await huggingfaceAPI.fetchRange(hfFilePath, proxyRange.start, proxyRange.end, { fileUrl });
-                setRangeHeaders(headers, rangeResponse.start, rangeResponse.end, fileSize);
-
-                return new Response(rangeResponse.body, {
-                    status: 206,
-                    headers
-                });
-            }
         }
 
-        const response = await huggingfaceAPI.fetchFile(hfFilePath, {
-            fileUrl,
+        const response = await fetch(fileUrl, {
+            method: 'GET',
             headers: fetchHeaders
         });
 
         if (!response.ok && response.status !== 206) {
             return new Response(`Error: Failed to fetch from HuggingFace - ${response.status}`, { status: response.status });
         }
+
+        // 构建响应头
+        const headers = new Headers();
+        setCommonHeaders(headers, encodedFileName, fileType, getFileCacheControl(context));
 
         // 复制相关头部
         if (response.headers.get('Content-Length')) {
