@@ -903,17 +903,7 @@ async function handleHuggingFaceFile(context, metadata, encodedFileName, fileTyp
         // 支持 Range 请求
         const range = request.headers.get('Range');
         if (range) {
-            const normalizedRange = HuggingFaceAPI.normalizeRangeHeader(range, fileSize);
-            if (fileSize && !normalizedRange) {
-                return new Response('Range Not Satisfiable', {
-                    status: 416,
-                    headers: {
-                        'Content-Range': `bytes */${fileSize}`,
-                        'Accept-Ranges': 'bytes'
-                    }
-                });
-            }
-            fetchHeaders['Range'] = normalizedRange?.header || range;
+            fetchHeaders['Range'] = range;
         }
 
         const response = await fetch(fileUrl, {
