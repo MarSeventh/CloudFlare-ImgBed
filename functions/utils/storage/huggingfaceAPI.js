@@ -521,9 +521,10 @@ export class HuggingFaceAPI {
     getRequestHeaders(extraHeaders = {}) {
         const headers = new Headers(extraHeaders);
 
-        if (this.isPrivate && this.token && !headers.has('Authorization')) {
+        if (this.isPrivate && this.token && shouldSendAuthorization(headers.get('X-HF-Target-URL')) && !headers.has('Authorization')) {
             headers.set('Authorization', `Bearer ${this.token}`);
         }
+        headers.delete('X-HF-Target-URL');
 
         return headers;
     }
@@ -532,8 +533,58 @@ export class HuggingFaceAPI {
         const fileUrl = options.fileUrl || this.getFileURL(filePath);
         return await fetch(fileUrl, {
             method: options.method || 'GET',
-            headers: this.getRequestHeaders(options.headers || {}),
+            headers: this.getRequestHeaders({
+                ...(options.headers || {}),
+                'X-HF-Target-URL': fileUrl,
+            }),
         });
+    }
+
+    async resolveFileURL(filePath, options = {}) {
+        const fileUrl = options.fileUrl || this.getFileURL(filePath);
+
+        try {
+            const response = await fetch(fileUrl, {
+                method: 'HEAD',
+                headers: this.getRequestHeaders({ 'X-HF-Target-URL': fileUrl }),
+                redirect: 'manual',
+            });
+
+            const location = response.headers.get('Location');
+            if (response.status >= 300 && response.status < 400 && location) {
+                return new URL(location, fileUrl).toString();
+            }
+        } catch (error) {
+            console.warn('HuggingFace download URL resolve failed:', error.message);
+        }
+
+        if (shouldSendAuthorization(fileUrl)) {
+            try {
+                const response = await fetch(fileUrl, {
+                    method: 'GET',
+                    headers: this.getRequestHeaders({
+                        Range: 'bytes=0-0',
+                        'X-HF-Target-URL': fileUrl,
+                    }),
+                    redirect: 'manual',
+                });
+
+                try {
+                    const location = response.headers.get('Location');
+                    if (response.status >= 300 && response.status < 400 && location) {
+                        return new URL(location, fileUrl).toString();
+                    }
+                } finally {
+                    if (response.body) {
+                        await response.body.cancel().catch(() => {});
+                    }
+                }
+            } catch (error) {
+                console.warn('HuggingFace range URL resolve failed:', error.message);
+            }
+        }
+
+        return fileUrl;
     }
 
     async getRemoteFileSize(filePath, options = {}) {
@@ -605,81 +656,81 @@ export class HuggingFaceAPI {
         };
     }
 
-    createRangeStream(filePath, rangeStart, rangeEnd, options = {}) {
+    async fetchRange(filePath, rangeStart, rangeEnd, options = {}) {
         const fileUrl = options.fileUrl || this.getFileURL(filePath);
-        let cancelled = false;
-        let activeAbortController = null;
+        const chunks = [];
+        let nextStart = rangeStart;
+        let totalBytes = 0;
 
-        return new ReadableStream({
-            start: async (controller) => {
-                let nextStart = rangeStart;
+        while (nextStart <= rangeEnd) {
+            const upstreamEnd = Math.min(nextStart + HF_UPSTREAM_RANGE_CHUNK_SIZE - 1, rangeEnd);
+            const response = await this.fetchFile(filePath, {
+                fileUrl,
+                headers: { Range: `bytes=${nextStart}-${upstreamEnd}` },
+            });
 
-                try {
-                    while (!cancelled && nextStart <= rangeEnd) {
-                        const upstreamEnd = Math.min(nextStart + HF_UPSTREAM_RANGE_CHUNK_SIZE - 1, rangeEnd);
-                        const abortController = new AbortController();
-                        activeAbortController = abortController;
-
-                        const response = await fetch(fileUrl, {
-                            method: 'GET',
-                            headers: this.getRequestHeaders({
-                                Range: `bytes=${nextStart}-${upstreamEnd}`,
-                            }),
-                            signal: abortController.signal,
-                        });
-
-                        if (cancelled) {
-                            abortController.abort();
-                            break;
-                        }
-
-                        if (!response.ok && response.status !== 206) {
-                            throw new Error(`HuggingFace range fetch failed: ${response.status}`);
-                        }
-
-                        const contentRange = parseContentRange(response.headers.get('Content-Range'));
-                        let readableBytes = upstreamEnd - nextStart + 1;
-
-                        if (contentRange) {
-                            if (contentRange.start !== nextStart || contentRange.end < nextStart) {
-                                throw new Error(`Unexpected HuggingFace Content-Range: ${response.headers.get('Content-Range')}`);
-                            }
-                            readableBytes = Math.min(contentRange.end - contentRange.start + 1, rangeEnd - nextStart + 1);
-                        } else if (response.status === 200 && nextStart !== 0) {
-                            throw new Error('HuggingFace did not honor range request');
-                        } else {
-                            const contentLength = Number(response.headers.get('Content-Length'));
-                            if (Number.isFinite(contentLength) && contentLength > 0) {
-                                readableBytes = Math.min(contentLength, rangeEnd - nextStart + 1);
-                            }
-                        }
-
-                        const sent = await enqueueResponseBody(controller, response.body, readableBytes);
-                        activeAbortController = null;
-
-                        if (sent <= 0) {
-                            throw new Error('Empty HuggingFace range response');
-                        }
-
-                        nextStart += sent;
-                    }
-
-                    if (!cancelled) {
-                        controller.close();
-                    }
-                } catch (error) {
-                    if (!cancelled) {
-                        controller.error(error);
-                    }
+            if (!response.ok && response.status !== 206) {
+                if (totalBytes > 0) {
+                    break;
                 }
-            },
-            cancel: () => {
-                cancelled = true;
-                if (activeAbortController) {
-                    activeAbortController.abort();
+                throw new Error(`HuggingFace range fetch failed: ${response.status}`);
+            }
+
+            const contentRange = parseContentRange(response.headers.get('Content-Range'));
+            let readableBytes = upstreamEnd - nextStart + 1;
+
+            if (contentRange) {
+                if (contentRange.start !== nextStart || contentRange.end < nextStart) {
+                    if (totalBytes > 0) {
+                        break;
+                    }
+                    throw new Error(`Unexpected HuggingFace Content-Range: ${response.headers.get('Content-Range')}`);
                 }
-            },
-        });
+                readableBytes = Math.min(contentRange.end - contentRange.start + 1, rangeEnd - nextStart + 1);
+            } else if (response.status === 200 && nextStart !== 0) {
+                if (totalBytes > 0) {
+                    break;
+                }
+                throw new Error('HuggingFace did not honor range request');
+            } else {
+                const contentLength = Number(response.headers.get('Content-Length'));
+                if (Number.isFinite(contentLength) && contentLength > 0) {
+                    readableBytes = Math.min(contentLength, rangeEnd - nextStart + 1);
+                }
+            }
+
+            const bytes = await readResponseBytes(response.body, readableBytes);
+            if (bytes.byteLength === 0) {
+                break;
+            }
+
+            chunks.push(bytes);
+            totalBytes += bytes.byteLength;
+            nextStart += bytes.byteLength;
+        }
+
+        if (totalBytes <= 0) {
+            throw new Error('Empty HuggingFace range response');
+        }
+
+        return {
+            body: concatUint8Arrays(chunks, totalBytes),
+            start: rangeStart,
+            end: rangeStart + totalBytes - 1,
+            contentLength: totalBytes,
+        };
+    }
+}
+
+function shouldSendAuthorization(fileUrl) {
+    if (!fileUrl) {
+        return true;
+    }
+
+    try {
+        return new URL(fileUrl).hostname === 'huggingface.co';
+    } catch {
+        return true;
     }
 }
 
@@ -756,14 +807,15 @@ function getApproximateMetadataFileSize(metadata = {}) {
     return null;
 }
 
-async function enqueueResponseBody(controller, body, maxBytes) {
+async function readResponseBytes(body, maxBytes) {
     if (!body || maxBytes <= 0) {
-        return 0;
+        return new Uint8Array(0);
     }
 
     const reader = body.getReader();
     let remaining = maxBytes;
-    let sent = 0;
+    let totalBytes = 0;
+    const chunks = [];
 
     try {
         while (remaining > 0) {
@@ -773,9 +825,9 @@ async function enqueueResponseBody(controller, body, maxBytes) {
             }
 
             const chunk = value.byteLength > remaining ? value.slice(0, remaining) : value;
-            controller.enqueue(chunk);
+            chunks.push(chunk);
 
-            sent += chunk.byteLength;
+            totalBytes += chunk.byteLength;
             remaining -= chunk.byteLength;
 
             if (chunk.byteLength < value.byteLength) {
@@ -787,5 +839,21 @@ async function enqueueResponseBody(controller, body, maxBytes) {
         reader.releaseLock();
     }
 
-    return sent;
+    return concatUint8Arrays(chunks, totalBytes);
+}
+
+function concatUint8Arrays(chunks, totalBytes) {
+    if (chunks.length === 1 && chunks[0].byteLength === totalBytes) {
+        return chunks[0];
+    }
+
+    const result = new Uint8Array(totalBytes);
+    let offset = 0;
+
+    for (const chunk of chunks) {
+        result.set(chunk, offset);
+        offset += chunk.byteLength;
+    }
+
+    return result;
 }
