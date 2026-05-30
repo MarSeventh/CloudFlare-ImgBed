@@ -880,11 +880,15 @@ async function handleHuggingFaceFile(context, metadata, encodedFileName, fileTyp
 
         // 构建文件 URL
         const fileUrl = metadata.HfFileUrl || `https://huggingface.co/datasets/${hfRepo}/resolve/main/${hfFilePath}`;
+        const fileSize = HuggingFaceAPI.getMetadataFileSize(metadata);
 
         // 处理 HEAD 请求
         if (request.method === 'HEAD') {
             const headers = new Headers();
             setCommonHeaders(headers, encodedFileName, fileType, getFileCacheControl(context));
+            if (fileSize) {
+                headers.set('Content-Length', fileSize.toString());
+            }
             return handleHeadRequest(headers);
         }
 
@@ -899,7 +903,17 @@ async function handleHuggingFaceFile(context, metadata, encodedFileName, fileTyp
         // 支持 Range 请求
         const range = request.headers.get('Range');
         if (range) {
-            fetchHeaders['Range'] = range;
+            const normalizedRange = HuggingFaceAPI.normalizeRangeHeader(range, fileSize);
+            if (fileSize && !normalizedRange) {
+                return new Response('Range Not Satisfiable', {
+                    status: 416,
+                    headers: {
+                        'Content-Range': `bytes */${fileSize}`,
+                        'Accept-Ranges': 'bytes'
+                    }
+                });
+            }
+            fetchHeaders['Range'] = normalizedRange?.header || range;
         }
 
         const response = await fetch(fileUrl, {

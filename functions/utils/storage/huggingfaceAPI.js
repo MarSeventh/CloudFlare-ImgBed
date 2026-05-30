@@ -12,6 +12,8 @@
  * SHA256 由前端预计算传入，避免后端 CPU 超时
  */
 
+const HF_MAX_PROXY_RANGE_SIZE = 4 * 1024 * 1024;
+
 export class HuggingFaceAPI {
     constructor(token, repo, isPrivate = false) {
         this.token = token;
@@ -516,5 +518,71 @@ export class HuggingFaceAPI {
      */
     getFileURL(filePath) {
         return `${this.baseURL}/datasets/${this.repo}/resolve/main/${filePath}`;
+    }
+
+    static getMetadataFileSize(metadata = {}) {
+        const fileSizeBytes = Number(metadata?.FileSizeBytes);
+        if (Number.isFinite(fileSizeBytes) && fileSizeBytes > 0) {
+            return Math.floor(fileSizeBytes);
+        }
+
+        const fileSizeMB = Number(metadata?.FileSize);
+        if (Number.isFinite(fileSizeMB) && fileSizeMB > 0) {
+            return Math.floor(fileSizeMB * 1024 * 1024);
+        }
+
+        return null;
+    }
+
+    static normalizeRangeHeader(rangeHeader, totalSize, maxRangeSize = HF_MAX_PROXY_RANGE_SIZE) {
+        if (!rangeHeader || !totalSize) {
+            return null;
+        }
+
+        const match = String(rangeHeader).trim().match(/^bytes=(\d*)-(\d*)$/i);
+        if (!match || (match[1] === '' && match[2] === '')) {
+            return null;
+        }
+
+        if (match[1] === '') {
+            const suffixLength = parseInt(match[2], 10);
+            if (!Number.isFinite(suffixLength) || suffixLength <= 0) {
+                return null;
+            }
+
+            const start = Math.max(totalSize - suffixLength, 0);
+            const end = totalSize - 1;
+            return {
+                header: `bytes=${start}-${end}`,
+                start,
+                end,
+                clipped: false,
+            };
+        }
+
+        const start = parseInt(match[1], 10);
+        if (!Number.isFinite(start) || start >= totalSize) {
+            return null;
+        }
+
+        const requestedEnd = match[2] === ''
+            ? totalSize - 1
+            : parseInt(match[2], 10);
+        if (!Number.isFinite(requestedEnd) || start > requestedEnd) {
+            return null;
+        }
+
+        const boundedEnd = Math.min(requestedEnd, totalSize - 1);
+        const isOpenEnded = match[2] === '';
+        const end = isOpenEnded
+            ? Math.min(start + maxRangeSize - 1, boundedEnd)
+            : boundedEnd;
+
+        return {
+            header: `bytes=${start}-${end}`,
+            start,
+            end,
+            clipped: end !== boundedEnd,
+        };
     }
 }
