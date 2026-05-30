@@ -12,6 +12,9 @@
  * SHA256 由前端预计算传入，避免后端 CPU 超时
  */
 
+const HF_PROXY_RANGE_CHUNK_SIZE = 4 * 1024 * 1024;
+const HF_UPSTREAM_RANGE_CHUNK_SIZE = 4 * 1024 * 1024;
+
 export class HuggingFaceAPI {
     constructor(token, repo, isPrivate = false) {
         this.token = token;
@@ -505,10 +508,7 @@ export class HuggingFaceAPI {
      * 获取文件内容（用于私有仓库代理）
      */
     async getFileContent(filePath) {
-        const fileUrl = `${this.baseURL}/datasets/${this.repo}/resolve/main/${filePath}`;
-        return await fetch(fileUrl, {
-            headers: this.isPrivate ? { 'Authorization': `Bearer ${this.token}` } : {}
-        });
+        return await this.fetchFile(filePath);
     }
 
     /**
@@ -517,4 +517,275 @@ export class HuggingFaceAPI {
     getFileURL(filePath) {
         return `${this.baseURL}/datasets/${this.repo}/resolve/main/${filePath}`;
     }
+
+    getRequestHeaders(extraHeaders = {}) {
+        const headers = new Headers(extraHeaders);
+
+        if (this.isPrivate && this.token && !headers.has('Authorization')) {
+            headers.set('Authorization', `Bearer ${this.token}`);
+        }
+
+        return headers;
+    }
+
+    async fetchFile(filePath, options = {}) {
+        const fileUrl = options.fileUrl || this.getFileURL(filePath);
+        return await fetch(fileUrl, {
+            method: options.method || 'GET',
+            headers: this.getRequestHeaders(options.headers || {}),
+        });
+    }
+
+    async getRemoteFileSize(filePath, options = {}) {
+        const metadataSize = getExactMetadataFileSize(options.metadata);
+        if (metadataSize) {
+            return metadataSize;
+        }
+
+        try {
+            const headResponse = await this.fetchFile(filePath, {
+                fileUrl: options.fileUrl,
+                method: 'HEAD',
+            });
+
+            if (headResponse.ok) {
+                const contentLength = Number(headResponse.headers.get('Content-Length'));
+                if (Number.isFinite(contentLength) && contentLength > 0) {
+                    return Math.floor(contentLength);
+                }
+            }
+        } catch (error) {
+            console.warn('HuggingFace HEAD size probe failed:', error.message);
+        }
+
+        try {
+            const rangeResponse = await this.fetchFile(filePath, {
+                fileUrl: options.fileUrl,
+                headers: { Range: 'bytes=0-0' },
+            });
+
+            try {
+                const contentRange = parseContentRange(rangeResponse.headers.get('Content-Range'));
+                if (contentRange?.total) {
+                    return contentRange.total;
+                }
+
+                if (rangeResponse.status === 200) {
+                    const contentLength = Number(rangeResponse.headers.get('Content-Length'));
+                    if (Number.isFinite(contentLength) && contentLength > 0) {
+                        return Math.floor(contentLength);
+                    }
+                }
+            } finally {
+                if (rangeResponse.body) {
+                    await rangeResponse.body.cancel().catch(() => {});
+                }
+            }
+        } catch (error) {
+            console.warn('HuggingFace range size probe failed:', error.message);
+        }
+
+        return getApproximateMetadataFileSize(options.metadata);
+    }
+
+    getProxyRange(rangeHeader, totalSize) {
+        const range = parseRangeHeader(rangeHeader, totalSize);
+        if (!range) {
+            return null;
+        }
+
+        const rangeEnd = range.openEnded
+            ? Math.min(range.start + HF_PROXY_RANGE_CHUNK_SIZE - 1, range.end)
+            : range.end;
+
+        return {
+            start: range.start,
+            end: rangeEnd,
+            openEnded: range.openEnded,
+        };
+    }
+
+    createRangeStream(filePath, rangeStart, rangeEnd, options = {}) {
+        const fileUrl = options.fileUrl || this.getFileURL(filePath);
+        let cancelled = false;
+        let activeAbortController = null;
+
+        return new ReadableStream({
+            start: async (controller) => {
+                let nextStart = rangeStart;
+
+                try {
+                    while (!cancelled && nextStart <= rangeEnd) {
+                        const upstreamEnd = Math.min(nextStart + HF_UPSTREAM_RANGE_CHUNK_SIZE - 1, rangeEnd);
+                        const abortController = new AbortController();
+                        activeAbortController = abortController;
+
+                        const response = await fetch(fileUrl, {
+                            method: 'GET',
+                            headers: this.getRequestHeaders({
+                                Range: `bytes=${nextStart}-${upstreamEnd}`,
+                            }),
+                            signal: abortController.signal,
+                        });
+
+                        if (cancelled) {
+                            abortController.abort();
+                            break;
+                        }
+
+                        if (!response.ok && response.status !== 206) {
+                            throw new Error(`HuggingFace range fetch failed: ${response.status}`);
+                        }
+
+                        const contentRange = parseContentRange(response.headers.get('Content-Range'));
+                        let readableBytes = upstreamEnd - nextStart + 1;
+
+                        if (contentRange) {
+                            if (contentRange.start !== nextStart || contentRange.end < nextStart) {
+                                throw new Error(`Unexpected HuggingFace Content-Range: ${response.headers.get('Content-Range')}`);
+                            }
+                            readableBytes = Math.min(contentRange.end - contentRange.start + 1, rangeEnd - nextStart + 1);
+                        } else if (response.status === 200 && nextStart !== 0) {
+                            throw new Error('HuggingFace did not honor range request');
+                        } else {
+                            const contentLength = Number(response.headers.get('Content-Length'));
+                            if (Number.isFinite(contentLength) && contentLength > 0) {
+                                readableBytes = Math.min(contentLength, rangeEnd - nextStart + 1);
+                            }
+                        }
+
+                        const sent = await enqueueResponseBody(controller, response.body, readableBytes);
+                        activeAbortController = null;
+
+                        if (sent <= 0) {
+                            throw new Error('Empty HuggingFace range response');
+                        }
+
+                        nextStart += sent;
+                    }
+
+                    if (!cancelled) {
+                        controller.close();
+                    }
+                } catch (error) {
+                    if (!cancelled) {
+                        controller.error(error);
+                    }
+                }
+            },
+            cancel: () => {
+                cancelled = true;
+                if (activeAbortController) {
+                    activeAbortController.abort();
+                }
+            },
+        });
+    }
+}
+
+function parseContentRange(contentRange) {
+    if (!contentRange) {
+        return null;
+    }
+
+    const match = contentRange.match(/^bytes\s+(\d+)-(\d+)\/(\d+|\*)$/i);
+    if (!match) {
+        return null;
+    }
+
+    return {
+        start: parseInt(match[1], 10),
+        end: parseInt(match[2], 10),
+        total: match[3] === '*' ? null : parseInt(match[3], 10),
+    };
+}
+
+function parseRangeHeader(rangeHeader, totalSize) {
+    if (!rangeHeader || !totalSize) {
+        return null;
+    }
+
+    const match = String(rangeHeader).trim().match(/^bytes=(\d*)-(\d*)$/i);
+    if (!match || (match[1] === '' && match[2] === '')) {
+        return null;
+    }
+
+    let start;
+    let end;
+    let openEnded = false;
+
+    if (match[1] === '') {
+        const suffixLength = parseInt(match[2], 10);
+        if (!Number.isFinite(suffixLength) || suffixLength <= 0) {
+            return null;
+        }
+        start = Math.max(totalSize - suffixLength, 0);
+        end = totalSize - 1;
+    } else {
+        start = parseInt(match[1], 10);
+        openEnded = match[2] === '';
+        end = openEnded ? totalSize - 1 : parseInt(match[2], 10);
+    }
+
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start >= totalSize || start > end) {
+        return null;
+    }
+
+    return {
+        start,
+        end: Math.min(end, totalSize - 1),
+        openEnded,
+    };
+}
+
+function getExactMetadataFileSize(metadata = {}) {
+    const fileSizeBytes = Number(metadata?.FileSizeBytes);
+    if (Number.isFinite(fileSizeBytes) && fileSizeBytes > 0) {
+        return Math.floor(fileSizeBytes);
+    }
+
+    return null;
+}
+
+function getApproximateMetadataFileSize(metadata = {}) {
+    const fileSizeMB = Number(metadata?.FileSize);
+    if (Number.isFinite(fileSizeMB) && fileSizeMB > 0) {
+        return Math.floor(fileSizeMB * 1024 * 1024);
+    }
+
+    return null;
+}
+
+async function enqueueResponseBody(controller, body, maxBytes) {
+    if (!body || maxBytes <= 0) {
+        return 0;
+    }
+
+    const reader = body.getReader();
+    let remaining = maxBytes;
+    let sent = 0;
+
+    try {
+        while (remaining > 0) {
+            const { done, value } = await reader.read();
+            if (done) {
+                break;
+            }
+
+            const chunk = value.byteLength > remaining ? value.slice(0, remaining) : value;
+            controller.enqueue(chunk);
+
+            sent += chunk.byteLength;
+            remaining -= chunk.byteLength;
+
+            if (chunk.byteLength < value.byteLength) {
+                await reader.cancel();
+                break;
+            }
+        }
+    } finally {
+        reader.releaseLock();
+    }
+
+    return sent;
 }
