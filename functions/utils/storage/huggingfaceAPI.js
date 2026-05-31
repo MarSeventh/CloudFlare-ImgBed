@@ -517,4 +517,18 @@ export class HuggingFaceAPI {
     getFileURL(filePath) {
         return `${this.baseURL}/datasets/${this.repo}/resolve/main/${filePath}`;
     }
+
+    static getMetadataFileSize(metadata = {}) {
+        const fileSizeBytes = Number(metadata?.FileSizeBytes);
+        if (Number.isFinite(fileSizeBytes) && fileSizeBytes > 0) {
+            return Math.floor(fileSizeBytes);
+        }
+
+        const fileSizeMB = Number(metadata?.FileSize);
+        if (Number.isFinite(fileSizeMB) && fileSizeMB > 0) {
+            return Math.floor(fileSizeMB * 1024 * 1024);
+        }
+
+        return null;
+    }
 }
