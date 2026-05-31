@@ -880,11 +880,15 @@ async function handleHuggingFaceFile(context, metadata, encodedFileName, fileTyp
 
         // 构建文件 URL
         const fileUrl = metadata.HfFileUrl || `https://huggingface.co/datasets/${hfRepo}/resolve/main/${hfFilePath}`;
+        const fileSize = HuggingFaceAPI.getMetadataFileSize(metadata);
 
         // 处理 HEAD 请求
         if (request.method === 'HEAD') {
             const headers = new Headers();
             setCommonHeaders(headers, encodedFileName, fileType, getFileCacheControl(context));
+            if (fileSize) {
+                headers.set('Content-Length', fileSize.toString());
+            }
             return handleHeadRequest(headers);
         }
 
