@@ -1,6 +1,6 @@
 import { readIndex } from "../../../utils/indexManager";
 import { getDatabase } from "../../../utils/databaseAdapter.js";
-import { buildFileMetadataForManagement, createMetadataViewContext } from "../../../utils/metadataView.js";
+import { buildFileMetadataForManagement, createMetadataViewContext } from "../../../utils/metadata/metadataView.js";
 
 export async function onRequest(context) {
     const { request } = context;

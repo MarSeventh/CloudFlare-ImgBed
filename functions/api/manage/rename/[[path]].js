@@ -10,12 +10,12 @@ import {
     resolveS3Credentials,
     resolveTelegramCredentials,
     resolveWebDAVCredentials,
-} from "../../../utils/channelCredentials.js";
+} from "../../../utils/metadata/channelCredentials.js";
 import {
     stripConfigDerivedMetadataInPlace,
     stripSensitiveMetadataInPlace,
-} from "../../../utils/metadataSecurity.js";
-import { buildFileMetadataForManagement } from "../../../utils/metadataView.js";
+} from "../../../utils/metadata/metadataSecurity.js";
+import { buildFileMetadataForManagement } from "../../../utils/metadata/metadataView.js";
 
 // CORS 跨域响应头
 const corsHeaders = {

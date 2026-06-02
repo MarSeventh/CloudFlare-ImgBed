@@ -6,7 +6,7 @@
  */
 
 import { getDatabase } from '../../../utils/databaseAdapter.js';
-import { buildFileMetadataForManagement, createMetadataViewContext } from '../../../utils/metadataView.js';
+import { buildFileMetadataForManagement, createMetadataViewContext } from '../../../utils/metadata/metadataView.js';
 
 // CORS 跨域响应头
 const corsHeaders = {

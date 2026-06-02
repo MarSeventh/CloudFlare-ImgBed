@@ -1,6 +1,6 @@
 import { addFileToIndex } from '../../../utils/indexManager.js';
 import { getDatabase } from '../../../utils/databaseAdapter.js';
-import { buildFileMetadataForManagement } from '../../../utils/metadataView.js';
+import { buildFileMetadataForManagement } from '../../../utils/metadata/metadataView.js';
 
 // CORS 跨域响应头
 const corsHeaders = {
