@@ -15,13 +15,14 @@ export async function resolveWebDAVConfig(env, metadata = {}) {
             || channels.find((item) => getWebDAVBaseUrl(item) === metadataBaseUrl);
 
         if (channel) {
-            return normalizeWebDAVConfig(channel);
+            const config = normalizeWebDAVConfig(channel);
+            return config ? { ...config, source: 'config' } : null;
         }
     } catch (error) {
         console.error('Failed to resolve WebDAV channel config:', error);
     }
 
-    return normalizeWebDAVConfig({
+    const config = normalizeWebDAVConfig({
         baseUrl: metadataBaseUrl,
         username: metadata.WebDAVUsername || '',
         password: metadata.WebDAVPassword || '',
@@ -29,6 +30,7 @@ export async function resolveWebDAVConfig(env, metadata = {}) {
         createDirectory: metadata.WebDAVCreateDirectory !== false,
         publicUrl: metadata.WebDAVPublicBaseUrl || '',
     });
+    return config ? { ...config, source: 'metadata' } : null;
 }
 
 function normalizeWebDAVConfig(config = {}) {

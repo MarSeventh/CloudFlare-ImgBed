@@ -3,6 +3,7 @@ import {
     getIndexInfo, getIndexStorageStats
 } from '../../utils/indexManager.js';
 import { getDatabase } from '../../utils/databaseAdapter.js';
+import { sanitizeFileMetadata } from '../../utils/metadataSecurity.js';
 
 // CORS 跨域响应头
 const corsHeaders = {
@@ -174,10 +175,7 @@ export async function onRequest(context) {
         }
 
         // 转换文件格式
-        const compatibleFiles = result.files.map(file => ({
-            name: file.id,
-            metadata: file.metadata
-        }));
+        const compatibleFiles = result.files.map(serializeFileRecordForManagement);
 
         return new Response(JSON.stringify({
             files: compatibleFiles,
@@ -237,7 +235,7 @@ async function getAllFileRecords(env, dir) {
                     continue;
                 }
 
-                allRecords.push(item);
+                allRecords.push(serializeFileRecordForManagement(item));
             }
 
             if (!cursor) break;
@@ -280,4 +278,11 @@ async function getAllFileRecords(env, dir) {
             error: error.message
         };
     }
+}
+
+export function serializeFileRecordForManagement(file) {
+    return {
+        name: file.id || file.name,
+        metadata: sanitizeFileMetadata(file.metadata)
+    };
 }
