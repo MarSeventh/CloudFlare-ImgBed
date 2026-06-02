@@ -4,12 +4,12 @@ import { moveFileInIndex, batchMoveFilesInIndex } from "../../../utils/indexMana
 import { getDatabase } from '../../../utils/databaseAdapter.js';
 import { sanitizeUploadFolder } from "../../../upload/uploadTools.js";
 import { WebDAVAPI } from "../../../utils/storage/webdavAPI.js";
-import { resolveWebDAVConfig } from "../../../utils/webdavConfig.js";
 import {
     resolveDiscordCredentials,
     resolveHuggingFaceCredentials,
     resolveS3Credentials,
     resolveTelegramCredentials,
+    resolveWebDAVCredentials,
 } from "../../../utils/channelCredentials.js";
 import { stripSensitiveMetadata } from "../../../utils/metadataSecurity.js";
 
@@ -182,8 +182,8 @@ async function moveFile(env, fileId, newFileId, cdnUrl, url) {
             img.metadata.WebDAVFilePath = newFileId;
             if (img.metadata.WebDAVPublicBaseUrl || img.metadata.WebDAVPublicUrl || webdavConfig?.publicUrl) {
                 const webdavAPI = new WebDAVAPI(webdavConfig || { baseUrl: img.metadata.WebDAVBaseUrl });
-                const publicBaseUrl = img.metadata.WebDAVPublicBaseUrl
-                    || webdavConfig?.publicUrl
+                const publicBaseUrl = webdavConfig?.publicUrl
+                    || img.metadata.WebDAVPublicBaseUrl
                     || img.metadata.WebDAVPublicUrl.slice(0, img.metadata.WebDAVPublicUrl.length - fileId.split('/').map(encodeURIComponent).join('/').length);
                 img.metadata.WebDAVPublicBaseUrl = publicBaseUrl;
                 img.metadata.WebDAVPublicUrl = webdavAPI.buildPublicUrl(newFileId, publicBaseUrl);
@@ -229,7 +229,7 @@ async function stripMetadataAfterConfigResolution(db, env, metadata) {
     } else if (metadata?.Channel === 'HuggingFace') {
         credentials = await resolveHuggingFaceCredentials(db, env, metadata);
     } else if (metadata?.Channel === 'WebDAV') {
-        credentials = await resolveWebDAVConfig(env, metadata);
+        credentials = await resolveWebDAVCredentials(db, env, metadata);
     }
 
     return credentials?.source === 'config'
@@ -292,8 +292,9 @@ async function moveWebDAVFile(env, img, newFileId) {
     }
 
     try {
-        const webdavConfig = await resolveWebDAVConfig(env, img.metadata);
-        if (!webdavConfig) {
+        const db = getDatabase(env);
+        const webdavConfig = await resolveWebDAVCredentials(db, env, img.metadata);
+        if (!webdavConfig.baseUrl) {
             return { success: false, error: 'WebDAV channel config not found for move' };
         }
 
