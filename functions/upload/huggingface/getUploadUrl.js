@@ -38,10 +38,11 @@ export async function onRequestPost(context) {
 
         const body = await request.json();
         const { fileSize, fileName, fileType, sha256, fileSample, channelName, uploadNameType, uploadFolder } = body;
+        const normalizedFileType = fileType || 'application/octet-stream';
 
-        if (!fileSize || !fileName || !fileType || !sha256 || !fileSample) {
+        if (!fileSize || !fileName || !sha256 || !fileSample) {
             return createResponse(JSON.stringify({
-                error: 'Missing required fields: fileSize, fileName, fileType, sha256, fileSample'
+                error: 'Missing required fields: fileSize, fileName, sha256, fileSample'
             }), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
@@ -86,7 +87,7 @@ export async function onRequestPost(context) {
         }
 
         // 使用统一的文件命名函数生成文件ID
-        const fullId = await buildUniqueFileId(context, fileName, fileType || 'application/octet-stream');
+        const fullId = await buildUniqueFileId(context, fileName, normalizedFileType);
 
         // 生成唯一标识符前缀（UUID格式），加在文件名前面
         const uniquePrefix = crypto.randomUUID();
@@ -98,6 +99,7 @@ export async function onRequestPost(context) {
         // 获取 LFS 上传信息
         const huggingfaceAPI = new HuggingFaceAPI(hfChannel.token, hfChannel.repo, hfChannel.isPrivate || false);
         const uploadInfo = await huggingfaceAPI.getLfsUploadInfo(fileSize, filePath, sha256, fileSample);
+        rewriteMultipartCompletionUrl(url, uploadInfo);
 
         // 返回上传信息
         return createResponse(JSON.stringify({
@@ -120,4 +122,14 @@ export async function onRequestPost(context) {
             headers: { 'Content-Type': 'application/json' }
         });
     }
+}
+
+function rewriteMultipartCompletionUrl(requestUrl, uploadInfo) {
+    const uploadAction = uploadInfo?.uploadAction;
+    if (!uploadAction?.header?.chunk_size || !uploadAction.href) {
+        return;
+    }
+
+    const originalCompletionUrl = uploadAction.href;
+    uploadAction.href = `${requestUrl.origin}/upload/huggingface/completeMultipart?target=${encodeURIComponent(originalCompletionUrl)}`;
 }
