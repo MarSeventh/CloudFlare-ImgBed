@@ -1,4 +1,5 @@
 import { readIndex } from "../../../utils/indexManager";
+import { sanitizeFileMetadata } from "../../../utils/metadataSecurity.js";
 
 export async function onRequest(context) {
     const { request } = context;
@@ -18,7 +19,12 @@ export async function onRequest(context) {
     count = Math.max(1, count);
 
     const allRecords = await readIndex(context, { count: -1, includeSubdirFiles: true });
-    const files = allRecords.files.filter(item => item.metadata?.UploadIP === ip);
+    const files = allRecords.files
+        .filter(item => item.metadata?.UploadIP === ip)
+        .map(item => ({
+            ...item,
+            metadata: sanitizeFileMetadata(item.metadata)
+        }));
 
     return new Response(JSON.stringify({
         data: files.slice(start, start + count),

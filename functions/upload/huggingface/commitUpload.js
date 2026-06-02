@@ -107,7 +107,6 @@ export async function onRequestPost(context) {
             ListType: "None",
             HfRepo: hfChannel.repo,
             HfFilePath: filePath,
-            HfToken: hfChannel.token,
             HfIsPrivate: hfChannel.isPrivate || false,
             HfFileUrl: fileUrl,
             TimeStamp: Date.now(),
