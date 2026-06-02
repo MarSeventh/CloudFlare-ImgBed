@@ -98,6 +98,7 @@ export async function onRequestPost(context) {
         // 获取 LFS 上传信息
         const huggingfaceAPI = new HuggingFaceAPI(hfChannel.token, hfChannel.repo, hfChannel.isPrivate || false);
         const uploadInfo = await huggingfaceAPI.getLfsUploadInfo(fileSize, filePath, sha256, fileSample);
+        rewriteMultipartCompletionUrl(url, uploadInfo);
 
         // 返回上传信息
         return createResponse(JSON.stringify({
@@ -120,4 +121,14 @@ export async function onRequestPost(context) {
             headers: { 'Content-Type': 'application/json' }
         });
     }
+}
+
+function rewriteMultipartCompletionUrl(requestUrl, uploadInfo) {
+    const uploadAction = uploadInfo?.uploadAction;
+    if (!uploadAction?.header?.chunk_size || !uploadAction.href) {
+        return;
+    }
+
+    const originalCompletionUrl = uploadAction.href;
+    uploadAction.href = `${requestUrl.origin}/upload/huggingface/completeMultipart?target=${encodeURIComponent(originalCompletionUrl)}`;
 }
