@@ -54,11 +54,14 @@ function enrichS3Metadata(context, sourceMetadata, view) {
 
     if (!key) return;
 
-    if (!view.S3Location && credentials.endpoint && credentials.bucketName) {
+    if (credentials.endpoint && credentials.bucketName) {
       view.S3Location = buildS3Location(credentials, key);
     }
 
-    if (!view.S3CdnFileUrl && credentials.cdnDomain) {
+    if (channel) {
+      delete view.S3CdnFileUrl;
+    }
+    if (credentials.cdnDomain) {
       view.S3CdnFileUrl = buildCdnFileUrl(credentials.cdnDomain, key);
     }
   } catch (error) {
@@ -80,7 +83,7 @@ function enrichHuggingFaceMetadata(context, sourceMetadata, view) {
         repo: sourceMetadata.HfRepo,
         filePath: sourceMetadata.HfFilePath,
       };
-    if (!view.HfFileUrl && credentials.repo && credentials.filePath) {
+    if (credentials.repo && credentials.filePath) {
       view.HfFileUrl = `https://huggingface.co/datasets/${credentials.repo}/resolve/main/${credentials.filePath}`;
     }
   } catch (error) {
@@ -103,7 +106,10 @@ function enrichWebDAVMetadata(context, sourceMetadata, view) {
         filePath: sourceMetadata.WebDAVFilePath,
       };
     const filePath = credentials.filePath || sourceMetadata.WebDAVFilePath;
-    if (!view.WebDAVPublicUrl && credentials.publicUrl && filePath) {
+    if (channel) {
+      delete view.WebDAVPublicUrl;
+    }
+    if (credentials.publicUrl && filePath) {
       view.WebDAVPublicUrl = buildWebDAVUrl(credentials.publicUrl, filePath);
     }
   } catch (error) {

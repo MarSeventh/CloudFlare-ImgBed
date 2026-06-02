@@ -747,18 +747,18 @@ async function handleS3File(context, metadata, encodedFileName, fileType) {
 }
 
 async function getS3CdnFileUrl(env, metadata) {
-    if (metadata?.S3CdnFileUrl) {
-        return metadata.S3CdnFileUrl;
-    }
-
     try {
         const db = getDatabase(env);
         const s3Credentials = await resolveS3Credentials(db, env, metadata);
         const key = s3Credentials.key || metadata?.S3FileKey;
-        return buildCdnFileUrl(s3Credentials.cdnDomain, key);
+        const configCdnFileUrl = buildCdnFileUrl(s3Credentials.cdnDomain, key);
+        if (s3Credentials.source === 'config') {
+            return configCdnFileUrl;
+        }
+        return configCdnFileUrl || metadata?.S3CdnFileUrl || '';
     } catch (error) {
         console.warn('Failed to build S3 CDN file URL:', error.message);
-        return '';
+        return metadata?.S3CdnFileUrl || '';
     }
 }
 
