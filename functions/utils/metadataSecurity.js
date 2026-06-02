@@ -14,18 +14,7 @@ export function sanitizeFileMetadata(metadata = {}) {
     return metadata;
   }
 
-  const sanitized = stripSensitiveMetadata(metadata);
-
-  if (sanitized.WebDAVBaseUrl) {
-    const safeBaseUrl = stripUrlUserinfo(sanitized.WebDAVBaseUrl);
-    if (safeBaseUrl) {
-      sanitized.WebDAVBaseUrl = safeBaseUrl;
-    } else {
-      delete sanitized.WebDAVBaseUrl;
-    }
-  }
-
-  return sanitized;
+  return stripSensitiveMetadata(metadata);
 }
 
 export function stripSensitiveMetadata(metadata = {}) {
@@ -34,10 +23,28 @@ export function stripSensitiveMetadata(metadata = {}) {
   }
 
   const stripped = { ...metadata };
-  for (const key of SENSITIVE_METADATA_KEYS) {
-    delete stripped[key];
+  return stripSensitiveMetadataInPlace(stripped);
+}
+
+export function stripSensitiveMetadataInPlace(metadata = {}) {
+  if (!metadata || typeof metadata !== 'object') {
+    return metadata;
   }
-  return stripped;
+
+  for (const key of SENSITIVE_METADATA_KEYS) {
+    delete metadata[key];
+  }
+
+  if (metadata.WebDAVBaseUrl) {
+    const safeBaseUrl = stripUrlUserinfo(metadata.WebDAVBaseUrl);
+    if (safeBaseUrl) {
+      metadata.WebDAVBaseUrl = safeBaseUrl;
+    } else {
+      delete metadata.WebDAVBaseUrl;
+    }
+  }
+
+  return metadata;
 }
 
 function stripUrlUserinfo(value) {
