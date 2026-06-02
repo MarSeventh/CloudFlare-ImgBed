@@ -1,6 +1,6 @@
-import { getUploadConfig } from '../api/manage/sysConfig/upload.js';
+import { getUploadConfig } from '../../api/manage/sysConfig/upload.js';
 import { sanitizeFileMetadata } from './metadataSecurity.js';
-import { buildWebDAVUrl } from './storage/webdavAPI.js';
+import { buildWebDAVUrl } from '../storage/webdavAPI.js';
 
 export async function createMetadataViewContext(db, env) {
   return {

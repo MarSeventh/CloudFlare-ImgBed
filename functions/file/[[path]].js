@@ -16,8 +16,8 @@ import {
     resolveS3Credentials,
     resolveTelegramCredentials,
     resolveWebDAVCredentials,
-} from '../utils/channelCredentials.js';
-import { buildCdnFileUrl } from '../utils/metadataView.js';
+} from '../utils/metadata/channelCredentials.js';
+import { buildCdnFileUrl } from '../utils/metadata/metadataView.js';
 
 
 export async function onRequest(context) {  // Contents of context object

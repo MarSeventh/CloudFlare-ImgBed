@@ -3,7 +3,7 @@ import {
     getIndexInfo, getIndexStorageStats
 } from '../../utils/indexManager.js';
 import { getDatabase } from '../../utils/databaseAdapter.js';
-import { createMetadataViewContext, serializeFileRecordForManagement } from '../../utils/metadataView.js';
+import { createMetadataViewContext, serializeFileRecordForManagement } from '../../utils/metadata/metadataView.js';
 
 // CORS 跨域响应头
 const corsHeaders = {

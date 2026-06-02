@@ -10,7 +10,7 @@ import {
     resolveHuggingFaceCredentials,
     resolveS3Credentials,
     resolveWebDAVCredentials,
-} from '../../../utils/channelCredentials.js';
+} from '../../../utils/metadata/channelCredentials.js';
 
 // CORS 跨域响应头
 const corsHeaders = {

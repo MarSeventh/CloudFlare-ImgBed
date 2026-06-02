@@ -10,8 +10,8 @@ import {
     resolveS3Credentials,
     resolveTelegramCredentials,
     resolveWebDAVCredentials,
-} from "../../../utils/channelCredentials.js";
-import { stripConfigDerivedMetadata, stripSensitiveMetadata } from "../../../utils/metadataSecurity.js";
+} from "../../../utils/metadata/channelCredentials.js";
+import { stripConfigDerivedMetadata, stripSensitiveMetadata } from "../../../utils/metadata/metadataSecurity.js";
 
 export async function onRequest(context) {
     const { request, env, params, waitUntil } = context;

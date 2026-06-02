@@ -1,5 +1,5 @@
-import { getUploadConfig } from '../api/manage/sysConfig/upload.js';
-import { normalizeWebDAVHeaders } from './storage/webdavAPI.js';
+import { getUploadConfig } from '../../api/manage/sysConfig/upload.js';
+import { normalizeWebDAVHeaders } from '../storage/webdavAPI.js';
 
 export async function resolveS3Credentials(db, env, metadata = {}) {
   const channel = await findChannel(db, env, 's3', metadata.ChannelName);
