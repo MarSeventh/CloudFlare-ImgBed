@@ -11,7 +11,7 @@ import {
     resolveTelegramCredentials,
     resolveWebDAVCredentials,
 } from "../../../utils/channelCredentials.js";
-import { stripSensitiveMetadata } from "../../../utils/metadataSecurity.js";
+import { stripConfigDerivedMetadata, stripSensitiveMetadata } from "../../../utils/metadataSecurity.js";
 
 export async function onRequest(context) {
     const { request, env, params, waitUntil } = context;
@@ -158,16 +158,10 @@ async function moveFile(env, fileId, newFileId, cdnUrl, url) {
 
         // S3 渠道的图片，需要移动S3中对应的图片
         if (img.metadata?.Channel === 'S3') {
-            const { success, newKey, endpoint, bucketName, source, error } = await moveS3File(env, img, newFileId);
+            const { success, newKey, error } = await moveS3File(env, img, newFileId);
             if (success) {
                 // 更新 metadata
-                img.metadata.S3FileKey = newFileId;
-
-                const s3ServerDomain = endpoint.replace(/https?:\/\//, "");
-                img.metadata.S3Location = `https://${bucketName}.${s3ServerDomain}/${newKey}`;
-                if (source === 'config') {
-                    img.metadata = stripSensitiveMetadata(img.metadata);
-                }
+                img.metadata.S3FileKey = newKey;
             } else {
                 // do nothing
             }
@@ -175,19 +169,11 @@ async function moveFile(env, fileId, newFileId, cdnUrl, url) {
 
         // WebDAV 渠道的图片，需要移动 WebDAV 中对应的文件
         if (img.metadata?.Channel === 'WebDAV') {
-            const { success, error, webdavConfig } = await moveWebDAVFile(env, img, newFileId);
+            const { success, error } = await moveWebDAVFile(env, img, newFileId);
             if (!success) {
                 throw new Error(error || 'WebDAV Move Failed');
             }
             img.metadata.WebDAVFilePath = newFileId;
-            if (img.metadata.WebDAVPublicBaseUrl || img.metadata.WebDAVPublicUrl || webdavConfig?.publicUrl) {
-                const webdavAPI = new WebDAVAPI(webdavConfig || { baseUrl: img.metadata.WebDAVBaseUrl });
-                const publicBaseUrl = webdavConfig?.publicUrl
-                    || img.metadata.WebDAVPublicBaseUrl
-                    || img.metadata.WebDAVPublicUrl.slice(0, img.metadata.WebDAVPublicUrl.length - fileId.split('/').map(encodeURIComponent).join('/').length);
-                img.metadata.WebDAVPublicBaseUrl = publicBaseUrl;
-                img.metadata.WebDAVPublicUrl = webdavAPI.buildPublicUrl(newFileId, publicBaseUrl);
-            }
         }
 
         // 旧版 Telegram 渠道和 Telegraph 渠道不支持移动
@@ -222,7 +208,9 @@ async function moveFile(env, fileId, newFileId, cdnUrl, url) {
 
 async function stripMetadataAfterConfigResolution(db, env, metadata) {
     let credentials = null;
-    if (metadata?.Channel === 'TelegramNew') {
+    if (metadata?.Channel === 'S3') {
+        credentials = await resolveS3Credentials(db, env, metadata);
+    } else if (metadata?.Channel === 'TelegramNew') {
         credentials = await resolveTelegramCredentials(db, env, metadata);
     } else if (metadata?.Channel === 'Discord') {
         credentials = await resolveDiscordCredentials(db, env, metadata);
@@ -232,9 +220,11 @@ async function stripMetadataAfterConfigResolution(db, env, metadata) {
         credentials = await resolveWebDAVCredentials(db, env, metadata);
     }
 
-    return credentials?.source === 'config'
-        ? stripSensitiveMetadata(metadata)
-        : metadata;
+    if (credentials?.source !== 'config') {
+        return metadata;
+    }
+
+    return stripConfigDerivedMetadata(stripSensitiveMetadata(metadata));
 }
 
 // 移动 S3 渠道的图片

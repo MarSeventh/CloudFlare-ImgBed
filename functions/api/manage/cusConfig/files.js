@@ -1,5 +1,6 @@
 import { readIndex } from "../../../utils/indexManager";
-import { sanitizeFileMetadata } from "../../../utils/metadataSecurity.js";
+import { getDatabase } from "../../../utils/databaseAdapter.js";
+import { buildFileMetadataForManagement, createMetadataViewContext } from "../../../utils/metadataView.js";
 
 export async function onRequest(context) {
     const { request } = context;
@@ -18,13 +19,19 @@ export async function onRequest(context) {
     start = Math.max(0, start);
     count = Math.max(1, count);
 
+    const db = getDatabase(context.env);
+    const metadataViewContext = await createMetadataViewContext(db, context.env);
     const allRecords = await readIndex(context, { count: -1, includeSubdirFiles: true });
-    const files = allRecords.files
+    const matchingFiles = allRecords.files
         .filter(item => item.metadata?.UploadIP === ip)
         .map(item => ({
             ...item,
-            metadata: sanitizeFileMetadata(item.metadata)
+            metadata: item.metadata
         }));
+    const files = await Promise.all(matchingFiles.map(async item => ({
+        ...item,
+        metadata: await buildFileMetadataForManagement(db, context.env, item.metadata, metadataViewContext)
+    })));
 
     return new Response(JSON.stringify({
         data: files.slice(start, start + count),

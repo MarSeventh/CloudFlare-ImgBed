@@ -6,7 +6,7 @@
  */
 
 import { getDatabase } from '../../../utils/databaseAdapter.js';
-import { sanitizeFileMetadata } from '../../../utils/metadataSecurity.js';
+import { buildFileMetadataForManagement, createMetadataViewContext } from '../../../utils/metadataView.js';
 
 // CORS 跨域响应头
 const corsHeaders = {
@@ -105,6 +105,7 @@ export async function onRequestGet(context) {
 
     // 处理记录
     const records = [];
+    const metadataViewContext = await createMetadataViewContext(db, env);
     
     for (const item of listResult.keys) {
       // 跳过管理相关的键（以 manage@ 开头）
@@ -125,7 +126,7 @@ export async function onRequestGet(context) {
       // 构建记录对象
       const record = {
         id: item.name,
-        metadata: sanitizeFileMetadata(item.metadata),
+        metadata: await buildFileMetadataForManagement(db, env, item.metadata, metadataViewContext),
       };
 
       // 如果需要包含 value 且是分块文件，读取 value

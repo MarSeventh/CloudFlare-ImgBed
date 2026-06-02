@@ -3,7 +3,7 @@ import {
     getIndexInfo, getIndexStorageStats
 } from '../../utils/indexManager.js';
 import { getDatabase } from '../../utils/databaseAdapter.js';
-import { sanitizeFileMetadata } from '../../utils/metadataSecurity.js';
+import { createMetadataViewContext, serializeFileRecordForManagement } from '../../utils/metadataView.js';
 
 // CORS 跨域响应头
 const corsHeaders = {
@@ -174,8 +174,13 @@ export async function onRequest(context) {
             });
         }
 
+        const db = getDatabase(context.env);
+        const metadataViewContext = await createMetadataViewContext(db, context.env);
+
         // 转换文件格式
-        const compatibleFiles = result.files.map(serializeFileRecordForManagement);
+        const compatibleFiles = await Promise.all(
+            result.files.map(file => serializeFileRecordForManagement(db, context.env, file, metadataViewContext))
+        );
 
         return new Response(JSON.stringify({
             files: compatibleFiles,
@@ -208,6 +213,7 @@ async function getAllFileRecords(env, dir) {
 
     try {
         const db = getDatabase(env);
+        const metadataViewContext = await createMetadataViewContext(db, env);
 
         while (true) {
             const response = await db.list({
@@ -235,7 +241,7 @@ async function getAllFileRecords(env, dir) {
                     continue;
                 }
 
-                allRecords.push(serializeFileRecordForManagement(item));
+                allRecords.push(await serializeFileRecordForManagement(db, env, item, metadataViewContext));
             }
 
             if (!cursor) break;
@@ -278,11 +284,4 @@ async function getAllFileRecords(env, dir) {
             error: error.message
         };
     }
-}
-
-export function serializeFileRecordForManagement(file) {
-    return {
-        name: file.id || file.name,
-        metadata: sanitizeFileMetadata(file.metadata)
-    };
 }

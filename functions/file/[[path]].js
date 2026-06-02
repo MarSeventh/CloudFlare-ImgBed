@@ -17,6 +17,7 @@ import {
     resolveTelegramCredentials,
     resolveWebDAVCredentials,
 } from '../utils/channelCredentials.js';
+import { buildCdnFileUrl } from '../utils/metadataView.js';
 
 
 export async function onRequest(context) {  // Contents of context object
@@ -684,7 +685,7 @@ async function handleS3File(context, metadata, encodedFileName, fileType) {
     const { Referer, url, request } = context;
 
     // 检查是否配置了 CDN 文件完整路径
-    const cdnFileUrl = metadata?.S3CdnFileUrl;
+    const cdnFileUrl = await getS3CdnFileUrl(context.env, metadata);
 
     // 如果配置了 CDN 文件路径，通过 CDN 读取文件
     if (cdnFileUrl) {
@@ -743,6 +744,22 @@ async function handleS3File(context, metadata, encodedFileName, fileType) {
 
     // 没有配置 CDN 文件路径，使用 S3 API
     return await handleS3FileViaAPI(context, metadata, encodedFileName, fileType);
+}
+
+async function getS3CdnFileUrl(env, metadata) {
+    if (metadata?.S3CdnFileUrl) {
+        return metadata.S3CdnFileUrl;
+    }
+
+    try {
+        const db = getDatabase(env);
+        const s3Credentials = await resolveS3Credentials(db, env, metadata);
+        const key = s3Credentials.key || metadata?.S3FileKey;
+        return buildCdnFileUrl(s3Credentials.cdnDomain, key);
+    } catch (error) {
+        console.warn('Failed to build S3 CDN file URL:', error.message);
+        return '';
+    }
 }
 
 // 通过 S3 API 读取文件
