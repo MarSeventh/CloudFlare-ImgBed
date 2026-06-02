@@ -11,7 +11,10 @@ import {
     resolveS3Credentials,
     resolveTelegramCredentials,
 } from "../../../utils/channelCredentials.js";
-import { sanitizeFileMetadata, stripSensitiveMetadata } from "../../../utils/metadataSecurity.js";
+import {
+    sanitizeFileMetadata,
+    stripSensitiveMetadataInPlace,
+} from "../../../utils/metadataSecurity.js";
 
 // CORS 跨域响应头
 const corsHeaders = {
@@ -143,13 +146,7 @@ export async function onRequest(context) {
                 const s3ServerDomain = endpoint.replace(/https?:\/\//, "");
                 metadata.S3Location = `https://${bucketName}.${s3ServerDomain}/${newKey}`;
                 if (source === 'config') {
-                    const strippedMetadata = stripSensitiveMetadata(metadata);
-                    for (const key of Object.keys(metadata)) {
-                        if (!(key in strippedMetadata)) {
-                            delete metadata[key];
-                        }
-                    }
-                    Object.assign(metadata, strippedMetadata);
+                    stripSensitiveMetadataInPlace(metadata);
                 }
             } else {
                 // do nothing
@@ -235,19 +232,15 @@ async function stripMetadataInPlaceAfterConfigResolution(db, env, metadata) {
         credentials = await resolveDiscordCredentials(db, env, metadata);
     } else if (metadata?.Channel === 'HuggingFace') {
         credentials = await resolveHuggingFaceCredentials(db, env, metadata);
+    } else if (metadata?.Channel === 'WebDAV') {
+        credentials = await resolveWebDAVConfig(env, metadata);
     }
 
     if (credentials?.source !== 'config') {
         return;
     }
 
-    const strippedMetadata = stripSensitiveMetadata(metadata);
-    for (const key of Object.keys(metadata)) {
-        if (!(key in strippedMetadata)) {
-            delete metadata[key];
-        }
-    }
-    Object.assign(metadata, strippedMetadata);
+    stripSensitiveMetadataInPlace(metadata);
 }
 
 // 移动 S3 渠道的图片

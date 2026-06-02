@@ -228,6 +228,8 @@ async function stripMetadataAfterConfigResolution(db, env, metadata) {
         credentials = await resolveDiscordCredentials(db, env, metadata);
     } else if (metadata?.Channel === 'HuggingFace') {
         credentials = await resolveHuggingFaceCredentials(db, env, metadata);
+    } else if (metadata?.Channel === 'WebDAV') {
+        credentials = await resolveWebDAVConfig(env, metadata);
     }
 
     return credentials?.source === 'config'
