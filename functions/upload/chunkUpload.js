@@ -1253,7 +1253,6 @@ export async function uploadLargeFileToTelegram(context, file, fullId, metadata,
         metadata.Channel = "TelegramNew";
         metadata.ChannelName = tgChannel.name;
         metadata.TgChatId = tgChatId;
-        metadata.TgBotToken = tgBotToken;
         metadata.TgProxyUrl = tgChannel.proxyUrl || '';
         metadata.IsChunked = true;
         metadata.TotalChunks = totalChunks;
