@@ -1,4 +1,5 @@
 import { getUploadConfig } from '../api/manage/sysConfig/upload.js';
+import { normalizeWebDAVHeaders } from './storage/webdavAPI.js';
 
 export async function resolveS3Credentials(db, env, metadata = {}) {
   const channel = await findChannel(db, env, 's3', metadata.ChannelName);
@@ -94,6 +95,35 @@ export async function resolveHuggingFaceCredentials(db, env, metadata = {}) {
   };
 }
 
+export async function resolveWebDAVCredentials(db, env, metadata = {}) {
+  const channel = await findChannel(db, env, 'webdav', metadata.ChannelName);
+  if (channel) {
+    return normalizeWebDAVCredentials({
+      source: 'config',
+      baseUrl: getWebDAVBaseUrl(channel),
+      username: channel.username || '',
+      password: channel.password || '',
+      headers: channel.headers || channel.customHeaders || {},
+      createDirectory: channel.createDirectory !== false,
+      publicUrl: channel.publicUrl || '',
+      filePath: metadata.WebDAVFilePath,
+      publicFileUrl: metadata.WebDAVPublicUrl,
+    });
+  }
+
+  return normalizeWebDAVCredentials({
+    source: 'metadata',
+    baseUrl: metadata.WebDAVBaseUrl,
+    username: metadata.WebDAVUsername || '',
+    password: metadata.WebDAVPassword || '',
+    headers: metadata.WebDAVHeaders || {},
+    createDirectory: metadata.WebDAVCreateDirectory !== false,
+    publicUrl: metadata.WebDAVPublicBaseUrl || '',
+    filePath: metadata.WebDAVFilePath,
+    publicFileUrl: metadata.WebDAVPublicUrl,
+  });
+}
+
 async function findChannel(db, env, groupName, channelName) {
   if (!channelName) return null;
 
@@ -105,4 +135,22 @@ async function findChannel(db, env, groupName, channelName) {
     console.error(`Failed to resolve ${groupName} channel credentials:`, error);
     return null;
   }
+}
+
+function normalizeWebDAVCredentials(config = {}) {
+  return {
+    source: config.source || 'metadata',
+    baseUrl: getWebDAVBaseUrl(config),
+    username: config.username || '',
+    password: config.password || '',
+    headers: normalizeWebDAVHeaders(config.headers || config.customHeaders || {}),
+    createDirectory: config.createDirectory !== false,
+    publicUrl: config.publicUrl || '',
+    filePath: config.filePath || '',
+    publicFileUrl: config.publicFileUrl || '',
+  };
+}
+
+function getWebDAVBaseUrl(config = {}) {
+  return config.baseUrl || config.endpoint || config.url || '';
 }

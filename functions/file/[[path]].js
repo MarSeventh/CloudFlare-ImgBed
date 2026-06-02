@@ -3,8 +3,7 @@ import { fetchSecurityConfig } from "../utils/sysConfig";
 import { TelegramAPI } from "../utils/storage/telegramAPI";
 import { DiscordAPI } from "../utils/storage/discordAPI";
 import { HuggingFaceAPI } from "../utils/storage/huggingfaceAPI";
-import { WebDAVAPI } from "../utils/storage/webdavAPI";
-import { resolveWebDAVConfig } from "../utils/webdavConfig";
+import { buildWebDAVUrl, WebDAVAPI } from "../utils/storage/webdavAPI";
 import {
     setCommonHeaders, setRangeHeaders, handleHeadRequest, getFileContent, isTgChannel,
     returnWithCheck, return404, returnBlockImg, isDomainAllowed, FILE_CACHE_CONTROL
@@ -16,6 +15,7 @@ import {
     resolveHuggingFaceCredentials,
     resolveS3Credentials,
     resolveTelegramCredentials,
+    resolveWebDAVCredentials,
 } from '../utils/channelCredentials.js';
 
 
@@ -961,8 +961,10 @@ async function handleWebDAVFile(context, metadata, encodedFileName, fileType) {
     const { request, url, Referer } = context;
 
     try {
-        const filePath = metadata.WebDAVFilePath;
-        const publicUrl = metadata.WebDAVPublicUrl;
+        const db = getDatabase(context.env);
+        const webdavCredentials = await resolveWebDAVCredentials(db, context.env, metadata);
+        const filePath = webdavCredentials.filePath || metadata.WebDAVFilePath;
+        const publicUrl = getWebDAVPublicFileUrl(webdavCredentials, filePath);
 
         if (!filePath && !publicUrl) {
             return new Response('Error: WebDAV file info not found', { status: 500 });
@@ -983,13 +985,24 @@ async function handleWebDAVFile(context, metadata, encodedFileName, fileType) {
                 method: request.method === 'HEAD' ? 'HEAD' : 'GET',
                 headers: fetchHeaders,
             });
+
+            if (!response.ok && response.status !== 206 && response.status !== 304 && webdavCredentials.baseUrl && filePath) {
+                try {
+                    const webdavAPI = new WebDAVAPI(webdavCredentials);
+                    response = await webdavAPI.getFile(filePath, {
+                        method: request.method === 'HEAD' ? 'HEAD' : 'GET',
+                        headers: fetchHeaders,
+                    });
+                } catch (fallbackError) {
+                    console.warn('WebDAV public URL fallback failed:', fallbackError.message);
+                }
+            }
         } else {
-            const webdavConfig = await resolveWebDAVConfig(context.env, metadata);
-            if (!webdavConfig) {
+            if (!webdavCredentials.baseUrl || !filePath) {
                 return new Response('Error: WebDAV channel config not found', { status: 500 });
             }
 
-            const webdavAPI = new WebDAVAPI(webdavConfig);
+            const webdavAPI = new WebDAVAPI(webdavCredentials);
             response = await webdavAPI.getFile(filePath, {
                 method: request.method === 'HEAD' ? 'HEAD' : 'GET',
                 headers: fetchHeaders,
@@ -1024,4 +1037,16 @@ async function handleWebDAVFile(context, metadata, encodedFileName, fileType) {
     } catch (error) {
         return new Response(`Error: Failed to fetch from WebDAV - ${error.message}`, { status: 500 });
     }
+}
+
+function getWebDAVPublicFileUrl(webdavCredentials, filePath) {
+    if (webdavCredentials.publicUrl && filePath) {
+        try {
+            return buildWebDAVUrl(webdavCredentials.publicUrl, filePath);
+        } catch {
+            return webdavCredentials.publicFileUrl || '';
+        }
+    }
+
+    return webdavCredentials.publicFileUrl || '';
 }

@@ -5,11 +5,11 @@ import { getDatabase } from '../../../utils/databaseAdapter.js';
 import { DiscordAPI } from '../../../utils/storage/discordAPI.js';
 import { HuggingFaceAPI } from '../../../utils/storage/huggingfaceAPI.js';
 import { WebDAVAPI } from '../../../utils/storage/webdavAPI.js';
-import { resolveWebDAVConfig } from '../../../utils/webdavConfig.js';
 import {
     resolveDiscordCredentials,
     resolveHuggingFaceCredentials,
     resolveS3Credentials,
+    resolveWebDAVCredentials,
 } from '../../../utils/channelCredentials.js';
 
 // CORS 跨域响应头
@@ -281,13 +281,14 @@ async function deleteWebDAVFile(env, img) {
     }
 
     try {
-        const webdavConfig = await resolveWebDAVConfig(env, img.metadata);
-        if (!webdavConfig) {
+        const db = getDatabase(env);
+        const webdavCredentials = await resolveWebDAVCredentials(db, env, img.metadata);
+        if (!webdavCredentials.baseUrl) {
             console.warn('WebDAV channel config not found for deletion');
             return false;
         }
 
-        const webdavAPI = new WebDAVAPI(webdavConfig);
+        const webdavAPI = new WebDAVAPI(webdavCredentials);
         return await webdavAPI.deleteFile(filePath);
     } catch (error) {
         console.error("WebDAV Delete Failed:", error);
