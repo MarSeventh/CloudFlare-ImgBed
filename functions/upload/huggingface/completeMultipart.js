@@ -19,18 +19,23 @@ export async function onRequestPost(context) {
             });
         }
 
-        const targetUrl = new URL(target);
-        if (targetUrl.protocol !== 'https:' ||
-            targetUrl.hostname !== 'huggingface.co' ||
-            targetUrl.pathname !== '/api/complete_multipart') {
-            return createResponse(JSON.stringify({ error: 'Invalid multipart completion target' }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json' }
-            });
+        let targetUrl;
+        try {
+            targetUrl = new URL(target);
+        } catch {
+            return jsonError('Invalid multipart completion target', 400);
+        }
+
+        if (!isValidCompletionTarget(targetUrl)) {
+            return jsonError('Invalid multipart completion target', 400);
         }
 
         const body = await request.text();
-        validateMultipartBody(body);
+        try {
+            validateMultipartBody(body);
+        } catch (error) {
+            return jsonError(error.message, 400);
+        }
 
         const completeResponse = await fetch(targetUrl.toString(), {
             method: 'POST',
@@ -43,8 +48,13 @@ export async function onRequestPost(context) {
 
         const responseText = await completeResponse.text();
         if (!completeResponse.ok) {
-            return createResponse(responseText || `Multipart complete failed: ${completeResponse.status}`, {
-                status: completeResponse.status
+            const contentType = completeResponse.headers.get('Content-Type') || 'application/json';
+            const errorBody = responseText || JSON.stringify({
+                error: `Multipart complete failed: ${completeResponse.status}`
+            });
+            return createResponse(errorBody, {
+                status: completeResponse.status,
+                headers: { 'Content-Type': contentType }
             });
         }
 
@@ -60,6 +70,19 @@ export async function onRequestPost(context) {
             headers: { 'Content-Type': 'application/json' }
         });
     }
+}
+
+function jsonError(message, status) {
+    return createResponse(JSON.stringify({ error: message }), {
+        status,
+        headers: { 'Content-Type': 'application/json' }
+    });
+}
+
+function isValidCompletionTarget(targetUrl) {
+    return targetUrl.protocol === 'https:' &&
+        targetUrl.hostname === 'huggingface.co' &&
+        targetUrl.pathname === '/api/complete_multipart';
 }
 
 function validateMultipartBody(body) {
