@@ -5,13 +5,10 @@ import { getDatabase } from '../../../utils/databaseAdapter.js';
 import { sanitizeUploadFolder } from "../../../upload/uploadTools.js";
 import { WebDAVAPI } from "../../../utils/storage/webdavAPI.js";
 import {
-    resolveDiscordCredentials,
-    resolveHuggingFaceCredentials,
     resolveS3Credentials,
-    resolveTelegramCredentials,
     resolveWebDAVCredentials,
 } from "../../../utils/metadata/channelCredentials.js";
-import { stripConfigDerivedMetadata, stripSensitiveMetadata } from "../../../utils/metadata/metadataSecurity.js";
+import { cleanPersistedMetadata } from "../../../utils/metadata/metadataSecurity.js";
 
 export async function onRequest(context) {
     const { request, env, params, waitUntil } = context;
@@ -159,12 +156,10 @@ async function moveFile(env, fileId, newFileId, cdnUrl, url) {
         // S3 渠道的图片，需要移动S3中对应的图片
         if (img.metadata?.Channel === 'S3') {
             const { success, newKey, error } = await moveS3File(env, img, newFileId);
-            if (success) {
-                // 更新 metadata
-                img.metadata.S3FileKey = newKey;
-            } else {
-                // do nothing
+            if (!success) {
+                throw new Error(error || 'S3 Move Failed');
             }
+            img.metadata.S3FileKey = newKey;
         }
 
         // WebDAV 渠道的图片，需要移动 WebDAV 中对应的文件
@@ -184,7 +179,7 @@ async function moveFile(env, fileId, newFileId, cdnUrl, url) {
         // 更新文件夹信息，根目录为空，否则为 aaa/123/ 的格式
         const DirectoryPath = newFileId.split('/').slice(0, -1).join('/') === '' ? '' : newFileId.split('/').slice(0, -1).join('/') + '/';
         img.metadata.Directory = DirectoryPath;
-        img.metadata = await stripMetadataAfterConfigResolution(db, env, img.metadata);
+        img.metadata = cleanPersistedMetadata(img.metadata);
 
         // 更新KV存储
         await db.put(newFileId, img.value, { metadata: img.metadata });
@@ -204,27 +199,6 @@ async function moveFile(env, fileId, newFileId, cdnUrl, url) {
         console.error('Move file failed:', e);
         return false;
     }
-}
-
-async function stripMetadataAfterConfigResolution(db, env, metadata) {
-    let credentials = null;
-    if (metadata?.Channel === 'S3') {
-        credentials = await resolveS3Credentials(db, env, metadata);
-    } else if (metadata?.Channel === 'TelegramNew') {
-        credentials = await resolveTelegramCredentials(db, env, metadata);
-    } else if (metadata?.Channel === 'Discord') {
-        credentials = await resolveDiscordCredentials(db, env, metadata);
-    } else if (metadata?.Channel === 'HuggingFace') {
-        credentials = await resolveHuggingFaceCredentials(db, env, metadata);
-    } else if (metadata?.Channel === 'WebDAV') {
-        credentials = await resolveWebDAVCredentials(db, env, metadata);
-    }
-
-    if (credentials?.source !== 'config') {
-        return metadata;
-    }
-
-    return stripConfigDerivedMetadata(stripSensitiveMetadata(metadata));
 }
 
 // 移动 S3 渠道的图片

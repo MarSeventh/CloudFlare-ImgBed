@@ -87,6 +87,16 @@ export function stripConfigDerivedMetadataInPlace(metadata = {}) {
   return metadata;
 }
 
+export function cleanPersistedMetadata(metadata = {}) {
+  return stripConfigDerivedMetadata(stripSensitiveMetadata(metadata));
+}
+
+export function cleanPersistedMetadataInPlace(metadata = {}) {
+  stripSensitiveMetadataInPlace(metadata);
+  stripConfigDerivedMetadataInPlace(metadata);
+  return metadata;
+}
+
 function stripUrlUserinfo(value) {
   try {
     const url = new URL(value);

@@ -1,5 +1,5 @@
 import { getUploadConfig } from '../../api/manage/sysConfig/upload.js';
-import { sanitizeFileMetadata } from './metadataSecurity.js';
+import { sanitizeFileMetadata, stripConfigDerivedMetadata } from './metadataSecurity.js';
 import { buildWebDAVUrl } from '../storage/webdavAPI.js';
 
 export async function createMetadataViewContext(db, env) {
@@ -12,7 +12,7 @@ export async function createMetadataViewContext(db, env) {
 
 export async function buildFileMetadataForManagement(db, env, metadata = {}, viewContext = null) {
   const context = viewContext || await createMetadataViewContext(db, env);
-  const view = sanitizeFileMetadata(metadata);
+  const view = stripConfigDerivedMetadata(sanitizeFileMetadata(metadata));
 
   enrichS3Metadata(context, metadata, view);
   enrichHuggingFaceMetadata(context, metadata, view);
@@ -33,23 +33,16 @@ function enrichS3Metadata(context, sourceMetadata, view) {
 
   try {
     const channel = findChannel(context, 's3', sourceMetadata.ChannelName);
-    const credentials = channel
-      ? {
-        endpoint: channel.endpoint,
-        region: channel.region || 'auto',
-        bucketName: channel.bucketName,
-        pathStyle: channel.pathStyle || false,
-        cdnDomain: channel.cdnDomain || '',
-        key: sourceMetadata.S3FileKey,
-      }
-      : {
-        endpoint: sourceMetadata.S3Endpoint,
-        region: sourceMetadata.S3Region || 'auto',
-        bucketName: sourceMetadata.S3BucketName,
-        pathStyle: sourceMetadata.S3PathStyle || false,
-        cdnDomain: sourceMetadata.S3CdnDomain || '',
-        key: sourceMetadata.S3FileKey,
-      };
+    if (!channel) return;
+
+    const credentials = {
+      endpoint: channel.endpoint,
+      region: channel.region || 'auto',
+      bucketName: channel.bucketName,
+      pathStyle: channel.pathStyle || false,
+      cdnDomain: channel.cdnDomain || '',
+      key: sourceMetadata.S3FileKey,
+    };
     const key = credentials.key || sourceMetadata.S3FileKey;
 
     if (!key) return;
@@ -58,9 +51,6 @@ function enrichS3Metadata(context, sourceMetadata, view) {
       view.S3Location = buildS3Location(credentials, key);
     }
 
-    if (channel) {
-      delete view.S3CdnFileUrl;
-    }
     if (credentials.cdnDomain) {
       view.S3CdnFileUrl = buildCdnFileUrl(credentials.cdnDomain, key);
     }
@@ -74,15 +64,12 @@ function enrichHuggingFaceMetadata(context, sourceMetadata, view) {
 
   try {
     const channel = findChannel(context, 'huggingface', sourceMetadata.ChannelName);
-    const credentials = channel
-      ? {
-        repo: channel.repo,
-        filePath: sourceMetadata.HfFilePath,
-      }
-      : {
-        repo: sourceMetadata.HfRepo,
-        filePath: sourceMetadata.HfFilePath,
-      };
+    if (!channel) return;
+
+    const credentials = {
+      repo: channel.repo,
+      filePath: sourceMetadata.HfFilePath,
+    };
     if (credentials.repo && credentials.filePath) {
       view.HfFileUrl = `https://huggingface.co/datasets/${credentials.repo}/resolve/main/${credentials.filePath}`;
     }
@@ -96,19 +83,13 @@ function enrichWebDAVMetadata(context, sourceMetadata, view) {
 
   try {
     const channel = findChannel(context, 'webdav', sourceMetadata.ChannelName);
-    const credentials = channel
-      ? {
-        publicUrl: channel.publicUrl || '',
-        filePath: sourceMetadata.WebDAVFilePath,
-      }
-      : {
-        publicUrl: sourceMetadata.WebDAVPublicBaseUrl || '',
-        filePath: sourceMetadata.WebDAVFilePath,
-      };
+    if (!channel) return;
+
+    const credentials = {
+      publicUrl: channel.publicUrl || '',
+      filePath: sourceMetadata.WebDAVFilePath,
+    };
     const filePath = credentials.filePath || sourceMetadata.WebDAVFilePath;
-    if (channel) {
-      delete view.WebDAVPublicUrl;
-    }
     if (credentials.publicUrl && filePath) {
       view.WebDAVPublicUrl = buildWebDAVUrl(credentials.publicUrl, filePath);
     }

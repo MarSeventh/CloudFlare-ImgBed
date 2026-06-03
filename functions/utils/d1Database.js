@@ -304,8 +304,8 @@ D1Database.prototype.extractMetadataFields = function(metadata) {
         channel: metadata.Channel || null,
         channelName: metadata.ChannelName || null,
         tgFileId: metadata.TgFileId || null,
-        tgChatId: metadata.TgChatId || null,
-        tgBotToken: metadata.TgBotToken || null,
+        tgChatId: null,
+        tgBotToken: null,
         isChunked: metadata.IsChunked || false
     };
 };

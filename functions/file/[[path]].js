@@ -751,14 +751,10 @@ async function getS3CdnFileUrl(env, metadata) {
         const db = getDatabase(env);
         const s3Credentials = await resolveS3Credentials(db, env, metadata);
         const key = s3Credentials.key || metadata?.S3FileKey;
-        const configCdnFileUrl = buildCdnFileUrl(s3Credentials.cdnDomain, key);
-        if (s3Credentials.source === 'config') {
-            return configCdnFileUrl;
-        }
-        return configCdnFileUrl || metadata?.S3CdnFileUrl || '';
+        return buildCdnFileUrl(s3Credentials.cdnDomain, key);
     } catch (error) {
         console.warn('Failed to build S3 CDN file URL:', error.message);
-        return metadata?.S3CdnFileUrl || '';
+        return '';
     }
 }
 
