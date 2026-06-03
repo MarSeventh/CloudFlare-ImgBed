@@ -5,7 +5,12 @@ import { getDatabase } from '../../../utils/databaseAdapter.js';
 import { DiscordAPI } from '../../../utils/storage/discordAPI.js';
 import { HuggingFaceAPI } from '../../../utils/storage/huggingfaceAPI.js';
 import { WebDAVAPI } from '../../../utils/storage/webdavAPI.js';
-import { resolveWebDAVConfig } from '../../../utils/webdavConfig.js';
+import {
+    resolveDiscordCredentials,
+    resolveHuggingFaceCredentials,
+    resolveS3Credentials,
+    resolveWebDAVCredentials,
+} from '../../../utils/metadata/channelCredentials.js';
 
 // CORS 跨域响应头
 const corsHeaders = {
@@ -145,17 +150,17 @@ async function deleteFile(env, fileId, cdnUrl, url) {
 
         // S3 渠道的图片，需要删除S3中对应的图片
         if (img.metadata?.Channel === 'S3') {
-            await deleteS3File(img);
+            await deleteS3File(env, img);
         }
 
         // Discord 渠道的图片，需要删除 Discord 中对应的消息
         if (img.metadata?.Channel === 'Discord') {
-            await deleteDiscordFile(img);
+            await deleteDiscordFile(env, img);
         }
 
         // HuggingFace 渠道的图片，需要删除 HuggingFace 中对应的文件
         if (img.metadata?.Channel === 'HuggingFace') {
-            await deleteHuggingFaceFile(img);
+            await deleteHuggingFaceFile(env, img);
         }
 
         // WebDAV 渠道的图片，需要删除 WebDAV 中对应的文件
@@ -183,19 +188,21 @@ async function deleteFile(env, fileId, cdnUrl, url) {
 }
 
 // 删除 S3 渠道的图片
-async function deleteS3File(img) {
+async function deleteS3File(env, img) {
+    const db = getDatabase(env);
+    const s3Credentials = await resolveS3Credentials(db, env, img.metadata);
     const s3Client = new S3Client({
-        region: img.metadata?.S3Region || "auto",
-        endpoint: img.metadata?.S3Endpoint,
+        region: s3Credentials.region || "auto",
+        endpoint: s3Credentials.endpoint,
         credentials: {
-            accessKeyId: img.metadata?.S3AccessKeyId,
-            secretAccessKey: img.metadata?.S3SecretAccessKey
+            accessKeyId: s3Credentials.accessKeyId,
+            secretAccessKey: s3Credentials.secretAccessKey
         },
-        forcePathStyle: img.metadata?.S3PathStyle || false // 是否启用路径风格
+        forcePathStyle: s3Credentials.pathStyle || false // 是否启用路径风格
     });
 
-    const bucketName = img.metadata?.S3BucketName;
-    const key = img.metadata?.S3FileKey;
+    const bucketName = s3Credentials.bucketName;
+    const key = s3Credentials.key;
 
     try {
         await s3Client.send(new DeleteObjectCommand({
@@ -210,10 +217,12 @@ async function deleteS3File(img) {
 }
 
 // 删除 Discord 渠道的图片（删除 Discord 消息）
-async function deleteDiscordFile(img) {
-    const botToken = img.metadata?.DiscordBotToken;
-    const channelId = img.metadata?.DiscordChannelId;
-    const messageId = img.metadata?.DiscordMessageId;
+async function deleteDiscordFile(env, img) {
+    const db = getDatabase(env);
+    const discordCredentials = await resolveDiscordCredentials(db, env, img.metadata);
+    const botToken = discordCredentials.botToken;
+    const channelId = discordCredentials.channelId;
+    const messageId = discordCredentials.messageId;
 
     if (!botToken || !channelId || !messageId) {
         console.warn('Discord file missing required metadata for deletion');
@@ -235,11 +244,13 @@ async function deleteDiscordFile(img) {
 
 
 // 删除 HuggingFace 渠道的图片
-async function deleteHuggingFaceFile(img) {
-    const token = img.metadata?.HfToken;
-    const repo = img.metadata?.HfRepo;
-    const filePath = img.metadata?.HfFilePath;
-    const isPrivate = img.metadata?.HfIsPrivate || false;
+async function deleteHuggingFaceFile(env, img) {
+    const db = getDatabase(env);
+    const hfCredentials = await resolveHuggingFaceCredentials(db, env, img.metadata);
+    const token = hfCredentials.token;
+    const repo = hfCredentials.repo;
+    const filePath = hfCredentials.filePath;
+    const isPrivate = hfCredentials.isPrivate || false;
 
     if (!token || !repo || !filePath) {
         console.warn('HuggingFace file missing required metadata for deletion');
@@ -270,13 +281,14 @@ async function deleteWebDAVFile(env, img) {
     }
 
     try {
-        const webdavConfig = await resolveWebDAVConfig(env, img.metadata);
-        if (!webdavConfig) {
+        const db = getDatabase(env);
+        const webdavCredentials = await resolveWebDAVCredentials(db, env, img.metadata);
+        if (!webdavCredentials.baseUrl) {
             console.warn('WebDAV channel config not found for deletion');
             return false;
         }
 
-        const webdavAPI = new WebDAVAPI(webdavConfig);
+        const webdavAPI = new WebDAVAPI(webdavCredentials);
         return await webdavAPI.deleteFile(filePath);
     } catch (error) {
         console.error("WebDAV Delete Failed:", error);

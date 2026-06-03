@@ -4,7 +4,18 @@ import { moveFileInIndex } from "../../../utils/indexManager.js";
 import { getDatabase } from '../../../utils/databaseAdapter.js';
 import { sanitizeUploadFolder } from "../../../upload/uploadTools.js";
 import { WebDAVAPI } from "../../../utils/storage/webdavAPI.js";
-import { resolveWebDAVConfig } from "../../../utils/webdavConfig.js";
+import {
+    resolveDiscordCredentials,
+    resolveHuggingFaceCredentials,
+    resolveS3Credentials,
+    resolveTelegramCredentials,
+    resolveWebDAVCredentials,
+} from "../../../utils/metadata/channelCredentials.js";
+import {
+    stripConfigDerivedMetadataInPlace,
+    stripSensitiveMetadataInPlace,
+} from "../../../utils/metadata/metadataSecurity.js";
+import { buildFileMetadataForManagement } from "../../../utils/metadata/metadataView.js";
 
 // CORS 跨域响应头
 const corsHeaders = {
@@ -128,13 +139,10 @@ export async function onRequest(context) {
 
         // S3 渠道的图片，需要移动 S3 中对应的图片
         if (metadata?.Channel === 'S3') {
-            const { success, newKey, error } = await moveS3File(fileData, newFileId);
+            const { success, newKey, error } = await moveS3File(env, fileData, newFileId);
             if (success) {
                 // 更新 metadata
-                metadata.S3FileKey = newFileId;
-
-                const s3ServerDomain = metadata.S3Endpoint.replace(/https?:\/\//, "");
-                metadata.S3Location = `https://${metadata.S3BucketName}.${s3ServerDomain}/${newKey}`;
+                metadata.S3FileKey = newKey;
             } else {
                 // do nothing
             }
@@ -142,19 +150,11 @@ export async function onRequest(context) {
 
         // WebDAV 渠道的图片，需要移动 WebDAV 中对应的文件
         if (metadata?.Channel === 'WebDAV') {
-            const { success, error, webdavConfig } = await moveWebDAVFile(env, fileData, newFileId);
+            const { success, error } = await moveWebDAVFile(env, fileData, newFileId);
             if (!success) {
                 throw new Error(error || 'WebDAV Move Failed');
             }
             metadata.WebDAVFilePath = newFileId;
-            if (metadata.WebDAVPublicBaseUrl || metadata.WebDAVPublicUrl || webdavConfig?.publicUrl) {
-                const webdavAPI = new WebDAVAPI(webdavConfig || { baseUrl: metadata.WebDAVBaseUrl });
-                const publicBaseUrl = metadata.WebDAVPublicBaseUrl
-                    || webdavConfig?.publicUrl
-                    || metadata.WebDAVPublicUrl.slice(0, metadata.WebDAVPublicUrl.length - fileId.split('/').map(encodeURIComponent).join('/').length);
-                metadata.WebDAVPublicBaseUrl = publicBaseUrl;
-                metadata.WebDAVPublicUrl = webdavAPI.buildPublicUrl(newFileId, publicBaseUrl);
-            }
         }
 
         // 旧版 Telegram 渠道和 Telegraph 渠道不支持重命名
@@ -171,6 +171,7 @@ export async function onRequest(context) {
         // 更新文件夹信息，根目录为空，否则为 aaa/123/ 的格式
         const DirectoryPath = newFileId.split('/').slice(0, -1).join('/') === '' ? '' : newFileId.split('/').slice(0, -1).join('/') + '/';
         metadata.Directory = DirectoryPath;
+        await stripMetadataInPlaceAfterConfigResolution(db, env, metadata);
 
         // 更新 KV 存储
         await db.put(newFileId, fileData.value, { metadata });
@@ -192,7 +193,7 @@ export async function onRequest(context) {
         return new Response(JSON.stringify({
             success: true,
             newFileId,
-            metadata,
+            metadata: await buildFileMetadataForManagement(db, env, metadata),
         }), {
             status: 200,
             headers: { 'Content-Type': 'application/json', ...corsHeaders },
@@ -210,20 +211,44 @@ export async function onRequest(context) {
     }
 }
 
+async function stripMetadataInPlaceAfterConfigResolution(db, env, metadata) {
+    let credentials = null;
+    if (metadata?.Channel === 'S3') {
+        credentials = await resolveS3Credentials(db, env, metadata);
+    } else if (metadata?.Channel === 'TelegramNew') {
+        credentials = await resolveTelegramCredentials(db, env, metadata);
+    } else if (metadata?.Channel === 'Discord') {
+        credentials = await resolveDiscordCredentials(db, env, metadata);
+    } else if (metadata?.Channel === 'HuggingFace') {
+        credentials = await resolveHuggingFaceCredentials(db, env, metadata);
+    } else if (metadata?.Channel === 'WebDAV') {
+        credentials = await resolveWebDAVCredentials(db, env, metadata);
+    }
+
+    if (credentials?.source !== 'config') {
+        return;
+    }
+
+    stripSensitiveMetadataInPlace(metadata);
+    stripConfigDerivedMetadataInPlace(metadata);
+}
+
 // 移动 S3 渠道的图片
-async function moveS3File(img, newFileId) {
+async function moveS3File(env, img, newFileId) {
+    const db = getDatabase(env);
+    const s3Credentials = await resolveS3Credentials(db, env, img.metadata);
     const s3Client = new S3Client({
-        region: img.metadata?.S3Region || "auto",
-        endpoint: img.metadata?.S3Endpoint,
+        region: s3Credentials.region || "auto",
+        endpoint: s3Credentials.endpoint,
         credentials: {
-            accessKeyId: img.metadata?.S3AccessKeyId,
-            secretAccessKey: img.metadata?.S3SecretAccessKey
+            accessKeyId: s3Credentials.accessKeyId,
+            secretAccessKey: s3Credentials.secretAccessKey
         },
-        forcePathStyle: img.metadata?.S3PathStyle || false
+        forcePathStyle: s3Credentials.pathStyle || false
     });
 
-    const bucketName = img.metadata?.S3BucketName;
-    const oldKey = img.metadata?.S3FileKey;
+    const bucketName = s3Credentials.bucketName;
+    const oldKey = s3Credentials.key;
     const newKey = newFileId;
 
     try {
@@ -241,7 +266,13 @@ async function moveS3File(img, newFileId) {
         }));
 
         // 返回新的 S3 文件信息
-        return { success: true, newKey };
+        return {
+            success: true,
+            newKey,
+            endpoint: s3Credentials.endpoint,
+            bucketName,
+            source: s3Credentials.source
+        };
     } catch (error) {
         console.error("S3 Move Failed:", error);
         return { success: false, error: error.message };
@@ -257,8 +288,9 @@ async function moveWebDAVFile(env, img, newFileId) {
     }
 
     try {
-        const webdavConfig = await resolveWebDAVConfig(env, img.metadata);
-        if (!webdavConfig) {
+        const db = getDatabase(env);
+        const webdavConfig = await resolveWebDAVCredentials(db, env, img.metadata);
+        if (!webdavConfig.baseUrl) {
             return { success: false, error: 'WebDAV channel config not found for move' };
         }
 

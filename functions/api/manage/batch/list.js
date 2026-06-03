@@ -6,6 +6,7 @@
  */
 
 import { getDatabase } from '../../../utils/databaseAdapter.js';
+import { sanitizeFileMetadata } from '../../../utils/metadata/metadataSecurity.js';
 
 // CORS 跨域响应头
 const corsHeaders = {
@@ -124,7 +125,7 @@ export async function onRequestGet(context) {
       // 构建记录对象
       const record = {
         id: item.name,
-        metadata: item.metadata,
+        metadata: sanitizeFileMetadata(item.metadata),
       };
 
       // 如果需要包含 value 且是分块文件，读取 value

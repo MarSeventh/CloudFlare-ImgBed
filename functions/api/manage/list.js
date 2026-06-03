@@ -3,6 +3,7 @@ import {
     getIndexInfo, getIndexStorageStats
 } from '../../utils/indexManager.js';
 import { getDatabase } from '../../utils/databaseAdapter.js';
+import { createMetadataViewContext, serializeFileRecordForManagement } from '../../utils/metadata/metadataView.js';
 
 // CORS 跨域响应头
 const corsHeaders = {
@@ -173,11 +174,13 @@ export async function onRequest(context) {
             });
         }
 
+        const db = getDatabase(context.env);
+        const metadataViewContext = await createMetadataViewContext(db, context.env);
+
         // 转换文件格式
-        const compatibleFiles = result.files.map(file => ({
-            name: file.id,
-            metadata: file.metadata
-        }));
+        const compatibleFiles = await Promise.all(
+            result.files.map(file => serializeFileRecordForManagement(db, context.env, file, metadataViewContext))
+        );
 
         return new Response(JSON.stringify({
             files: compatibleFiles,
@@ -210,6 +213,7 @@ async function getAllFileRecords(env, dir) {
 
     try {
         const db = getDatabase(env);
+        const metadataViewContext = await createMetadataViewContext(db, env);
 
         while (true) {
             const response = await db.list({
@@ -237,7 +241,7 @@ async function getAllFileRecords(env, dir) {
                     continue;
                 }
 
-                allRecords.push(item);
+                allRecords.push(await serializeFileRecordForManagement(db, env, item, metadataViewContext));
             }
 
             if (!cursor) break;
