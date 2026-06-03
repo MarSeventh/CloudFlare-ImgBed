@@ -6,7 +6,7 @@ export async function createMetadataViewContext(db, env) {
   return {
     db,
     env,
-    uploadConfig: await loadUploadConfig(db, env),
+    uploadConfig: await loadChannelConfig(db, env, 'metadata view'),
   };
 }
 
@@ -65,12 +65,8 @@ function enrichHuggingFaceMetadata(context, sourceMetadata, view) {
     const channel = findConfiguredChannel(context.uploadConfig, 'huggingface', sourceMetadata);
     if (!channel) return;
 
-    const credentials = {
-      repo: channel.repo,
-      filePath: sourceMetadata.HfFilePath,
-    };
-    if (credentials.repo && credentials.filePath) {
-      view.HfFileUrl = `https://huggingface.co/datasets/${credentials.repo}/resolve/main/${credentials.filePath}`;
+    if (channel.repo && sourceMetadata.HfFilePath) {
+      view.HfFileUrl = `https://huggingface.co/datasets/${channel.repo}/resolve/main/${sourceMetadata.HfFilePath}`;
     }
   } catch (error) {
     console.warn('Failed to enrich HuggingFace metadata:', error.message);
@@ -84,20 +80,12 @@ function enrichWebDAVMetadata(context, sourceMetadata, view) {
     const channel = findConfiguredChannel(context.uploadConfig, 'webdav', sourceMetadata);
     if (!channel) return;
 
-    const credentials = {
-      publicUrl: channel.publicUrl || '',
-      filePath: sourceMetadata.WebDAVFilePath,
-    };
-    if (credentials.publicUrl && credentials.filePath) {
-      view.WebDAVPublicUrl = buildWebDAVUrl(credentials.publicUrl, credentials.filePath);
+    if (channel.publicUrl && sourceMetadata.WebDAVFilePath) {
+      view.WebDAVPublicUrl = buildWebDAVUrl(channel.publicUrl, sourceMetadata.WebDAVFilePath);
     }
   } catch (error) {
     console.warn('Failed to enrich WebDAV metadata:', error.message);
   }
-}
-
-async function loadUploadConfig(db, env) {
-  return loadChannelConfig(db, env, 'metadata view');
 }
 
 export function buildS3Location(credentials, key) {
