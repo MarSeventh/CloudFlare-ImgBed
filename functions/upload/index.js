@@ -827,8 +827,7 @@ async function uploadFileToWebDAV(context, fullId, metadata, returnLink) {
             : webdavChannels[0];
     }
 
-    const baseUrl = webdavChannel?.baseUrl || webdavChannel?.endpoint || webdavChannel?.url;
-    if (!webdavChannel || !baseUrl) {
+    if (!webdavChannel || !webdavChannel.baseUrl) {
         return createResponse('Error: WebDAV channel not properly configured', { status: 400 });
     }
 

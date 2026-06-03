@@ -6,7 +6,7 @@
  */
 export class WebDAVAPI {
     constructor(config = {}) {
-        const baseUrl = config.baseUrl || config.endpoint || config.url;
+        const baseUrl = config.baseUrl;
         if (!baseUrl) {
             throw new Error('WebDAV baseUrl is required');
         }
@@ -14,7 +14,7 @@ export class WebDAVAPI {
         this.baseUrl = normalizeBaseUrl(baseUrl);
         this.username = config.username || '';
         this.password = config.password || '';
-        this.headers = normalizeHeaders(config.headers || config.customHeaders || {});
+        this.headers = normalizeHeaders(config.headers || {});
         this.createDirectory = config.createDirectory !== false;
     }
 
