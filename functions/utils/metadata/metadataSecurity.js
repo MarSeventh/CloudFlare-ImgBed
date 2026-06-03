@@ -80,7 +80,12 @@ export function stripConfigDerivedMetadataInPlace(metadata = {}) {
 }
 
 export function cleanPersistedMetadata(metadata = {}) {
-  return stripConfigDerivedMetadata(stripSensitiveMetadata(metadata));
+  if (!metadata || typeof metadata !== 'object') {
+    return metadata;
+  }
+
+  const cleaned = { ...metadata };
+  return cleanPersistedMetadataInPlace(cleaned);
 }
 
 export function cleanPersistedMetadataInPlace(metadata = {}) {
