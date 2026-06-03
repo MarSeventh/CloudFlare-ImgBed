@@ -22,7 +22,7 @@ export async function onRequestPost(context) {
         }
 
         const body = await request.json();
-        const { fullId, filePath, sha256, fileSize, fileName, fileType, channelName, multipartParts } = body;
+        const { fullId, filePath, sha256, fileSize, fileName, fileType, channelName } = body;
 
         if (!fullId || !filePath || !sha256 || !fileSize) {
             return createResponse(JSON.stringify({
@@ -73,11 +73,6 @@ export async function onRequestPost(context) {
 
         const huggingfaceAPI = new HuggingFaceAPI(hfChannel.token, hfChannel.repo, hfChannel.isPrivate || false);
 
-        // 如果有 multipart parts，需要先完成 multipart 上传
-        if (multipartParts && multipartParts.length > 0) {
-            console.log('Completing multipart upload...');
-        }
-
         // 提交 LFS 文件引用
         console.log('Committing LFS file...');
         const commitResult = await huggingfaceAPI.commitLfsFile(
@@ -110,11 +105,7 @@ export async function onRequestPost(context) {
             UploadIP: uploadIp,
             UploadAddress: uploadAddress,
             ListType: "None",
-            HfRepo: hfChannel.repo,
             HfFilePath: filePath,
-            HfToken: hfChannel.token,
-            HfIsPrivate: hfChannel.isPrivate || false,
-            HfFileUrl: fileUrl,
             TimeStamp: Date.now(),
             Label: "None",
             Directory: normalizedDirectory,

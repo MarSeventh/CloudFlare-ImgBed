@@ -1,5 +1,7 @@
 import { addFileToIndex } from '../../../utils/indexManager.js';
 import { getDatabase } from '../../../utils/databaseAdapter.js';
+import { buildFileMetadataForManagement } from '../../../utils/metadata/metadataView.js';
+import { cleanPersistedMetadata } from '../../../utils/metadata/metadataSecurity.js';
 
 // CORS 跨域响应头
 const corsHeaders = {
@@ -93,16 +95,17 @@ export async function onRequest(context) {
         if (typeof body.FileType === 'string') {
             updatedMetadata.FileType = body.FileType;
         }
+        const metadataToSave = cleanPersistedMetadata(updatedMetadata);
 
         // 保存更新后的 metadata
-        await db.put(fileId, fileData.value, { metadata: updatedMetadata });
+        await db.put(fileId, fileData.value, { metadata: metadataToSave });
 
         // 更新索引
-        waitUntil(addFileToIndex(context, fileId, updatedMetadata));
+        waitUntil(addFileToIndex(context, fileId, metadataToSave));
 
         return new Response(JSON.stringify({
             success: true,
-            metadata: updatedMetadata,
+            metadata: await buildFileMetadataForManagement(db, env, metadataToSave),
         }), {
             status: 200,
             headers: { 'Content-Type': 'application/json', ...corsHeaders },

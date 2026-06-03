@@ -354,7 +354,7 @@ async function uploadFileToS3(context, fullId, metadata, returnLink) {
         return createResponse('Error: No S3 channel provided', { status: 400 });
     }
 
-    const { endpoint, pathStyle, accessKeyId, secretAccessKey, bucketName, region, cdnDomain } = s3Channel;
+    const { endpoint, pathStyle, accessKeyId, secretAccessKey, bucketName, region } = s3Channel;
 
     // 创建 S3 客户端
     const s3Client = new S3Client({
@@ -392,25 +392,7 @@ async function uploadFileToS3(context, fullId, metadata, returnLink) {
         // 更新 metadata
         metadata.Channel = "S3";
         metadata.ChannelName = s3Channel.name;
-
-        const s3ServerDomain = endpoint.replace(/https?:\/\//, "");
-        if (pathStyle) {
-            metadata.S3Location = `https://${s3ServerDomain}/${bucketName}/${s3FileName}`; // 采用路径风格的 URL
-        } else {
-            metadata.S3Location = `https://${bucketName}.${s3ServerDomain}/${s3FileName}`; // 采用虚拟主机风格的 URL
-        }
-        metadata.S3Endpoint = endpoint;
-        metadata.S3PathStyle = pathStyle;
-        metadata.S3AccessKeyId = accessKeyId;
-        metadata.S3SecretAccessKey = secretAccessKey;
-        metadata.S3Region = region || "auto";
-        metadata.S3BucketName = bucketName;
         metadata.S3FileKey = s3FileName;
-        // 保存 CDN 文件完整路径（如果配置了 CDN 域名）
-        if (cdnDomain) {
-            // 存储完整的 CDN 文件路径，而不是仅存储域名
-            metadata.S3CdnFileUrl = `${cdnDomain.replace(/\/$/, '')}/${s3FileName}`;
-        }
 
         // 图像审查
         if (uploadModerate && uploadModerate.enabled) {
@@ -555,12 +537,6 @@ async function uploadFileToTelegram(context, fullId, metadata, fileExt, fileName
             metadata.ChannelName = tgChannel.name;
 
             metadata.TgFileId = id;
-            metadata.TgChatId = tgChatId;
-            metadata.TgBotToken = tgBotToken;
-            // 保存代理域名配置
-            if (tgProxyUrl) {
-                metadata.TgProxyUrl = tgProxyUrl;
-            }
             await db.put(fullId, "", {
                 metadata: metadata,
             });
@@ -674,15 +650,8 @@ async function uploadFileToDiscord(context, fullId, metadata, returnLink) {
         metadata.ChannelName = discordChannel.name || "Discord_env";
         metadata.FileSize = (fileInfo.file_size / 1024 / 1024).toFixed(2);
         metadata.DiscordMessageId = fileInfo.message_id;
-        metadata.DiscordChannelId = discordChannel.channelId;
-        metadata.DiscordBotToken = discordChannel.botToken;
         // 注意：不存储 DiscordAttachmentUrl，因为 Discord 附件 URL 会在约24小时后过期
         // 读取时会通过 API 获取新的 URL
-
-        // 如果配置了代理 URL，保存代理信息
-        if (discordChannel.proxyUrl) {
-            metadata.DiscordProxyUrl = discordChannel.proxyUrl;
-        }
 
         // 图像审查（使用 Discord CDN URL 或代理 URL）
         let moderateUrl = fileInfo.url;
@@ -787,11 +756,7 @@ async function uploadFileToHuggingFace(context, fullId, metadata, returnLink) {
         // 更新 metadata
         metadata.Channel = "HuggingFace";
         metadata.ChannelName = hfChannel.name || "HuggingFace_env";
-        metadata.HfRepo = hfChannel.repo;
         metadata.HfFilePath = hfFilePath;
-        metadata.HfToken = hfChannel.token;
-        metadata.HfIsPrivate = hfChannel.isPrivate || false;
-        metadata.HfFileUrl = result.fileUrl;
 
         // 图像审查
         const securityConfig = context.securityConfig;
@@ -862,8 +827,7 @@ async function uploadFileToWebDAV(context, fullId, metadata, returnLink) {
             : webdavChannels[0];
     }
 
-    const baseUrl = webdavChannel?.baseUrl || webdavChannel?.endpoint || webdavChannel?.url;
-    if (!webdavChannel || !baseUrl) {
+    if (!webdavChannel || !webdavChannel.baseUrl) {
         return createResponse('Error: WebDAV channel not properly configured', { status: 400 });
     }
 
@@ -878,17 +842,15 @@ async function uploadFileToWebDAV(context, fullId, metadata, returnLink) {
 
         metadata.Channel = "WebDAV";
         metadata.ChannelName = webdavChannel.name || "WebDAV_env";
-        metadata.WebDAVBaseUrl = baseUrl;
         metadata.WebDAVFilePath = fullId;
-        if (webdavChannel.publicUrl) {
-            metadata.WebDAVPublicBaseUrl = webdavChannel.publicUrl;
-            metadata.WebDAVPublicUrl = webdavAPI.buildPublicUrl(fullId, webdavChannel.publicUrl);
-        }
+        const webdavPublicUrl = webdavChannel.publicUrl
+            ? webdavAPI.buildPublicUrl(fullId, webdavChannel.publicUrl)
+            : '';
 
         const uploadModerate = securityConfig.upload?.moderate;
         if (uploadModerate && uploadModerate.enabled) {
-            if (metadata.WebDAVPublicUrl) {
-                metadata.Label = await moderateContent(env, metadata.WebDAVPublicUrl);
+            if (webdavPublicUrl) {
+                metadata.Label = await moderateContent(env, webdavPublicUrl);
             } else {
                 try {
                     await db.put(fullId, "", { metadata });

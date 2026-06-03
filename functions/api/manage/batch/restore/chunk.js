@@ -5,6 +5,7 @@
  */
 
 import { getDatabase } from '../../../../utils/databaseAdapter.js';
+import { cleanPersistedMetadata } from '../../../../utils/metadata/metadataSecurity.js';
 
 // CORS 跨域响应头
 const corsHeaders = {
@@ -73,15 +74,16 @@ export async function onRequestPost(context) {
       // 恢复文件数据 - 并行写入
       const filePromises = Object.entries(data).map(async ([key, fileData]) => {
         try {
+          const metadata = cleanPersistedMetadata(fileData.metadata);
           if (fileData.value) {
             // 有 value 的文件（如 Telegram/Discord 分块文件）
             await db.put(key, fileData.value, {
-              metadata: fileData.metadata
+              metadata
             });
           } else if (fileData.metadata) {
             // 只有元数据的文件
             await db.put(key, '', {
-              metadata: fileData.metadata
+              metadata
             });
           }
           return { success: true };
