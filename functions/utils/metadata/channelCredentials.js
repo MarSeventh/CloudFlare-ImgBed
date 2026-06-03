@@ -98,20 +98,20 @@ export async function resolveHuggingFaceCredentials(db, env, metadata = {}) {
 export async function resolveWebDAVCredentials(db, env, metadata = {}) {
   const channel = await findChannel(db, env, 'webdav', metadata);
   if (channel) {
-    return normalizeWebDAVCredentials({
+    return {
       source: 'config',
-      baseUrl: getWebDAVBaseUrl(channel),
+      baseUrl: channel.baseUrl || '',
       username: channel.username || '',
       password: channel.password || '',
-      headers: channel.headers || channel.customHeaders || {},
+      headers: normalizeWebDAVHeaders(channel.headers || {}),
       createDirectory: channel.createDirectory !== false,
       publicUrl: channel.publicUrl || '',
       filePath: metadata.WebDAVFilePath,
       publicFileUrl: '',
-    });
+    };
   }
 
-  return normalizeWebDAVCredentials({
+  return {
     source: 'missing',
     baseUrl: '',
     username: '',
@@ -121,7 +121,7 @@ export async function resolveWebDAVCredentials(db, env, metadata = {}) {
     publicUrl: '',
     filePath: metadata.WebDAVFilePath,
     publicFileUrl: '',
-  });
+  };
 }
 
 async function findChannel(db, env, groupName, metadata = {}) {
@@ -146,22 +146,4 @@ function getEffectiveChannelName(groupName, metadata = {}) {
   }
 
   return '';
-}
-
-function normalizeWebDAVCredentials(config = {}) {
-  return {
-    source: config.source || 'missing',
-    baseUrl: getWebDAVBaseUrl(config),
-    username: config.username || '',
-    password: config.password || '',
-    headers: normalizeWebDAVHeaders(config.headers || config.customHeaders || {}),
-    createDirectory: config.createDirectory !== false,
-    publicUrl: config.publicUrl || '',
-    filePath: config.filePath || '',
-    publicFileUrl: config.publicFileUrl || '',
-  };
-}
-
-function getWebDAVBaseUrl(config = {}) {
-  return config.baseUrl || config.endpoint || config.url || '';
 }
