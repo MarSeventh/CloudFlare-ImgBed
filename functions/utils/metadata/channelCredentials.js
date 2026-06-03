@@ -78,7 +78,6 @@ export async function resolveHuggingFaceCredentials(db, env, metadata = {}) {
       repo: channel.repo,
       isPrivate: channel.isPrivate || false,
       filePath: metadata.HfFilePath,
-      fileUrl: '',
     };
   }
 
@@ -87,7 +86,6 @@ export async function resolveHuggingFaceCredentials(db, env, metadata = {}) {
     repo: '',
     isPrivate: false,
     filePath: metadata.HfFilePath,
-    fileUrl: '',
   });
 }
 
@@ -103,7 +101,6 @@ export async function resolveWebDAVCredentials(db, env, metadata = {}) {
       createDirectory: channel.createDirectory !== false,
       publicUrl: channel.publicUrl || '',
       filePath: metadata.WebDAVFilePath,
-      publicFileUrl: '',
     };
   }
 
@@ -115,7 +112,6 @@ export async function resolveWebDAVCredentials(db, env, metadata = {}) {
     createDirectory: true,
     publicUrl: '',
     filePath: metadata.WebDAVFilePath,
-    publicFileUrl: '',
   });
 }
 
