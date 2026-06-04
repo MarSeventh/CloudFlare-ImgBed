@@ -23,6 +23,10 @@ const name = env.WORKER_NAME || 'cloudflare-imgbed';
 let toml = `name = "${name}"
 main = "index.js"
 compatibility_date = "2024-08-21"
+# public兼容性标志
+compatibility_flags = [
+  "global_fetch_strictly_public"
+]
 
 [assets]
 directory = "../../frontend-dist"
