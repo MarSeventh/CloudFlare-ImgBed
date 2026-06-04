@@ -750,15 +750,10 @@ async function getS3CdnFileUrl(env, metadata) {
     try {
         const db = getDatabase(env);
         const s3Credentials = await resolveS3Credentials(db, env, metadata);
-        const key = s3Credentials.key || metadata?.S3FileKey;
-        const configCdnFileUrl = buildCdnFileUrl(s3Credentials.cdnDomain, key);
-        if (s3Credentials.source === 'config') {
-            return configCdnFileUrl;
-        }
-        return configCdnFileUrl || metadata?.S3CdnFileUrl || '';
+        return buildCdnFileUrl(s3Credentials.cdnDomain, s3Credentials.key);
     } catch (error) {
         console.warn('Failed to build S3 CDN file URL:', error.message);
-        return metadata?.S3CdnFileUrl || '';
+        return '';
     }
 }
 
@@ -914,7 +909,7 @@ async function handleHuggingFaceFile(context, metadata, encodedFileName, fileTyp
         }
 
         // 构建文件 URL
-        const fileUrl = hfCredentials.fileUrl || `https://huggingface.co/datasets/${hfRepo}/resolve/main/${hfFilePath}`;
+        const fileUrl = `https://huggingface.co/datasets/${hfRepo}/resolve/main/${hfFilePath}`;
         const fileSize = HuggingFaceAPI.getMetadataFileSize(metadata);
 
         // 处理 HEAD 请求
@@ -980,7 +975,7 @@ async function handleWebDAVFile(context, metadata, encodedFileName, fileType) {
     try {
         const db = getDatabase(context.env);
         const webdavCredentials = await resolveWebDAVCredentials(db, context.env, metadata);
-        const filePath = webdavCredentials.filePath || metadata.WebDAVFilePath;
+        const filePath = webdavCredentials.filePath;
         const publicUrl = getWebDAVPublicFileUrl(webdavCredentials, filePath);
 
         if (!filePath && !publicUrl) {
@@ -1060,10 +1055,10 @@ function getWebDAVPublicFileUrl(webdavCredentials, filePath) {
     if (webdavCredentials.publicUrl && filePath) {
         try {
             return buildWebDAVUrl(webdavCredentials.publicUrl, filePath);
-        } catch {
-            return webdavCredentials.publicFileUrl || '';
+        } catch (error) {
+            console.warn('Invalid WebDAV public URL config:', error.message);
         }
     }
 
-    return webdavCredentials.publicFileUrl || '';
+    return '';
 }

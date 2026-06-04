@@ -28,14 +28,6 @@ const CONFIG_DERIVED_METADATA_KEYS = [
   'WebDAVPublicUrl',
 ];
 
-export function sanitizeFileMetadata(metadata = {}) {
-  if (!metadata || typeof metadata !== 'object') {
-    return metadata;
-  }
-
-  return stripSensitiveMetadata(metadata);
-}
-
 export function stripSensitiveMetadata(metadata = {}) {
   if (!metadata || typeof metadata !== 'object') {
     return metadata;
@@ -84,6 +76,21 @@ export function stripConfigDerivedMetadataInPlace(metadata = {}) {
     delete metadata[key];
   }
 
+  return metadata;
+}
+
+export function cleanPersistedMetadata(metadata = {}) {
+  if (!metadata || typeof metadata !== 'object') {
+    return metadata;
+  }
+
+  const cleaned = { ...metadata };
+  return cleanPersistedMetadataInPlace(cleaned);
+}
+
+export function cleanPersistedMetadataInPlace(metadata = {}) {
+  stripSensitiveMetadataInPlace(metadata);
+  stripConfigDerivedMetadataInPlace(metadata);
   return metadata;
 }
 

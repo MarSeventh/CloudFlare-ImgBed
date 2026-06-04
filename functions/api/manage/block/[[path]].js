@@ -1,6 +1,7 @@
 import { purgeCFCache, purgeRandomFileListCache, purgePublicFileListCache } from "../../../utils/purgeCache";
 import { addFileToIndex } from "../../../utils/indexManager.js";
 import { getDatabase } from "../../../utils/databaseAdapter.js";
+import { cleanPersistedMetadata } from "../../../utils/metadata/metadataSecurity.js";
 
 export async function onRequest(context) {
     // Contents of context object
@@ -9,8 +10,6 @@ export async function onRequest(context) {
       env, // same as existing Worker API
       params, // if filename includes [id] or [[path]]
       waitUntil, // same as ctx.waitUntil in existing Worker API
-      next, // used for middleware or to fetch assets
-      data, // arbitrary space for passing data between middlewares
     } = context;
 
     // 组装 CDN URL
@@ -30,8 +29,9 @@ export async function onRequest(context) {
 
     //change the metadata
     value.metadata.ListType = "Block"
-    await db.put(params.path, value.value, {metadata: value.metadata});
-    const info = JSON.stringify({ success: true, listType: value.metadata.ListType });
+    const metadata = cleanPersistedMetadata(value.metadata);
+    await db.put(params.path, value.value, {metadata});
+    const info = JSON.stringify({ success: true, listType: metadata.ListType });
 
     // 清除CDN缓存
     await purgeCFCache(env, cdnUrl);
@@ -42,7 +42,7 @@ export async function onRequest(context) {
     await purgePublicFileListCache(url.origin, normalizedFolder);
 
     // 更新索引
-    waitUntil(addFileToIndex(context, params.path, value.metadata));
+    waitUntil(addFileToIndex(context, params.path, metadata));
 
     return new Response(info);
 }

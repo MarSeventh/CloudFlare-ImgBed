@@ -1,7 +1,8 @@
 import { purgeCFCache } from "../../../utils/purgeCache.js";
 import { addFileToIndex } from "../../../utils/indexManager.js";
 import { getDatabase } from "../../../utils/databaseAdapter.js";
-import { mergeTags, normalizeTags, validateTag } from "../../../utils/tagHelpers.js";
+import { mergeTags, validateTag } from "../../../utils/tagHelpers.js";
+import { cleanPersistedMetadata } from "../../../utils/metadata/metadataSecurity.js";
 
 /**
  * Tag Management API for Single Files
@@ -168,10 +169,11 @@ async function handleUpdateTags(context, db, fileId, hostname) {
 
         // Update metadata
         fileData.metadata.Tags = updatedTags;
+        const metadata = cleanPersistedMetadata(fileData.metadata);
 
         // Save to database
         await db.put(fileId, fileData.value, {
-            metadata: fileData.metadata
+            metadata
         });
 
         // Clear CDN cache asynchronously (don't wait for it to complete)
@@ -179,7 +181,7 @@ async function handleUpdateTags(context, db, fileId, hostname) {
         waitUntil(purgeCFCache(context.env, cdnUrl));
 
         // Update file index asynchronously
-        waitUntil(addFileToIndex(context, fileId, fileData.metadata));
+        waitUntil(addFileToIndex(context, fileId, metadata));
 
         return new Response(JSON.stringify({
             success: true,

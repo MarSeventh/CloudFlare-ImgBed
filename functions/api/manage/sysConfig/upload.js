@@ -295,7 +295,7 @@ export async function getUploadConfig(db, env) {
             if (webdavChannels[0]) {
                 webdavChannels[0].enabled = wd.enabled
                 webdavChannels[0].publicUrl = wd.publicUrl || webdavChannels[0].publicUrl
-                webdavChannels[0].headers = normalizeWebDAVHeaders(wd.headers || wd.customHeaders || webdavChannels[0].headers)
+                webdavChannels[0].headers = normalizeWebDAVHeaders(wd.headers || webdavChannels[0].headers)
                 webdavChannels[0].createDirectory = wd.createDirectory !== false
                 webdavChannels[0].quota = wd.quota
             }
@@ -303,7 +303,7 @@ export async function getUploadConfig(db, env) {
         }
         // id 自增
         wd.id = webdavChannels.length + 1
-        wd.headers = normalizeWebDAVHeaders(wd.headers || wd.customHeaders || {})
+        wd.headers = normalizeWebDAVHeaders(wd.headers || {})
         wd.createDirectory = wd.createDirectory !== false
         webdavChannels.push(wd)
     }
