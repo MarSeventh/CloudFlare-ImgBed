@@ -1,18 +1,18 @@
-import { getUploadConfig } from '../../api/manage/sysConfig/upload.js';
-import { sanitizeFileMetadata, stripConfigDerivedMetadata } from './metadataSecurity.js';
+import { findConfiguredChannel, loadChannelConfig } from './channelConfig.js';
+import { stripConfigDerivedMetadata, stripSensitiveMetadata } from './metadataSecurity.js';
 import { buildWebDAVUrl } from '../storage/webdavAPI.js';
 
 export async function createMetadataViewContext(db, env) {
   return {
     db,
     env,
-    uploadConfig: await loadUploadConfig(db, env),
+    uploadConfig: await loadChannelConfig(db, env, 'metadata view'),
   };
 }
 
 export async function buildFileMetadataForManagement(db, env, metadata = {}, viewContext = null) {
   const context = viewContext || await createMetadataViewContext(db, env);
-  const view = stripConfigDerivedMetadata(sanitizeFileMetadata(metadata));
+  const view = stripConfigDerivedMetadata(stripSensitiveMetadata(metadata));
 
   enrichS3Metadata(context, metadata, view);
   enrichHuggingFaceMetadata(context, metadata, view);
@@ -32,7 +32,7 @@ function enrichS3Metadata(context, sourceMetadata, view) {
   if (sourceMetadata?.Channel !== 'S3') return;
 
   try {
-    const channel = findChannel(context, 's3', sourceMetadata.ChannelName);
+    const channel = findConfiguredChannel(context.uploadConfig, 's3', sourceMetadata);
     if (!channel) return;
 
     const credentials = {
@@ -43,16 +43,15 @@ function enrichS3Metadata(context, sourceMetadata, view) {
       cdnDomain: channel.cdnDomain || '',
       key: sourceMetadata.S3FileKey,
     };
-    const key = credentials.key || sourceMetadata.S3FileKey;
 
-    if (!key) return;
+    if (!credentials.key) return;
 
     if (credentials.endpoint && credentials.bucketName) {
-      view.S3Location = buildS3Location(credentials, key);
+      view.S3Location = buildS3Location(credentials, credentials.key);
     }
 
     if (credentials.cdnDomain) {
-      view.S3CdnFileUrl = buildCdnFileUrl(credentials.cdnDomain, key);
+      view.S3CdnFileUrl = buildCdnFileUrl(credentials.cdnDomain, credentials.key);
     }
   } catch (error) {
     console.warn('Failed to enrich S3 metadata:', error.message);
@@ -63,15 +62,11 @@ function enrichHuggingFaceMetadata(context, sourceMetadata, view) {
   if (sourceMetadata?.Channel !== 'HuggingFace') return;
 
   try {
-    const channel = findChannel(context, 'huggingface', sourceMetadata.ChannelName);
+    const channel = findConfiguredChannel(context.uploadConfig, 'huggingface', sourceMetadata);
     if (!channel) return;
 
-    const credentials = {
-      repo: channel.repo,
-      filePath: sourceMetadata.HfFilePath,
-    };
-    if (credentials.repo && credentials.filePath) {
-      view.HfFileUrl = `https://huggingface.co/datasets/${credentials.repo}/resolve/main/${credentials.filePath}`;
+    if (channel.repo && sourceMetadata.HfFilePath) {
+      view.HfFileUrl = `https://huggingface.co/datasets/${channel.repo}/resolve/main/${sourceMetadata.HfFilePath}`;
     }
   } catch (error) {
     console.warn('Failed to enrich HuggingFace metadata:', error.message);
@@ -82,35 +77,15 @@ function enrichWebDAVMetadata(context, sourceMetadata, view) {
   if (sourceMetadata?.Channel !== 'WebDAV') return;
 
   try {
-    const channel = findChannel(context, 'webdav', sourceMetadata.ChannelName);
+    const channel = findConfiguredChannel(context.uploadConfig, 'webdav', sourceMetadata);
     if (!channel) return;
 
-    const credentials = {
-      publicUrl: channel.publicUrl || '',
-      filePath: sourceMetadata.WebDAVFilePath,
-    };
-    const filePath = credentials.filePath || sourceMetadata.WebDAVFilePath;
-    if (credentials.publicUrl && filePath) {
-      view.WebDAVPublicUrl = buildWebDAVUrl(credentials.publicUrl, filePath);
+    if (channel.publicUrl && sourceMetadata.WebDAVFilePath) {
+      view.WebDAVPublicUrl = buildWebDAVUrl(channel.publicUrl, sourceMetadata.WebDAVFilePath);
     }
   } catch (error) {
     console.warn('Failed to enrich WebDAV metadata:', error.message);
   }
-}
-
-async function loadUploadConfig(db, env) {
-  try {
-    return await getUploadConfig(db, env);
-  } catch (error) {
-    console.warn('Failed to load upload config for metadata view:', error.message);
-    return null;
-  }
-}
-
-function findChannel(context, groupName, channelName) {
-  if (!channelName || !context?.uploadConfig) return null;
-  const channels = context.uploadConfig[groupName]?.channels || [];
-  return channels.find((channel) => channel.name === channelName) || null;
 }
 
 export function buildS3Location(credentials, key) {
