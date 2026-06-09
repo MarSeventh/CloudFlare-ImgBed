@@ -10,7 +10,16 @@ export async function onRequestGet(context) {
     const { request, env } = context;
 
     // 读取安全配置，判断是否需要认证
-    const securityConfig = await fetchSecurityConfig(env);
+    let securityConfig;
+    try {
+        securityConfig = await fetchSecurityConfig(env, { throwOnError: true });
+    } catch (error) {
+        console.error('Session check failed because security config could not be loaded:', error);
+        return new Response(JSON.stringify({ error: 'Security config unavailable' }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json' },
+        });
+    }
     const adminUsername = securityConfig.auth.admin.adminUsername;
     const adminPassword = securityConfig.auth.admin.adminPassword;
     const userAuthCode = securityConfig.auth.user.authCode;

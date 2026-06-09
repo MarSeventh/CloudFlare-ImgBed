@@ -9,7 +9,16 @@ export async function onRequestPost(context) {
     const { username, password } = await request.json();
 
     // 读取安全设置
-    const securityConfig = await fetchSecurityConfig(env);
+    let securityConfig;
+    try {
+        securityConfig = await fetchSecurityConfig(env, { throwOnError: true });
+    } catch (error) {
+        console.error('Admin login blocked because security config could not be loaded:', error);
+        return new Response(JSON.stringify({ error: 'Security config unavailable' }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json' },
+        });
+    }
     const adminUsername = securityConfig.auth.admin.adminUsername;
     const adminPassword = securityConfig.auth.admin.adminPassword;
 
