@@ -7,6 +7,7 @@
 import { generateSessionToken } from './passwordHash.js';
 import { getDatabase } from '../databaseAdapter.js';
 import { fetchSecurityConfig } from '../sysConfig.js';
+import { normalizeSessionMaxAgeDays, sessionMaxAgeDaysToTtl } from './sessionConfig.js';
 
 const SESSION_PREFIX = 'manage@session@';
 
@@ -28,10 +29,11 @@ export async function createSession(env, authType, username = '') {
     const securityConfig = await fetchSecurityConfig(env);
     const accessConfig = securityConfig.access || {};
     const secure = accessConfig.sessionSecure ?? false;
-    const maxAgeDays = authType === 'admin'
+    const rawMaxAgeDays = authType === 'admin'
         ? (accessConfig.adminSessionMaxAge ?? 14)
         : (accessConfig.userSessionMaxAge ?? 14);
-    const maxAge = maxAgeDays * 86400;
+    const maxAgeDays = normalizeSessionMaxAgeDays(rawMaxAgeDays);
+    const maxAge = sessionMaxAgeDaysToTtl(maxAgeDays);
 
     const db = getDatabase(env);
     const token = generateSessionToken();
