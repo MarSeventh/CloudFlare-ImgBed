@@ -7,8 +7,9 @@
 import { generateSessionToken } from './passwordHash.js';
 import { getDatabase } from '../databaseAdapter.js';
 import { fetchSecurityConfig } from '../sysConfig.js';
+import { normalizeSessionMaxAgeDays, sessionMaxAgeDaysToTtl } from './sessionConfig.js';
 
-const SESSION_PREFIX = 'session@';
+const SESSION_PREFIX = 'manage@session@';
 
 // Cookie 名称映射
 const COOKIE_NAMES = {
@@ -28,10 +29,11 @@ export async function createSession(env, authType, username = '') {
     const securityConfig = await fetchSecurityConfig(env);
     const accessConfig = securityConfig.access || {};
     const secure = accessConfig.sessionSecure ?? false;
-    const maxAgeDays = authType === 'admin'
+    const rawMaxAgeDays = authType === 'admin'
         ? (accessConfig.adminSessionMaxAge ?? 14)
         : (accessConfig.userSessionMaxAge ?? 14);
-    const maxAge = maxAgeDays * 86400;
+    const maxAgeDays = normalizeSessionMaxAgeDays(rawMaxAgeDays);
+    const maxAge = sessionMaxAgeDaysToTtl(maxAgeDays);
 
     const db = getDatabase(env);
     const token = generateSessionToken();
@@ -42,7 +44,9 @@ export async function createSession(env, authType, username = '') {
         expiresAt: Date.now() + maxAge * 1000,
     };
 
-    await db.put(`${SESSION_PREFIX}${token}`, JSON.stringify(sessionData));
+    await db.put(`${SESSION_PREFIX}${token}`, JSON.stringify(sessionData), {
+        expirationTtl: maxAge,
+    });
 
     const cookieName = COOKIE_NAMES[authType] || 'session';
     const cookie = buildSessionCookie(cookieName, token, maxAge, secure);

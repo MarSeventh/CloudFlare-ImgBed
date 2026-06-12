@@ -1,0 +1,84 @@
+name: Deploy to Cloudflare Workers
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      worker_name:
+        description: 'Worker Name'
+        required: false
+        default: 'cloudflare-imgbed'
+
+# 所有配置均通过 Secrets 传入（public 仓库的 Variables 对所有人可见，不安全）
+#
+# 在仓库 Settings → Secrets and variables → Actions → Secrets 中配置：
+#
+# 必填：
+#   CLOUDFLARE_API_TOKEN  - Cloudflare API Token（需要 Workers 编辑权限）
+#   CLOUDFLARE_ACCOUNT_ID - Cloudflare Account ID
+#
+# 数据库（二选一）：
+#   D1_DATABASE_ID        - D1 数据库 ID
+#   KV_NAMESPACE_ID       - KV 命名空间 ID
+#
+# 可选：
+#   R2_BUCKET_NAME        - R2 存储桶名称
+#   WORKER_NAME           - Worker 名称（默认 cloudflare-imgbed，手动触发时可在界面覆盖）
+#   WORKER_VARS           - JSON 格式的业务环境变量（非必要不建议配置，
+#                           部署完成后请在管理面板中配置所有设置）
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # 仅在 fork 仓库且配置了 Cloudflare secrets 时运行
+    # 原仓库 push 和未配置 secrets 的 fork 不会触发部署
+    if: ${{ github.event.repository.fork }}
+    steps:
+      - name: Check deployment config
+        id: check
+        run: |
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
+            echo "CLOUDFLARE_API_TOKEN not configured, skipping Worker deployment"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout
+        if: steps.check.outputs.skip != 'true'
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        if: steps.check.outputs.skip != 'true'
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        if: steps.check.outputs.skip != 'true'
+        run: npm ci --omit=dev --omit=optional
+
+      - name: Generate worker routes
+        if: steps.check.outputs.skip != 'true'
+        run: node deploy/worker/generate-routes.js
+
+      - name: Generate wrangler config
+        if: steps.check.outputs.skip != 'true'
+        env:
+          WORKER_NAME: ${{ inputs.worker_name || secrets.WORKER_NAME }}
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          KV_NAMESPACE_ID: ${{ secrets.KV_NAMESPACE_ID }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          WORKER_VARS: ${{ secrets.WORKER_VARS }}
+        run: node deploy/worker/generate-toml.js
+
+      - name: Deploy to Cloudflare Workers
+        if: steps.check.outputs.skip != 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: '4'
+          command: deploy --config deploy/worker/wrangler.toml

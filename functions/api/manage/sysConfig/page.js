@@ -152,6 +152,7 @@ export async function getPageConfig(db, env) {
                 { label: 'S3', value: 's3' },
                 { label: 'Discord', value: 'discord' },
                 { label: 'HuggingFace', value: 'huggingface' },
+                { label: 'WebDAV', value: 'webdav' },
             ],
             placeholder: 'telegram',
             category: '客户端设置',

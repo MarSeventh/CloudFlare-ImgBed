@@ -4,7 +4,7 @@
  * 在前端直接上传文件到 S3 后，调用此 API 提交 LFS 文件引用
  */
 
-import { HuggingFaceAPI } from '../../utils/huggingfaceAPI.js';
+import { HuggingFaceAPI } from '../../utils/storage/huggingfaceAPI.js';
 import { fetchUploadConfig } from '../../utils/sysConfig.js';
 import { getDatabase } from '../../utils/databaseAdapter.js';
 import { moderateContent, endUpload, getUploadIp, getIPAddress, sanitizeUploadFolder, createResponse } from '../uploadTools.js';
@@ -22,7 +22,7 @@ export async function onRequestPost(context) {
         }
 
         const body = await request.json();
-        const { fullId, filePath, sha256, fileSize, fileName, fileType, channelName, multipartParts } = body;
+        const { fullId, filePath, sha256, fileSize, fileName, fileType, channelName } = body;
 
         if (!fullId || !filePath || !sha256 || !fileSize) {
             return createResponse(JSON.stringify({
@@ -73,11 +73,6 @@ export async function onRequestPost(context) {
 
         const huggingfaceAPI = new HuggingFaceAPI(hfChannel.token, hfChannel.repo, hfChannel.isPrivate || false);
 
-        // 如果有 multipart parts，需要先完成 multipart 上传
-        if (multipartParts && multipartParts.length > 0) {
-            console.log('Completing multipart upload...');
-        }
-
         // 提交 LFS 文件引用
         console.log('Committing LFS file...');
         const commitResult = await huggingfaceAPI.commitLfsFile(
@@ -110,11 +105,7 @@ export async function onRequestPost(context) {
             UploadIP: uploadIp,
             UploadAddress: uploadAddress,
             ListType: "None",
-            HfRepo: hfChannel.repo,
             HfFilePath: filePath,
-            HfToken: hfChannel.token,
-            HfIsPrivate: hfChannel.isPrivate || false,
-            HfFileUrl: fileUrl,
             TimeStamp: Date.now(),
             Label: "None",
             Directory: normalizedDirectory,

@@ -6,3 +6,6 @@ Dockerfile
 .gitignore
 .github
 data
+readme
+deploy/worker
+*.md

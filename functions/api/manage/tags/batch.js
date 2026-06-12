@@ -2,6 +2,7 @@ import { purgeCFCache } from "../../../utils/purgeCache.js";
 import { batchAddFilesToIndex } from "../../../utils/indexManager.js";
 import { getDatabase } from "../../../utils/databaseAdapter.js";
 import { mergeTags, validateTag } from "../../../utils/tagHelpers.js";
+import { cleanPersistedMetadata } from "../../../utils/metadata/metadataSecurity.js";
 
 /**
  * Batch Tag Management API
@@ -118,10 +119,11 @@ export async function onRequest(context) {
 
                 // Update metadata
                 fileData.metadata.Tags = updatedTags;
+                const metadata = cleanPersistedMetadata(fileData.metadata);
 
                 // Save to database
                 await db.put(fileId, fileData.value, {
-                    metadata: fileData.metadata
+                    metadata
                 });
 
                 // Clear CDN cache (async)
@@ -131,7 +133,7 @@ export async function onRequest(context) {
                 // Track updated file for batch index update
                 updatedFiles.push({
                     fileId: fileId,
-                    metadata: fileData.metadata
+                    metadata
                 });
 
                 results.updated++;
