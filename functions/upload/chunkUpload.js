@@ -4,6 +4,7 @@ import { TelegramAPI } from '../utils/storage/telegramAPI';
 import { DiscordAPI } from '../utils/storage/discordAPI';
 import { S3Client, CreateMultipartUploadCommand, UploadPartCommand, AbortMultipartUploadCommand } from "@aws-sdk/client-s3";
 import { getDatabase, checkDatabaseConfig } from '../utils/databaseAdapter.js';
+import { fetchPageConfig } from '../utils/sysConfig.js';
 
 // 初始化分块上传
 export async function initializeChunkedUpload(context) {
@@ -1271,8 +1272,17 @@ export async function uploadLargeFileToTelegram(context, file, fullId, metadata,
         // 异步结束上传
         waitUntil(endUpload(context, fullId, metadata));
 
+        // 构建公开访问链接（使用 urlPrefix 配置）
+        const pageConfig = await fetchPageConfig(env);
+        const urlPrefixConfig = pageConfig.config?.find(c => c.id === 'urlPrefix');
+        const urlPrefix = urlPrefixConfig?.value || '';
+        const responseBody = [{ 'src': returnLink }];
+        if (urlPrefix) {
+            responseBody[0].publicUrl = `${urlPrefix.replace(/\/+$/, '')}/${fullId}`;
+        }
+
         return createResponse(
-            JSON.stringify([{ 'src': returnLink }]),
+            JSON.stringify(responseBody),
             {
                 status: 200,
                 headers: {
