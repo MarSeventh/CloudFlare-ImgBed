@@ -5,7 +5,7 @@
  */
 
 import { HuggingFaceAPI } from '../../utils/storage/huggingfaceAPI.js';
-import { fetchUploadConfig } from '../../utils/sysConfig.js';
+import { fetchPageConfig, fetchUploadConfig } from '../../utils/sysConfig.js';
 import { getDatabase } from '../../utils/databaseAdapter.js';
 import { moderateContent, endUpload, getUploadIp, getIPAddress, sanitizeUploadFolder, createResponse } from '../uploadTools.js';
 import { userAuthCheck, UnauthorizedResponse } from '../../utils/auth/userAuth.js';
@@ -136,12 +136,22 @@ export async function onRequestPost(context) {
 
         // 返回成功响应
         const returnLink = `/file/${fullId}`;
-        return createResponse(JSON.stringify({
+        const responseBody = {
             success: true,
             src: returnLink,
             fileUrl,
             fullId
-        }), {
+        };
+
+        // 构建公开访问链接（使用 urlPrefix 配置）
+        const pageConfig = await fetchPageConfig(env);
+        const urlPrefixConfig = pageConfig.config?.find(c => c.id === 'urlPrefix');
+        const urlPrefix = urlPrefixConfig?.value || '';
+        if (urlPrefix) {
+            responseBody.publicUrl = `${urlPrefix.replace(/\/+$/, '')}/${fullId}`;
+        }
+
+        return createResponse(JSON.stringify(responseBody), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
         });

@@ -1,5 +1,5 @@
 import { userAuthCheck, UnauthorizedResponse } from "../utils/auth/userAuth";
-import { fetchUploadConfig, fetchSecurityConfig } from "../utils/sysConfig";
+import { fetchUploadConfig, fetchSecurityConfig, fetchPageConfig } from "../utils/sysConfig";
 import {
     createResponse, getUploadIp, getIPAddress, resolveFileExt,
     moderateContent, purgeCDNCache, isBlockedUploadIp, buildUniqueFileId, endUpload, getImageDimensions,
@@ -200,6 +200,12 @@ async function processFileUpload(context, formdata = null) {
         returnLink = `/file/${fullId}`;
     }
 
+    // 构建公开访问链接（使用 urlPrefix 配置）
+    const pageConfig = await fetchPageConfig(context.env);
+    const urlPrefixConfig = pageConfig.config?.find(c => c.id === 'urlPrefix');
+    const urlPrefix = urlPrefixConfig?.value || '';
+    context.publicUrl = urlPrefix ? `${urlPrefix.replace(/\/+$/, '')}/${fullId}` : '';
+
     /* ====================================不同渠道上传======================================= */
     // 出错是否切换渠道自动重试，默认开启
     const autoRetry = url.searchParams.get('autoRetry') === 'false' ? false : true;
@@ -265,6 +271,19 @@ async function processFileUpload(context, formdata = null) {
     return res;
 }
 
+// 构建上传成功响应，自动附带 publicUrl（如果已配置）
+function buildUploadResponse(context, returnLink) {
+    const result = { src: returnLink };
+    if (context.publicUrl) {
+        result.publicUrl = context.publicUrl;
+    }
+    return createResponse(JSON.stringify([result]), {
+        headers: {
+            'Content-Type': 'application/json',
+        },
+    });
+}
+
 // 上传到Cloudflare R2
 async function uploadFileToCloudflareR2(context, fullId, metadata, returnLink) {
     const { env, waitUntil, uploadConfig, formdata, specifiedChannelName } = context;
@@ -317,15 +336,7 @@ async function uploadFileToCloudflareR2(context, fullId, metadata, returnLink) {
     waitUntil(endUpload(context, fullId, metadata));
 
     // 成功上传，将文件ID返回给客户端
-    return createResponse(
-        JSON.stringify([{ 'src': `${returnLink}` }]),
-        {
-            status: 200,
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        }
-    );
+    return buildUploadResponse(context, returnLink);
 }
 
 
@@ -417,12 +428,7 @@ async function uploadFileToS3(context, fullId, metadata, returnLink) {
         // 结束上传
         waitUntil(endUpload(context, fullId, metadata));
 
-        return createResponse(JSON.stringify([{ src: returnLink }]), {
-            status: 200,
-            headers: {
-                "Content-Type": "application/json",
-            },
-        });
+        return buildUploadResponse(context, returnLink);
     } catch (error) {
         return createResponse(`Error: Failed to upload to S3 - ${error.message}`, { status: 500 });
     }
@@ -515,15 +521,7 @@ async function uploadFileToTelegram(context, fullId, metadata, fileExt, fileName
         metadata.FileSize = (fileInfo.file_size / 1024 / 1024).toFixed(2);
 
         // 将响应返回给客户端
-        res = createResponse(
-            JSON.stringify([{ 'src': `${returnLink}` }]),
-            {
-                status: 200,
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            }
-        );
+        res = buildUploadResponse(context, returnLink);
 
 
         // 图像审查（使用代理域名或官方域名）
@@ -583,15 +581,7 @@ async function uploadFileToExternal(context, fullId, metadata, returnLink) {
     waitUntil(endUpload(context, fullId, metadata));
 
     // 返回结果
-    return createResponse(
-        JSON.stringify([{ 'src': `${returnLink}` }]),
-        {
-            status: 200,
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        }
-    );
+    return buildUploadResponse(context, returnLink);
 }
 
 
@@ -671,13 +661,7 @@ async function uploadFileToDiscord(context, fullId, metadata, returnLink) {
         waitUntil(endUpload(context, fullId, metadata));
 
         // 返回成功响应
-        return createResponse(
-            JSON.stringify([{ 'src': returnLink }]),
-            {
-                status: 200,
-                headers: { 'Content-Type': 'application/json' }
-            }
-        );
+        return buildUploadResponse(context, returnLink);
 
     } catch (error) {
         console.error('Discord upload error:', error.message);
@@ -791,13 +775,7 @@ async function uploadFileToHuggingFace(context, fullId, metadata, returnLink) {
         waitUntil(endUpload(context, fullId, metadata));
 
         // 返回成功响应
-        return createResponse(
-            JSON.stringify([{ 'src': returnLink }]),
-            {
-                status: 200,
-                headers: { 'Content-Type': 'application/json' }
-            }
-        );
+        return buildUploadResponse(context, returnLink);
 
     } catch (error) {
         console.error('HuggingFace upload error:', error.message);
@@ -872,13 +850,7 @@ async function uploadFileToWebDAV(context, fullId, metadata, returnLink) {
 
         waitUntil(endUpload(context, fullId, metadata));
 
-        return createResponse(
-            JSON.stringify([{ 'src': returnLink }]),
-            {
-                status: 200,
-                headers: { 'Content-Type': 'application/json' }
-            }
-        );
+        return buildUploadResponse(context, returnLink);
     } catch (error) {
         console.error('WebDAV upload error:', error.message);
         return createResponse(`Error: WebDAV upload failed - ${error.message}`, { status: 500 });
