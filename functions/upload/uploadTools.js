@@ -31,35 +31,82 @@ export function generateShortId(length = 8) {
     return result;
 }
 
+const UNKNOWN_IP_ADDRESS = '未知';
+
 // 获取IP地址
-export async function getIPAddress(ip) {
-    let address = '未知';
+export async function getIPAddress(env, ip, securityConfig = null) {
+    if (!env || !ip) return UNKNOWN_IP_ADDRESS;
+
     try {
-        const ipInfo = await fetch(`https://apimobile.meituan.com/locate/v2/ip/loc?rgeo=true&ip=${ip}`);
-        const ipData = await ipInfo.json();
+        const config = securityConfig || await fetchSecurityConfig(env);
+        const ipQuery = config?.upload?.ipQuery;
 
-        if (ipInfo.ok && ipData.data) {
-            const lng = ipData.data?.lng || 0;
-            const lat = ipData.data?.lat || 0;
-
-            // 读取具体地址
-            const addressInfo = await fetch(`https://apimobile.meituan.com/group/v1/city/latlng/${lat},${lng}?tag=0`);
-            const addressData = await addressInfo.json();
-
-            if (addressInfo.ok && addressData.data) {
-                // 根据各字段是否存在，拼接地址
-                address = [
-                    addressData.data.detail,
-                    addressData.data.city,
-                    addressData.data.province,
-                    addressData.data.country
-                ].filter(Boolean).join(', ');
-            }
+        if (!ipQuery?.enabled || ipQuery.channel !== 'customApi') {
+            return UNKNOWN_IP_ADDRESS;
         }
+
+        const customApi = ipQuery.customApi || {};
+        if (!customApi.url) {
+            return UNKNOWN_IP_ADDRESS;
+        }
+
+        const responseFields = Array.isArray(customApi.responseFields)
+            ? customApi.responseFields
+                .map(field => typeof field === 'string' ? field : field?.path || '')
+                .filter(Boolean)
+            : [];
+        if (responseFields.length === 0) {
+            return UNKNOWN_IP_ADDRESS;
+        }
+
+        const replaceIpPlaceholder = value => String(value ?? '').replace(/\{ip\}/g, ip);
+        const queryUrl = new URL(replaceIpPlaceholder(customApi.url));
+        const paramList = Array.isArray(customApi.params) ? customApi.params : [];
+        for (const param of paramList) {
+            const key = replaceIpPlaceholder(param?.key || '');
+            if (!key) continue;
+            queryUrl.searchParams.append(key, replaceIpPlaceholder(param?.value || ''));
+        }
+
+        const response = await fetch(queryUrl.toString());
+        if (!response.ok) {
+            return UNKNOWN_IP_ADDRESS;
+        }
+
+        const data = JSON.parse((await response.text()).trim());
+        const formatValue = value => {
+            if (Array.isArray(value)) {
+                return value.map(formatValue).filter(Boolean).join(', ');
+            }
+            if (typeof value === 'object' && value !== null) {
+                return JSON.stringify(value);
+            }
+            return String(value ?? '').trim();
+        };
+
+        const address = responseFields
+            .map(path => {
+                const value = String(path)
+                    .replace(/\[(\d+)\]/g, '.$1')
+                    .split('.')
+                    .map(segment => segment.trim())
+                    .filter(Boolean)
+                    .reduce((current, segment) => {
+                        if (current === undefined || current === null) return undefined;
+                        return current[segment];
+                    }, data);
+
+                if (value === undefined || value === null || value === '') return '';
+                return formatValue(value);
+            })
+            .filter(Boolean)
+            .join('，');
+
+        return address || UNKNOWN_IP_ADDRESS;
     } catch (error) {
         console.error('Error fetching IP address:', error);
+        return UNKNOWN_IP_ADDRESS;
     }
-    return address;
 }
 
 // 处理文件名中的特殊字符

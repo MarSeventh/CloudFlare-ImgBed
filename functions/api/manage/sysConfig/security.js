@@ -154,6 +154,15 @@ export async function getSecurityConfig(db, env) {
             channel: kvUpload.moderate?.channel || 'moderatecontent.com', // [moderatecontent.com, nsfwjs]
             moderateContentApiKey: kvUpload.moderate?.moderateContentApiKey || kvUpload.moderate?.apiKey || env.ModerateContentApiKey || '',
             nsfwApiPath: kvUpload.moderate?.nsfwApiPath || '',
+        },
+        ipQuery: {
+            enabled: kvUpload.ipQuery?.enabled ?? false,
+            channel: kvUpload.ipQuery?.channel || 'customApi',
+            customApi: {
+                url: kvUpload.ipQuery?.customApi?.url || '',
+                params: normalizeIpQueryParams(kvUpload.ipQuery?.customApi?.params),
+                responseFields: normalizeIpQueryResponseFields(kvUpload.ipQuery?.customApi?.responseFields)
+            }
         }
     }
     settings.upload = upload
@@ -178,4 +187,26 @@ export async function getSecurityConfig(db, env) {
     settings.apiTokens = apiTokens
 
     return settings;
+}
+
+function normalizeIpQueryParams(params) {
+    if (!Array.isArray(params) || params.length === 0) {
+        return [{ key: 'ip', value: '{ip}' }];
+    }
+
+    return params.map(param => ({
+        key: param?.key || '',
+        value: param?.value || ''
+    }));
+}
+
+function normalizeIpQueryResponseFields(fields) {
+    if (!Array.isArray(fields)) {
+        return [];
+    }
+
+    return fields.map(field => {
+        if (typeof field === 'string') return field;
+        return field?.path || '';
+    });
 }
