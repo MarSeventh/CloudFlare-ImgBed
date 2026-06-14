@@ -37,7 +37,7 @@ jobs:
         if: success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run deploy-worker.yml --ref main
+        run: gh workflow run deploy-worker.yml --repo "${{ github.repository }}" --ref main
 
       - name: Sync check
         if: failure()
