@@ -2,6 +2,7 @@ name: Upstream Sync
 
 permissions:
   contents: write
+  actions: write
 
 on:
   schedule:
@@ -31,6 +32,12 @@ jobs:
 
           # Set test_mode true to run tests instead of the true action!!
           test_mode: false
+
+      - name: Trigger Worker deploy
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run deploy-worker.yml --ref main
 
       - name: Sync check
         if: failure()
