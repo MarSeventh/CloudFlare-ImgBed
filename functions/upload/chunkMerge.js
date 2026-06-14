@@ -165,7 +165,7 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
             FileType: originalFileType,
             FileSize: '0', // 会在最终合并后更新
             UploadIP: uploadIp,
-            UploadAddress: await getIPAddress(uploadIp),
+            UploadAddress: await getIPAddress(env, uploadIp, context.securityConfig),
             ListType: "None",
             TimeStamp: Date.now(),
             Label: "None",
