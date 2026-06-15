@@ -13,6 +13,9 @@
 name = "cloudflare-imgbed"
 main = "index.js"
 compatibility_date = "2024-08-21"
+# 让 Worker 对自身 zone 的 fetch() 走公网前门（否则同域自调用绕过 Worker
+# 直连 origin，没有 origin 时会秒回 522）。修复 WebDAV 列目录/上传/下载/删除。
+compatibility_flags = ["global_fetch_strictly_public"]
 
 # 静态资源（前端文件）
 [assets]
