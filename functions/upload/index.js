@@ -91,7 +91,7 @@ async function processFileUpload(context, formdata = null) {
 
     // 获取IP地址
     const uploadIp = getUploadIp(request);
-    const ipAddress = await getIPAddress(uploadIp);
+    const ipAddress = await getIPAddress(context.env, uploadIp, context.securityConfig);
 
     // 获取上传文件夹路径
     let uploadFolder = url.searchParams.get('uploadFolder') || '';

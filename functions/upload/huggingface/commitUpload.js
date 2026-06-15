@@ -92,7 +92,7 @@ export async function onRequestPost(context) {
 
         // 获取上传IP和地址
         const uploadIp = getUploadIp(request) || '';
-        const uploadAddress = await getIPAddress(uploadIp);
+        const uploadAddress = await getIPAddress(env, uploadIp);
 
         // 构建 metadata
         const metadata = {
