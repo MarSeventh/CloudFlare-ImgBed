@@ -86,7 +86,7 @@ export async function onRequest(context) {
             status: 200,
             headers: {
                 'Content-Type': 'application/json',
-                'Cache-Control': 'public, max-age=60' // Cache for 1 minute
+                'Cache-Control': 'private, max-age=60'
             }
         });
 
