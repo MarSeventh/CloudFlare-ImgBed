@@ -3,6 +3,7 @@ import { createResponse, getUploadIp, getIPAddress, selectConsistentChannel, bui
 import { retryFailedChunks, cleanupFailedMultipartUploads, checkChunkUploadStatuses, cleanupChunkData, cleanupUploadSession } from './chunkUpload';
 import { S3Client, CompleteMultipartUploadCommand } from "@aws-sdk/client-s3";
 import { getDatabase } from '../utils/databaseAdapter.js';
+import { fetchPageConfig } from '../utils/sysConfig.js';
 
 // 处理分块合并
 export async function handleChunkMerge(context) {
@@ -112,6 +113,18 @@ async function startMerge(context, uploadId, totalChunks, originalFileName, orig
             // 清理上传会话
             await cleanupUploadSession(env, uploadId);
 
+            // 构建公开访问链接（使用 urlPrefix 配置）
+            if (result.result && result.result.length > 0) {
+                const src = result.result[0].src;
+                const fileName = src.startsWith('/file/') ? src.slice(6) : src.split('/file/').pop();
+                const pageConfig = await fetchPageConfig(env);
+                const urlPrefixConfig = pageConfig.config?.find(c => c.id === 'urlPrefix');
+                const urlPrefix = urlPrefixConfig?.value || '';
+                if (urlPrefix) {
+                    result.result[0].publicUrl = `${urlPrefix.replace(/\/+$/, '')}/${fileName}`;
+                }
+            }
+
             return createResponse(JSON.stringify(result.result), {
                 status: 200,
                 headers: { 'Content-Type': 'application/json' }
@@ -152,7 +165,7 @@ async function handleChannelBasedMerge(context, uploadId, totalChunks, originalF
             FileType: originalFileType,
             FileSize: '0', // 会在最终合并后更新
             UploadIP: uploadIp,
-            UploadAddress: await getIPAddress(uploadIp),
+            UploadAddress: await getIPAddress(env, uploadIp, context.securityConfig),
             ListType: "None",
             TimeStamp: Date.now(),
             Label: "None",
