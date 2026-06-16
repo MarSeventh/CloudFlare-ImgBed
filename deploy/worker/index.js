@@ -175,6 +175,10 @@ async function executeChain(middlewares, handler, context) {
     return await context.next();
 }
 
+
+// ==================== Worker Cache ====================
+
+// 统一缓存键，HEAD 与 GET 共用完整 GET 响应缓存
 function createCacheKeyRequest(request) {
     return new Request(request.url, {
         method: 'GET',
@@ -182,6 +186,7 @@ function createCacheKeyRequest(request) {
     });
 }
 
+// 解析 Cache-Control 指令，支持 max-age/s-maxage 等数值字段
 function parseCacheDirective(cacheControl, directive) {
     if (!cacheControl) return null;
 
@@ -221,6 +226,7 @@ function isCacheLookupRequest(request) {
     return request.method === 'GET' || request.method === 'HEAD';
 }
 
+// 只写入完整 GET 响应，Range 请求仅尝试命中已有完整缓存
 function isCacheStoreRequest(request) {
     return request.method === 'GET' && !request.headers.has('Range');
 }
@@ -265,6 +271,7 @@ async function maybeServeFromCache(request, ctx, producer) {
 
     const response = await producer();
 
+    // 按业务代码返回的 Cache-Control 决定是否写入 Worker Cache
     if (isCacheableResponse(request, response)) {
         ctx.waitUntil(cache.put(cacheKey, response.clone()).catch(error => {
             console.warn('Failed to store response in Worker cache:', error.message);
