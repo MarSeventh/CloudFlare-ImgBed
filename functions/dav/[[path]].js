@@ -188,6 +188,7 @@ async function handlePut(request, env) {
     formData.append('file', fileContent, fileName);
 
     const uploadUrl = new URL(`/upload`, request.url);
+    uploadUrl.searchParams.set('uploadNameType', 'origin'); // WebDAV 规范：使用原始文件名
     if (uploadFolder) {
         uploadUrl.searchParams.set('uploadFolder', uploadFolder);
     }
