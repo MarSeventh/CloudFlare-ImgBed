@@ -25,7 +25,8 @@ export async function onRequest(context) {
         case 'PROPFIND': return handlePropfind(modifiedRequest, env);
         case 'PUT': return handlePut(modifiedRequest, env);
         case 'DELETE': return handleDelete(modifiedRequest, env);
-        case 'GET': return handleGet(modifiedRequest, env);
+        case 'GET': 
+        case 'HEAD': return handleGet(modifiedRequest, env); // 增加了对 HEAD 请求的支持
         case 'MOVE': return handleMove(modifiedRequest, env, context);
         case 'MKCOL': return new Response(null, { status: 201 });
         default: return new Response('Method Not Allowed', { status: 405 });
@@ -118,7 +119,7 @@ function handleOptions(request) {
     return new Response(null, {
         status: 200,
         headers: {
-            'Allow': 'OPTIONS, GET, PUT, DELETE, PROPFIND, MOVE, MKCOL',
+            'Allow': 'OPTIONS, GET, HEAD, PUT, DELETE, PROPFIND, MOVE, MKCOL', // 加入了 HEAD 支持声明
             'DAV': '1',
             'MS-Author-Via': 'DAV',
         },
@@ -142,18 +143,11 @@ async function handleGet(request, env) {
         try {
             const fileUrl = new URL(`/file${path}`, request.url);
 
-            const fileResponse = await fetch(fileUrl.toString());
-
-            if (!fileResponse.ok) {
-                 return new Response('File not found', { status: fileResponse.status, statusText: fileResponse.statusText });
-            }
-
-            const response = new Response(fileResponse.body, fileResponse);
-            response.headers.set('Access-Control-Allow-Origin', '*');
-
-            return response;
+            // 直接返回 307 临时重定向，让客户端直连 /file 下载或播放
+            return Response.redirect(fileUrl.toString(), 307);
+            
         } catch (error) {
-            console.error('GET (file) failed:', error.stack);
+            console.error('GET/HEAD (file) failed:', error.stack);
             return new Response(`Error getting file: ${error.message}`, { status: 500 });
         }
     }
