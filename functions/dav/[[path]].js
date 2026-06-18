@@ -116,7 +116,7 @@ async function checkAuth(request, env) {
 
 function handleOptions(request) {
     return new Response(null, {
-        status: 204,
+        status: 200,
         headers: {
             'Allow': 'OPTIONS, GET, PUT, DELETE, PROPFIND, MOVE, MKCOL',
             'DAV': '1',
