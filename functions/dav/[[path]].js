@@ -273,6 +273,25 @@ async function handlePropfind(request, env) {
             }
         }
 
+        // 检查请求路径是否为目录
+        let isDir = false;
+        if (path === '/') {
+            isDir = true;
+        } else {
+            const dir = path.startsWith('/') ? path.substring(1) : path;
+            const cleanDir = dir.endsWith('/') ? dir : dir + '/';
+            // 如果数据库中存在以当前路径为前缀的键，说明目录存在
+            const listResponse = await db.list({ prefix: cleanDir, limit: 1 });
+            if (listResponse.keys && listResponse.keys.length > 0) {
+                isDir = true;
+            }
+        }
+
+        // 如果路径既不是文件也不是目录，直接返回 404
+        if (!isFile && !isDir) {
+            return new Response('Not Found', { status: 404 });
+        }
+
         let xml;
         if (isFile) {
             xml = `<?xml version="1.0" encoding="utf-8"?><D:multistatus xmlns:D="DAV:">${createFileXml(fileInfo)}</D:multistatus>`;
