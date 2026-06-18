@@ -6,11 +6,17 @@ import { createApiToken } from "../api/manage/apiTokens";
 export async function onRequest(context) {
     const { request, env } = context;
 
+    // WebDAV 规范：如果请求的是根目录 /dav 但没有斜杠，重定向到 /dav/，以保证客户端的 href 匹配
+    const url = new URL(request.url);
+    if (url.pathname === '/dav') {
+        url.pathname = '/dav/';
+        return Response.redirect(url.toString(), 301);
+    }
+
     const authResponse = await checkAuth(request, env);
     if (authResponse) return authResponse;
 
     // 从请求路径中替换第一个 /dav 部分
-    const url = new URL(request.url);
     url.pathname = url.pathname.replace(/^\/dav/, '') || '/';
     const modifiedRequest = new Request(url.toString(), request);
 
