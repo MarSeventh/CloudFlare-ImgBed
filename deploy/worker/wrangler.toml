@@ -31,9 +31,9 @@ not_found_handling = "single-page-application"
 # database_name = "img_d1"
 # database_id = ""
 
-[[r2_buckets]]
-binding = "img_r2"
-bucket_name = "imgbed"
+# [[r2_buckets]]
+# binding = "img_r2"
+# bucket_name = "imgbed"
 
 # [[kv_namespaces]]
 # binding = "img_url"
