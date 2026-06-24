@@ -35,6 +35,6 @@ not_found_handling = "single-page-application"
 binding = "img_r2"
 bucket_name = "imgbed"
 
-[[kv_namespaces]]
-binding = "img_url"
-id = "img_url"
+# [[kv_namespaces]]
+# binding = "img_url"
+# id = "img_url"
