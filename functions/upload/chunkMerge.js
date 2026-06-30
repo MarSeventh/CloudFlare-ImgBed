@@ -450,6 +450,7 @@ async function mergeTelegramChunksInfo(context, uploadId, completedChunks, metad
         const chunks = sortedChunks.map(chunk => ({
             index: chunk.index,
             fileId: chunk.uploadResult.fileId,
+            messageId: chunk.uploadResult.messageId,
             size: chunk.uploadResult.size,
             fileName: chunk.uploadResult.fileName
         }));

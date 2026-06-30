@@ -4,11 +4,13 @@ import { removeFileFromIndex, batchRemoveFilesFromIndex } from "../../../utils/i
 import { getDatabase } from '../../../utils/databaseAdapter.js';
 import { DiscordAPI } from '../../../utils/storage/discordAPI.js';
 import { HuggingFaceAPI } from '../../../utils/storage/huggingfaceAPI.js';
+import { TelegramAPI } from '../../../utils/storage/telegramAPI.js';
 import { WebDAVAPI } from '../../../utils/storage/webdavAPI.js';
 import {
     resolveDiscordCredentials,
     resolveHuggingFaceCredentials,
     resolveS3Credentials,
+    resolveTelegramCredentials,
     resolveWebDAVCredentials,
 } from '../../../utils/metadata/channelCredentials.js';
 
@@ -158,6 +160,11 @@ async function deleteFile(env, fileId, cdnUrl, url) {
             await deleteDiscordFile(env, img);
         }
 
+        // Telegram 渠道的图片，需要删除 Telegram 中对应的消息
+        if (img.metadata?.Channel === 'TelegramNew') {
+            await deleteTelegramFile(env, img);
+        }
+
         // HuggingFace 渠道的图片，需要删除 HuggingFace 中对应的文件
         if (img.metadata?.Channel === 'HuggingFace') {
             await deleteHuggingFaceFile(env, img);
@@ -240,6 +247,75 @@ async function deleteDiscordFile(env, img) {
         console.error("Discord Delete Failed:", error);
         return false;
     }
+}
+
+// 删除 Telegram 渠道的图片（删除 Telegram 消息）
+async function deleteTelegramFile(env, img) {
+    const db = getDatabase(env);
+    const telegramCredentials = await resolveTelegramCredentials(db, env, img.metadata);
+    const botToken = telegramCredentials.botToken;
+    const chatId = telegramCredentials.chatId;
+    const proxyUrl = telegramCredentials.proxyUrl || '';
+
+    if (!botToken || !chatId) {
+        console.warn('Telegram file missing required channel config for deletion');
+        return false;
+    }
+
+    try {
+        const telegramAPI = new TelegramAPI(botToken, proxyUrl);
+        if (img.metadata?.IsChunked === true) {
+            return await deleteTelegramChunkedFile(telegramAPI, chatId, img);
+        }
+
+        const messageId = img.metadata?.TgMessageId;
+        if (!messageId) {
+            console.warn('Telegram file missing TgMessageId, skipping source message deletion');
+            return true;
+        }
+
+        const success = await telegramAPI.deleteMessage(chatId, messageId);
+        if (!success) {
+            console.error('Telegram Delete Failed: API returned false');
+        }
+        return success;
+    } catch (error) {
+        console.error("Telegram Delete Failed:", error);
+        return false;
+    }
+}
+
+async function deleteTelegramChunkedFile(telegramAPI, chatId, img) {
+    let chunks = [];
+    try {
+        chunks = img.value ? JSON.parse(img.value) : [];
+    } catch (error) {
+        console.warn('Telegram chunked file has invalid chunks data, skipping source message deletion');
+        return true;
+    }
+
+    if (!Array.isArray(chunks) || chunks.length === 0) {
+        console.warn('Telegram chunked file has no chunks data, skipping source message deletion');
+        return true;
+    }
+
+    const chunksWithMessageIds = chunks.filter(chunk => chunk.messageId);
+    if (chunksWithMessageIds.length === 0) {
+        console.warn('Telegram chunked file missing messageId metadata, skipping source message deletion');
+        return true;
+    }
+
+    const results = await Promise.all(chunksWithMessageIds.map(chunk =>
+        telegramAPI.deleteMessage(chatId, chunk.messageId)
+    ));
+
+    const failedCount = results.filter(success => !success).length;
+    if (failedCount > 0) {
+        console.error(`Telegram Delete Failed: ${failedCount}/${chunksWithMessageIds.length} chunk messages failed`);
+        return false;
+    }
+
+    return true;
 }
 
 
