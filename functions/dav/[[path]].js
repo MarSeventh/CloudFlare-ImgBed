@@ -6,11 +6,17 @@ import { createApiToken } from "../api/manage/apiTokens";
 export async function onRequest(context) {
     const { request, env } = context;
 
+    // WebDAV 规范：如果请求的是根目录 /dav 但没有斜杠，重定向到 /dav/，以保证客户端的 href 匹配
+    const url = new URL(request.url);
+    if (url.pathname === '/dav') {
+        url.pathname = '/dav/';
+        return Response.redirect(url.toString(), 301);
+    }
+
     const authResponse = await checkAuth(request, env);
     if (authResponse) return authResponse;
 
     // 从请求路径中替换第一个 /dav 部分
-    const url = new URL(request.url);
     url.pathname = url.pathname.replace(/^\/dav/, '') || '/';
     const modifiedRequest = new Request(url.toString(), request);
 
@@ -20,6 +26,7 @@ export async function onRequest(context) {
         case 'PUT': return handlePut(modifiedRequest, env);
         case 'DELETE': return handleDelete(modifiedRequest, env);
         case 'GET': return handleGet(modifiedRequest, env);
+        case 'MOVE': return handleMove(modifiedRequest, env, context);
         case 'MKCOL': return new Response(null, { status: 201 });
         default: return new Response('Method Not Allowed', { status: 405 });
     }
@@ -30,20 +37,23 @@ export async function onRequest(context) {
 async function getApiHeaders(env) {
     const othersConfig = await fetchOthersConfig(env);
     let token = othersConfig.webDAV.internalToken;
+    let tokenId = othersConfig.webDAV.internalTokenId;
+
+    const db = getDatabase(env);
 
     // token 不存在时自动创建并更新 WebDAV 设置
     if (!token) {
-        const db = getDatabase(env);
         const tokenResult = await createApiToken(
             db,
             'WebDAV Internal Token',
-            ['list', 'upload', 'delete'],
+            ['list', 'upload', 'delete', 'manage'],
             'system',
             null,
             false,
             'internal'
         );
         token = tokenResult.token;
+        tokenId = tokenResult.id;
 
         // 更新 others config 中的 WebDAV 设置
         const settingsStr = await db.get('manage@sysConfig@others');
@@ -52,6 +62,18 @@ async function getApiHeaders(env) {
         settings.webDAV.internalToken = token;
         settings.webDAV.internalTokenId = tokenResult.id;
         await db.put('manage@sysConfig@others', JSON.stringify(settings));
+    } else if (tokenId) {
+        // 自愈：确保已存在的 token 具有 'manage' 权限，以便执行 MOVE 操作
+        const settingsStr = await db.get('manage@sysConfig@security');
+        const settings = settingsStr ? JSON.parse(settingsStr) : {};
+        if (settings.apiTokens?.tokens?.[tokenId]) {
+            const tokenData = settings.apiTokens.tokens[tokenId];
+            if (!tokenData.permissions.includes('manage')) {
+                tokenData.permissions.push('manage');
+                tokenData.updatedAt = new Date().toISOString();
+                await db.put('manage@sysConfig@security', JSON.stringify(settings));
+            }
+        }
     }
 
     return {
@@ -94,10 +116,10 @@ async function checkAuth(request, env) {
 
 function handleOptions(request) {
     return new Response(null, {
-        status: 204,
+        status: 200,
         headers: {
-            'Allow': 'OPTIONS, GET, PUT, DELETE, PROPFIND, MKCOL',
-            'DAV': '1, 2',
+            'Allow': 'OPTIONS, GET, PUT, DELETE, PROPFIND, MOVE, MKCOL',
+            'DAV': '1',
             'MS-Author-Via': 'DAV',
         },
     });
@@ -166,6 +188,7 @@ async function handlePut(request, env) {
     formData.append('file', fileContent, fileName);
 
     const uploadUrl = new URL(`/upload`, request.url);
+    uploadUrl.searchParams.set('uploadNameType', 'origin'); // WebDAV 规范：使用原始文件名
     if (uploadFolder) {
         uploadUrl.searchParams.set('uploadFolder', uploadFolder);
     }
@@ -230,14 +253,203 @@ async function handleDelete(request, env) {
 
 async function handlePropfind(request, env) {
     const path = decodeURIComponent(new URL(request.url).pathname);
+    const depth = request.headers.get('Depth') || '1';
+    
     try {
-        const dir = path === '/' ? '' : path.substring(1, path.endsWith('/') ? path.length - 1 : path.length);
-        const contents = await fetchDirectoryContents(dir, env, request);
-        const xml = generateWebDAVXml(path, contents);
+        const db = getDatabase(env);
+        
+        // 检查请求路径是否为文件
+        let isFile = false;
+        let fileInfo = null;
+        if (path !== '/') {
+            const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+            const fileData = await db.getWithMetadata(cleanPath);
+            if (fileData && fileData.metadata) {
+                isFile = true;
+                fileInfo = {
+                    name: cleanPath,
+                    metadata: fileData.metadata
+                };
+            }
+        }
+
+        // 检查请求路径是否为目录
+        let isDir = false;
+        if (path === '/') {
+            isDir = true;
+        } else {
+            const dir = path.startsWith('/') ? path.substring(1) : path;
+            const cleanDir = dir.endsWith('/') ? dir : dir + '/';
+            // 如果数据库中存在以当前路径为前缀的键，说明目录存在
+            const listResponse = await db.list({ prefix: cleanDir, limit: 1 });
+            if (listResponse.keys && listResponse.keys.length > 0) {
+                isDir = true;
+            }
+        }
+
+        // 如果路径既不是文件也不是目录，直接返回 404
+        if (!isFile && !isDir) {
+            return new Response('Not Found', { status: 404 });
+        }
+
+        let xml;
+        if (isFile) {
+            xml = `<?xml version="1.0" encoding="utf-8"?><D:multistatus xmlns:D="DAV:">${createFileXml(fileInfo)}</D:multistatus>`;
+        } else {
+            const dir = path === '/' ? '' : path.substring(1, path.endsWith('/') ? path.length - 1 : path.length);
+            let contents = { files: [], directories: [] };
+            if (depth !== '0') {
+                contents = await fetchDirectoryContents(dir, env, request);
+            }
+            xml = generateWebDAVXml(path, contents, depth);
+        }
+        
         return new Response(xml, { status: 207, headers: { 'Content-Type': 'application/xml; charset=utf-8' } });
     } catch (error) {
         console.error('Propfind failed:', error.stack);
         return new Response(`Failed to list files: ${error.message}`, { status: 500 });
+    }
+}
+
+async function handleMove(request, env, context) {
+    const destinationHeader = request.headers.get('Destination');
+    if (!destinationHeader) {
+        return new Response('Destination header is required', { status: 400 });
+    }
+
+    let destinationUrl;
+    try {
+        destinationUrl = new URL(destinationHeader);
+    } catch (e) {
+        return new Response('Invalid Destination URL', { status: 400 });
+    }
+
+    const requestUrl = new URL(request.url);
+    if (destinationUrl.host !== requestUrl.host) {
+        return new Response('Cannot move resource to a different server', { status: 502 });
+    }
+
+    const sourcePath = decodeURIComponent(requestUrl.pathname);
+    const cleanSource = sourcePath.startsWith('/') ? sourcePath.substring(1) : sourcePath;
+
+    let destPath = decodeURIComponent(destinationUrl.pathname);
+    destPath = destPath.replace(/^\/dav/, '') || '/';
+    const cleanDest = destPath.startsWith('/') ? destPath.substring(1) : destPath;
+
+    if (!cleanSource || !cleanDest) {
+        return new Response('Invalid source or destination path', { status: 400 });
+    }
+
+    const overwrite = request.headers.get('Overwrite') !== 'F';
+
+    try {
+        const db = getDatabase(env);
+
+        // 检查源路径是否为目录
+        let isFolder = cleanSource.endsWith('/');
+        let lookupSource = isFolder ? cleanSource.slice(0, -1) : cleanSource;
+
+        if (!isFolder) {
+            const listResponse = await db.list({ prefix: lookupSource + '/', limit: 1 });
+            if (listResponse.keys && listResponse.keys.length > 0) {
+                isFolder = true;
+            }
+        }
+
+        let lookupDest = cleanDest.endsWith('/') ? cleanDest.slice(0, -1) : cleanDest;
+
+        // 处理覆盖逻辑：如果目标存在且允许覆盖，先将其删除
+        let destExisted = false;
+        const existingFile = await db.getWithMetadata(lookupDest);
+        if (existingFile && existingFile.value !== null) {
+            destExisted = true;
+            if (!overwrite) {
+                return new Response('Precondition Failed', { status: 412 });
+            }
+            const deleteUrl = new URL(`/api/manage/delete/${encodeURIComponent(lookupDest)}`, request.url);
+            const deleteResponse = await fetch(deleteUrl.toString(), {
+                method: 'DELETE',
+                headers: await getApiHeaders(env)
+            });
+            if (!deleteResponse.ok) {
+                return new Response('Failed to delete existing destination file', { status: 500 });
+            }
+        } else {
+            const listResponse = await db.list({ prefix: lookupDest + '/', limit: 1 });
+            if (listResponse.keys && listResponse.keys.length > 0) {
+                destExisted = true;
+                if (!overwrite) {
+                    return new Response('Precondition Failed', { status: 412 });
+                }
+                const deleteUrl = new URL(`/api/manage/delete/${encodeURIComponent(lookupDest)}`, request.url);
+                deleteUrl.searchParams.set('folder', 'true');
+                const deleteResponse = await fetch(deleteUrl.toString(), {
+                    method: 'DELETE',
+                    headers: await getApiHeaders(env)
+                });
+                if (!deleteResponse.ok) {
+                    return new Response('Failed to delete existing destination folder', { status: 500 });
+                }
+            }
+        }
+
+        if (isFolder) {
+            // 递归列出目录下的所有文件并重命名
+            const listUrl = new URL(`/api/manage/list`, request.url);
+            listUrl.searchParams.set('dir', lookupSource);
+            listUrl.searchParams.set('count', -1);
+            listUrl.searchParams.set('recursive', 'true');
+            
+            const listResponse = await fetch(listUrl.toString(), { headers: await getApiHeaders(env) });
+            if (!listResponse.ok) {
+                return new Response('Failed to list source folder contents', { status: 500 });
+            }
+            const listData = await listResponse.json();
+
+            const filesToMove = listData.files || [];
+            for (const file of filesToMove) {
+                const relativePath = file.name.substring(lookupSource.length);
+                const newFileId = lookupDest + relativePath;
+
+                const renameUrl = new URL(`/api/manage/rename/${encodeURIComponent(file.name)}`, request.url);
+                const renameResponse = await fetch(renameUrl.toString(), {
+                    method: 'POST',
+                    headers: {
+                        ...(await getApiHeaders(env)),
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ newFileId })
+                });
+
+                if (!renameResponse.ok) {
+                    const errorMsg = await renameResponse.text();
+                    return new Response(`Failed to move file ${file.name}: ${errorMsg}`, { status: 500 });
+                }
+            }
+            
+            return new Response(null, { status: destExisted ? 204 : 201 });
+        } else {
+            // 单个文件重命名/移动
+            const renameUrl = new URL(`/api/manage/rename/${encodeURIComponent(lookupSource)}`, request.url);
+            const renameResponse = await fetch(renameUrl.toString(), {
+                method: 'POST',
+                headers: {
+                    ...(await getApiHeaders(env)),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ newFileId: lookupDest })
+            });
+
+            if (renameResponse.ok) {
+                return new Response(null, { status: destExisted ? 204 : 201 });
+            } else {
+                const errorMsg = await renameResponse.text();
+                return new Response(`Rename failed: ${errorMsg}`, { status: 500 });
+            }
+        }
+    } catch (error) {
+        console.error('MOVE operation failed:', error.stack);
+        return new Response(`Internal server error: ${error.message}`, { status: 500 });
     }
 }
 
@@ -300,30 +512,36 @@ function generateDirectoryListingHtml(basePath, contents) {
     return `<!DOCTYPE html><html><head><title>Index of ${basePath}</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{font-family:sans-serif;padding:20px}li{margin:5px 0}</style></head><body><h1>Index of ${basePath}</h1><ul>${parentDirLink}${dirLinks}${fileLinks}</ul></body></html>`;
 }
 
-function generateWebDAVXml(basePath, contents) {
+function generateWebDAVXml(basePath, contents, depth) {
     let responses = '';
-    const currentPath = basePath.endsWith('/') ? basePath : `${basePath}/`;
+    const prefixPath = basePath.startsWith('/dav/') ? basePath : `/dav${basePath.startsWith('/') ? '' : '/'}${basePath}`;
+    const currentPath = prefixPath.endsWith('/') ? prefixPath : `${prefixPath}/`;
 
     responses += createCollectionXml(currentPath);
 
-    for (const dir of contents.directories) {
-        responses += createCollectionXml(`/${dir}/`);
-    }
-    for (const file of contents.files) {
-        responses += createFileXml(file);
+    if (depth !== '0') {
+        for (const dir of contents.directories) {
+            const dirPath = dir.startsWith('dav/') ? `/${dir}/` : `/dav/${dir}/`;
+            responses += createCollectionXml(dirPath);
+        }
+        for (const file of contents.files) {
+            responses += createFileXml(file);
+        }
     }
     return `<?xml version="1.0" encoding="utf-8"?><D:multistatus xmlns:D="DAV:">${responses}</D:multistatus>`;
 }
 
 function createCollectionXml(path) {
-    const now = new Date().toUTCString();
+    const now = new Date();
+    const creationDate = now.toISOString();
+    const lastModified = now.toUTCString();
+    const pathWithSlash = path.endsWith('/') ? path : `${path}/`;
     const cleanPath = path.endsWith('/') ? path.slice(0, -1) : path;
     const name = cleanPath.split('/').pop() || '';
-    return `<D:response><D:href>${encodeURI(path)}</D:href><D:propstat><D:prop><D:displayname>${name}</D:displayname><D:resourcetype><D:collection/></D:resourcetype><D:creationdate>${now}</D:creationdate><D:getlastmodified>${now}</D:getlastmodified></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>`;
+    return `<D:response><D:href>${encodeURI(pathWithSlash)}</D:href><D:propstat><D:prop><D:displayname>${name}</D:displayname><D:resourcetype><D:collection/></D:resourcetype><D:creationdate>${creationDate}</D:creationdate><D:getlastmodified>${lastModified}</D:getlastmodified></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>`;
 }
 
 function createFileXml(file) {
-    // 文件大小：优先 FileSizeBytes（字节），回退到 FileSize（MB）转字节
     let fileSize = "0";
     if (file.metadata) {
         if (file.metadata['FileSizeBytes']) {
@@ -332,10 +550,11 @@ function createFileXml(file) {
             fileSize = String(Math.round(parseFloat(file.metadata['FileSize']) * 1024 * 1024));
         }
     }
-    // 修改时间：使用上传时间戳，回退到当前时间
-    const timestamp = file.metadata && file.metadata['TimeStamp']
-        ? new Date(Number(file.metadata['TimeStamp'])).toUTCString()
-        : new Date().toUTCString();
+    const fileTime = file.metadata && file.metadata['TimeStamp']
+        ? new Date(Number(file.metadata['TimeStamp']))
+        : new Date();
+    const creationDate = fileTime.toISOString();
+    const lastModified = fileTime.toUTCString();
     const contentType = file.metadata && file.metadata['FileType'] ? file.metadata['FileType'] : "application/octet-stream";
-    return `<D:response><D:href>${encodeURI(`/dav/${file.name}`)}</D:href><D:propstat><D:prop><D:displayname>${file.name.split('/').pop()}</D:displayname><D:resourcetype/><D:creationdate>${timestamp}</D:creationdate><D:getlastmodified>${timestamp}</D:getlastmodified><D:getcontentlength>${fileSize}</D:getcontentlength><D:getcontenttype>${contentType}</D:getcontenttype></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>`;
+    return `<D:response><D:href>${encodeURI(`/dav/${file.name}`)}</D:href><D:propstat><D:prop><D:displayname>${file.name.split('/').pop()}</D:displayname><D:resourcetype/><D:creationdate>${creationDate}</D:creationdate><D:getlastmodified>${lastModified}</D:getlastmodified><D:getcontentlength>${fileSize}</D:getcontentlength><D:getcontenttype>${contentType}</D:getcontenttype></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>`;
 }

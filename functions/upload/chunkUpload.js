@@ -30,7 +30,7 @@ export async function initializeChunkedUpload(context) {
 
         // 获取上传IP
         const uploadIp = getUploadIp(request);
-        const ipAddress = await getIPAddress(uploadIp);
+        const ipAddress = await getIPAddress(env, uploadIp, context.securityConfig);
 
         // 获取上传渠道
         const uploadChannel = url.searchParams.get('uploadChannel') || 'telegram';

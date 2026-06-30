@@ -13,6 +13,8 @@
 name = "cloudflare-imgbed"
 main = "index.js"
 compatibility_date = "2024-08-21"
+# 让 Worker 对自身 zone 的 fetch() 走公网入口，不要直连 origin。
+compatibility_flags = ["global_fetch_strictly_public"]
 
 # 静态资源（前端文件）
 [assets]

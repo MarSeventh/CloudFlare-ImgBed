@@ -1,3 +1,7 @@
+/**
+ * 用户端页面配置 API
+ * 负责读取页面配置并转换为前端可直接使用的用户配置对象
+ */
 import { fetchPageConfig } from "../utils/sysConfig";
 
 export async function onRequest(context) {
