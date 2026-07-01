@@ -10,7 +10,7 @@
 # GitHub Actions 部署时会自动从 Secrets/Variables 生成此文件，
 # 无需手动编辑。详见 .github/workflows/deploy-worker.yml
 
-name = "cloudflare-imgbed"
+name = "image-bed"
 main = "index.js"
 compatibility_date = "2024-08-21"
 # 让 Worker 对自身 zone 的 fetch() 走公网入口，不要直连 origin。
