@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS files (
     channel TEXT,
     channel_name TEXT,
     tg_file_id TEXT,
+    tg_message_id TEXT,
     tg_chat_id TEXT,
     tg_bot_token TEXT,
     is_chunked BOOLEAN DEFAULT FALSE,
