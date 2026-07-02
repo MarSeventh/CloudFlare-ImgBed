@@ -9,7 +9,7 @@ on:
       worker_name:
         description: 'Worker Name'
         required: false
-        default: 'cloudflare-imgbed'
+        default: ''
 
 # 所有配置均通过 Secrets 传入（public 仓库的 Variables 对所有人可见，不安全）
 #
