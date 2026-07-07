@@ -154,6 +154,7 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 
 <details>
     <summary>Other page screenshots</summary>
+    
 ![image-20250313204101984](readme/login.png)
 
 ![image-20250313204138886](readme/uploading.png)
