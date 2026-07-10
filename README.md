@@ -27,7 +27,7 @@
 
 > [!IMPORTANT]
 >
-> **Please check the announcement for upgrade notes on version 2.0!**
+> **If you encounter issues, please check the announcement first. Important notifications and non-compatible updates will be explained in the announcement!**
 
 
 <details>
