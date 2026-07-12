@@ -26,8 +26,8 @@ D1Database.prototype.putFile = function(fileId, value, options) {
         'id, value, metadata, file_name, file_type, file_size, ' +
         'upload_ip, upload_address, list_type, timestamp, ' +
         'label, directory, channel, channel_name, ' +
-        'tg_file_id, tg_chat_id, tg_bot_token, is_chunked' +
-        ') VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        'tg_file_id, tg_message_id, tg_chat_id, tg_bot_token, is_chunked' +
+        ') VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
     
     return stmt.bind(
@@ -46,6 +46,7 @@ D1Database.prototype.putFile = function(fileId, value, options) {
         extractedFields.channel,
         extractedFields.channelName,
         extractedFields.tgFileId,
+        extractedFields.tgMessageId,
         extractedFields.tgChatId,
         extractedFields.tgBotToken,
         extractedFields.isChunked
@@ -304,6 +305,7 @@ D1Database.prototype.extractMetadataFields = function(metadata) {
         channel: metadata.Channel || null,
         channelName: metadata.ChannelName || null,
         tgFileId: metadata.TgFileId || null,
+        tgMessageId: metadata.TgMessageId || null,
         tgChatId: null,
         tgBotToken: null,
         isChunked: metadata.IsChunked || false
