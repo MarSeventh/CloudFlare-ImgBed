@@ -2,7 +2,7 @@
     <a href="https://github.com/MarSeventh/CloudFlare-ImgBed"><img width="80%" alt="logo" src="readme/banner.png" /></a>
     <p><em>🗂️开源文件托管解决方案，支持 Docker 和无服务器部署，支持 Telegram、Discord、Cloudflare R2、S3、Huggingface、WebDAV 等多种存储渠道，提供 RESTful APIs 和 WebDAV 支持</em></p>
     <p>
-        <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README_zh.md">简体中文</a> | <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README.md">English</a> | <a href="https://cfbed.sanyue.de">官方网站</a> | <a href="https://cfbed.sanyue.de/about/ecosystem.html">生态建设</a>
+        <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README_zh.md">简体中文</a> | <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README.md">English</a> | <a href="https://cfbed.sanyue.de">官方网站</a>
     </p>
     <p align="center">
         <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/LICENSE"><img src="https://img.shields.io/github/license/MarSeventh/CloudFlare-ImgBed" alt="License" /></a>
@@ -68,7 +68,18 @@
 
 </details>
 
-# 4. Tips
+# 4. Ecosystem
+
+开源生态的发展离不开所有人的支持，欢迎大家前往[CloudFlare ImgBed 生态建设](https://cfbed.sanyue.de/about/ecosystem.html)页面了解更多信息，我们的生态建设版块包括但不限于以下内容：
+
+- **优秀的插件扩展**：浏览器插件；Typecho、WordPress、Obsidian等知名平台扩展插件；OpenList驱动等
+- **丰富的周边应用**：桌面客户端、bot辅助工具等
+- **AI 智能体应用**：项目官方skill等
+- **优质的教程内容**：各大自媒体创作者的优质视频、文字教程
+
+您不仅能在这里找到您心仪的插件、应用、教程，还可以在这里分享您自己的作品，分享请参考[生态建设征集令](https://github.com/MarSeventh/CloudFlare-ImgBed/discussions/606)的说明，期待大家积极参与到我们的生态建设中来！
+
+# 5. Tips
 
 - **前端开源**：参见[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)项目。
 
@@ -87,7 +98,7 @@
 
   [![Contributors](https://contrib.rocks/image?repo=Marseventh/Cloudflare-ImgBed)](https://github.com/MarSeventh/CloudFlare-ImgBed/graphs/contributors)
 
-# 5. Star History
+# 6. Star History
 
 **如果觉得项目不错希望您能给个免费的star✨✨✨，非常感谢！**
 
@@ -99,7 +110,7 @@
  </picture>
 </a>
 
-# 6. Special Sponsors
+# 7. Special Sponsors
 
 - **[CloudFlare](https://www.cloudflare.com) & [EdgeOne](https://edgeone.ai/?from=github)**：提供CDN加速和安全保护服务
 
@@ -109,7 +120,7 @@
 
 - **[Linux DO](https://linux.do/)**：新的理想型社区
 
-# 7. License
+# 8. License
 
 本项目基于 [MIT 协议](https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/LICENSE) 开源，您在符合协议的前提下可以自由使用、修改、分发本项目，但请保留原作者在**包括但不限于**前后端代码和其他文件在内的所有副本或重要部分中的**版权声明**。
 

@@ -2,7 +2,7 @@
     <a href="https://github.com/MarSeventh/CloudFlare-ImgBed"><img width="80%" alt="logo" src="readme/banner.png" /></a>
     <p><em>🗂️Open-source file hosting solution, supporting Docker and serverless deployment, supporting multiple storage channels such as Telegram, Discord, Cloudflare R2, S3, Huggingface, WebDAV, etc., providing RESTful APIs and WebDAV support.</em></p>
     <p >
-        <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README_zh.md">简体中文</a> | <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README.md">English</a> | <a href="https://cfbed.sanyue.de/en">Official Website</a> | <a href="https://cfbed.sanyue.de/en/about/ecosystem.html">Ecosystem</a>
+        <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README_zh.md">简体中文</a> | <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README.md">English</a> | <a href="https://cfbed.sanyue.de/en">Official Website</a>
     </p>
     <p align="center">
         <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/LICENSE"><img src="https://img.shields.io/github/license/MarSeventh/CloudFlare-ImgBed" alt="License" /></a>
@@ -67,7 +67,18 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 
 </details>
 
-# 4. Tips
+# 4. Ecosystem
+
+Open source ecosystem development cannot be separated from everyone's support. Everyone is welcome to visit the [CloudFlare ImgBed Ecosystem Building](https://cfbed.sanyue.de/about/ecosystem.html) page for more information. Our ecosystem building section includes but is not limited to the following content:
+
+- **Excellent Plugin Extensions**: Browser plugins; extensions for well-known platforms like Typecho, WordPress, Obsidian; OpenList drivers, etc.
+- **Rich Peripheral Applications**: Desktop clients, bot辅助 tools, etc.
+- **AI Intelligent Agent Applications**: Official skills for the project, etc.
+- **High-Quality Tutorial Content**: High-quality videos and articles from various self-media creators.
+
+You can not only find the plugins, applications, and tutorials you like here, but you can also share your own works here. For sharing guidelines, please refer to the instructions in the [Ecosystem Building Call for Contributions](https://github.com/MarSeventh/CloudFlare-ImgBed/discussions/606). We look forward to everyone actively participating in our ecosystem building!
+
+# 5. Tips
 
 - Frontend is open source, see [MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub).
 
@@ -85,7 +96,7 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 
   [![Contributors](https://contrib.rocks/image?repo=Marseventh/Cloudflare-ImgBed)](https://github.com/MarSeventh/CloudFlare-ImgBed/graphs/contributors)
 
-# 5. Star History
+# 6. Star History
 
 **If you like the project, please give a free star✨✨✨, thank you very much!**
 
@@ -97,7 +108,7 @@ Provides detailed deployment documentation, feature docs, development plans, upd
  </picture>
 </a>
 
-# 6. Special Sponsors
+# 7. Special Sponsors
 
 - **[CloudFlare](https://www.cloudflare.com/) & [EdgeOne](https://edgeone.ai/?from=github)**: Provides CDN acceleration, and security protection
 
@@ -107,7 +118,7 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 
 - **[Linux DO](https://linux.do/)**: New Ideal Community
 
-# 7. License
+# 8. License
 
 This project is licensed under the [MIT License](https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/LICENSE). You can use, modify, and distribute the project freely as long as the original **copyright notice** is retained in **all copies or substantial portions** of the software.
 
