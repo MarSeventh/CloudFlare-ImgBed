@@ -28,120 +28,7 @@
 
 > [!IMPORTANT]
 >
-> **遇到问题请务必先查看公告，重要通知和非兼容性更新内容均会在公告中说明！**
-
-
-
-<details>
-    <summary>公告</summary>
-
-
-
-## 置顶
-
-1. 部署使用出现问题，请先仔细查阅文档、常见问题解答以及已有issues。
-
-2. **注意**：本仓库为[Telegraph-Image](https://github.com/cf-pages/Telegraph-Image)项目的重制版，如果你觉得本项目不错，在支持本项目的同时，也请支持原项目。
-
-## V2.7.1+ Cloudflare Pages 构建输出目录变更
-
-> 自 v2.7.1 版本起，前端构建产物已迁移至 `frontend-dist` 目录。**Cloudflare Pages 用户**需要手动修改构建配置：
->
-> 1. 前往 Cloudflare Dashboard → 您的 Pages 项目 → `设置` → `构建`
-> 2. 编辑`构建配置`，将`构建输出目录`从 `/` 修改为 `/frontend-dist`
-> 3. 保存后重新部署
->
-> Docker 用户和 Workers 用户无需操作。
-
-## 2026.3.4 V2.6.2 重构 Docker 镜像的说明
-
-> 本次版本对 Docker 镜像进行了重构，涉及基础镜像、目录结构和数据库等方面的变更，带来了并发、内存管理等方面的优化。为确保数据安全，请务必**先备份数据再进行升级**。
->
-> ### 升级前：备份数据
->
-> 1. 备份数据：在管理面板下载备份文件（若原来使用本地R2存储需要全部下载重传）
-> 2. 备份data文件夹
->
-> ### 升级步骤
->
-> 1. 拉取最新镜像：
->
->    ```bash
->    docker compose pull
->    ```
->
-> 2. 使用新镜像启动容器：
->
->    ```bash
->    docker compose up -d
->    ```
->
-> 3. 检查容器是否正常运行：
->
->    ```bash
->    docker compose logs -f
->    ```
->
->    确认日志中无报错信息后即可正常使用。
->
-> 4. 恢复数据：在管理面板恢复全部数据（原来的R2文件需要重传）
-> 
-> ### 升级异常：回退版本
->
-> 如果升级后出现异常，可通过以下步骤回退：
->
-> 1. 停止容器：
->
->    ```bash
->    docker compose down
->    ```
->
-> 2. 回退到旧版本镜像：
->
->    ```bash
->    # amd64
->    docker pull marseventh/cloudflare-imgbed@sha256:896dc1b79883
->    # arm
->    docker pull marseventh/cloudflare-imgbed@sha256:b5442ccc198c
->    ```
->
->    同时修改 `docker-compose.yml` 中的 `image` 字段为对应旧版本 tag，然后重新启动：
->
->    ```bash
->    docker compose up -d
->    ```
->
-> **注意事项**：
-> - 升级前请务必确认备份完整，必要时备份一份data文件夹
-> - 如果你使用了自定义的 `docker-compose.yml` 配置（如自定义端口、环境变量等），升级时请注意保留
-> - 遇到问题请先查阅文档和已有 issues，或提交新的 issue
-
-## 2025.2.6  V2.0 版本升级注意事项
-
-> v2.0 版已发布，相较于 v1.0 版本进行了大量改动和优化，但 beta 版本可能存在潜在不稳定性，若您追求稳定，可选择暂缓更新。
->
-> 由于**构建命令发生了变化**，此次更新需要您**手动进行**，请按照以下步骤进行操作：
->
-> - 同步fork的仓库至最新版（若已自动同步可忽略）
->
-> - 前往 pages 管理页面，进入`设置`->`构建`，编辑`构建配置`，在`构建命令`处填写`npm install`
->
-> - 新版本所有设置项已**迁移至 管理端->系统设置 界面**，原则上无需再通过环境变量的方式进行设置，通过系统设置界面进行的设置将**覆盖掉**环境变量中的设置，但为了保证 **Telegram渠道的图片** 能够与旧版本相兼容，**若您之前设置了 Telegram 渠道相关的环境变量，请将其保留！**
->
-> - 确保上述设置完成无误后，前往 pages 管理页面，进入`部署`，对最后一次不成功的部署进行`重试操作`
-
-## 关于切换到 Telegram 渠道的通知
-
-
-> 由于telegraph图床被滥用，该项目上传渠道已切换至Telegram Channel，请**更新至最新版（更新方式见第3.1章最后一节）**，按照文档中的部署要求**设置`TG_BOT_TOKEN`和`TG_CHAT_ID`**，否则将无法正常使用上传功能。
->
-> 此外，目前**KV数据库为必须配置**，如果以前未配置请按照文档说明配置。
->
-> 出现问题，请先查看第5节常见问题Q&A部分。
-
-</details>
-
-
+> **遇到问题请务必先查看[公告](https://github.com/MarSeventh/CloudFlare-ImgBed/discussions/categories/announcements)，重要通知和非兼容性更新内容均会在公告中说明！**
 
 
 # 1. Introduction
@@ -223,3 +110,9 @@
 - **[速维云](https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC)**：提供云计算服务资源支持
 
 - **[Linux DO](https://linux.do/)**：新的理想型社区
+
+# 7. License
+
+本项目基于 [MIT 协议](https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/LICENSE) 开源，您在符合协议的前提下可以自由使用、修改、分发本项目，但请保留原作者在**包括但不限于**前后端代码和其他文件在内的所有副本或重要部分中的**版权声明**。
+
+本项目基于 [Telegraph-Image](https://github.com/cf-pages/Telegraph-Image) 项目二次开发。
