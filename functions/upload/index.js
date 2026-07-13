@@ -535,6 +535,7 @@ async function uploadFileToTelegram(context, fullId, metadata, fileExt, fileName
             metadata.ChannelName = tgChannel.name;
 
             metadata.TgFileId = id;
+            metadata.TgMessageId = fileInfo.message_id;
             await db.put(fullId, "", {
                 metadata: metadata,
             });

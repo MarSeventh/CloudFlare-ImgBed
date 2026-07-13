@@ -623,6 +623,7 @@ async function uploadSingleChunkToTelegram(context, chunkData, chunkIndex, total
         return {
             success: true,
             fileId: chunkInfo.file_id,
+            messageId: chunkInfo.message_id,
             size: chunkInfo.file_size,
             fileName: chunkFileName,
             uploadTime: Date.now(),

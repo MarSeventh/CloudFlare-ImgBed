@@ -3,10 +3,12 @@ import { purgeCFCache, purgeRandomFileListCache, purgePublicFileListCache } from
 import { removeFileFromIndex, batchRemoveFilesFromIndex } from "../../../utils/indexManager.js";
 import { getDatabase } from '../../../utils/databaseAdapter.js';
 import { DiscordAPI } from '../../../utils/storage/discordAPI.js';
+import { TelegramAPI } from '../../../utils/storage/telegramAPI.js';
 import { HuggingFaceAPI } from '../../../utils/storage/huggingfaceAPI.js';
 import { WebDAVAPI } from '../../../utils/storage/webdavAPI.js';
 import {
     resolveDiscordCredentials,
+    resolveTelegramCredentials,
     resolveHuggingFaceCredentials,
     resolveS3Credentials,
     resolveWebDAVCredentials,
@@ -168,6 +170,11 @@ async function deleteFile(env, fileId, cdnUrl, url) {
             await deleteWebDAVFile(env, img);
         }
 
+        // Telegram 渠道的图片，需要删除 Telegram 中对应的消息
+        if (img.metadata?.Channel === 'Telegram' || img.metadata?.Channel === 'TelegramNew') {
+            await deleteTelegramFile(env, img);
+        }
+
         // 删除数据库中的记录
         // 注意：容量统计现在由索引自动维护，删除文件后索引更新时会自动重新计算
         await db.delete(fileId);
@@ -292,6 +299,75 @@ async function deleteWebDAVFile(env, img) {
         return await webdavAPI.deleteFile(filePath);
     } catch (error) {
         console.error("WebDAV Delete Failed:", error);
+        return false;
+    }
+}
+
+// 删除 Telegram 渠道的图片（删除 Telegram 消息）
+async function deleteTelegramFile(env, img) {
+    const db = getDatabase(env);
+    const tgCredentials = await resolveTelegramCredentials(db, env, img.metadata);
+    const botToken = tgCredentials.botToken;
+    const chatId = tgCredentials.chatId;
+    const proxyUrl = tgCredentials.proxyUrl || '';
+
+    if (!botToken || !chatId) {
+        console.warn('Telegram file missing required credentials for deletion');
+        return false;
+    }
+
+    try {
+        const telegramAPI = new TelegramAPI(botToken, proxyUrl);
+
+        // 检查是否为分片文件
+        if (img.metadata?.IsChunked === true) {
+            // 从 value 中读取分片信息
+            let chunks = [];
+            try {
+                if (img.value) {
+                    chunks = JSON.parse(img.value);
+                }
+            } catch (parseError) {
+                console.error('Failed to parse Telegram chunks data for deletion:', parseError);
+                return false;
+            }
+
+            if (!chunks || chunks.length === 0) {
+                console.warn('Telegram chunked file has no chunks data');
+                return false;
+            }
+
+            // 逐个删除每个分片的消息
+            let allSuccess = true;
+            for (const chunk of chunks) {
+                if (chunk.messageId) {
+                    const success = await telegramAPI.deleteMessage(chatId, chunk.messageId);
+                    if (!success) {
+                        console.error(`Telegram chunk ${chunk.index} delete failed`);
+                        allSuccess = false;
+                    }
+                } else {
+                    console.warn(`Telegram chunk ${chunk.index} missing messageId, cannot delete`);
+                    allSuccess = false;
+                }
+            }
+            return allSuccess;
+        } else {
+            // 单文件：使用 TgMessageId 删除
+            const messageId = img.metadata?.TgMessageId;
+            if (!messageId) {
+                console.warn('Telegram file missing TgMessageId for deletion');
+                return false;
+            }
+
+            const success = await telegramAPI.deleteMessage(chatId, messageId);
+            if (!success) {
+                console.error('Telegram Delete Failed: API returned false');
+            }
+            return success;
+        }
+    } catch (error) {
+        console.error("Telegram Delete Failed:", error);
         return false;
     }
 }
