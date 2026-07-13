@@ -69,10 +69,10 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 
 # 4. Ecosystem
 
-Open source ecosystem development cannot be separated from everyone's support. Everyone is welcome to visit the [CloudFlare ImgBed Ecosystem Building](https://cfbed.sanyue.de/about/ecosystem.html) page for more information. Our ecosystem building section includes but is not limited to the following content:
+Open source ecosystem development cannot be separated from everyone's support. Everyone is welcome to visit the [CloudFlare ImgBed Ecosystem Building](https://cfbed.sanyue.de/en/about/ecosystem.html) page for more information. Our ecosystem building section includes but is not limited to the following content:
 
 - **Excellent Plugin Extensions**: Browser plugins; extensions for well-known platforms like Typecho, WordPress, Obsidian; OpenList drivers, etc.
-- **Rich Peripheral Applications**: Desktop clients, bot辅助 tools, etc.
+- **Rich Peripheral Applications**: Desktop clients, bot support tools, etc.
 - **AI Intelligent Agent Applications**: Official skills for the project, etc.
 - **High-Quality Tutorial Content**: High-quality videos and articles from various self-media creators.
 
