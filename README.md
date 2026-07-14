@@ -32,7 +32,7 @@
 
 # 1. Introduction
 
-CloudFlare-ImgBed is an open-source file hosting solution that not only provides fundamental features covering the entire file lifecycle—such as **uploading**, **managing**, **reading**, and **deleting**—but also offers advanced capabilities including **authentication**, **directory organization**, **content moderation**, and **random images**. Supported by a comprehensive RESTful API and WebDAV integration, it is perfectly suited for self-hosted image hosting, static site asset management, and lightweight file distribution scenarios. You can see [Feature Docs](https://cfbed.sanyue.de/en/guide/features.html) for details.
+CloudFlare-ImgBed is an open-source file hosting solution compatible with both Docker and Serverless dual-stack deployments, featuring support for multiple backend storage channels. It not only provides fundamental features covering the entire file lifecycle—such as **uploading**, **managing**, **reading**, and **deleting**—but also offers advanced capabilities including **authentication**, **directory organization**, **content moderation**, and **random images**. Supported by a comprehensive RESTful API and WebDAV integration, it is perfectly suited for self-hosted image hosting, static site asset management, and lightweight file distribution scenarios. You can see [Feature Docs](https://cfbed.sanyue.de/en/guide/features.html) for details.
 
 ![CloudFlare](readme/海报.png)
 
