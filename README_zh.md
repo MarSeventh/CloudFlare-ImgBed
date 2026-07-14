@@ -33,7 +33,7 @@
 
 # 1. Introduction
 
-免费文件托管解决方案，具有**上传**、**管理**、**读取**、**删除**等全链路功能，覆盖文件全生命周期，支持**鉴权**、**目录**、**图片审查**、**随机图**等各项特性（详见[功能文档](https://cfbed.sanyue.de/guide/features.html)）。
+CloudFlare-ImgBed是一个开源文件托管解决方案，不仅具备**上传**、**管理**、**读取**、**删除**等覆盖文件全生命周期的基础功能，还提供**身份认证**、**目录组织**、**内容审核**、**随机图**等能力以及完整的RESTful API与WebDAV支持，适合自建图床、静态站资源管理和轻量文件分发场景。详见[功能文档](https://cfbed.sanyue.de/guide/features.html)。
 
 ![CloudFlare](readme/海报.png)
 
