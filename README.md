@@ -50,20 +50,39 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 
 <details>
     <summary>Other page screenshots</summary>
-    
-![image-20250313204101984](readme/login.png)
 
-![image-20250313204138886](readme/uploading.png)
-
-![image-20250313204308225](readme/dashboard.png)
-
-![image-20250314152355339](readme/customer-config.png)
-
-![status-page](readme/status-page.png)
-
-![public-gallery](readme/public-gallery.png)
-
-
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <strong>Login Page</strong><br>
+      <img src="readme/login.png" alt="Login Page" width="100%">
+    </td>
+    <td align="center" width="50%">
+      <strong>Upload Progress</strong><br>
+      <img src="readme/uploading.png" alt="Upload Progress" width="100%">
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <strong>File Management</strong><br>
+      <img src="readme/dashboard.png" alt="File Management" width="100%">
+    </td>
+    <td align="center" width="50%">
+      <strong>User Management</strong><br>
+      <img src="readme/customer-config.png" alt="User Management" width="100%">
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <strong>Status Page</strong><br>
+      <img src="readme/status-page.png" alt="Status Page" width="100%">
+    </td>
+    <td align="center" width="50%">
+      <strong>Public Gallery</strong><br>
+      <img src="readme/public-gallery.png" alt="Public Gallery" width="100%">
+    </td>
+  </tr>
+</table>
 
 </details>
 
