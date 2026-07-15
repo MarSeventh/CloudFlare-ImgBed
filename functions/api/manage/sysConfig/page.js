@@ -27,7 +27,9 @@ export async function onRequest(context) {
     // POST保存设置
     if (request.method === 'POST') {
         const body = await request.json()
-        const settings = body
+        const previousSettings = await getPageConfig(db, env)
+        const settings = processAnnouncementInfo(body, previousSettings)
+
         // 写入数据库
         await db.put('manage@sysConfig@page', JSON.stringify(settings))
 
@@ -45,6 +47,10 @@ export async function getPageConfig(db, env) {
     // 读取数据库中的设置
     const settingsStr = await db.get('manage@sysConfig@page')
     const settingsKV = settingsStr ? JSON.parse(settingsStr) : {}
+
+    if (Number.isFinite(Number(settingsKV.announcementRefreshAt))) {
+        settings.announcementRefreshAt = Number(settingsKV.announcementRefreshAt)
+    }
 
     const config = []
     settings.config = config
@@ -313,6 +319,35 @@ export async function getPageConfig(db, env) {
         if (index !== -1) {
             config[index].value = item.value
         }
+    }
+
+    return settings
+}
+
+/**
+ * 处理公告内容及其刷新状态。
+ * 公告内容变化或管理员主动刷新时生成新版本；否则沿用旧版本，
+ * 确保修改标题、背景等无关设置不会让公告重复弹出。
+ */
+function processAnnouncementInfo(settings, previousSettings) {
+    const previousAnnouncement = Array.isArray(previousSettings.config)
+        ? previousSettings.config.find(item => item?.id === 'announcement')?.value ?? ''
+        : ''
+    const nextAnnouncement = Array.isArray(settings.config)
+        ? settings.config.find(item => item?.id === 'announcement')?.value ?? ''
+        : ''
+    const shouldRefreshAnnouncement =
+        previousAnnouncement !== nextAnnouncement || settings.refreshAnnouncement === true
+
+    // 该字段只是前端发来的单次操作指令，不应进入持久化配置。
+    delete settings.refreshAnnouncement
+
+    if (shouldRefreshAnnouncement) {
+        settings.announcementRefreshAt = Date.now()
+    } else if (previousSettings.announcementRefreshAt) {
+        settings.announcementRefreshAt = previousSettings.announcementRefreshAt
+    } else {
+        delete settings.announcementRefreshAt
     }
 
     return settings
