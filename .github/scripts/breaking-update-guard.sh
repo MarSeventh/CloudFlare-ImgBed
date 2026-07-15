@@ -261,7 +261,11 @@ check_updates() {
     issue_url="$(create_or_update_notice "$update_json")"
     blocked=true
 
-    append_summary "### ⏸️ 自动同步已暂停 / Automatic synchronization paused"
+    if [[ "$allow_breaking_update" == "true" ]]; then
+      append_summary "### ✅ 已确认兼容性更新 / Compatibility update confirmed"
+    else
+      append_summary "### ⏸️ 自动同步已暂停 / Automatic synchronization paused"
+    fi
     append_summary "- 更新编号 / Update ID: \`$update_id\`"
     if [[ -n "$issue_url" ]]; then
       append_summary "- 通知 / Notice: $issue_url"
@@ -280,7 +284,7 @@ check_updates() {
 
   if [[ "$blocked" == "true" && "$allow_breaking_update" == "true" ]]; then
     append_summary ""
-    append_summary "已收到手动确认，本次运行将继续同步。 / Manual confirmation received; synchronization will continue for this run."
+    append_summary "已收到手动确认，本次运行将继续同步并在成功后关闭通知。 / Manual confirmation received; synchronization will continue and the notice will be closed after a successful run."
   fi
 
   set_output blocked false
