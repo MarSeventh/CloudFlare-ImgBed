@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm_breaking_update:
-        description: "I have reviewed the notice and agree to apply this compatibility update / 我已阅读公告并同意应用此兼容性更新"
+        description: "I have reviewed any compatibility update notice and agree to apply it if present / 我已阅读可能存在的兼容性更新公告，并同意在有此类更新时应用"
         required: true
         default: false
         type: boolean
