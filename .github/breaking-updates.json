@@ -1,4 +1,27 @@
 {
   "schemaVersion": 1,
-  "updates": []
+  "updates": [
+    {
+      "id": "test-breaking-update-20260715",
+      "enabled": true,
+      "introducedCommit": "",
+      "title": {
+        "zh": "测试兼容性更新",
+        "en": "Test compatibility update"
+      },
+      "summary": {
+        "zh": "这是一项用于验证自动更新保护机制的测试通知，不包含实际破坏性变更。",
+        "en": "This is a test notice for validating the automatic update protection mechanism. It does not contain an actual breaking change."
+      },
+      "changes": {
+        "zh": [
+          "本次仅用于测试通知和暂停逻辑"
+        ],
+        "en": [
+          "This test only validates the notification and pause logic"
+        ]
+      },
+      "announcementUrl": "https://github.com/MarSeventh/CloudFlare-ImgBed/releases"
+    }
+  ]
 }
