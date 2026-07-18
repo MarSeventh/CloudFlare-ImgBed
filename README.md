@@ -1,6 +1,6 @@
 <div align="center">
     <a href="https://github.com/MarSeventh/CloudFlare-ImgBed"><img width="80%" alt="logo" src="readme/banner.png" /></a>
-    <p><em>🗂️ An open-source file hosting solution with Docker and serverless deployment options, multiple storage backends such as Telegram, Discord, Cloudflare R2, S3, Hugging Face, and WebDAV, plus comprehensive RESTful API and WebDAV support.</em></p>
+    <p><em>🗂️ An open-source file hosting solution for Docker and serverless environments, with multiple storage backends, a RESTful API, and WebDAV support.</em></p>
     <p>
         <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README_zh.md">简体中文</a> | <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README.md">English</a> | <a href="https://cfbed.sanyue.de/en">Official Website</a>
     </p>
@@ -19,10 +19,6 @@
     </p>
 </div>
 
-
-
-
-
 ---
 
 > [!IMPORTANT]
@@ -32,7 +28,9 @@
 
 # 1. 💡 Introduction
 
-CloudFlare ImgBed is an open-source file hosting solution that supports both Docker and serverless deployments, with multiple backend storage options. It provides essential features covering the entire file lifecycle—including **uploading**, **managing**, **reading**, and **deleting**—along with **authentication**, **directory organization**, **content moderation**, and **random images**. With a comprehensive RESTful API and WebDAV support, it is well suited for self-hosted image hosting, static site asset management, and lightweight file distribution. See the [feature documentation](https://cfbed.sanyue.de/en/guide/features.html) for details.
+CloudFlare ImgBed is an open-source file hosting solution that supports both Docker and serverless deployments, with multiple backend storage options.
+
+It provides essential features covering the entire file lifecycle—including **uploading**, **managing**, **reading**, and **deleting**—along with **authentication**, **directory organization**, **content moderation**, and **random images**. With a comprehensive RESTful API and WebDAV support, it is well suited for self-hosted image hosting, static site asset management, and lightweight file distribution. See the [feature documentation](https://cfbed.sanyue.de/en/guide/features.html) for details.
 
 ![CloudFlare](readme/海报.png)
 
@@ -119,19 +117,19 @@ Maintaining an open source project takes time and effort. If CloudFlare ImgBed h
 
 ## 💖 Sponsors
 
-Thank you to every sponsor who supports this project!
+Thank you to every sponsor who supports this project! Your support helps sustain ongoing maintenance and drives the continued improvement of CloudFlare ImgBed.
 
 [![Sponsors](https://afdian-sponsors.sanyue.de/image?columns=12)](https://afdian.com/a/marseventh)
 
 ## 🤝 Partners
 
-- **[Cloudflare](https://www.cloudflare.com/) & [EdgeOne](https://edgeone.ai/?from=github)**: Provide CDN acceleration and security protection
+- **[Cloudflare](https://www.cloudflare.com/) & [EdgeOne](https://edgeone.ai/?from=github)**: CDN acceleration and security protection
 
   <a href="https://www.cloudflare.com/"><img src="readme/cloudflare-logo.png" alt="Cloudflare Logo" height="25"></a> <a href="https://edgeone.ai/?from=github"><img src="readme/edgeone-logo.png" alt="EdgeOne Logo" height="25"></a>
 
-- **[Svyun](https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC)**: Provides cloud computing resources
+- **[Svyun](https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC)**: Cloud computing resources
 
-- **[Linux DO](https://linux.do/)**: Provides community support
+- **[Linux DO](https://linux.do/)**: Community support
 
 # 6. 👥 Community
 
@@ -155,10 +153,12 @@ Thank you to everyone who has contributed code, documentation, ideas, and feedba
 
 # 7. ⚖️ License & Related Projects
 
+## 📄 License
+
 > [!IMPORTANT]
 > This project is licensed under the [MIT License](LICENSE). You may use, modify, and distribute it, provided that the original copyright and license notices are retained in all copies or substantial portions of the software.
 
-## Related Open Source Projects
+## 🔗 Related Open Source Projects
 
 - **Web frontend**: [MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)
 - **Desktop client**: [MarSeventh/satellite](https://github.com/MarSeventh/satellite)

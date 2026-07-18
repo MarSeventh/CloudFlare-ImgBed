@@ -1,6 +1,6 @@
 <div align="center">
     <a href="https://github.com/MarSeventh/CloudFlare-ImgBed"><img width="80%" alt="logo" src="readme/banner.png" /></a>
-    <p><em>🗂️ 开源文件托管解决方案，同时支持 Docker 与 Serverless 部署，可接入 Telegram、Discord、Cloudflare R2、S3、Hugging Face、WebDAV 等多种存储渠道，并提供完整的 RESTful API 与 WebDAV 支持。</em></p>
+    <p><em>🗂️ 支持 Docker 与 Serverless 部署的开源文件托管方案，兼容多种存储后端，并提供 RESTful API 与 WebDAV 支持。</em></p>
     <p>
         <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README_zh.md">简体中文</a> | <a href="https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/README.md">English</a> | <a href="https://cfbed.sanyue.de">官方网站</a>
     </p>
@@ -19,11 +19,6 @@
     </p>
 </div>
 
-
-
-
-
-
 ---
 
 > [!IMPORTANT]
@@ -33,7 +28,9 @@
 
 # 1. 💡 项目介绍
 
-CloudFlare ImgBed 是一个同时支持 Docker 与 Serverless 部署、可接入多种后端存储渠道的开源文件托管解决方案。它不仅具备**上传**、**管理**、**读取**、**删除**等覆盖文件全生命周期的基础功能，还提供**身份认证**、**目录组织**、**内容审核**、**随机图**等能力，以及完整的 RESTful API 与 WebDAV 支持，适用于自建图床、静态站资源管理和轻量文件分发场景。详见[功能文档](https://cfbed.sanyue.de/guide/features.html)。
+CloudFlare ImgBed 是一个同时支持 Docker 与 Serverless 部署、可接入多种后端存储渠道的开源文件托管解决方案。
+
+它不仅具备**上传**、**管理**、**读取**、**删除**等覆盖文件全生命周期的基础功能，还提供**身份认证**、**目录组织**、**内容审核**、**随机图**等能力，以及完整的 RESTful API 与 WebDAV 支持，适用于自建图床、静态站资源管理和轻量文件分发场景。详见[功能文档](https://cfbed.sanyue.de/guide/features.html)。
 
 ![CloudFlare](readme/海报.png)
 
@@ -97,14 +94,14 @@ CloudFlare ImgBed 是一个同时支持 Docker 与 Serverless 部署、可接入
 
 # 4. 🌱 项目生态
 
-开源生态的发展离不开所有人的支持，欢迎大家前往[CloudFlare ImgBed 生态建设](https://cfbed.sanyue.de/about/ecosystem.html)页面了解更多信息，我们的生态建设版块包括但不限于以下内容：
+欢迎前往 [CloudFlare ImgBed 生态](https://cfbed.sanyue.de/about/ecosystem.html)，探索社区提供的扩展、应用和教程，包括：
 
 - **优秀的插件扩展**：浏览器扩展，Typecho、WordPress、Obsidian 等平台的集成插件，OpenList 驱动等
 - **丰富的周边应用**：桌面客户端、Bot 辅助工具等
 - **AI 智能体应用**：项目官方 Skill 及相关工具
 - **优质的教程内容**：内容创作者分享的优质视频和图文教程
 
-您不仅能在这里找到您心仪的插件、应用、教程，还可以在这里分享您自己的作品，分享请参考[生态建设征集令](https://github.com/MarSeventh/CloudFlare-ImgBed/discussions/606)的说明，期待大家积极参与到我们的生态建设中来！
+您也可以向社区分享自己的作品，提交规范请参见[生态建设征集令](https://github.com/MarSeventh/CloudFlare-ImgBed/discussions/606)，期待您的参与！
 
 # 5. 💝 支持与合作伙伴
 
@@ -120,7 +117,7 @@ CloudFlare ImgBed 是一个同时支持 Docker 与 Serverless 部署、可接入
 
 ## 💖 赞助者
 
-感谢每一位赞助者对本项目的支持！
+感谢每一位赞助者对本项目的支持！您的支持帮助项目持续维护，也为 CloudFlare ImgBed 的长期改进提供动力。
 
 [![赞助者](https://afdian-sponsors.sanyue.de/image?columns=12)](https://afdian.com/a/marseventh)
 
@@ -156,10 +153,12 @@ CloudFlare ImgBed 是一个同时支持 Docker 与 Serverless 部署、可接入
 
 # 7. ⚖️ 开源协议与相关项目
 
+## 📄 开源协议
+
 > [!IMPORTANT]
 > 本项目基于 [MIT License](LICENSE) 开源。您可以自由使用、修改和分发本项目，但须在软件的所有副本或重要部分中保留原始版权及许可声明。
 
-## 相关开源项目
+## 🔗 相关开源项目
 
 - **Web 前端**：[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)
 - **桌面客户端**：[MarSeventh/satellite](https://github.com/MarSeventh/satellite)
