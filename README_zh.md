@@ -30,6 +30,8 @@
 
 CloudFlare ImgBed 是一个同时支持 Docker 与 Serverless 部署、可接入多种后端存储渠道的开源文件托管解决方案。
 
+支持的存储渠道包括 **Telegram**、**Discord**、**Cloudflare R2**、**S3 兼容存储**、**Hugging Face**、**WebDAV** 等。
+
 它不仅具备**上传**、**管理**、**读取**、**删除**等覆盖文件全生命周期的基础功能，还提供**身份认证**、**目录组织**、**内容审核**、**随机图**等能力，以及完整的 RESTful API 与 WebDAV 支持，适用于自建图床、静态站资源管理和轻量文件分发场景。详见[功能文档](https://cfbed.sanyue.de/guide/features.html)。
 
 ![CloudFlare](readme/海报.png)
