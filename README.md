@@ -117,11 +117,13 @@ Thank you to every sponsor who supports this project!
 
 ## 🤝 Special Sponsors
 
-| Partner | Support |
-| :--- | :--- |
-| [Cloudflare](https://www.cloudflare.com/) & [EdgeOne](https://edgeone.ai/?from=github) | CDN acceleration and security protection |
-| [Svyun](https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC) | Cloud computing resources |
-| [Linux DO](https://linux.do/) | Community support |
+- **[Cloudflare](https://www.cloudflare.com/) & [EdgeOne](https://edgeone.ai/?from=github)**: Provide CDN acceleration and security protection
+
+  <a href="https://www.cloudflare.com/"><img src="readme/cloudflare-logo.png" alt="Cloudflare Logo" height="25"></a> <a href="https://edgeone.ai/?from=github"><img src="readme/edgeone-logo.png" alt="EdgeOne Logo" height="25"></a>
+
+- **[Svyun](https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC)**: Provides cloud computing resources
+
+- **[Linux DO](https://linux.do/)**: Provides community support
 
 ## 👥 Contributors
 

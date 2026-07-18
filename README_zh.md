@@ -118,11 +118,13 @@ CloudFlare ImgBed 是一个同时支持 Docker 与 Serverless 部署、可接入
 
 ## 🤝 特别赞助
 
-| 合作伙伴 | 提供的支持 |
-| :--- | :--- |
-| [Cloudflare](https://www.cloudflare.com/) & [EdgeOne](https://edgeone.ai/?from=github) | CDN 加速及安全防护 |
-| [速维云](https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC) | 云计算资源 |
-| [Linux DO](https://linux.do/) | 社区支持 |
+- **[Cloudflare](https://www.cloudflare.com/) & [EdgeOne](https://edgeone.ai/?from=github)**：提供 CDN 加速及安全防护
+
+  <a href="https://www.cloudflare.com/"><img src="readme/cloudflare-logo.png" alt="Cloudflare Logo" height="25"></a> <a href="https://edgeone.ai/?from=github"><img src="readme/edgeone-logo.png" alt="EdgeOne Logo" height="25"></a>
+
+- **[速维云](https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC)**：提供云计算资源
+
+- **[Linux DO](https://linux.do/)**：提供社区支持
 
 ## 👥 贡献者
 
