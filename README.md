@@ -115,7 +115,7 @@ Thank you to every sponsor who supports this project!
 
 [![Sponsors](https://afdian-sponsors.sanyue.de/image?columns=12)](https://afdian.com/a/marseventh)
 
-## 🤝 Special Sponsors
+## 🤝 Partners
 
 - **[Cloudflare](https://www.cloudflare.com/) & [EdgeOne](https://edgeone.ai/?from=github)**: Provide CDN acceleration and security protection
 

@@ -116,7 +116,7 @@ CloudFlare ImgBed 是一个同时支持 Docker 与 Serverless 部署、可接入
 
 [![赞助者](https://afdian-sponsors.sanyue.de/image?columns=12)](https://afdian.com/a/marseventh)
 
-## 🤝 特别赞助
+## 🤝 合作伙伴
 
 - **[Cloudflare](https://www.cloudflare.com/) & [EdgeOne](https://edgeone.ai/?from=github)**：提供 CDN 加速及安全防护
 
