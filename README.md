@@ -97,23 +97,29 @@ Open source ecosystem development cannot be separated from everyone's support. E
 
 You can not only find the plugins, applications, and tutorials you like here, but you can also share your own works here. For sharing guidelines, please refer to the instructions in the [Ecosystem Building Call for Contributions](https://github.com/MarSeventh/CloudFlare-ImgBed/discussions/606). We look forward to everyone actively participating in our ecosystem building!
 
-# 5. Tips
+# 5. Sponsor & Contributors
 
-- Frontend is open source, see [MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub).
+**Sponsor**: Maintaining the project is not easy. If you like it, please support the author. Your support is the motivation to keep going~
 
-- Desktop software is open source, see [MarSeventh/satellite](https://github.com/MarSeventh/satellite).
-
-- **Sponsor**: Maintaining the project is not easy. If you like it, please support the author. Your support is the motivation to keep going~
-
-  <a href="https://afdian.com/a/marseventh"><img src="https://img.shields.io/badge/AFDIAN-946CE6?style=for-the-badge&logo=afdian&logoColor=white" height="36" alt="Afdian"></a>&nbsp;&nbsp;<a href="readme/weixin-reward.png" target="_blank"><img src="https://img.shields.io/badge/WeChat_Pay-07c160?style=for-the-badge&logo=wechat&logoColor=white" height="36" alt="WeChat Pay"></a>
+<a href="https://afdian.com/a/marseventh"><img src="https://img.shields.io/badge/AFDIAN-946CE6?style=for-the-badge&logo=afdian&logoColor=white" height="36" alt="Afdian"></a>&nbsp;&nbsp;<a href="readme/weixin-reward.png" target="_blank"><img src="https://img.shields.io/badge/WeChat_Pay-07c160?style=for-the-badge&logo=wechat&logoColor=white" height="36" alt="WeChat Pay"></a>
   
-- **Sponsors**: Thanks to the following sponsors for supporting this project!
+**Sponsors**: Thanks to the following sponsors for supporting this project!
 
-  [![sponsors](https://afdian-sponsors.sanyue.de/image?columns=12)](https://afdian.com/a/marseventh)
-  
-- **Contributors**: Thanks to the following contributors for their selfless contributions!
+[![sponsors](https://afdian-sponsors.sanyue.de/image?columns=12)](https://afdian.com/a/marseventh)
 
-  [![Contributors](https://contrib.rocks/image?repo=Marseventh/Cloudflare-ImgBed)](https://github.com/MarSeventh/CloudFlare-ImgBed/graphs/contributors)
+**Special Sponsors**: Thanks to the following special sponsors for supporting this project!
+
+- **[CloudFlare](https://www.cloudflare.com/) & [EdgeOne](https://edgeone.ai/?from=github)**: Provides CDN acceleration, and security protection
+
+  <a href="https://www.cloudflare.com"><img src="readme/cloudflare-logo.png" alt="Cloudflare Logo" height="25"></a> <a href="https://edgeone.ai/?from=github"><img src="readme/edgeone-logo.png" alt="Tencent Logo" height="25"></a>
+
+- **[Svyun](https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC)**: Provides cloud computing resources support
+
+- **[Linux DO](https://linux.do/)**: New Ideal Community
+
+**Contributors**: Thanks to the following contributors for their selfless contributions!
+
+[![Contributors](https://contrib.rocks/image?repo=Marseventh/Cloudflare-ImgBed)](https://github.com/MarSeventh/CloudFlare-ImgBed/graphs/contributors)
 
 # 6. Star History
 
@@ -127,18 +133,12 @@ You can not only find the plugins, applications, and tutorials you like here, bu
  </picture>
 </a>
 
-# 7. Special Sponsors
-
-- **[CloudFlare](https://www.cloudflare.com/) & [EdgeOne](https://edgeone.ai/?from=github)**: Provides CDN acceleration, and security protection
-
-  <a href="https://www.cloudflare.com"><img src="readme/cloudflare-logo.png" alt="Cloudflare Logo" height="25"></a> <a href="https://edgeone.ai/?from=github"><img src="readme/edgeone-logo.png" alt="Tencent Logo" height="25"></a>
-
-- **[Svyun](https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC)**: Provides cloud computing resources support
-
-- **[Linux DO](https://linux.do/)**: New Ideal Community
-
-# 8. License
+# 7. License
 
 This project is licensed under the [MIT License](https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/LICENSE). You can use, modify, and distribute the project freely as long as the original **copyright notice** is retained in **all copies or substantial portions** of the software.
+
+Frontend is open source, see [MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub).
+
+Desktop software is open source, see [MarSeventh/satellite](https://github.com/MarSeventh/satellite).
 
 This project is a secondary development based on the [Telegraph-Image](https://github.com/cf-pages/Telegraph-Image) project.
