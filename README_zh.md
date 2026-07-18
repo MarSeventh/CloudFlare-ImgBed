@@ -139,8 +139,8 @@ CloudFlare-ImgBed 是一个兼容 Docker 和 Serverless 双栈部署，支持多
 
 本项目基于 [MIT 协议](https://github.com/MarSeventh/CloudFlare-ImgBed/blob/main/LICENSE) 开源，您在符合协议的前提下可以自由使用、修改、分发本项目，但请保留原作者在**包括但不限于**前后端代码和其他文件在内的所有副本或重要部分中的**版权声明**。
 
-**项目前端开源**：参见[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)项目。
+**项目前端开源**，参见[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)项目。
 
-**项目桌面端开源**：参见[MarSeventh/satellite](https://github.com/MarSeventh/satellite)项目。
+**项目桌面端开源**，参见[MarSeventh/satellite](https://github.com/MarSeventh/satellite)项目。
 
 本项目基于 [Telegraph-Image](https://github.com/cf-pages/Telegraph-Image) 项目二次开发。
