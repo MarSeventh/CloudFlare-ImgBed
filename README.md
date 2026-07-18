@@ -36,13 +36,7 @@ CloudFlare ImgBed is an open-source file hosting solution that supports both Doc
 
 ![CloudFlare](readme/海报.png)
 
-# 2. 📚 [Documentation](https://cfbed.sanyue.de/en)
-
-Provides detailed deployment documentation, feature docs, development plans, update logs, FAQ, and more to help you get started quickly.
-
-[![recent update](https://recent-update.cfbed.sanyue.de/en)](https://cfbed.sanyue.de/en/guide/update-log.html)
-
-# 3. 🖥️ Demo
+# 2. 🖥️ Demo
 
 **Demo Address**: [CloudFlare ImgBed](https://cfbed.1314883.xyz/) · **Access Password**: `cfbed`
 
@@ -86,6 +80,20 @@ Provides detailed deployment documentation, feature docs, development plans, upd
 
 </details>
 
+# 3. 📚 Documentation & Updates
+
+## 📖 Documentation
+
+The documentation covers deployment, storage configuration, feature usage, RESTful API integration, WebDAV, version upgrades, and troubleshooting. Whether you are deploying the project for the first time or maintaining an existing instance, you can find the relevant instructions here.
+
+**[Read the full documentation →](https://cfbed.sanyue.de/en)**
+
+## 📝 Changelog
+
+Follow the latest features, bug fixes, compatibility changes, and upgrade notes.
+
+[![Recent Updates](https://recent-update.cfbed.sanyue.de/en)](https://cfbed.sanyue.de/en/guide/update-log.html)
+
 # 4. 🌱 Ecosystem
 
 An open-source ecosystem grows through community support. Visit the [CloudFlare ImgBed Ecosystem](https://cfbed.sanyue.de/en/about/ecosystem.html) page to explore the following resources and more:
@@ -97,7 +105,7 @@ An open-source ecosystem grows through community support. Visit the [CloudFlare 
 
 Discover useful plugins, applications, and tutorials, or share your own work with the community. See the [Ecosystem Call for Contributions](https://github.com/MarSeventh/CloudFlare-ImgBed/discussions/606) for submission guidelines. We look forward to your participation!
 
-# 5. 💝 Sponsors & Contributors
+# 5. 💝 Support & Partners
 
 ## ☕ Support the Project
 
@@ -125,15 +133,17 @@ Thank you to every sponsor who supports this project!
 
 - **[Linux DO](https://linux.do/)**: Provides community support
 
-## 👥 Contributors
+# 6. 👥 Community
+
+## 🧑‍💻 Contributors
 
 Thank you to everyone who has contributed code, documentation, ideas, and feedback!
 
 [![Contributors](https://contrib.rocks/image?repo=Marseventh/Cloudflare-ImgBed)](https://github.com/MarSeventh/CloudFlare-ImgBed/graphs/contributors)
 
-# 6. ⭐ Star History
+## ⭐ Star History
 
-**If you like the project, please give a free star✨✨✨, thank you very much!**
+**If you find the project useful, please consider giving it a Star ⭐. Thank you for your support!**
 
 <a href="https://www.star-history.com/?repos=MarSeventh%2FCloudFlare-ImgBed%2CMarSeventh%2FSanyue-ImgHub&type=date&legend=top-left">
  <picture>
@@ -143,7 +153,7 @@ Thank you to everyone who has contributed code, documentation, ideas, and feedba
  </picture>
 </a>
 
-# 7. ⚖️ License
+# 7. ⚖️ License & Related Projects
 
 > [!IMPORTANT]
 > This project is licensed under the [MIT License](LICENSE). You may use, modify, and distribute it, provided that the original copyright and license notices are retained in all copies or substantial portions of the software.

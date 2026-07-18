@@ -37,13 +37,7 @@ CloudFlare ImgBed 是一个同时支持 Docker 与 Serverless 部署、可接入
 
 ![CloudFlare](readme/海报.png)
 
-# 2. 📚 [项目文档](https://cfbed.sanyue.de)
-
-提供详细的部署文档、功能文档、开发计划、更新日志、常见问题解答等，帮助您快速上手。
-
-[![更新日志](https://recent-update.cfbed.sanyue.de/cn)](https://cfbed.sanyue.de/guide/update-log.html)
-
-# 3. 🖥️ 在线演示
+# 2. 🖥️ 在线演示
 
 **演示站点**：[CloudFlare ImgBed](https://cfbed.1314883.xyz/) · **访问密码**：`cfbed`
 
@@ -87,6 +81,20 @@ CloudFlare ImgBed 是一个同时支持 Docker 与 Serverless 部署、可接入
 
 </details>
 
+# 3. 📚 文档与更新
+
+## 📖 项目文档
+
+项目文档涵盖部署方式、存储渠道配置、功能使用、RESTful API、WebDAV、版本升级及常见问题等内容。无论是首次部署还是日常维护，都可以在文档中找到对应的操作说明。
+
+**[查看完整文档 →](https://cfbed.sanyue.de)**
+
+## 📝 更新日志
+
+了解项目的最新功能、问题修复、兼容性变更和升级注意事项。
+
+[![更新日志](https://recent-update.cfbed.sanyue.de/cn)](https://cfbed.sanyue.de/guide/update-log.html)
+
 # 4. 🌱 项目生态
 
 开源生态的发展离不开所有人的支持，欢迎大家前往[CloudFlare ImgBed 生态建设](https://cfbed.sanyue.de/about/ecosystem.html)页面了解更多信息，我们的生态建设版块包括但不限于以下内容：
@@ -98,7 +106,7 @@ CloudFlare ImgBed 是一个同时支持 Docker 与 Serverless 部署、可接入
 
 您不仅能在这里找到您心仪的插件、应用、教程，还可以在这里分享您自己的作品，分享请参考[生态建设征集令](https://github.com/MarSeventh/CloudFlare-ImgBed/discussions/606)的说明，期待大家积极参与到我们的生态建设中来！
 
-# 5. 💝 赞助与贡献者
+# 5. 💝 支持与合作伙伴
 
 ## ☕ 支持项目
 
@@ -126,15 +134,17 @@ CloudFlare ImgBed 是一个同时支持 Docker 与 Serverless 部署、可接入
 
 - **[Linux DO](https://linux.do/)**：提供社区支持
 
-## 👥 贡献者
+# 6. 👥 项目社区
+
+## 🧑‍💻 贡献者
 
 感谢所有为项目贡献代码、文档、创意和反馈的开发者！
 
 [![贡献者](https://contrib.rocks/image?repo=Marseventh/Cloudflare-ImgBed)](https://github.com/MarSeventh/CloudFlare-ImgBed/graphs/contributors)
 
-# 6. ⭐ Star 趋势
+## ⭐ Star 趋势
 
-**如果觉得项目不错希望您能给个免费的 star✨✨✨，非常感谢！**
+**如果这个项目对您有所帮助，欢迎点亮一个 Star ⭐，感谢您的支持！**
 
 <a href="https://www.star-history.com/?repos=MarSeventh%2FCloudFlare-ImgBed%2CMarSeventh%2FSanyue-ImgHub&type=date&legend=top-left">
  <picture>
@@ -144,7 +154,7 @@ CloudFlare ImgBed 是一个同时支持 Docker 与 Serverless 部署、可接入
  </picture>
 </a>
 
-# 7. ⚖️ 开源协议
+# 7. ⚖️ 开源协议与相关项目
 
 > [!IMPORTANT]
 > 本项目基于 [MIT License](LICENSE) 开源。您可以自由使用、修改和分发本项目，但须在软件的所有副本或重要部分中保留原始版权及许可声明。
