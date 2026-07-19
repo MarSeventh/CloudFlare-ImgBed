@@ -4,6 +4,7 @@ node_modules
 /wrangler.toml
 .DS_Store
 
+
 *.sqlite
 *.sqlite-*
 
@@ -11,3 +12,8 @@ node_modules
 .vscode/
 .claude/
 .agents/
+
+/docs/*
+CODE_OF_CONDUCT_DRAFT.md
+CLAUDE.md
+AGENTS.md
