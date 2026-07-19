@@ -106,3 +106,12 @@ export function isAIResultStatus(status) {
 /** @property {number} attempts */
 /** @property {string} createdAt */
 /** @property {string} updatedAt */
+
+/** @typedef {Object} AfterMetadataPersistedPayload */
+/** @property {string} fileId */
+/** @property {Object} metadata */
+
+/** @typedef {Object} AIHookContext */
+/** @property {Object} [env] */
+/** @property {function(Promise<*>): void} [waitUntil] */
+/** @property {AbortSignal} [signal] */
