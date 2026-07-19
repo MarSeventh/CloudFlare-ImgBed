@@ -37,6 +37,7 @@ export const AI_ERROR_CATEGORY = Object.freeze({
     UNSUPPORTED: 'unsupported',
     TIMEOUT: 'timeout',
     RATE_LIMITED: 'rate_limited',
+    CANCELLED: 'cancelled',
     PROVIDER: 'provider',
     STORAGE: 'storage',
     UNKNOWN: 'unknown'
@@ -82,6 +83,18 @@ export function isAIResultStatus(status) {
 
 /** @typedef {Object} AIProviderContext */
 /** @property {AbortSignal} [signal] */
+
+/** @typedef {Object} AIPipelineStep */
+/** @property {string} id */
+/** @property {string} capability */
+/** @property {number} timeoutMs */
+/** @property {function(Object): Promise<*>|*} execute */
+
+/** @typedef {Object} AIPipelineResult */
+/** @property {string} pipelineId */
+/** @property {string} pipelineVersion */
+/** @property {string} status */
+/** @property {Array<Object>} steps */
 /** @property {number} [timeoutMs] */
 /** @property {Object} [config] */
 
