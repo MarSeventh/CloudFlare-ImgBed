@@ -142,3 +142,60 @@ export async function fetchOthersConfig(env) {
         };
     }
 }
+
+export async function fetchAIConfig(env) {
+    try {
+        const db = getDatabase(env);
+        const settingsStr = await db.get('manage@sysConfig@ai');
+        const settings = settingsStr ? JSON.parse(settingsStr) : {};
+        return resolveAIConfig(settings, env);
+    } catch (error) {
+        console.error('Failed to fetch AI config:', error);
+        return resolveAIConfig({}, env);
+    }
+}
+
+function resolveAIConfig(settings, env = {}) {
+    const providers = settings.providers || {};
+    const wdTagger = providers.wdTagger || {};
+    const tagging = settings.capabilities?.tagging || {};
+    const enabled = settings.enabled ?? env.AI_ENABLE === 'true';
+
+    return {
+        enabled,
+        timeoutMs: configNumber(settings.timeoutMs, env.AI_TIMEOUT, 30000),
+        capabilities: {
+            tagging: {
+                enabled: tagging.enabled ?? enabled,
+                provider: tagging.provider || env.AI_TAGGING_PROVIDER || env.AI_PROVIDER || 'wd_tagger'
+            }
+        },
+        providers: {
+            wdTagger: {
+                endpoint: wdTagger.endpoint || env.WD_TAGGER_ENDPOINT || '',
+                apiKey: wdTagger.apiKey || env.WD_TAGGER_API_KEY || '',
+                model: wdTagger.model || env.WD_TAGGER_MODEL || 'wd-tagger',
+                modelVersion: wdTagger.modelVersion || env.WD_TAGGER_MODEL_VERSION || '',
+                timeoutMs: configNumber(wdTagger.timeoutMs, env.AI_TIMEOUT, 30000),
+                maxInputSizeBytes: configNumber(
+                    wdTagger.maxInputSizeBytes,
+                    env.WD_TAGGER_MAX_INPUT_SIZE,
+                    10 * 1024 * 1024
+                ),
+                threshold: configNumber(wdTagger.threshold, env.WD_TAGGER_THRESHOLD, 0.35),
+                maxTags: configNumber(wdTagger.maxTags, env.WD_TAGGER_MAX_TAGS, 100),
+                requestFormat: wdTagger.requestFormat || env.WD_TAGGER_REQUEST_FORMAT || 'raw',
+                fileField: wdTagger.fileField || env.WD_TAGGER_FILE_FIELD || 'image',
+                headers: wdTagger.headers || {}
+            }
+        }
+    };
+}
+
+function configNumber(storedValue, environmentValue, fallback) {
+    const value = storedValue ?? environmentValue;
+    if (value === undefined || value === null || value === '') return fallback;
+
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+}

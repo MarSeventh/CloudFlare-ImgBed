@@ -8,6 +8,7 @@ pipeline described in `docs/rfc/RFC-0001-AI-Pipeline.md`.
 The first implementation stage defines contracts only:
 
 - `artifact/` contains a storage-neutral file input shape.
+- `factory/` contains explicit Provider registration and construction.
 - `hooks/` contains an isolated lifecycle hook registry.
 - `pipeline/` contains provider-neutral step orchestration.
 - `provider/` contains the common provider interface.
@@ -15,9 +16,9 @@ The first implementation stage defines contracts only:
 - `task/` contains task identity and lifecycle fields.
 - `types/` contains shared capabilities, statuses, and error categories.
 
-No provider is constructed, no hook is registered, no configuration or
-database is read, and no upload or API path imports this subsystem yet. AI is
-therefore disabled without changing existing behavior.
+No provider is constructed automatically, no hook is registered, and no upload
+or API path imports this subsystem yet. AI is therefore disabled without
+changing existing upload behavior.
 
 ## Planned boundaries
 
@@ -27,10 +28,16 @@ WebDAV, Hugging Face, or Discord APIs.
 
 ## Configuration
 
-Configuration is not read by this stage. Future configuration must use the
-existing `functions/utils/sysConfig.js` loader, keep AI disabled by default,
-and preserve deployment environment variables as defaults rather than creating
-a parallel configuration system.
+AI configuration is loaded explicitly through `fetchAIConfig()` in the existing
+`functions/utils/sysConfig.js` loader. Database settings use
+`manage@sysConfig@ai` and override deployment environment defaults. AI remains
+disabled by default.
+
+WD Tagger environment defaults are `WD_TAGGER_ENDPOINT`,
+`WD_TAGGER_API_KEY`, `WD_TAGGER_MODEL`, `WD_TAGGER_MODEL_VERSION`,
+`WD_TAGGER_THRESHOLD`, `WD_TAGGER_MAX_TAGS`, `WD_TAGGER_MAX_INPUT_SIZE`,
+`WD_TAGGER_REQUEST_FORMAT`, and `WD_TAGGER_FILE_FIELD`. Shared defaults use
+`AI_ENABLE`, `AI_TIMEOUT`, and `AI_TAGGING_PROVIDER`.
 
 ## Public interface
 
@@ -60,6 +67,19 @@ respond to their own cancellation constraints.
 Pipeline output is an in-memory execution result only. This stage does not
 select Providers, retry calls, persist tasks, merge metadata, register hooks,
 or connect the pipeline to Upload.
+
+`createAIFactory()` returns an isolated `AIFactory` with `wd_tagger`
+registered. It creates `WDTaggerProvider` only when requested. The Provider
+supports the `tagging` capability and returns the common `AIResult` envelope.
+It uses the project's existing console logger and does not log credentials,
+request bodies, response bodies, or image content.
+
+The configured WD Tagger endpoint must accept an HTTP `POST`. The default
+`raw` format sends image bytes with their MIME type; `multipart` sends the image
+using the configured file field. Supported JSON responses include arrays of
+`{ label, score }`, a `tags` array or object, `general`, `predictions`, or
+`result.tags`. Returned tags are normalized, thresholded, sorted, truncated,
+and bounded by `maxTags`.
 
 ## Example
 
@@ -94,6 +114,19 @@ const pipeline = createAIPipeline({
 });
 
 const execution = await pipeline.run({ artifact });
+```
+
+```js
+import { AI_PROVIDER_NAMES, createAIFactory } from './index.js';
+import { fetchAIConfig } from '../utils/sysConfig.js';
+
+const aiConfig = await fetchAIConfig(env);
+const factory = createAIFactory();
+const provider = factory.create(
+    AI_PROVIDER_NAMES.WD_TAGGER,
+    aiConfig.providers.wdTagger
+);
+const result = await provider.analyze(artifact, 'tagging', { signal });
 ```
 
 Provider capabilities use action-oriented identifiers such as `tagging`,
