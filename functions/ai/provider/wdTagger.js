@@ -318,21 +318,45 @@ function inputLimitError() {
 }
 
 function normalizeTags(response, threshold, maxTags) {
-    const source = Array.isArray(response)
-        ? response
-        : response?.tags ?? response?.general ?? response?.predictions ?? response?.result?.tags ?? [];
+    const entries = extractTagEntries(response);
+    const uniqueTags = new Map();
 
-    const entries = Array.isArray(source)
-        ? source
-        : source && typeof source === 'object'
-            ? Object.entries(source).map(([name, confidence]) => ({ name, confidence }))
-            : [];
+    for (const value of entries) {
+        const tag = normalizeTag(value);
+        if (!tag || tag.confidence < threshold) continue;
 
-    return entries
-        .map(normalizeTag)
-        .filter(tag => tag && tag.confidence >= threshold)
+        const current = uniqueTags.get(tag.name);
+        if (!current || tag.confidence > current.confidence) {
+            uniqueTags.set(tag.name, tag);
+        }
+    }
+
+    return [...uniqueTags.values()]
         .sort((left, right) => right.confidence - left.confidence)
         .slice(0, maxTags);
+}
+
+function extractTagEntries(response) {
+    if (Array.isArray(response)) return response;
+    if (!response || typeof response !== 'object') return [];
+    if (response.tags !== undefined) return toTagEntries(response.tags);
+
+    const grouped = [response.general, response.character]
+        .filter(group => group !== undefined)
+        .flatMap(toTagEntries);
+    if (grouped.length > 0) return grouped;
+
+    return toTagEntries(
+        response.predictions ?? response.result?.tags ?? response.caption ?? []
+    );
+}
+
+function toTagEntries(source) {
+    if (Array.isArray(source)) return source;
+    if (source && typeof source === 'object') {
+        return Object.entries(source).map(([name, confidence]) => ({ name, confidence }));
+    }
+    return [];
 }
 
 function normalizeTag(value) {
