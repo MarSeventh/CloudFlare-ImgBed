@@ -16,9 +16,9 @@ The first implementation stage defines contracts only:
 - `task/` contains task identity and lifecycle fields.
 - `types/` contains shared capabilities, statuses, and error categories.
 
-No provider is constructed automatically, no hook is registered, and no upload
-or API path imports this subsystem yet. AI is therefore disabled without
-changing existing upload behavior.
+No provider is constructed automatically, and no upload or API path statically
+imports a Provider. Upload dynamically loads and registers its single AI Hook
+only when the deployment gate `AI_ENABLE=true` is present.
 
 ## Planned boundaries
 
@@ -32,6 +32,11 @@ AI configuration is loaded explicitly through `fetchAIConfig()` in the existing
 `functions/utils/sysConfig.js` loader. Database settings use
 `manage@sysConfig@ai` and override deployment environment defaults. AI remains
 disabled by default.
+
+`AI_ENABLE=true` is also the fast deployment gate for Upload integration. The
+database `enabled` value can disable processing after the module is loaded, but
+cannot enable Upload integration when the environment gate is absent. This
+keeps the disabled upload path free of AI imports and AI configuration reads.
 
 WD Tagger environment defaults are `WD_TAGGER_ENDPOINT`,
 `WD_TAGGER_API_KEY`, `WD_TAGGER_MODEL`, `WD_TAGGER_MODEL_VERSION`,
@@ -80,6 +85,27 @@ using the configured file field. Supported JSON responses include arrays of
 `{ label, score }`, a `tags` array or object, `general`, `predictions`, or
 `result.tags`. Returned tags are normalized, thresholded, sorted, truncated,
 and bounded by `maxTags`.
+
+## Upload integration
+
+The existing `endUpload()` completion point dynamically dispatches
+`after_metadata_persisted` inside its existing background lifetime. AI errors
+are logged and do not change the upload response or stored file availability.
+
+Only direct image uploads that still expose their original `File` through the
+request context are processed by the current WD Tagger integration. External
+links, chunked uploads, and direct storage commit callbacks are skipped until
+their storage-neutral Artifact readers are implemented. The integration does
+not fetch public file URLs. Other future Providers may define different input
+requirements.
+
+Before saving a result, the integration reads the current file record and
+merges only `metadata.ai`, preserving the current file value and other metadata
+fields. AI data is not added to the existing public index. KV has no atomic
+metadata compare-and-swap operation, so this merge is best-effort if another
+writer updates the same record at the exact write boundary. The public list
+also strips `metadata.ai`; a later management metadata update cannot expose AI
+fields through that existing public response.
 
 ## Example
 

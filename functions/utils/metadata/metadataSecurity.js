@@ -54,6 +54,17 @@ export function stripConfigDerivedMetadata(metadata = {}) {
   return stripConfigDerivedMetadataInPlace(stripped);
 }
 
+// 返回适合公开接口的 metadata 副本，AI 数据默认只对管理端可见
+export function stripAIMetadata(metadata = {}) {
+  if (!metadata || typeof metadata !== 'object') {
+    return metadata;
+  }
+
+  const stripped = { ...metadata };
+  delete stripped.ai;
+  return stripped;
+}
+
 // 返回适合持久化保存的 metadata 副本
 export function cleanPersistedMetadata(metadata = {}) {
   if (!metadata || typeof metadata !== 'object') {
