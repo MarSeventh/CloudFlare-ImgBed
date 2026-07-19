@@ -4,6 +4,10 @@ import {
     AI_ERROR_CATEGORY,
     AI_RESULT_STATUS
 } from '../types/index.js';
+import {
+    requestGradioSpace,
+    resolveHuggingFaceSpace
+} from './gradioSpace.js';
 
 const PROVIDER_NAME = 'wd_tagger';
 const DEFAULT_MAX_INPUT_SIZE = 10 * 1024 * 1024;
@@ -79,7 +83,12 @@ export class WDTaggerProvider extends AIProvider {
                     this.config.maxInputSizeBytes
                 );
                 const response = await this.request(bytes, artifact, context, execution.signal);
-                const tags = normalizeTags(response, this.config.threshold, this.config.maxTags);
+                const tags = normalizeTags(
+                    response,
+                    this.config.threshold,
+                    this.config.characterThreshold,
+                    this.config.maxTags
+                );
 
                 return createAIResult({
                     status: AI_RESULT_STATUS.SUCCEEDED,
@@ -134,6 +143,29 @@ export class WDTaggerProvider extends AIProvider {
             headers.set('authorization', `Bearer ${this.config.apiKey}`);
         }
 
+        const space = resolveHuggingFaceSpace(this.config.endpoint);
+        if (space) {
+            try {
+                return await requestGradioSpace({
+                    space,
+                    bytes,
+                    artifact,
+                    config: this.config,
+                    fetcher,
+                    headers,
+                    signal
+                });
+            } catch (error) {
+                if (signal.aborted) throw signal.reason || error;
+                throw new WDTaggerProviderError(error.message || 'WD Tagger Space request failed', {
+                    category: AI_ERROR_CATEGORY.PROVIDER,
+                    retryable: error.status === 429 || error.status >= 500,
+                    status: error.status || 0,
+                    cause: error
+                });
+            }
+        }
+
         let body;
         if (this.config.requestFormat === 'multipart') {
             body = new FormData();
@@ -142,6 +174,10 @@ export class WDTaggerProvider extends AIProvider {
                 new Blob([bytes], { type: artifact.mimeType || 'application/octet-stream' }),
                 artifact.fileName || 'image'
             );
+            body.set('model', this.config.model);
+            body.set('threshold', String(this.config.threshold));
+            body.set('general_threshold', String(this.config.threshold));
+            body.set('character_threshold', String(this.config.characterThreshold));
         } else {
             headers.set('content-type', artifact.mimeType || 'application/octet-stream');
             body = bytes;
@@ -209,6 +245,7 @@ function normalizeConfig(config) {
             1
         ),
         threshold: normalizeNumber(config.threshold, 0.35, 0, 1),
+        characterThreshold: normalizeNumber(config.characterThreshold, 0.85, 0, 1),
         maxTags: Math.floor(normalizeNumber(config.maxTags, 100, 1)),
         requestFormat,
         fileField: config.fileField || 'image',
@@ -317,13 +354,14 @@ function inputLimitError() {
     });
 }
 
-function normalizeTags(response, threshold, maxTags) {
+function normalizeTags(response, threshold, characterThreshold, maxTags) {
     const entries = extractTagEntries(response);
     const uniqueTags = new Map();
 
     for (const value of entries) {
         const tag = normalizeTag(value);
-        if (!tag || tag.confidence < threshold) continue;
+        const minimum = value?.category === 'character' ? characterThreshold : threshold;
+        if (!tag || tag.confidence < minimum) continue;
 
         const current = uniqueTags.get(tag.name);
         if (!current || tag.confidence > current.confidence) {
@@ -337,18 +375,45 @@ function normalizeTags(response, threshold, maxTags) {
 }
 
 function extractTagEntries(response) {
-    if (Array.isArray(response)) return response;
+    if (Array.isArray(response)) {
+        const structured = response.flatMap(value => {
+            if (!value || typeof value !== 'object') return [];
+            return looksLikeTag(value) ? [value] : extractTagEntries(value);
+        });
+        if (structured.length > 0) return structured;
+        return response.filter(value => typeof value === 'string').flatMap(captionToTagEntries);
+    }
     if (!response || typeof response !== 'object') return [];
+    if (response.data !== undefined) return extractTagEntries(response.data);
+    if (response.confidences !== undefined) return toTagEntries(response.confidences);
     if (response.tags !== undefined) return toTagEntries(response.tags);
 
-    const grouped = [response.general, response.character]
-        .filter(group => group !== undefined)
-        .flatMap(toTagEntries);
+    const grouped = [
+        ...toTagEntries(response.general).map(tag => withCategory(tag, 'general')),
+        ...toTagEntries(response.character).map(tag => withCategory(tag, 'character'))
+    ];
     if (grouped.length > 0) return grouped;
 
     return toTagEntries(
         response.predictions ?? response.result?.tags ?? response.caption ?? []
     );
+}
+
+function looksLikeTag(value) {
+    return value.name !== undefined
+        || value.label !== undefined && value.confidences === undefined
+        || value.tag !== undefined
+        || value.score !== undefined
+        || value.probability !== undefined;
+}
+
+function captionToTagEntries(value) {
+    return value.split(',').map(name => name.trim()).filter(Boolean).map(name => ({ name, confidence: 1 }));
+}
+
+function withCategory(tag, category) {
+    if (typeof tag === 'string') return { name: tag, confidence: 1, category };
+    return { ...tag, category };
 }
 
 function toTagEntries(source) {

@@ -24,11 +24,38 @@ export async function runUploadAI(payload, context) {
         return { status: 'skipped', reason: 'disabled' };
     }
 
-    const artifact = createUploadArtifact(payload, context);
-    if (!artifact) {
-        return { status: 'skipped', reason: 'artifact_unavailable' };
+    if (!isDirectorySelected(payload.metadata?.Directory, taggingConfig.targetDirectories)) {
+        return { status: 'skipped', reason: 'directory_not_selected' };
+    }
+    return runConfiguredAI(payload, context, config);
+}
+
+export async function runManualAI(payload, context) {
+    const config = await fetchAIConfig(context.env);
+    if (!config.enabled) return { status: 'skipped', reason: 'disabled' };
+
+    const originalEnabled = config.capabilities.tagging.enabled;
+    config.capabilities.tagging.enabled = true;
+    try {
+        return await runConfiguredAI(payload, context, config);
+    } finally {
+        config.capabilities.tagging.enabled = originalEnabled;
+    }
+}
+
+async function runConfiguredAI(payload, context, config) {
+    const taggingConfig = config.capabilities?.tagging;
+    if (!config.enabled || !taggingConfig?.enabled) {
+        return { status: 'skipped', reason: 'disabled' };
     }
 
+    const artifact = createUploadArtifact(payload, context);
+    if (!artifact) return { status: 'skipped', reason: 'artifact_unavailable' };
+
+    return executeAI(payload, context, config, taggingConfig, artifact);
+}
+
+async function executeAI(payload, context, config, taggingConfig, artifact) {
     const factory = createAIFactory({ logger: console });
     const providerName = taggingConfig.provider || AI_PROVIDER_NAMES.WD_TAGGER;
     const providerConfig = providerName === AI_PROVIDER_NAMES.WD_TAGGER
@@ -40,7 +67,6 @@ export async function runUploadAI(payload, context) {
         return { status: 'skipped', reason: 'provider_unsupported_input' };
     }
     const policy = provider.getExecutionPolicy();
-
     const pipeline = createAIPipeline({
         pipelineId: UPLOAD_PIPELINE_ID,
         pipelineVersion: UPLOAD_PIPELINE_VERSION,
@@ -51,10 +77,7 @@ export async function runUploadAI(payload, context) {
             capability: 'tagging',
             timeoutMs: policy.timeoutMs,
             execute: ({ artifact: stepArtifact, capability, signal }) =>
-                provider.analyze(stepArtifact, capability, {
-                    signal,
-                    fetch: context.aiFetch
-                })
+                provider.analyze(stepArtifact, capability, { signal, fetch: context.aiFetch })
         }]
     });
 
@@ -71,13 +94,11 @@ export async function runUploadAI(payload, context) {
                 message: 'AI pipeline did not return a provider result'
             }
         });
-
-        const aiMetadata = {
+        const mergeResult = await mergeAIResult(context.env, payload.fileId, {
             ...result,
             pipelineId: execution.pipelineId,
             pipelineVersion: execution.pipelineVersion
-        };
-        const mergeResult = await mergeAIResult(context.env, payload.fileId, aiMetadata);
+        });
         return {
             status: mergeResult.updated ? result.status : 'skipped',
             reason: mergeResult.reason || ''
@@ -104,9 +125,9 @@ export async function mergeAIResult(env, fileId, aiMetadata) {
 
 function createUploadArtifact(payload, context) {
     const metadata = payload.metadata || {};
-    if (metadata.Channel === 'External' || metadata.IsChunked) return null;
+    if (!context.aiFile && (metadata.Channel === 'External' || metadata.IsChunked)) return null;
 
-    const file = context.formdata?.get?.('file');
+    const file = context.aiFile || context.formdata?.get?.('file');
     if (!file || typeof file.arrayBuffer !== 'function') return null;
 
     return createArtifact({
@@ -122,6 +143,14 @@ function createUploadArtifact(payload, context) {
             return file.arrayBuffer();
         }
     });
+}
+
+function isDirectorySelected(directory, selectedDirectories = []) {
+    if (!selectedDirectories.length) return true;
+    const normalized = String(directory || '').replace(/^\/+|\/+$/g, '');
+    return selectedDirectories.some(selected =>
+        normalized === selected || normalized.startsWith(`${selected}/`)
+    );
 }
 
 function providerAcceptsArtifact(provider, artifact) {

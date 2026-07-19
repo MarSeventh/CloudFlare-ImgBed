@@ -33,14 +33,12 @@ AI configuration is loaded explicitly through `fetchAIConfig()` in the existing
 `manage@sysConfig@ai` and override deployment environment defaults. AI remains
 disabled by default.
 
-`AI_ENABLE=true` is also the fast deployment gate for Upload integration. The
-database `enabled` value can disable processing after the module is loaded, but
-cannot enable Upload integration when the environment gate is absent. This
-keeps the disabled upload path free of AI imports and AI configuration reads.
+Upload integration resolves the stored setting as well as `AI_ENABLE`, so the
+management UI can enable or disable automatic tagging without a redeployment.
 
 WD Tagger environment defaults are `WD_TAGGER_ENDPOINT`,
 `WD_TAGGER_API_KEY`, `WD_TAGGER_MODEL`, `WD_TAGGER_MODEL_VERSION`,
-`WD_TAGGER_THRESHOLD`, `WD_TAGGER_MAX_TAGS`, `WD_TAGGER_MAX_INPUT_SIZE`,
+`WD_TAGGER_THRESHOLD`, `WD_TAGGER_CHARACTER_THRESHOLD`, `WD_TAGGER_MAX_TAGS`, `WD_TAGGER_MAX_INPUT_SIZE`,
 `WD_TAGGER_REQUEST_FORMAT`, and `WD_TAGGER_FILE_FIELD`. Shared defaults use
 `AI_ENABLE`, `AI_TIMEOUT`, and `AI_TAGGING_PROVIDER`.
 
@@ -79,9 +77,13 @@ supports the `tagging` capability and returns the common `AIResult` envelope.
 It uses the project's existing console logger and does not log credentials,
 request bodies, response bodies, or image content.
 
-The configured WD Tagger endpoint must accept an HTTP `POST`. The default
-`raw` format sends image bytes with their MIME type; `multipart` sends the image
-using the configured file field. Supported JSON responses include arrays of
+The configured WD Tagger endpoint may be a regular HTTP inference endpoint or a
+Hugging Face Space repository URL such as
+`https://huggingface.co/spaces/SmilingWolf/wd-tagger`. Space repository URLs are
+resolved to their hosted Gradio application and its prediction inputs are
+discovered automatically. For regular endpoints, the default `raw` format sends
+image bytes with their MIME type; `multipart` sends the image using the
+configured file field. Supported JSON responses include arrays of
 `{ label, score }`, a `tags` array or object, `general`, `predictions`, or
 `result.tags`. Returned tags are normalized, thresholded, sorted, truncated,
 and bounded by `maxTags`.

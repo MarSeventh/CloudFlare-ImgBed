@@ -167,7 +167,8 @@ function resolveAIConfig(settings, env = {}) {
         capabilities: {
             tagging: {
                 enabled: tagging.enabled ?? enabled,
-                provider: tagging.provider || env.AI_TAGGING_PROVIDER || env.AI_PROVIDER || 'wd_tagger'
+                provider: tagging.provider || env.AI_TAGGING_PROVIDER || env.AI_PROVIDER || 'wd_tagger',
+                targetDirectories: normalizeDirectories(tagging.targetDirectories)
             }
         },
         providers: {
@@ -183,6 +184,11 @@ function resolveAIConfig(settings, env = {}) {
                     10 * 1024 * 1024
                 ),
                 threshold: configNumber(wdTagger.threshold, env.WD_TAGGER_THRESHOLD, 0.35),
+                characterThreshold: configNumber(
+                    wdTagger.characterThreshold,
+                    env.WD_TAGGER_CHARACTER_THRESHOLD,
+                    0.85
+                ),
                 maxTags: configNumber(wdTagger.maxTags, env.WD_TAGGER_MAX_TAGS, 100),
                 requestFormat: wdTagger.requestFormat || env.WD_TAGGER_REQUEST_FORMAT || 'raw',
                 fileField: wdTagger.fileField || env.WD_TAGGER_FILE_FIELD || 'image',
@@ -190,6 +196,14 @@ function resolveAIConfig(settings, env = {}) {
             }
         }
     };
+}
+
+function normalizeDirectories(value) {
+    if (!Array.isArray(value)) return [];
+    return [...new Set(value.map(directory => String(directory || '')
+        .trim()
+        .replace(/^\/+|\/+$/g, ''))
+        .filter(Boolean))];
 }
 
 function configNumber(storedValue, environmentValue, fallback) {
