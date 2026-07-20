@@ -117,6 +117,17 @@ export async function getPageConfig(db, env) {
             category_en: 'Global Settings',
         },
         {
+            id: 'wallpaperEnabled',
+            label: '启用壁纸',
+            label_en: 'Enable Wallpaper',
+            type: 'boolean',
+            default: true,
+            tooltip: '控制所有页面的背景壁纸开关，关闭后将使用纯色背景',
+            tooltip_en: 'Toggle background wallpaper across all pages. When off, a solid color background will be used',
+            category: '全局设置',
+            category_en: 'Global Settings',
+        },
+        {
             id: 'urlPrefix',
             label: '默认URL前缀',
             label_en: 'Default URL Prefix',
