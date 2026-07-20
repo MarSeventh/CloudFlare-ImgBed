@@ -9,6 +9,7 @@ import { getDatabase } from '../../utils/databaseAdapter.js';
 import { fetchAIConfig } from '../../utils/sysConfig.js';
 import { createAIAdapter } from '../env/adapter.js';
 import { MetadataService, readAIResultStateFrom } from '../services/metadata.service.js';
+import { TagProcessor } from '../processors/tag/index.js';
 
 export const UPLOAD_PIPELINE_ID = 'upload_ai';
 export const UPLOAD_PIPELINE_VERSION = '1';
@@ -92,8 +93,15 @@ async function executeAI(payload, context, config, taggingConfig, artifact, opti
             id: 'tagging',
             capability: 'tagging',
             timeoutMs: policy.timeoutMs,
-            execute: ({ artifact: stepArtifact, capability, signal }) =>
-                provider.analyze(stepArtifact, capability, { signal, fetch: context.aiFetch })
+            execute: async ({ artifact: stepArtifact, signal }) => {
+                const processor = new TagProcessor(provider);
+                const { result } = await processor.process({
+                    artifact: stepArtifact,
+                    signal,
+                    fetch: context.aiFetch
+                });
+                return result;
+            }
         }]
     });
 
