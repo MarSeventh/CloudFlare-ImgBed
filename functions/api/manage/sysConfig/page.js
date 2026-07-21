@@ -313,8 +313,9 @@ export async function getPageConfig(db, env) {
             if (typeof parsedConfig === 'object' && parsedConfig !== null) {
                 // 搜索config中的id，如果存在则更新
                 for (let i = 0; i < config.length; i++) {
-                    if (parsedConfig[config[i].id]) {
-                        config[i].value = parsedConfig[config[i].id]
+                    const id = config[i].id
+                    if (Object.prototype.hasOwnProperty.call(parsedConfig, id)) {
+                        config[i].value = parsedConfig[id]
                     }
                 }
             }
