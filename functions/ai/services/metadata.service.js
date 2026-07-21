@@ -1,4 +1,5 @@
 import { mergeTags, sanitizeAITags } from '../../utils/tagHelpers.js';
+import { addFileToIndex } from '../../utils/indexManager.js';
 
 export const AI_METADATA_VERSION = 1;
 
@@ -57,6 +58,22 @@ export class MetadataService {
             ...aiMetadata,
             metadataVersion: AI_METADATA_VERSION
         }));
+
+        // 标签变更后同步搜索索引：画廊/列表/搜索/自动补全读的是预建索引快照，
+        // 不写索引 AI 标签就不会出现在搜索里，直到下次重建。与既有标签 API
+        // 一致，仅记录 add 操作，由后续 readIndex/merge 合入快照。AI 已在后台
+        // 生命周期内执行，因此内联 await 而非再 fire-and-forget，避免响应结束
+        // 后索引操作被中止而丢失。
+        if (tagsChanged) {
+            try {
+                await addFileToIndex({ env: this.adapter.env }, fileId, metadata);
+            } catch (error) {
+                console.error('[AI] Failed to record index operation for AI tags', {
+                    fileId,
+                    message: error?.message || 'Unknown error'
+                });
+            }
+        }
         return { updated: true };
     }
 }

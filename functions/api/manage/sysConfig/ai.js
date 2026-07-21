@@ -17,9 +17,34 @@ export async function onRequest(context) {
         const current = await fetchAIConfig(env);
         const tagging = input?.capabilities?.tagging || {};
         const wdTagger = input?.providers?.wdTagger || {};
+        const queue = input?.queue || {};
         const settings = {
             enabled: input?.enabled ?? true,
             timeoutMs: numberInRange(input?.timeoutMs, current.timeoutMs, 1000, 120000),
+            parallel: Math.floor(numberInRange(input?.parallel, current.parallel, 1, 10)),
+            queue: {
+                enabled: booleanValue(queue.enabled, current.queue.enabled),
+                fallbackToDirect: booleanValue(
+                    queue.fallbackToDirect,
+                    current.queue.fallbackToDirect
+                ),
+                maxRetries: Math.floor(numberInRange(
+                    queue.maxRetries,
+                    current.queue.maxRetries,
+                    0,
+                    10
+                )),
+                retryDelaysSeconds: normalizeRetryDelays(
+                    queue.retryDelaysSeconds,
+                    current.queue.retryDelaysSeconds
+                ),
+                staleAfterSeconds: Math.floor(numberInRange(
+                    queue.staleAfterSeconds,
+                    current.queue.staleAfterSeconds,
+                    0,
+                    604800
+                ))
+            },
             capabilities: {
                 tagging: {
                     enabled: tagging.enabled === true,
@@ -65,6 +90,19 @@ function numberInRange(value, fallback, min, max) {
     const number = Number(value);
     if (!Number.isFinite(number)) return fallback;
     return Math.min(max, Math.max(min, number));
+}
+
+function booleanValue(value, fallback) {
+    return typeof value === 'boolean' ? value : fallback;
+}
+
+function normalizeRetryDelays(value, fallback) {
+    if (!Array.isArray(value)) return fallback;
+    const normalized = value
+        .map(item => Math.floor(Number(item)))
+        .filter(item => Number.isFinite(item) && item >= 0 && item <= 43200)
+        .slice(0, 10);
+    return normalized.length ? normalized : fallback;
 }
 
 function json(body, status = 200) {

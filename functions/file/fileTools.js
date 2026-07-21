@@ -129,6 +129,7 @@ export async function returnWithCheck(context, imgRecord) {
     const { url, securityConfig } = context;
     const whiteListMode = securityConfig.access.whiteListMode;
     const isAdminPreview = context.fileAccess?.isAdminPreview === true;
+    const isInternalAIRequest = context.fileAccess?.isInternalAIRequest === true;
     const adminAuthorized = context.fileAccess?.adminAuthResult?.authorized === true;
     const response = new Response('success', { status: 200 });
 
@@ -138,7 +139,14 @@ export async function returnWithCheck(context, imgRecord) {
 
     const record = imgRecord;
     if (record.metadata === null) {
-        context.fileAccess.cacheControl = isAdminPreview ? FILE_CACHE_CONTROL.PRIVATE : FILE_CACHE_CONTROL.PUBLIC;
+        context.fileAccess.cacheControl = isAdminPreview || isInternalAIRequest
+            ? FILE_CACHE_CONTROL.PRIVATE
+            : FILE_CACHE_CONTROL.PUBLIC;
+        return response;
+    }
+
+    if (isInternalAIRequest) {
+        context.fileAccess.cacheControl = FILE_CACHE_CONTROL.PRIVATE;
         return response;
     }
 

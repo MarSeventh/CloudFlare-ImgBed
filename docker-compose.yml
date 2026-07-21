@@ -7,4 +7,7 @@ services:
       - "7658:8080"
     volumes:
       - ./data:/app/data
+    environment:
+      # Docker 默认使用 SQLite 持久化 AI Queue；设为 false 可恢复直连模式。
+      AI_LOCAL_QUEUE_ENABLE: "true"
     restart: unless-stopped

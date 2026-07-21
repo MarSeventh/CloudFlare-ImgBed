@@ -73,7 +73,10 @@ async function runConfiguredAI(payload, context, config) {
 }
 
 async function executeAI(payload, context, config, taggingConfig, artifact, options = {}) {
-    const factory = createAIFactory({ logger: console });
+    const factory = createAIFactory({
+        logger: console,
+        adapter: createAIAdapter(context.env, context)
+    });
     const providerName = taggingConfig.provider || AI_PROVIDER_NAMES.WD_TAGGER;
     const providerConfig = providerName === AI_PROVIDER_NAMES.WD_TAGGER
         ? config.providers.wdTagger

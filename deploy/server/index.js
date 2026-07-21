@@ -13,6 +13,8 @@ import { join, resolve, dirname } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { SqliteD1 } from './sqliteD1.js';
 import { LocalR2Storage } from './r2Storage.js';
+import { LocalAIQueue } from './aiQueue.js';
+import { consumeAIQueue } from '../../functions/ai/queue/consumer.js';
 
 const NativeResponse = globalThis.Response;
 
@@ -114,14 +116,30 @@ if (existsSync(migrationsDir)) {
 
 const r2Storage = new LocalR2Storage(join(DATA_DIR, 'r2'));
 
+const localAIQueueEnabled = process.env.AI_LOCAL_QUEUE_ENABLE !== 'false';
+let localAIQueue = null;
+
 // ==================== 创建环境对象 ====================
 
 function createEnv() {
-    return {
+    const env = {
         ...process.env,
         img_d1: sqliteD1,
         img_r2: r2Storage,
     };
+    if (localAIQueue) env.img_queue = localAIQueue;
+    return env;
+}
+
+if (localAIQueueEnabled) {
+    localAIQueue = new LocalAIQueue({
+        db: sqliteD1,
+        consumer: consumeAIQueue,
+        envFactory: createEnv,
+        pollIntervalMs: Number(process.env.AI_LOCAL_QUEUE_POLL_MS) || 1000,
+        batchSize: 5
+    });
+    localAIQueue.start();
 }
 
 // ==================== Functions 路由解析 ====================
@@ -413,4 +431,5 @@ serve({
     console.log(`Server running at http://0.0.0.0:${info.port}`);
     console.log(`Data directory: ${DATA_DIR}`);
     console.log(`Mode: Docker (Native Node.js)`);
+    console.log(`AI queue: ${localAIQueue ? 'SQLite' : 'direct fallback'}`);
 });

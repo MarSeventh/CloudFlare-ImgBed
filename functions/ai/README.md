@@ -3,22 +3,27 @@
 This directory is the repository-native extension boundary for the optional AI
 pipeline described in `docs/rfc/RFC-0001-AI-Pipeline.md`.
 
-## Current stage
+## Architecture
 
-The first implementation stage defines contracts only:
+The subsystem is isolated behind upload hooks and provider-neutral contracts:
 
 - `artifact/` contains a storage-neutral file input shape.
 - `factory/` contains explicit Provider registration and construction.
 - `hooks/` contains an isolated lifecycle hook registry.
 - `pipeline/` contains provider-neutral step orchestration.
-- `provider/` contains the common provider interface.
+- `provider/` contains the common provider interface and, grouped by source,
+  the concrete providers (e.g. `provider/huggingface/` for the WD Tagger).
+- `queue/` contains the versioned task message, stored-file Artifact reader,
+  and Cloudflare Queue consumer.
 - `result/` contains the bounded AI result envelope.
 - `task/` contains task identity and lifecycle fields.
 - `types/` contains shared capabilities, statuses, and error categories.
 
-No provider is constructed automatically, and no upload or API path statically
-imports a Provider. Upload dynamically loads and registers its single AI Hook
-only when the deployment gate `AI_ENABLE=true` is present.
+Upload persists storage and metadata before dispatching AI work. When the
+optional `img_queue` binding exists, automatic upload tagging sends a task to
+the shared AI queue. Without the binding, or when `send()` fails, the existing
+`waitUntil()` direct execution remains available as a backward-compatible
+fallback. Manual management tagging remains synchronous.
 
 ## Planned boundaries
 
@@ -40,7 +45,71 @@ WD Tagger environment defaults are `WD_TAGGER_ENDPOINT`,
 `WD_TAGGER_API_KEY`, `WD_TAGGER_MODEL`, `WD_TAGGER_MODEL_VERSION`,
 `WD_TAGGER_THRESHOLD`, `WD_TAGGER_CHARACTER_THRESHOLD`, `WD_TAGGER_MAX_TAGS`, `WD_TAGGER_MAX_INPUT_SIZE`,
 `WD_TAGGER_REQUEST_FORMAT`, and `WD_TAGGER_FILE_FIELD`. Shared defaults use
-`AI_ENABLE`, `AI_TIMEOUT`, and `AI_TAGGING_PROVIDER`.
+`AI_ENABLE`, `AI_TIMEOUT`, `AI_PARALLEL`, and `AI_TAGGING_PROVIDER`.
+
+`AI_PARALLEL` controls bounded processing within a delivered Queue batch and
+defaults to `1`. It can be set from the existing AI management configuration or
+as an environment default, with an allowed range of 1 through 10.
+
+Runtime Queue policy is stored with the existing AI management configuration:
+
+```json
+{
+  "queue": {
+    "enabled": true,
+    "fallbackToDirect": true,
+    "maxRetries": 3,
+    "retryDelaysSeconds": [30, 120, 300],
+    "staleAfterSeconds": 3600
+  }
+}
+```
+
+The configuration response also includes the read-only `bindingAvailable`
+field. Resource names and bindings remain deployment settings and are never
+persisted from the management API. Environment defaults use
+`AI_QUEUE_ENABLE`, `AI_QUEUE_FALLBACK_DIRECT`, `AI_QUEUE_MAX_RETRIES`,
+`AI_QUEUE_RETRY_DELAYS`, and `AI_QUEUE_STALE_AFTER`.
+
+## Cloudflare Queue
+
+All current and future AI providers share the `img_queue` binding. Messages are
+provider-neutral and contain a schema version, task and pipeline identity,
+capability, file ID, image URL hint, MIME type, file size, and enqueue time.
+Provider endpoints, API keys, headers, and threshold configuration are never
+placed in Queue messages. Consumers load the latest AI configuration before
+execution.
+
+Create the queue once for a Worker deployment:
+
+```sh
+npx wrangler queues create imgqueue
+```
+
+For GitHub Actions deployments, add the repository secret
+`AI_QUEUE_NAME=imgqueue`. `deploy/worker/generate-toml.js` then adds both the
+producer binding and consumer settings. For direct Wrangler deployments,
+uncomment the `queues.producers` and `queues.consumers` examples in
+`deploy/worker/wrangler.toml`.
+
+The consumer receives batches of up to five messages, processes them serially
+by default, and retries timeout, rate-limit, storage, and provider 5xx failures
+according to the runtime Queue policy. Invalid input and unsupported files
+are acknowledged without retry. A final failure is stored in the per-file AI
+task value; no dead-letter queue is required.
+
+Cloudflare Pages Functions cannot consume Queue messages. Pages deployments
+should omit `img_queue` and continue using the direct fallback. The complete
+producer/consumer path targets the repository's standalone Worker deployment.
+
+Docker deployments use a local `img_queue` adapter backed by the existing
+`data/database.sqlite` file. Pending tasks therefore survive container restarts
+when the data volume is mounted. The adapter uses the same message schema,
+consumer, idempotency rules, concurrency setting, and retry policy as the
+Cloudflare Queue path. Set `AI_LOCAL_QUEUE_ENABLE=false` to disable it and use
+the direct `waitUntil()` fallback. `AI_LOCAL_QUEUE_POLL_MS` optionally changes
+the default 1000 ms poll interval. `AI_QUEUE_NAME` is only used while generating
+a Cloudflare Worker deployment configuration.
 
 ## Public interface
 
@@ -67,15 +136,23 @@ underlying operation that ignores cancellation. With parallel execution, the
 `stop` policy prevents new steps from starting; already running steps finish or
 respond to their own cancellation constraints.
 
-Pipeline output is an in-memory execution result only. This stage does not
-select Providers, retry calls, persist tasks, merge metadata, register hooks,
-or connect the pipeline to Upload.
+Pipeline output remains provider-neutral. The upload integration selects a
+Provider through the Factory, while the Queue consumer owns delivery retries,
+task idempotency, and bounded AI task-state updates around each execution.
 
 `createAIFactory()` returns an isolated `AIFactory` with `wd_tagger`
-registered. It creates `WDTaggerProvider` only when requested. The Provider
-supports the `tagging` capability and returns the common `AIResult` envelope.
-It uses the project's existing console logger and does not log credentials,
-request bodies, response bodies, or image content.
+registered. Passing `{ adapter }` injects the AI environment adapter into every
+provider it constructs. It creates `WDTaggerProvider` only when requested. The
+Provider supports the `tagging` capability and returns the common `AIResult`
+envelope. It uses the project's existing console logger and does not log
+credentials, request bodies, response bodies, or image content.
+
+Following the environment-adapter architecture, the Provider routes inference by
+runtime. When the operator configures a `@cf/...` model id and the deployment
+binds Workers AI as `env.AI`, inference runs natively through `env.AI.run(...)`.
+Otherwise, or whenever an HTTP / Hugging Face Space endpoint is configured, it
+uses the remote transport. The adapter is optional; without it the Provider
+degrades to the remote transport so existing deployments keep working.
 
 The configured WD Tagger endpoint may be a regular HTTP inference endpoint or a
 Hugging Face Space repository URL such as
@@ -94,20 +171,34 @@ The existing `endUpload()` completion point dynamically dispatches
 `after_metadata_persisted` inside its existing background lifetime. AI errors
 are logged and do not change the upload response or stored file availability.
 
-Only direct image uploads that still expose their original `File` through the
-request context are processed by the current WD Tagger integration. External
-links, chunked uploads, and direct storage commit callbacks are skipped until
-their storage-neutral Artifact readers are implemented. The integration does
-not fetch public file URLs. Other future Providers may define different input
-requirements.
+Queued tasks use `fileId` as their authoritative identity and read the latest
+metadata before execution. The existing file-serving path is reused through an
+internal-only context flag, so visitor block pages and hotlink rules cannot be
+mistaken for the source image. This flag is not accepted from a URL, header, or
+other HTTP input. The queued path supports regular and size-compliant chunked
+images across existing storage providers. External-link uploads remain skipped
+until an explicit SSRF-safe policy is added.
+
+Queue delivery is at least once. A stable `taskId` makes redelivery idempotent,
+and a queued task cannot overwrite an AI result completed after its own
+`queuedAt` timestamp. Enqueue writes a `manage@aiTask@<fileId>` state value
+with `status=processing`; success, terminal failure, configuration disablement,
+and directory deselection all write a terminal state so files do not remain
+indefinitely in processing.
 
 Before saving a result, the integration reads the current file record and
-merges only `metadata.ai`, preserving the current file value and other metadata
-fields. AI data is not added to the existing public index. KV has no atomic
-metadata compare-and-swap operation, so this merge is best-effort if another
-writer updates the same record at the exact write boundary. The public list
-also strips `metadata.ai`; a later management metadata update cannot expose AI
-fields through that existing public response.
+merges only the bounded AI task state value, preserving the current file value
+and other metadata fields. Successful tags are additionally merged into the existing
+`metadata.Tags` array via `mergeTags(..., 'add')`, so AI tags are searchable and
+displayed through the existing tag system. Provider-specific tags that contain
+characters the tag validator rejects — such as character labels like
+`artoria_pendragon_(fate)` — are sanitized into valid tags first rather than
+being dropped. The task state value is internal coordination state and is not
+returned by file metadata APIs, so providers, models, and task bookkeeping never
+appear in API output. KV metadata remains bounded to its 1024-byte limit; AI tags
+are added only while the resulting UTF-8 metadata stays within that limit. KV has
+no atomic metadata compare-and-swap operation, so this merge is best-effort if
+another writer updates the same record at the exact write boundary.
 
 ## Example
 

@@ -206,6 +206,8 @@ const output = `/**
  * 复用 functions/ 下的全部业务逻辑，不修改任何业务代码
  */
 
+import { consumeAIQueue } from '../../functions/ai/queue/consumer.js';
+
 // ==================== 自动生成的导入 ====================
 
 ${imports}
@@ -440,6 +442,10 @@ export default {
         };
 
         return await maybeServeFromCache(request, ctx, () => executeChain(middlewares, handler, context));
+    },
+
+    async queue(batch, env, ctx) {
+        await consumeAIQueue(batch, env, ctx);
     },
 };
 `;

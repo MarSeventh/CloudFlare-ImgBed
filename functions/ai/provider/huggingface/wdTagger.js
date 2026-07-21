@@ -1,9 +1,9 @@
-import { AIProvider } from './index.js';
-import { createAIResult } from '../result/index.js';
+import { AIProvider } from '../index.js';
+import { createAIResult } from '../../result/index.js';
 import {
     AI_ERROR_CATEGORY,
     AI_RESULT_STATUS
-} from '../types/index.js';
+} from '../../types/index.js';
 import {
     requestGradioSpace,
     resolveHuggingFaceSpace
@@ -12,10 +12,25 @@ import {
 const PROVIDER_NAME = 'wd_tagger';
 const DEFAULT_MAX_INPUT_SIZE = 10 * 1024 * 1024;
 
+/**
+ * WD Tagger is a tagging Provider. It produces raw tags for the Tag Processor
+ * and never writes metadata or the database itself.
+ *
+ * Following the environment-adapter architecture, the Provider receives the
+ * AI adapter and routes inference by runtime:
+ *
+ *   - cf / cf-worker with a bound Workers AI model → env.AI.run(...)
+ *   - every other runtime, or a configured HTTP / Hugging Face Space endpoint
+ *     → the remote transport (raw / multipart HTTP, or a Gradio Space)
+ *
+ * The adapter is optional; without it the Provider degrades to the remote
+ * transport so existing deployments keep working.
+ */
 export class WDTaggerProvider extends AIProvider {
     constructor(config = {}, options = {}) {
         super();
         this.config = normalizeConfig(config);
+        this.adapter = options.adapter || null;
         this.logger = options.logger?.error ? options.logger : console;
     }
 
@@ -63,6 +78,13 @@ export class WDTaggerProvider extends AIProvider {
             };
         }
 
+        if (error?.retryable === true) {
+            return {
+                category: AI_ERROR_CATEGORY.STORAGE,
+                retryable: true
+            };
+        }
+
         return {
             category: AI_ERROR_CATEGORY.PROVIDER,
             retryable: false
@@ -82,7 +104,7 @@ export class WDTaggerProvider extends AIProvider {
                     execution.signal,
                     this.config.maxInputSizeBytes
                 );
-                const response = await this.request(bytes, artifact, context, execution.signal);
+                const response = await this.infer(bytes, artifact, context, execution.signal);
                 const tags = normalizeTags(
                     response,
                     this.config.threshold,
@@ -129,8 +151,39 @@ export class WDTaggerProvider extends AIProvider {
         }
     }
 
-    async request(bytes, artifact, context, signal) {
-        const fetcher = context.fetch || globalThis.fetch;
+    /**
+     * Route inference to the environment-native backend when one is available,
+     * otherwise fall back to the remote transport. WD Tagger has no first-party
+     * Workers AI model, so the native path is only taken when the operator has
+     * configured a `@cf/...` model id against a bound `env.AI` binding.
+     */
+    async infer(bytes, artifact, context, signal) {
+        const binding = this.adapter?.env?.AI;
+        if (isWorkersAIModel(this.config.model) && binding && typeof binding.run === 'function') {
+            return this.inferOnWorkersAI(binding, bytes, signal);
+        }
+        return this.requestRemote(bytes, artifact, context, signal);
+    }
+
+    async inferOnWorkersAI(binding, bytes, signal) {
+        try {
+            const output = await waitForAbort(
+                binding.run(this.config.model, { image: [...bytes] }),
+                signal
+            );
+            return output;
+        } catch (error) {
+            if (signal.aborted) throw signal.reason || error;
+            throw new WDTaggerProviderError('Workers AI inference failed', {
+                category: AI_ERROR_CATEGORY.PROVIDER,
+                retryable: true,
+                cause: error
+            });
+        }
+    }
+
+    async requestRemote(bytes, artifact, context, signal) {
+        const fetcher = context.fetch || this.adapter?.fetch || globalThis.fetch;
         if (typeof fetcher !== 'function') {
             throw new WDTaggerProviderError('Fetch API is unavailable', {
                 category: AI_ERROR_CATEGORY.PROVIDER
@@ -198,6 +251,7 @@ export class WDTaggerProvider extends AIProvider {
             if (signal.aborted) throw signal.reason || error;
             throw new WDTaggerProviderError('WD Tagger request failed', {
                 category: AI_ERROR_CATEGORY.PROVIDER,
+                retryable: true,
                 cause: error
             });
         }
@@ -225,6 +279,11 @@ export class WDTaggerProviderError extends Error {
         this.retryable = options.retryable === true;
         this.status = options.status || 0;
     }
+}
+
+// A `@cf/...` model id signals a Cloudflare Workers AI model bound to env.AI.
+function isWorkersAIModel(model) {
+    return typeof model === 'string' && model.startsWith('@cf/');
 }
 
 function normalizeConfig(config) {
@@ -259,7 +318,7 @@ function validateRequest(artifact, capability, config) {
             category: AI_ERROR_CATEGORY.UNSUPPORTED
         });
     }
-    if (!config.endpoint) {
+    if (!config.endpoint && !isWorkersAIModel(config.model)) {
         throw new WDTaggerProviderError('WD Tagger endpoint is not configured', {
             category: AI_ERROR_CATEGORY.PROVIDER
         });
@@ -378,7 +437,13 @@ function extractTagEntries(response) {
     if (Array.isArray(response)) {
         const structured = response.flatMap(value => {
             if (!value || typeof value !== 'object') return [];
-            return looksLikeTag(value) ? [value] : extractTagEntries(value);
+            if (looksLikeTag(value)) return [value];
+            // Skip the rating output (general/sensitive/questionable/explicit),
+            // but keep character/general label→score maps that a WD Tagger
+            // Space returns as separate array outputs.
+            if (isRatingMap(value)) return [];
+            const nested = extractTagEntries(value);
+            return nested.length > 0 ? nested : toLabelScoreEntries(value);
         });
         if (structured.length > 0) return structured;
         return response.filter(value => typeof value === 'string').flatMap(captionToTagEntries);
@@ -422,6 +487,27 @@ function toTagEntries(source) {
         return Object.entries(source).map(([name, confidence]) => ({ name, confidence }));
     }
     return [];
+}
+
+const RATING_MAP_LABELS = new Set(['general', 'sensitive', 'questionable', 'explicit']);
+
+// A flat { label: score } object, such as a WD Tagger general/character/rating output.
+function isLabelScoreMap(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    const entries = Object.entries(value);
+    return entries.length > 0 && entries.every(([, score]) => Number.isFinite(Number(score)));
+}
+
+// The rating output is not converted to tags; identified by every key being a rating label.
+function isRatingMap(value) {
+    if (!isLabelScoreMap(value)) return false;
+    return Object.keys(value).every(key => RATING_MAP_LABELS.has(key.toLowerCase()));
+}
+
+// Convert a { label: score } map (e.g. the character output) into tag entries.
+function toLabelScoreEntries(value) {
+    if (!isLabelScoreMap(value)) return [];
+    return Object.entries(value).map(([name, confidence]) => ({ name, confidence }));
 }
 
 function normalizeTag(value) {

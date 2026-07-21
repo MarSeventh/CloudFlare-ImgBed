@@ -1,4 +1,4 @@
-import { WDTaggerProvider } from '../provider/wdTagger.js';
+import { WDTaggerProvider } from '../provider/huggingface/wdTagger.js';
 
 export const AI_PROVIDER_NAMES = Object.freeze({
     WD_TAGGER: 'wd_tagger'
@@ -7,6 +7,7 @@ export const AI_PROVIDER_NAMES = Object.freeze({
 export class AIFactory {
     constructor(options = {}) {
         this.logger = options.logger || console;
+        this.adapter = options.adapter || null;
         this.providers = new Map();
     }
 
@@ -46,7 +47,10 @@ export function createAIFactory(options = {}) {
     const factory = new AIFactory(options);
     factory.register(
         AI_PROVIDER_NAMES.WD_TAGGER,
-        config => new WDTaggerProvider(config, { logger: factory.logger })
+        config => new WDTaggerProvider(config, {
+            logger: factory.logger,
+            adapter: factory.adapter
+        })
     );
     return factory;
 }

@@ -159,11 +159,40 @@ function resolveAIConfig(settings, env = {}) {
     const providers = settings.providers || {};
     const wdTagger = providers.wdTagger || {};
     const tagging = settings.capabilities?.tagging || {};
+    const queue = settings.queue || {};
     const enabled = settings.enabled ?? env.AI_ENABLE === 'true';
 
     return {
         enabled,
         timeoutMs: configNumber(settings.timeoutMs, env.AI_TIMEOUT, 30000),
+        parallel: Math.max(1, Math.min(10, Math.floor(configNumber(
+            settings.parallel,
+            env.AI_PARALLEL,
+            1
+        )))),
+        queue: {
+            enabled: configBoolean(queue.enabled, env.AI_QUEUE_ENABLE, true),
+            fallbackToDirect: configBoolean(
+                queue.fallbackToDirect,
+                env.AI_QUEUE_FALLBACK_DIRECT,
+                true
+            ),
+            maxRetries: Math.max(0, Math.min(10, Math.floor(configNumber(
+                queue.maxRetries,
+                env.AI_QUEUE_MAX_RETRIES,
+                3
+            )))),
+            retryDelaysSeconds: normalizeRetryDelays(
+                queue.retryDelaysSeconds,
+                env.AI_QUEUE_RETRY_DELAYS
+            ),
+            staleAfterSeconds: Math.max(0, Math.min(604800, Math.floor(configNumber(
+                queue.staleAfterSeconds,
+                env.AI_QUEUE_STALE_AFTER,
+                3600
+            )))),
+            bindingAvailable: typeof env.img_queue?.send === 'function'
+        },
         capabilities: {
             tagging: {
                 enabled: tagging.enabled ?? enabled,
@@ -212,4 +241,25 @@ function configNumber(storedValue, environmentValue, fallback) {
 
     const number = Number(value);
     return Number.isFinite(number) ? number : fallback;
+}
+
+function configBoolean(storedValue, environmentValue, fallback) {
+    const value = storedValue ?? environmentValue;
+    if (value === undefined || value === null || value === '') return fallback;
+    if (typeof value === 'boolean') return value;
+    return String(value).toLowerCase() === 'true';
+}
+
+function normalizeRetryDelays(storedValue, environmentValue) {
+    const value = storedValue ?? environmentValue;
+    const values = Array.isArray(value)
+        ? value
+        : typeof value === 'string'
+            ? value.split(',')
+            : [];
+    const normalized = values
+        .map(item => Math.floor(Number(item)))
+        .filter(item => Number.isFinite(item) && item >= 0 && item <= 43200)
+        .slice(0, 10);
+    return normalized.length ? normalized : [30, 120, 300];
 }
