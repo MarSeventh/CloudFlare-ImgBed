@@ -13,11 +13,5 @@ node_modules
 .claude/
 .agents/
 
-/docs/*
-CODE_OF_CONDUCT_DRAFT.md
-CLAUDE.md
-AGENTS.md
-.agents/
-.claude/
-.superpower/
+.superpowers/*
 /test/*

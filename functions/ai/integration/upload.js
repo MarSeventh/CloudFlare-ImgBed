@@ -78,10 +78,16 @@ async function executeAI(payload, context, config, taggingConfig, artifact, opti
         adapter: createAIAdapter(context.env, context)
     });
     const providerName = taggingConfig.provider || AI_PROVIDER_NAMES.WD_TAGGER;
-    const providerConfig = providerName === AI_PROVIDER_NAMES.WD_TAGGER
-        ? config.providers.wdTagger
-        : {};
+    if (!factory.has(providerName)) {
+        await artifact.dispose();
+        return { status: 'skipped', reason: 'unknown_provider' };
+    }
+    const providerConfig = config.providers?.[providerName] || {};
     const provider = factory.create(providerName, providerConfig);
+    if (!provider.getCapabilities().includes('tagging')) {
+        await artifact.dispose();
+        return { status: 'skipped', reason: 'provider_capability_unsupported' };
+    }
     if (!providerAcceptsArtifact(provider, artifact)) {
         await artifact.dispose();
         return { status: 'skipped', reason: 'provider_unsupported_input' };

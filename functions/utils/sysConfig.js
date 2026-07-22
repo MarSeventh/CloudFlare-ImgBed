@@ -157,14 +157,13 @@ export async function fetchAIConfig(env) {
 
 function resolveAIConfig(settings, env = {}) {
     const providers = settings.providers || {};
-    const wdTagger = providers.wdTagger || {};
     const tagging = settings.capabilities?.tagging || {};
     const queue = settings.queue || {};
     const enabled = settings.enabled ?? env.AI_ENABLE === 'true';
 
     return {
         enabled,
-        timeoutMs: configNumber(settings.timeoutMs, env.AI_TIMEOUT, 30000),
+        timeoutMs: configNumber(settings.timeoutMs, env.AI_TIMEOUT, 60000),
         parallel: Math.max(1, Math.min(10, Math.floor(configNumber(
             settings.parallel,
             env.AI_PARALLEL,
@@ -201,29 +200,80 @@ function resolveAIConfig(settings, env = {}) {
             }
         },
         providers: {
-            wdTagger: {
-                endpoint: wdTagger.endpoint || env.WD_TAGGER_ENDPOINT || '',
-                apiKey: wdTagger.apiKey || env.WD_TAGGER_API_KEY || '',
-                model: wdTagger.model || env.WD_TAGGER_MODEL || 'wd-tagger',
-                modelVersion: wdTagger.modelVersion || env.WD_TAGGER_MODEL_VERSION || '',
-                timeoutMs: configNumber(wdTagger.timeoutMs, env.AI_TIMEOUT, 30000),
-                maxInputSizeBytes: configNumber(
-                    wdTagger.maxInputSizeBytes,
-                    env.WD_TAGGER_MAX_INPUT_SIZE,
-                    10 * 1024 * 1024
-                ),
-                threshold: configNumber(wdTagger.threshold, env.WD_TAGGER_THRESHOLD, 0.35),
-                characterThreshold: configNumber(
-                    wdTagger.characterThreshold,
-                    env.WD_TAGGER_CHARACTER_THRESHOLD,
-                    0.85
-                ),
-                maxTags: configNumber(wdTagger.maxTags, env.WD_TAGGER_MAX_TAGS, 100),
-                requestFormat: wdTagger.requestFormat || env.WD_TAGGER_REQUEST_FORMAT || 'raw',
-                fileField: wdTagger.fileField || env.WD_TAGGER_FILE_FIELD || 'image',
-                headers: wdTagger.headers || {}
-            }
+            // Providers are keyed by canonical registry name. The legacy camelCase
+            // `wdTagger` blob is still read for back-compat with configs saved
+            // before this migration.
+            wd_tagger: resolveWdTaggerConfig(providers.wd_tagger ?? providers.wdTagger ?? {}, env),
+            openai: resolveOpenAIConfig(providers.openai ?? {}, env),
+            anthropic: resolveAnthropicConfig(providers.anthropic ?? {}, env)
         }
+    };
+}
+
+function resolveWdTaggerConfig(wdTagger, env) {
+    return {
+        endpoint: wdTagger.endpoint || env.WD_TAGGER_ENDPOINT || '',
+        apiKey: wdTagger.apiKey || env.WD_TAGGER_API_KEY || '',
+        model: wdTagger.model || env.WD_TAGGER_MODEL || 'wd-tagger',
+        modelVersion: wdTagger.modelVersion || env.WD_TAGGER_MODEL_VERSION || '',
+        timeoutMs: configNumber(wdTagger.timeoutMs, env.AI_TIMEOUT, 30000),
+        maxInputSizeBytes: configNumber(
+            wdTagger.maxInputSizeBytes,
+            env.WD_TAGGER_MAX_INPUT_SIZE,
+            10 * 1024 * 1024
+        ),
+        threshold: configNumber(wdTagger.threshold, env.WD_TAGGER_THRESHOLD, 0.35),
+        characterThreshold: configNumber(
+            wdTagger.characterThreshold,
+            env.WD_TAGGER_CHARACTER_THRESHOLD,
+            0.85
+        ),
+        maxTags: configNumber(wdTagger.maxTags, env.WD_TAGGER_MAX_TAGS, 100),
+        requestFormat: wdTagger.requestFormat || env.WD_TAGGER_REQUEST_FORMAT || 'raw',
+        fileField: wdTagger.fileField || env.WD_TAGGER_FILE_FIELD || 'image',
+        headers: wdTagger.headers || {}
+    };
+}
+
+function resolveOpenAIConfig(openai, env) {
+    return {
+        endpoint: openai.endpoint || env.AI_OPENAI_ENDPOINT || 'https://api.openai.com/v1/chat/completions',
+        apiKey: openai.apiKey || env.AI_OPENAI_API_KEY || '',
+        model: openai.model || env.AI_OPENAI_MODEL || 'gpt-4o-mini',
+        modelVersion: openai.modelVersion || '',
+        maxTokens: configNumber(openai.maxTokens, env.AI_OPENAI_MAX_TOKENS, 1024),
+        temperature: configNumber(openai.temperature, env.AI_OPENAI_TEMPERATURE, 0),
+        tokenField: openai.tokenField || env.AI_OPENAI_TOKEN_FIELD || 'max_tokens',
+        jsonMode: configBoolean(openai.jsonMode, env.AI_OPENAI_JSON_MODE, false),
+        timeoutMs: configNumber(openai.timeoutMs, env.AI_TIMEOUT, 60000),
+        maxInputSizeBytes: configNumber(
+            openai.maxInputSizeBytes,
+            env.AI_OPENAI_MAX_INPUT_SIZE,
+            5 * 1024 * 1024
+        ),
+        maxTags: configNumber(openai.maxTags, env.AI_OPENAI_MAX_TAGS, 40),
+        prompts: openai.prompts && typeof openai.prompts === 'object' ? openai.prompts : {},
+        headers: openai.headers && typeof openai.headers === 'object' ? openai.headers : {}
+    };
+}
+
+function resolveAnthropicConfig(anthropic, env) {
+    return {
+        endpoint: anthropic.endpoint || env.AI_ANTHROPIC_ENDPOINT || 'https://api.anthropic.com/v1/messages',
+        apiKey: anthropic.apiKey || env.AI_ANTHROPIC_API_KEY || '',
+        model: anthropic.model || env.AI_ANTHROPIC_MODEL || 'claude-haiku-4-5',
+        modelVersion: anthropic.modelVersion || '',
+        anthropicVersion: anthropic.anthropicVersion || env.AI_ANTHROPIC_VERSION || '2023-06-01',
+        maxTokens: configNumber(anthropic.maxTokens, env.AI_ANTHROPIC_MAX_TOKENS, 1024),
+        timeoutMs: configNumber(anthropic.timeoutMs, env.AI_TIMEOUT, 60000),
+        maxInputSizeBytes: configNumber(
+            anthropic.maxInputSizeBytes,
+            env.AI_ANTHROPIC_MAX_INPUT_SIZE,
+            5 * 1024 * 1024
+        ),
+        maxTags: configNumber(anthropic.maxTags, env.AI_ANTHROPIC_MAX_TAGS, 40),
+        prompts: anthropic.prompts && typeof anthropic.prompts === 'object' ? anthropic.prompts : {},
+        headers: anthropic.headers && typeof anthropic.headers === 'object' ? anthropic.headers : {}
     };
 }
 

@@ -47,6 +47,66 @@ WD Tagger environment defaults are `WD_TAGGER_ENDPOINT`,
 `WD_TAGGER_REQUEST_FORMAT`, and `WD_TAGGER_FILE_FIELD`. Shared defaults use
 `AI_ENABLE`, `AI_TIMEOUT`, `AI_PARALLEL`, and `AI_TAGGING_PROVIDER`.
 
+## Capabilities and providers
+
+Each capability (what to do, e.g. `tagging`) is decoupled from the provider
+(how it is done). A capability's `provider` setting selects one implementation;
+adding a new implementation is a matter of registering a Provider in the factory
+plus a config schema — the Processor, MetadataService, queue, and search index
+are unchanged because every Provider returns the same bounded result envelope
+(`{ results: { tags: [{ name, confidence }] } }`).
+
+Tagging ships with three interchangeable providers:
+
+- `wd_tagger` — the WD Tagger specialist model (HTTP endpoint, Hugging Face
+  Space, or a bound Workers AI `@cf/...` model).
+- `openai` — any OpenAI-compatible `/chat/completions` vision endpoint. The full
+  endpoint URL is operator-supplied, so the one provider covers OpenAI,
+  OpenRouter, Azure, and local gateways. Non-Bearer auth (Azure `api-key`,
+  OpenRouter extra headers) is expressed through the provider's `headers` map.
+- `anthropic` — the Anthropic Messages API (`x-api-key` + `anthropic-version`).
+
+The LLM providers turn an image into tags by prompt. The default prompt forces a
+`{"tags":[...]}` JSON response, which the provider parses (tolerant of markdown
+fences and prose), deduplicates, and caps at `maxTags`; downstream
+`sanitizeAITags` then lowercases and validates exactly as it does for WD Tagger,
+so LLM tags share the same path. Each capability's prompt can be overridden per
+provider via `providers.<name>.prompts.<capability>`. The provider structure
+also reserves a `description` capability (caption) prompt for a future
+milestone; it is not wired to a Processor yet.
+
+`config.providers` is keyed by canonical provider name (`wd_tagger`, `openai`,
+`anthropic`). A legacy camelCase `wdTagger` blob saved before this migration is
+still read for back-compat.
+
+LLM provider environment defaults:
+
+- OpenAI: `AI_OPENAI_ENDPOINT`, `AI_OPENAI_API_KEY`, `AI_OPENAI_MODEL`,
+  `AI_OPENAI_MAX_TOKENS`, `AI_OPENAI_TEMPERATURE`, `AI_OPENAI_TOKEN_FIELD`
+  (`max_tokens` or `max_completion_tokens`), `AI_OPENAI_JSON_MODE`,
+  `AI_OPENAI_MAX_INPUT_SIZE`, `AI_OPENAI_MAX_TAGS`.
+- Anthropic: `AI_ANTHROPIC_ENDPOINT`, `AI_ANTHROPIC_API_KEY`,
+  `AI_ANTHROPIC_MODEL`, `AI_ANTHROPIC_VERSION`, `AI_ANTHROPIC_MAX_TOKENS`,
+  `AI_ANTHROPIC_MAX_INPUT_SIZE`, `AI_ANTHROPIC_MAX_TAGS`.
+
+### Privacy and security
+
+- **Private-image egress.** With an LLM provider, the image bytes are sent
+  (base64-inlined) to a third-party vendor and are subject to that vendor's
+  retention and training terms. OpenRouter in particular may fan out to arbitrary
+  downstream providers. This is a privacy posture change from WD Tagger on your
+  own endpoint — enable it deliberately.
+- **Transport.** The management API requires an `https://` endpoint whenever an
+  API key is set, so the key and image are never sent in cleartext.
+- **Secrets.** The config API masks every provider's `apiKey` in responses and
+  preserves the stored key when a save omits it. Providers log only
+  `{ fileId, category, retryable, status }` — never prompts, image bytes,
+  response bodies, or keys.
+- **Timeout interaction.** The pipeline is bounded by both the per-step provider
+  timeout and the global `AI_TIMEOUT`; whichever fires first wins. LLM vision
+  calls are slower than WD Tagger, so keep `AI_TIMEOUT` at or above the LLM
+  provider's `timeoutMs` (default 60s) or the step will be cut short.
+
 `AI_PARALLEL` controls bounded processing within a delivered Queue batch and
 defaults to `1`. It can be set from the existing AI management configuration or
 as an environment default, with an allowed range of 1 through 10.
@@ -140,19 +200,53 @@ Pipeline output remains provider-neutral. The upload integration selects a
 Provider through the Factory, while the Queue consumer owns delivery retries,
 task idempotency, and bounded AI task-state updates around each execution.
 
-`createAIFactory()` returns an isolated `AIFactory` with `wd_tagger`
-registered. Passing `{ adapter }` injects the AI environment adapter into every
-provider it constructs. It creates `WDTaggerProvider` only when requested. The
-Provider supports the `tagging` capability and returns the common `AIResult`
-envelope. It uses the project's existing console logger and does not log
-credentials, request bodies, response bodies, or image content.
+`createAIFactory()` returns an isolated `AIFactory` with `wd_tagger`, `openai`,
+and `anthropic` registered. Passing `{ adapter }` injects the AI environment
+adapter into every provider it constructs. Each provider is created only when
+requested, supports the `tagging` capability, and returns the common `AIResult`
+envelope. Providers use the project's existing console logger and do not log
+credentials, request bodies, response bodies, or image content. `describeProviders()`
+enumerates registered providers with their declared capabilities; it constructs
+each with an empty config, so every provider's `normalizeConfig` tolerates `{}`.
 
-Following the environment-adapter architecture, the Provider routes inference by
-runtime. When the operator configures a `@cf/...` model id and the deployment
-binds Workers AI as `env.AI`, inference runs natively through `env.AI.run(...)`.
-Otherwise, or whenever an HTTP / Hugging Face Space endpoint is configured, it
-uses the remote transport. The adapter is optional; without it the Provider
-degrades to the remote transport so existing deployments keep working.
+A capability selects one provider through `capabilities.<capability>.provider`.
+Because a Processor only reads the provider-neutral `AIResult` envelope, swapping
+the provider behind a capability requires no downstream change — the tag merge,
+queue, and search index paths are identical regardless of which provider produced
+the result. This is the extension point for "one feature, several implementations":
+add a provider to the factory plus a config schema, and it becomes selectable.
+
+### WD Tagger provider
+
+Following the environment-adapter architecture, the WD Tagger provider routes
+inference by runtime. When the operator configures a `@cf/...` model id and the
+deployment binds Workers AI as `env.AI`, inference runs natively through
+`env.AI.run(...)`. Otherwise, or whenever an HTTP / Hugging Face Space endpoint is
+configured, it uses the remote transport. The adapter is optional; without it the
+Provider degrades to the remote transport so existing deployments keep working.
+
+### LLM providers (`openai`, `anthropic`)
+
+`openai` targets any OpenAI-compatible `/chat/completions` vision endpoint. The
+full endpoint URL is operator-supplied, so one provider covers OpenAI, OpenRouter,
+Azure OpenAI, and local gateways; non-Bearer auth (Azure `api-key`, OpenRouter
+extra headers) is expressed through `headers`. `tokenField` switches between
+`max_tokens` and `max_completion_tokens` for newer models, and `jsonMode` opts into
+`response_format` where a gateway supports it. `anthropic` targets the native
+Messages API using `x-api-key` + `anthropic-version` headers and a base64 image
+block, with the prompt in the top-level `system` field.
+
+Both LLM providers turn model output into tags through a prompt that instructs the
+model to return `{"tags":[...]}`. The prompt per capability is configurable via
+`providers.<name>.prompts.<capability>`, so operators can adapt output to a given
+model. Parsing is tolerant: it strips markdown fences, recovers a JSON block from
+surrounding prose, and falls back to comma-separated text. Tags are deduplicated
+case-insensitively, capped at `maxTags` (default 40), and length-bounded; cleaning
+and validation are left to the shared `sanitizeAITags` so LLM tags travel WD
+Tagger's exact downstream path. LLM providers accept only `image/jpeg`, `image/png`,
+`image/gif`, and `image/webp`; other types are a clean pipeline skip. The
+`description` capability has a prompt stub and result branch ready but is not yet
+wired to a Processor.
 
 The configured WD Tagger endpoint may be a regular HTTP inference endpoint or a
 Hugging Face Space repository URL such as

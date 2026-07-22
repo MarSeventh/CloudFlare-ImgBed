@@ -2,6 +2,7 @@ import { runManualAI } from '../../../ai/integration/upload.js';
 import { onRequest as serveFile } from '../../../file/[[path]].js';
 import { readIndex } from '../../../utils/indexManager.js';
 import { fetchAIConfig } from '../../../utils/sysConfig.js';
+import { createAIFactory } from '../../../ai/factory/index.js';
 
 export async function onRequestPost(context) {
     let body;
@@ -12,8 +13,11 @@ export async function onRequestPost(context) {
     }
 
     const config = await fetchAIConfig(context.env);
-    if (!config.enabled || !config.providers.wdTagger.endpoint) {
-        return json({ error: 'WD Tagger is not configured' }, 400);
+    if (!config.enabled) {
+        return json({ error: 'AI is not enabled' }, 400);
+    }
+    if (!isTaggingProviderReady(config)) {
+        return json({ error: 'The selected tagging provider is not configured' }, 400);
     }
 
     const directories = normalizeDirectories(
@@ -90,6 +94,25 @@ async function tagStoredFile(context, file) {
         console.error('[AI] Failed to tag stored file', { fileId: file.id, message: error.message });
         return { status: 'failed', reason: error.message };
     }
+}
+
+// Provider-aware readiness check: construct the selected tagging provider and
+// ask whether it has everything it needs. LLM providers expose isConfigured();
+// WD Tagger is ready with an endpoint or a bound Workers AI (@cf/...) model.
+function isTaggingProviderReady(config) {
+    const providerName = config.capabilities?.tagging?.provider || 'wd_tagger';
+    const providerConfig = config.providers?.[providerName] || {};
+    try {
+        const provider = createAIFactory().create(providerName, providerConfig);
+        if (typeof provider.isConfigured === 'function') {
+            return provider.isConfigured();
+        }
+    } catch {
+        return false;
+    }
+    // WD Tagger fallback: an HTTP endpoint or a Workers AI model id.
+    return Boolean(providerConfig.endpoint) ||
+        (typeof providerConfig.model === 'string' && providerConfig.model.startsWith('@cf/'));
 }
 
 function normalizeDirectories(value) {

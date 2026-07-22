@@ -1,7 +1,11 @@
 import { WDTaggerProvider } from '../provider/huggingface/wdTagger.js';
+import { OpenAICompatibleProvider } from '../provider/llm/openai.js';
+import { AnthropicProvider } from '../provider/llm/anthropic.js';
 
 export const AI_PROVIDER_NAMES = Object.freeze({
-    WD_TAGGER: 'wd_tagger'
+    WD_TAGGER: 'wd_tagger',
+    OPENAI: 'openai',
+    ANTHROPIC: 'anthropic'
 });
 
 export class AIFactory {
@@ -45,12 +49,38 @@ export class AIFactory {
 
 export function createAIFactory(options = {}) {
     const factory = new AIFactory(options);
+    const providerOptions = () => ({
+        logger: factory.logger,
+        adapter: factory.adapter
+    });
     factory.register(
         AI_PROVIDER_NAMES.WD_TAGGER,
-        config => new WDTaggerProvider(config, {
-            logger: factory.logger,
-            adapter: factory.adapter
-        })
+        config => new WDTaggerProvider(config, providerOptions())
+    );
+    factory.register(
+        AI_PROVIDER_NAMES.OPENAI,
+        config => new OpenAICompatibleProvider(config, providerOptions())
+    );
+    factory.register(
+        AI_PROVIDER_NAMES.ANTHROPIC,
+        config => new AnthropicProvider(config, providerOptions())
     );
     return factory;
+}
+
+/**
+ * Enumerates registered providers with their declared capabilities. Each is
+ * constructed with an empty config, so provider normalizeConfig MUST NOT throw
+ * on {}. Used by the management API to validate a chosen provider and, later, to
+ * drive a dynamic configuration form in the frontend.
+ */
+export function describeProviders(options = {}) {
+    const factory = createAIFactory(options);
+    return factory.list().map(name => {
+        const provider = factory.create(name, {});
+        return {
+            name,
+            capabilities: [...provider.getCapabilities()]
+        };
+    });
 }

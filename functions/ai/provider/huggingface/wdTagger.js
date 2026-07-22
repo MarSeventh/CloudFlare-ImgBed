@@ -4,6 +4,9 @@ import {
     AI_ERROR_CATEGORY,
     AI_RESULT_STATUS
 } from '../../types/index.js';
+import { ProviderError, errorFromStatus as sharedErrorFromStatus, normalizeNumber } from '../shared/errors.js';
+import { createExecutionSignal, waitForAbort } from '../shared/execution.js';
+import { readArtifactBytes } from '../shared/bytes.js';
 import {
     requestGradioSpace,
     resolveHuggingFaceSpace
@@ -38,6 +41,11 @@ export class WDTaggerProvider extends AIProvider {
         return PROVIDER_NAME;
     }
 
+    /** Ready with an HTTP endpoint or a bound Workers AI (@cf/...) model id. */
+    isConfigured() {
+        return Boolean(this.config.endpoint) || isWorkersAIModel(this.config.model);
+    }
+
     getModelIdentity() {
         return {
             model: this.config.model,
@@ -64,7 +72,7 @@ export class WDTaggerProvider extends AIProvider {
     }
 
     classifyError(error) {
-        if (error instanceof WDTaggerProviderError) {
+        if (error instanceof ProviderError) {
             return {
                 category: error.category,
                 retryable: error.retryable
@@ -96,13 +104,18 @@ export class WDTaggerProvider extends AIProvider {
 
         try {
             validateRequest(artifact, capability, this.config);
-            const execution = createExecutionSignal(context.signal, this.config.timeoutMs);
+            const execution = createExecutionSignal(
+                context.signal,
+                this.config.timeoutMs,
+                'WD Tagger request timed out'
+            );
 
             try {
                 const bytes = await readArtifactBytes(
                     artifact,
                     execution.signal,
-                    this.config.maxInputSizeBytes
+                    this.config.maxInputSizeBytes,
+                    'WD Tagger'
                 );
                 const response = await this.infer(bytes, artifact, context, execution.signal);
                 const tags = normalizeTags(
@@ -257,7 +270,10 @@ export class WDTaggerProvider extends AIProvider {
         }
 
         if (!response.ok) {
-            throw errorFromStatus(response.status);
+            throw sharedErrorFromStatus(response.status, {
+                ErrorClass: WDTaggerProviderError,
+                label: 'WD Tagger'
+            });
         }
 
         try {
@@ -271,13 +287,9 @@ export class WDTaggerProvider extends AIProvider {
     }
 }
 
-export class WDTaggerProviderError extends Error {
+export class WDTaggerProviderError extends ProviderError {
     constructor(message, options = {}) {
-        super(message, options.cause ? { cause: options.cause } : undefined);
-        this.name = 'WDTaggerProviderError';
-        this.category = options.category || AI_ERROR_CATEGORY.PROVIDER;
-        this.retryable = options.retryable === true;
-        this.status = options.status || 0;
+        super(message, { ...options, name: 'WDTaggerProviderError' });
     }
 }
 
@@ -338,79 +350,6 @@ function validateRequest(artifact, capability, config) {
             category: AI_ERROR_CATEGORY.INVALID_INPUT
         });
     }
-}
-
-async function readArtifactBytes(artifact, signal, maxBytes) {
-    const value = await waitForAbort(artifact.read({ signal, maxBytes }), signal);
-
-    if (value instanceof ArrayBuffer) {
-        return assertByteLimit(new Uint8Array(value), maxBytes);
-    }
-    if (ArrayBuffer.isView(value)) {
-        return assertByteLimit(
-            new Uint8Array(value.buffer, value.byteOffset, value.byteLength),
-            maxBytes
-        );
-    }
-    if (typeof Blob !== 'undefined' && value instanceof Blob) {
-        return assertByteLimit(new Uint8Array(await value.arrayBuffer()), maxBytes);
-    }
-    if (typeof ReadableStream !== 'undefined' && value instanceof ReadableStream) {
-        return readStream(value, maxBytes, signal);
-    }
-
-    throw new WDTaggerProviderError('AI artifact did not provide readable bytes', {
-        category: AI_ERROR_CATEGORY.INVALID_INPUT
-    });
-}
-
-async function readStream(stream, maxBytes, signal) {
-    const reader = stream.getReader();
-    const chunks = [];
-    let size = 0;
-    const cancel = () => {
-        reader.cancel(signal.reason).catch(() => {});
-    };
-
-    if (signal.aborted) cancel();
-    else signal.addEventListener('abort', cancel, { once: true });
-
-    try {
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const chunk = value instanceof Uint8Array ? value : new Uint8Array(value);
-            size += chunk.byteLength;
-            if (size > maxBytes) throw inputLimitError();
-            chunks.push(chunk);
-        }
-    } finally {
-        signal.removeEventListener('abort', cancel);
-        try {
-            reader.releaseLock();
-        } catch {
-            // A pending read keeps the lock until the underlying source settles.
-        }
-    }
-
-    const bytes = new Uint8Array(size);
-    let offset = 0;
-    for (const chunk of chunks) {
-        bytes.set(chunk, offset);
-        offset += chunk.byteLength;
-    }
-    return bytes;
-}
-
-function assertByteLimit(bytes, maxBytes) {
-    if (bytes.byteLength > maxBytes) throw inputLimitError();
-    return bytes;
-}
-
-function inputLimitError() {
-    return new WDTaggerProviderError('AI artifact exceeds WD Tagger input limit', {
-        category: AI_ERROR_CATEGORY.INVALID_INPUT
-    });
 }
 
 function normalizeTags(response, threshold, characterThreshold, maxTags) {
@@ -527,74 +466,8 @@ function normalizeTag(value) {
     };
 }
 
-function createExecutionSignal(parentSignal, timeoutMs) {
-    const controller = new AbortController();
-    const abortFromParent = () => controller.abort(parentSignal.reason);
-    let timeoutId;
-
-    if (parentSignal?.aborted) abortFromParent();
-    else parentSignal?.addEventListener('abort', abortFromParent, { once: true });
-
-    if (!controller.signal.aborted) {
-        timeoutId = setTimeout(() => {
-            controller.abort(new WDTaggerProviderError('WD Tagger request timed out', {
-                category: AI_ERROR_CATEGORY.TIMEOUT,
-                retryable: true
-            }));
-        }, timeoutMs);
-    }
-
-    return {
-        signal: controller.signal,
-        dispose() {
-            if (timeoutId !== undefined) clearTimeout(timeoutId);
-            parentSignal?.removeEventListener('abort', abortFromParent);
-        }
-    };
-}
-
-function errorFromStatus(status) {
-    if (status === 408 || status === 504) {
-        return new WDTaggerProviderError('WD Tagger request timed out', {
-            category: AI_ERROR_CATEGORY.TIMEOUT,
-            retryable: true,
-            status
-        });
-    }
-    if (status === 429) {
-        return new WDTaggerProviderError('WD Tagger rate limit exceeded', {
-            category: AI_ERROR_CATEGORY.RATE_LIMITED,
-            retryable: true,
-            status
-        });
-    }
-    return new WDTaggerProviderError(`WD Tagger request failed with status ${status}`, {
-        category: AI_ERROR_CATEGORY.PROVIDER,
-        retryable: status >= 500,
-        status
-    });
-}
-
 function safeErrorMessage(error) {
     if (error instanceof WDTaggerProviderError) return error.message;
     if (error?.name === 'AbortError') return 'WD Tagger request cancelled';
     return 'WD Tagger analysis failed';
-}
-
-function waitForAbort(promise, signal) {
-    if (signal.aborted) return Promise.reject(signal.reason || new Error('WD Tagger request cancelled'));
-
-    return new Promise((resolve, reject) => {
-        const abort = () => reject(signal.reason || new Error('WD Tagger request cancelled'));
-        signal.addEventListener('abort', abort, { once: true });
-        Promise.resolve(promise)
-            .then(resolve, reject)
-            .finally(() => signal.removeEventListener('abort', abort));
-    });
-}
-
-function normalizeNumber(value, fallback, minimum, maximum = Number.POSITIVE_INFINITY) {
-    const number = Number(value ?? fallback);
-    if (!Number.isFinite(number) || number < minimum || number > maximum) return fallback;
-    return number;
 }
