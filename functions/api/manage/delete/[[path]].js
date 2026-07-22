@@ -130,7 +130,7 @@ export async function onRequest(context) {
 }
 
 // 删除单个文件的核心函数
-async function deleteFile(env, fileId, cdnUrl, url) {
+export async function deleteFile(env, fileId, cdnUrl, url) {
     try {
         // 读取图片信息
         const db = getDatabase(env);
