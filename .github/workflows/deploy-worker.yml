@@ -25,7 +25,6 @@ on:
 #
 # 可选：
 #   R2_BUCKET_NAME        - R2 存储桶名称
-#   AI_QUEUE_NAME         - 通用 AI Queue 资源名（推荐 imgqueue，需提前创建）
 #   WORKER_NAME           - Worker 名称（默认 cloudflare-imgbed，手动触发时可在界面覆盖）
 #   WORKER_VARS           - JSON 格式的业务环境变量（非必要不建议配置，
 #                           部署完成后请在管理面板中配置所有设置）
@@ -83,4 +82,4 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: '4'
-          command: deploy --config deploy/worker/wrangler.toml --yes
+          command: deploy --config deploy/worker/wrangler.toml
