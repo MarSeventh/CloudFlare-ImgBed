@@ -27,6 +27,7 @@ import * as apiManageCusConfigBlockipList from '../../functions/api/manage/cusCo
 import * as apiManageCusConfigFiles from '../../functions/api/manage/cusConfig/files.js';
 import * as apiManageCusConfigList from '../../functions/api/manage/cusConfig/list.js';
 import * as apiManageCusConfigWhiteip from '../../functions/api/manage/cusConfig/whiteip.js';
+import * as apiManageDeleteBatch from '../../functions/api/manage/delete/batch.js';
 import * as apiManageSysConfigOthers from '../../functions/api/manage/sysConfig/others.js';
 import * as apiManageSysConfigPage from '../../functions/api/manage/sysConfig/page.js';
 import * as apiManageSysConfigSecurity from '../../functions/api/manage/sysConfig/security.js';
@@ -77,6 +78,7 @@ const routes = [
     { path: '/api/manage/cusConfig/files', module: apiManageCusConfigFiles, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/manage/cusConfig/list', module: apiManageCusConfigList, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/manage/cusConfig/whiteip', module: apiManageCusConfigWhiteip, middlewares: [mw_api, mw_api_manage] },
+    { path: '/api/manage/delete/batch', module: apiManageDeleteBatch, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/manage/sysConfig/others', module: apiManageSysConfigOthers, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/manage/sysConfig/page', module: apiManageSysConfigPage, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/manage/sysConfig/security', module: apiManageSysConfigSecurity, middlewares: [mw_api, mw_api_manage] },
