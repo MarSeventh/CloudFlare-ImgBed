@@ -4,14 +4,15 @@ on:
   push:
     branches:
       - main
+      - dev
   workflow_dispatch:
     inputs:
       worker_name:
-        description: 'Worker Name'
+        description: 'Worker Name (覆盖默认名称，注意：仅更改名称不会自动匹配数据库/KV绑定)'
         required: false
         default: ''
 
-# 所有配置均通过 Secrets 传入（public 仓库的 Variables 对所有人可见，不安全）
+# 所有配置均通过 Secrets 传入
 #
 # 在仓库 Settings → Secrets and variables → Actions → Secrets 中配置：
 #
@@ -19,28 +20,41 @@ on:
 #   CLOUDFLARE_API_TOKEN  - Cloudflare API Token（需要 Workers 编辑权限）
 #   CLOUDFLARE_ACCOUNT_ID - Cloudflare Account ID
 #
-# 数据库（二选一）：
-#   D1_DATABASE_ID        - D1 数据库 ID
-#   KV_NAMESPACE_ID       - KV 命名空间 ID
+# Worker 名称（每个环境独立）：
+#   WORKER_NAME_PROD      - 生产环境 Worker 名称（main 分支）
+#   WORKER_NAME_DEV       - 开发环境 Worker 名称（dev 分支）
+#   WORKER_NAME           - 通用回退名称（其他分支）
+#
+# 数据库（每个环境独立）：
+#   D1_DATABASE_ID_PROD   - 生产环境 D1 数据库 ID
+#   D1_DATABASE_ID_DEV    - 开发环境 D1 数据库 ID
+#   D1_DATABASE_ID        - 通用回退 D1 数据库 ID
+#
+#   KV_NAMESPACE_ID_PROD  - 生产环境 KV 命名空间 ID
+#   KV_NAMESPACE_ID_DEV   - 开发环境 KV 命名空间 ID
+#   KV_NAMESPACE_ID       - 通用回退 KV 命名空间 ID
+#
+#   R2_BUCKET_NAME_PROD   - 生产环境 R2 存储桶名称
+#   R2_BUCKET_NAME_DEV    - 开发环境 R2 存储桶名称
+#   R2_BUCKET_NAME        - 通用回退 R2 存储桶名称
 #
 # 可选：
-#   R2_BUCKET_NAME        - R2 存储桶名称
-#   WORKER_NAME           - Worker 名称（默认 cloudflare-imgbed，手动触发时可在界面覆盖）
-#   WORKER_VARS           - JSON 格式的业务环境变量（非必要不建议配置，部署完成后请在管理面板中配置所有设置）
-#   AI_QUEUE_NAME         - Queue队列名称
+#   AI_QUEUE_NAME         - AI 队列名称（所有环境共用）
+#   WORKER_VARS_PROD      - 生产环境业务环境变量（JSON 格式）
+#   WORKER_VARS_DEV       - 开发环境业务环境变量（JSON 格式）
+#   WORKER_VARS           - 通用回退业务环境变量（JSON 格式）
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # 仅在 fork 仓库且配置了 Cloudflare secrets 时运行
-    # 原仓库 push 和未配置 secrets 的 fork 不会触发部署
-    if: ${{ github.event.repository.fork }}
+    environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
+    
     steps:
       - name: Check deployment config
         id: check
         run: |
           if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
-            echo "CLOUDFLARE_API_TOKEN not configured, skipping Worker deployment"
+            echo "::warning::CLOUDFLARE_API_TOKEN not configured, skipping Worker deployment"
             echo "skip=true" >> $GITHUB_OUTPUT
           else
             echo "skip=false" >> $GITHUB_OUTPUT
@@ -58,7 +72,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.check.outputs.skip != 'true'
-        run: npm ci --omit=dev --omit=optional
+        run: npm ci
 
       - name: Generate worker routes
         if: steps.check.outputs.skip != 'true'
@@ -67,13 +81,24 @@ jobs:
       - name: Generate wrangler config
         if: steps.check.outputs.skip != 'true'
         env:
-          WORKER_NAME: ${{ inputs.worker_name || secrets.WORKER_NAME }}
-          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
-          KV_NAMESPACE_ID: ${{ secrets.KV_NAMESPACE_ID }}
-          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
-          WORKER_VARS: ${{ secrets.WORKER_VARS }}
+          WORKER_NAME: ${{ inputs.worker_name || (github.ref_name == 'main' && secrets.WORKER_NAME_PROD) || (github.ref_name == 'dev' && secrets.WORKER_NAME_DEV) || secrets.WORKER_NAME }}
+          D1_DATABASE_ID: ${{ (github.ref_name == 'main' && secrets.D1_DATABASE_ID_PROD) || (github.ref_name == 'dev' && secrets.D1_DATABASE_ID_DEV) || secrets.D1_DATABASE_ID }}
+          KV_NAMESPACE_ID: ${{ (github.ref_name == 'main' && secrets.KV_NAMESPACE_ID_PROD) || (github.ref_name == 'dev' && secrets.KV_NAMESPACE_ID_DEV) || secrets.KV_NAMESPACE_ID }}
+          R2_BUCKET_NAME: ${{ (github.ref_name == 'main' && secrets.R2_BUCKET_NAME_PROD) || (github.ref_name == 'dev' && secrets.R2_BUCKET_NAME_DEV) || secrets.R2_BUCKET_NAME }}
           AI_QUEUE_NAME: ${{ secrets.AI_QUEUE_NAME }}
-        run: node deploy/worker/generate-toml.js
+          WORKER_VARS: ${{ (github.ref_name == 'main' && secrets.WORKER_VARS_PROD) || (github.ref_name == 'dev' && secrets.WORKER_VARS_DEV) || secrets.WORKER_VARS }}
+          ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'development' }}
+        run: node deploy/worker/generate-config.js
+
+      - name: Validate configuration
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          if [ -z "$WORKER_NAME" ]; then
+            echo "::error::WORKER_NAME is not set. Please configure WORKER_NAME_PROD, WORKER_NAME_DEV, or WORKER_NAME secret."
+            exit 1
+          fi
+          echo "Deploying Worker: $WORKER_NAME"
+          echo "Environment: $ENVIRONMENT"
 
       - name: Deploy to Cloudflare Workers
         if: steps.check.outputs.skip != 'true'
@@ -81,5 +106,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: '4'
-          command: deploy --config deploy/worker/wrangler.toml
+          wranglerVersion: '4.0.0'
+          command: deploy --config deploy/worker/wrangler.jsonc
