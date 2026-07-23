@@ -88,7 +88,7 @@ jobs:
           AI_QUEUE_NAME: ${{ secrets.AI_QUEUE_NAME }}
           WORKER_VARS: ${{ (github.ref_name == 'main' && secrets.WORKER_VARS_PROD) || (github.ref_name == 'dev' && secrets.WORKER_VARS_DEV) || secrets.WORKER_VARS }}
           ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'development' }}
-        run: node deploy/worker/generate-config.js
+        run: node deploy/worker/generate-toml.js
 
       - name: Validate configuration
         if: steps.check.outputs.skip != 'true'
@@ -107,4 +107,4 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: '4.0.0'
-          command: deploy --config deploy/worker/wrangler.jsonc
+          command: deploy --config deploy/worker/wrangler.toml
