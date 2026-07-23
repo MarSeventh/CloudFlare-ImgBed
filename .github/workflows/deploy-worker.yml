@@ -11,14 +11,24 @@ on:
         description: 'Worker Name'
         required: false
         default: ''
-      environment:
-        description: 'Deployment Environment'
-        required: false
-        default: 'production'
-        type: choice
-        options:
-          - production
-          - staging
+
+# 所有配置均通过 Secrets 传入（public 仓库的 Variables 对所有人可见，不安全）
+#
+# 在仓库 Settings → Secrets and variables → Actions → Secrets 中配置：
+#
+# 必填：
+#   CLOUDFLARE_API_TOKEN  - Cloudflare API Token（需要 Workers 编辑权限）
+#   CLOUDFLARE_ACCOUNT_ID - Cloudflare Account ID
+#
+# 数据库（二选一）：
+#   D1_DATABASE_ID        - D1 数据库 ID
+#   KV_NAMESPACE_ID       - KV 命名空间 ID
+#
+# 可选：
+#   R2_BUCKET_NAME        - R2 存储桶名称
+#   WORKER_NAME           - Worker 名称（默认 cloudflare-imgbed，手动触发时可在界面覆盖）
+#   WORKER_VARS           - JSON 格式的业务环境变量（非必要不建议配置，
+#                           部署完成后请在管理面板中配置所有设置）
 
 jobs:
   deploy:
