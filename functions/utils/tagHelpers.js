@@ -42,6 +42,49 @@ export function normalizeTags(tags) {
 }
 
 /**
+ * Sanitize a single AI-provided tag into a form accepted by validateTag.
+ * AI providers (e.g. WD Tagger) emit tags that may contain parentheses,
+ * spaces or colons, such as "artoria_pendragon_(fate)". These would be
+ * silently dropped by normalizeTags/validateTag, so disallowed characters
+ * are converted to underscores instead of discarding the whole tag. The
+ * global validateTag rules for user input are intentionally left unchanged.
+ * @param {string} tag - The raw tag from an AI provider
+ * @returns {string} - A valid tag, or '' if nothing usable remains
+ */
+export function sanitizeAITag(tag) {
+    if (!tag || typeof tag !== 'string') {
+        return '';
+    }
+
+    const cleaned = tag
+        .toLowerCase()
+        .trim()
+        // Replace any run of disallowed characters with a single underscore
+        .replace(/[^\w一-龥぀-ゟ゠-ヿ가-힯-]+/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^[_-]+|[_-]+$/g, '');
+
+    return validateTag(cleaned) ? cleaned : '';
+}
+
+/**
+ * Sanitize and de-duplicate a list of AI-provided tags.
+ * @param {string[]} tags - Raw tags from an AI provider
+ * @returns {string[]} - Unique, valid tags
+ */
+export function sanitizeAITags(tags) {
+    if (!Array.isArray(tags)) {
+        return [];
+    }
+
+    const sanitized = tags
+        .map(sanitizeAITag)
+        .filter(Boolean);
+
+    return [...new Set(sanitized)];
+}
+
+/**
  * Merge tags based on action
  * @param {string[]} existingTags - Current tags on the file
  * @param {string[]} newTags - Tags to add/remove/set

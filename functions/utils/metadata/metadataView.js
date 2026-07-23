@@ -3,7 +3,7 @@
  * 负责生成管理端可展示的 metadata，过滤敏感字段并按当前渠道配置补齐派生字段
  */
 import { findConfiguredChannel, loadChannelConfig } from './channelConfig.js';
-import { stripConfigDerivedMetadata, stripSensitiveMetadata } from './metadataSecurity.js';
+import { stripAIMetadata, stripConfigDerivedMetadata, stripSensitiveMetadata } from './metadataSecurity.js';
 import { buildWebDAVUrl } from '../storage/webdavAPI.js';
 
 /* ========== 主要函数 ========== */
@@ -20,7 +20,8 @@ export async function createMetadataViewContext(db, env) {
 // 构建管理端可见 metadata，过滤敏感字段并补齐可展示链接
 export async function buildFileMetadataForManagement(db, env, metadata = {}, viewContext = null) {
   const context = viewContext || await createMetadataViewContext(db, env);
-  const view = stripConfigDerivedMetadata(stripSensitiveMetadata(metadata));
+  // AI 数据仅作内部协调，不通过管理端接口对外返回（公开接口已单独剥离）。
+  const view = stripAIMetadata(stripConfigDerivedMetadata(stripSensitiveMetadata(metadata)));
 
   // 管理端展示字段从当前渠道配置实时补齐，不依赖旧 metadata 中保存的派生值
   enrichS3Metadata(context, metadata, view);

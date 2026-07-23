@@ -181,6 +181,7 @@ async function buildFileAccessContext(context) {
     const fromAdmin = url.searchParams.get('from') === 'admin';
     const fileAccess = {
         isAdminPreview: fromAdmin,
+        isInternalAIRequest: context.internalAIRequest === true,
         adminAuthResult: { authorized: false, authType: null },
         cacheControl: undefined,
     };

@@ -396,6 +396,18 @@ export async function endUpload(context, fileId, metadata) {
 
     // 更新文件索引（索引更新时会自动计算容量统计）
     await addFileToIndex(context, fileId, metadata);
+
+    // AI 是可选的上传后扩展；是否启用由环境变量或管理端配置共同决定。
+    try {
+        const { dispatchAfterMetadataPersisted } = await import('../ai/integration/upload.js');
+        await dispatchAfterMetadataPersisted({ fileId, metadata }, context);
+    } catch (error) {
+        // 上传及基础元数据已经成功，AI 错误不得改变上传结果。
+        console.error('[AI] Upload extension failed', {
+            fileId,
+            message: error?.message || 'Unknown AI error'
+        });
+    }
 }
 
 // 从 request 中解析 ip 地址

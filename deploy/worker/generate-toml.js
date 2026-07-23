@@ -7,6 +7,7 @@
  *   D1_DATABASE_ID   - D1 数据库 ID
  *   KV_NAMESPACE_ID  - KV 命名空间 ID
  *   R2_BUCKET_NAME   - R2 存储桶名称
+ *   AI_QUEUE_NAME    - 通用 AI Queue 资源名（推荐 imgqueue）
  *   WORKER_VARS      - JSON 格式的业务环境变量
  */
 
@@ -22,7 +23,7 @@ const name = env.WORKER_NAME || 'cloudflare-imgbed';
 
 let toml = `name = "${name}"
 main = "index.js"
-compatibility_date = "2024-08-21"
+compatibility_date = "2026-07-21"
 compatibility_flags = ["global_fetch_strictly_public"]
 
 [assets]
@@ -56,6 +57,23 @@ if (env.R2_BUCKET_NAME) {
 [[r2_buckets]]
 binding = "img_r2"
 bucket_name = "${env.R2_BUCKET_NAME}"
+`;
+}
+
+// 通用 AI 任务队列（同一 Worker 同时作为 producer 和 consumer）
+if (env.AI_QUEUE_NAME) {
+    toml += `
+[[queues.producers]]
+binding = "img_queue"
+queue = "${env.AI_QUEUE_NAME}"
+
+[[queues.consumers]]
+queue = "${env.AI_QUEUE_NAME}"
+max_batch_size = 5
+max_batch_timeout = 5
+max_retries = 10
+retry_delay = 30
+max_concurrency = 1
 `;
 }
 
