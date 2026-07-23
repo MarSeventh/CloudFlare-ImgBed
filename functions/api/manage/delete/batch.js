@@ -13,6 +13,7 @@ const corsHeaders = {
 };
 
 export async function onRequestPost(context) {
+    try {
         const payload = await context.request.json();
         const fileIds = normalizeBatchFileIds(payload?.fileIds, MAX_BATCH_SIZE);
         if (fileIds.length === 0) {
