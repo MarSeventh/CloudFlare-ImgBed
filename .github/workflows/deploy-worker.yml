@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - dev  # 添加 dev 分支
   workflow_dispatch:
     inputs:
       worker_name:
@@ -27,15 +26,15 @@ on:
 # 可选：
 #   R2_BUCKET_NAME        - R2 存储桶名称
 #   WORKER_NAME           - Worker 名称（默认 cloudflare-imgbed，手动触发时可在界面覆盖）
-#   WORKER_VARS           - JSON 格式的业务环境变量（非必要不建议配置，
-#                           部署完成后请在管理面板中配置所有设置）
+#   WORKER_VARS           - JSON 格式的业务环境变量（非必要不建议配置，部署完成后请在管理面板中配置所有设置）
+#   AI_QUEUE_NAME         - Queue队列名称
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # 根据分支设置环境
-    environment: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
-    
+    # 仅在 fork 仓库且配置了 Cloudflare secrets 时运行
+    # 原仓库 push 和未配置 secrets 的 fork 不会触发部署
+    if: ${{ github.event.repository.fork }}
     steps:
       - name: Check deployment config
         id: check
@@ -68,32 +67,13 @@ jobs:
       - name: Generate wrangler config
         if: steps.check.outputs.skip != 'true'
         env:
-          # 根据分支设置不同的 Worker 名称
-          WORKER_NAME: ${{ 
-            inputs.worker_name || 
-            (github.ref_name == 'main' && secrets.WORKER_NAME_PROD) || 
-            (github.ref_name == 'dev' && secrets.WORKER_NAME_DEV) || 
-            secrets.WORKER_NAME 
-          }}
-          D1_DATABASE_ID: ${{ 
-            github.ref_name == 'main' && secrets.D1_DATABASE_ID_PROD || 
-            secrets.D1_DATABASE_ID_DEV 
-          }}
-          KV_NAMESPACE_ID: ${{ 
-            github.ref_name == 'main' && secrets.KV_NAMESPACE_ID_PROD || 
-            secrets.KV_NAMESPACE_ID_DEV 
-          }}
-          R2_BUCKET_NAME: ${{ 
-            github.ref_name == 'main' && secrets.R2_BUCKET_NAME_PROD || 
-            secrets.R2_BUCKET_NAME_DEV 
-          }}
+          WORKER_NAME: ${{ inputs.worker_name || secrets.WORKER_NAME }}
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          KV_NAMESPACE_ID: ${{ secrets.KV_NAMESPACE_ID }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          WORKER_VARS: ${{ secrets.WORKER_VARS }}
           AI_QUEUE_NAME: ${{ secrets.AI_QUEUE_NAME }}
-          WORKER_VARS: ${{ 
-            github.ref_name == 'main' && secrets.WORKER_VARS_PROD || 
-            secrets.WORKER_VARS_DEV 
-          }}
-          ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
-        run: node deploy/worker/generate-config.js
+        run: node deploy/worker/generate-toml.js
 
       - name: Deploy to Cloudflare Workers
         if: steps.check.outputs.skip != 'true'
@@ -102,4 +82,4 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: '4'
-          command: deploy --config deploy/worker/wrangler.jsonc
+          command: deploy --config deploy/worker/wrangler.toml
