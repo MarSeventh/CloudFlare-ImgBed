@@ -12,8 +12,7 @@ const corsHeaders = {
     'Access-Control-Max-Age': '86400',
 };
 
-export async function onRequest(context) {
-    try {
+export async function onRequestPost(context) {
         const payload = await context.request.json();
         const fileIds = normalizeBatchFileIds(payload?.fileIds, MAX_BATCH_SIZE);
         if (fileIds.length === 0) {
