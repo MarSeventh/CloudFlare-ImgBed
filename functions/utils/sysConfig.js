@@ -155,11 +155,40 @@ export async function fetchAIConfig(env) {
     }
 }
 
+/**
+ * Resolves the persisted AI settings blob into a fully-materialized runtime
+ * config. Also migrates the legacy shape (`providers.wd_tagger/openai/anthropic/llm`
+ * plus `capabilities.X.provider`) into the new shape:
+ *
+ *   {
+ *     unifiedLLM: {...},
+ *     capabilities: {
+ *       tagging:     { enabled, engine: 'wd_tagger'|'llm', wdTagger, llmSource: 'unified'|'custom', customLLM },
+ *       description: { enabled, engine: 'llm',              llmSource, customLLM },
+ *       ocr:         { enabled, engine: 'llm',              llmSource, customLLM }
+ *     }
+ *   }
+ *
+ * Each capability also carries a computed `resolved` field describing the
+ * concrete { providerName, providerConfig, groupKey } the pipeline should run.
+ * `groupKey` is 'unified_llm' when the capability follows the shared LLM
+ * config, so multiple capabilities can be batched by UnifiedLLMProvider.
+ */
 function resolveAIConfig(settings, env = {}) {
-    const providers = settings.providers || {};
-    const tagging = settings.capabilities?.tagging || {};
-    const queue = settings.queue || {};
     const enabled = settings.enabled ?? env.AI_ENABLE === 'true';
+    const queue = settings.queue || {};
+
+    // Legacy top-level directories are used only as the migration fallback for
+    // each capability that didn't have its own directories saved yet.
+    const legacyTargetDirectories = normalizeDirectories(settings.targetDirectories);
+
+    const migrated = migrateAISettings(settings, legacyTargetDirectories);
+    const unifiedLLM = resolveLLMConfig(migrated.unifiedLLM, env, legacyTargetDirectories);
+    const capabilities = {
+        tagging: resolveCapability('tagging', migrated.capabilities.tagging, unifiedLLM, env),
+        description: resolveCapability('description', migrated.capabilities.description, unifiedLLM, env),
+        ocr: resolveCapability('ocr', migrated.capabilities.ocr, unifiedLLM, env)
+    };
 
     return {
         enabled,
@@ -192,21 +221,141 @@ function resolveAIConfig(settings, env = {}) {
             )))),
             bindingAvailable: typeof env.img_queue?.send === 'function'
         },
+        unifiedLLM,
+        capabilities
+    };
+}
+
+/**
+ * Reads the raw persisted blob and returns a normalized-but-not-resolved
+ * settings shape. Prefers new-schema fields; falls back to legacy fields so
+ * existing installs read cleanly and rewrite the new shape on the next save.
+ */
+function migrateAISettings(settings = {}, legacyTargetDirectories = []) {
+    const providers = settings.providers || {};
+    const unifiedLLM = settings.unifiedLLM
+        ?? providers.llm
+        ?? {};
+
+    return {
+        unifiedLLM,
         capabilities: {
-            tagging: {
-                enabled: tagging.enabled ?? enabled,
-                provider: tagging.provider || env.AI_TAGGING_PROVIDER || env.AI_PROVIDER || 'wd_tagger',
-                targetDirectories: normalizeDirectories(tagging.targetDirectories)
-            }
-        },
-        providers: {
-            // Providers are keyed by canonical registry name. The legacy camelCase
-            // `wdTagger` blob is still read for back-compat with configs saved
-            // before this migration.
-            wd_tagger: resolveWdTaggerConfig(providers.wd_tagger ?? providers.wdTagger ?? {}, env),
-            openai: resolveOpenAIConfig(providers.openai ?? {}, env),
-            anthropic: resolveAnthropicConfig(providers.anthropic ?? {}, env)
+            tagging: migrateCapability(settings.capabilities?.tagging, providers, 'tagging', legacyTargetDirectories),
+            description: migrateCapability(settings.capabilities?.description, providers, 'description', legacyTargetDirectories),
+            ocr: migrateCapability(settings.capabilities?.ocr, providers, 'ocr', legacyTargetDirectories)
         }
+    };
+}
+
+function migrateCapability(rawCap, providers, capName, legacyTargetDirectories) {
+    const cap = rawCap || {};
+    const legacyWDTagger = providers.wd_tagger || providers.wdTagger || {};
+    // Per-cap directories: prefer the cap's own value; fall back to the legacy
+    // top-level `settings.targetDirectories` so existing installs keep the same
+    // filter until the user re-saves.
+    const targetDirectories = Array.isArray(cap.targetDirectories)
+        ? cap.targetDirectories
+        : legacyTargetDirectories;
+
+    // Already new-schema (has engine field): pass through, only fill in defaults.
+    if (typeof cap.engine === 'string') {
+        return {
+            enabled: cap.enabled === true,
+            engine: cap.engine,
+            wdTagger: cap.wdTagger || (capName === 'tagging' ? legacyWDTagger : {}),
+            llmSource: cap.llmSource === 'custom' ? 'custom' : 'unified',
+            customLLM: cap.customLLM || {},
+            targetDirectories
+        };
+    }
+
+    // Legacy migration: map `capabilities.<cap>.provider` to the new shape.
+    const legacyProvider = String(cap.provider || '').trim();
+    const enabled = cap.enabled === true;
+
+    if (capName === 'tagging' && (legacyProvider === '' || legacyProvider === 'wd_tagger')) {
+        return {
+            enabled,
+            engine: 'wd_tagger',
+            wdTagger: legacyWDTagger,
+            llmSource: 'unified',
+            customLLM: {},
+            targetDirectories
+        };
+    }
+    if (legacyProvider === 'openai' || legacyProvider === 'anthropic') {
+        const source = providers[legacyProvider] || {};
+        return {
+            enabled,
+            engine: 'llm',
+            wdTagger: capName === 'tagging' ? legacyWDTagger : {},
+            llmSource: 'custom',
+            customLLM: { ...source, engine: legacyProvider },
+            targetDirectories
+        };
+    }
+    // Default: LLM engine, unified source (covers legacyProvider === 'llm' or
+    // an unrecognised value for description/ocr).
+    return {
+        enabled,
+        engine: 'llm',
+        wdTagger: capName === 'tagging' ? legacyWDTagger : {},
+        llmSource: 'unified',
+        customLLM: {},
+        targetDirectories
+    };
+}
+
+/**
+ * Turns a migrated capability into the runtime shape. `resolved.groupKey`
+ * decides how the pipeline groups steps — capabilities sharing 'unified_llm'
+ * can be batched into a single UnifiedLLMProvider call when batchMode='unified'.
+ */
+function resolveCapability(capName, cap, unifiedLLM, env) {
+    const engine = capName === 'tagging'
+        ? (cap.engine === 'llm' ? 'llm' : 'wd_tagger')
+        : 'llm';
+    const wdTagger = resolveWdTaggerConfig(cap.wdTagger || {}, env);
+    const llmSource = cap.llmSource === 'custom' ? 'custom' : 'unified';
+    const customLLM = resolveLLMConfig(cap.customLLM || {}, env);
+    const targetDirectories = normalizeDirectories(cap.targetDirectories);
+
+    // Effective directories: capabilities that follow the unified LLM inherit
+    // the unified LLM's directory scope; other engines/sources use their own.
+    const effectiveTargetDirectories = (engine === 'llm' && llmSource === 'unified')
+        ? unifiedLLM.targetDirectories
+        : targetDirectories;
+
+    let resolved;
+    if (engine === 'wd_tagger') {
+        resolved = {
+            providerName: 'wd_tagger',
+            providerConfig: wdTagger,
+            groupKey: `wd_tagger:${capName}`
+        };
+    } else if (llmSource === 'custom') {
+        resolved = {
+            providerName: 'llm',
+            providerConfig: customLLM,
+            groupKey: `custom_llm:${capName}`
+        };
+    } else {
+        resolved = {
+            providerName: 'llm',
+            providerConfig: unifiedLLM,
+            groupKey: 'unified_llm'
+        };
+    }
+
+    return {
+        enabled: cap.enabled === true,
+        engine,
+        wdTagger,
+        llmSource,
+        customLLM,
+        targetDirectories,
+        effectiveTargetDirectories,
+        resolved
     };
 }
 
@@ -235,45 +384,32 @@ function resolveWdTaggerConfig(wdTagger, env) {
     };
 }
 
-function resolveOpenAIConfig(openai, env) {
+function resolveLLMConfig(llm, env, legacyTargetDirectories = []) {
+    const targetDirectories = Array.isArray(llm.targetDirectories)
+        ? normalizeDirectories(llm.targetDirectories)
+        : normalizeDirectories(legacyTargetDirectories);
     return {
-        endpoint: openai.endpoint || env.AI_OPENAI_ENDPOINT || 'https://api.openai.com/v1/chat/completions',
-        apiKey: openai.apiKey || env.AI_OPENAI_API_KEY || '',
-        model: openai.model || env.AI_OPENAI_MODEL || 'gpt-4o-mini',
-        modelVersion: openai.modelVersion || '',
-        maxTokens: configNumber(openai.maxTokens, env.AI_OPENAI_MAX_TOKENS, 1024),
-        temperature: configNumber(openai.temperature, env.AI_OPENAI_TEMPERATURE, 0),
-        tokenField: openai.tokenField || env.AI_OPENAI_TOKEN_FIELD || 'max_tokens',
-        jsonMode: configBoolean(openai.jsonMode, env.AI_OPENAI_JSON_MODE, false),
-        timeoutMs: configNumber(openai.timeoutMs, env.AI_TIMEOUT, 60000),
+        endpoint: llm.endpoint || env.AI_LLM_ENDPOINT || '',
+        apiKey: llm.apiKey || env.AI_LLM_API_KEY || '',
+        model: llm.model || env.AI_LLM_MODEL || 'gpt-4o-mini',
+        modelVersion: llm.modelVersion || '',
+        engine: llm.engine === 'anthropic' ? 'anthropic' : 'openai',
+        batchMode: llm.batchMode === 'unified' ? 'unified' : 'separate',
+        anthropicVersion: llm.anthropicVersion || env.AI_ANTHROPIC_VERSION || '2023-06-01',
+        tokenField: llm.tokenField === 'max_completion_tokens' ? 'max_completion_tokens' : 'max_tokens',
+        jsonMode: configBoolean(llm.jsonMode, env.AI_LLM_JSON_MODE, false),
+        temperature: configNumber(llm.temperature, env.AI_LLM_TEMPERATURE, 0),
+        maxTokens: configNumber(llm.maxTokens, env.AI_LLM_MAX_TOKENS, 2048),
+        timeoutMs: configNumber(llm.timeoutMs, env.AI_TIMEOUT, 60000),
         maxInputSizeBytes: configNumber(
-            openai.maxInputSizeBytes,
-            env.AI_OPENAI_MAX_INPUT_SIZE,
+            llm.maxInputSizeBytes,
+            env.AI_LLM_MAX_INPUT_SIZE,
             5 * 1024 * 1024
         ),
-        maxTags: configNumber(openai.maxTags, env.AI_OPENAI_MAX_TAGS, 40),
-        prompts: openai.prompts && typeof openai.prompts === 'object' ? openai.prompts : {},
-        headers: openai.headers && typeof openai.headers === 'object' ? openai.headers : {}
-    };
-}
-
-function resolveAnthropicConfig(anthropic, env) {
-    return {
-        endpoint: anthropic.endpoint || env.AI_ANTHROPIC_ENDPOINT || 'https://api.anthropic.com/v1/messages',
-        apiKey: anthropic.apiKey || env.AI_ANTHROPIC_API_KEY || '',
-        model: anthropic.model || env.AI_ANTHROPIC_MODEL || 'claude-haiku-4-5',
-        modelVersion: anthropic.modelVersion || '',
-        anthropicVersion: anthropic.anthropicVersion || env.AI_ANTHROPIC_VERSION || '2023-06-01',
-        maxTokens: configNumber(anthropic.maxTokens, env.AI_ANTHROPIC_MAX_TOKENS, 1024),
-        timeoutMs: configNumber(anthropic.timeoutMs, env.AI_TIMEOUT, 60000),
-        maxInputSizeBytes: configNumber(
-            anthropic.maxInputSizeBytes,
-            env.AI_ANTHROPIC_MAX_INPUT_SIZE,
-            5 * 1024 * 1024
-        ),
-        maxTags: configNumber(anthropic.maxTags, env.AI_ANTHROPIC_MAX_TAGS, 40),
-        prompts: anthropic.prompts && typeof anthropic.prompts === 'object' ? anthropic.prompts : {},
-        headers: anthropic.headers && typeof anthropic.headers === 'object' ? anthropic.headers : {}
+        maxTags: configNumber(llm.maxTags, env.AI_LLM_MAX_TAGS, 40),
+        prompts: llm.prompts && typeof llm.prompts === 'object' ? llm.prompts : {},
+        headers: llm.headers && typeof llm.headers === 'object' ? llm.headers : {},
+        targetDirectories
     };
 }
 

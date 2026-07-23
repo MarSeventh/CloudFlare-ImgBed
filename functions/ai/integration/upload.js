@@ -10,6 +10,7 @@ import { fetchAIConfig } from '../../utils/sysConfig.js';
 import { createAIAdapter } from '../env/adapter.js';
 import { MetadataService, readAIResultStateFrom } from '../services/metadata.service.js';
 import { TagProcessor } from '../processors/tag/index.js';
+import { MultiCapabilityProcessor } from '../processors/multicapability/index.js';
 
 export const UPLOAD_PIPELINE_ID = 'upload_ai';
 export const UPLOAD_PIPELINE_VERSION = '1';
@@ -24,13 +25,11 @@ export async function dispatchAfterMetadataPersisted(payload, context) {
 
 export async function runUploadAI(payload, context) {
     const config = await fetchAIConfig(context.env);
-    const taggingConfig = config.capabilities?.tagging;
-    if (!config.enabled || !taggingConfig?.enabled) {
-        return { status: 'skipped', reason: 'disabled' };
-    }
 
-    if (!isDirectorySelected(payload.metadata?.Directory, taggingConfig.targetDirectories)) {
-        return { status: 'skipped', reason: 'directory_not_selected' };
+    // At least one capability must be enabled AND match the file's directory
+    const anyEnabled = collectEnabledCapabilities(config, payload.metadata?.Directory).length > 0;
+    if (!config.enabled || !anyEnabled) {
+        return { status: 'skipped', reason: 'disabled' };
     }
 
     if (config.queue?.enabled) {
@@ -47,86 +46,80 @@ export async function runUploadAI(payload, context) {
     return runConfiguredAI(payload, context, config);
 }
 
-export async function runManualAI(payload, context) {
+/**
+ * Manual re-run entry point. `options.capability` selects which single
+ * capability to execute — the others are force-disabled for this call so a
+ * manual OCR doesn't also re-run tagging/description on the same image.
+ * Defaults to 'tagging' for back-compat with the existing /api/manage/ai/tag
+ * endpoint.
+ */
+export async function runManualAI(payload, context, options = {}) {
     const config = await fetchAIConfig(context.env);
     if (!config.enabled) return { status: 'skipped', reason: 'disabled' };
 
-    const originalEnabled = config.capabilities.tagging.enabled;
-    config.capabilities.tagging.enabled = true;
+    const capability = options.capability || 'tagging';
+    if (!config.capabilities?.[capability]) {
+        return { status: 'skipped', reason: 'unknown_capability' };
+    }
+
+    // Manual runs bypass the per-cap directory filter — the caller already
+    // scoped the file list to the directories they picked in the UI. Force the
+    // effective directories to "any" so `collectEnabledCapabilities` doesn't
+    // silently drop this file when its Directory doesn't match the cap's
+    // saved targetDirectories.
+    const original = {};
+    for (const [name, cap] of Object.entries(config.capabilities)) {
+        original[name] = { enabled: cap.enabled, effective: cap.effectiveTargetDirectories };
+        cap.enabled = name === capability;
+        cap.effectiveTargetDirectories = [];
+    }
     try {
         return await runConfiguredAI(payload, context, config);
     } finally {
-        config.capabilities.tagging.enabled = originalEnabled;
+        for (const [name, prev] of Object.entries(original)) {
+            config.capabilities[name].enabled = prev.enabled;
+            config.capabilities[name].effectiveTargetDirectories = prev.effective;
+        }
     }
 }
 
 async function runConfiguredAI(payload, context, config) {
-    const taggingConfig = config.capabilities?.tagging;
-    if (!config.enabled || !taggingConfig?.enabled) {
-        return { status: 'skipped', reason: 'disabled' };
-    }
+    if (!config.enabled) return { status: 'skipped', reason: 'disabled' };
+
+    const capabilities = collectEnabledCapabilities(config, payload.metadata?.Directory);
+    if (capabilities.length === 0) return { status: 'skipped', reason: 'disabled' };
 
     const artifact = createUploadArtifact(payload, context);
     if (!artifact) return { status: 'skipped', reason: 'artifact_unavailable' };
 
-    return executeAI(payload, context, config, taggingConfig, artifact);
+    return executeAI(payload, context, config, capabilities, artifact);
 }
 
-async function executeAI(payload, context, config, taggingConfig, artifact, options = {}) {
+async function executeAI(payload, context, config, capabilities, artifact, options = {}) {
     const factory = createAIFactory({
         logger: console,
         adapter: createAIAdapter(context.env, context)
     });
-    const providerName = taggingConfig.provider || AI_PROVIDER_NAMES.WD_TAGGER;
-    if (!factory.has(providerName)) {
+
+    const steps = buildCapabilitySteps(factory, config, capabilities, context);
+    if (steps.length === 0) {
         await artifact.dispose();
-        return { status: 'skipped', reason: 'unknown_provider' };
+        return { status: 'skipped', reason: 'no_runnable_steps' };
     }
-    const providerConfig = config.providers?.[providerName] || {};
-    const provider = factory.create(providerName, providerConfig);
-    if (!provider.getCapabilities().includes('tagging')) {
-        await artifact.dispose();
-        return { status: 'skipped', reason: 'provider_capability_unsupported' };
-    }
-    if (!providerAcceptsArtifact(provider, artifact)) {
-        await artifact.dispose();
-        return { status: 'skipped', reason: 'provider_unsupported_input' };
-    }
-    const policy = provider.getExecutionPolicy();
+
+    // Use the timeout from the first step's provider as the pipeline-level guard
     const pipeline = createAIPipeline({
         pipelineId: UPLOAD_PIPELINE_ID,
         pipelineVersion: UPLOAD_PIPELINE_VERSION,
         maxParallel: 1,
         timeoutMs: config.timeoutMs,
-        steps: [{
-            id: 'tagging',
-            capability: 'tagging',
-            timeoutMs: policy.timeoutMs,
-            execute: async ({ artifact: stepArtifact, signal }) => {
-                const processor = new TagProcessor(provider);
-                const { result } = await processor.process({
-                    artifact: stepArtifact,
-                    signal,
-                    fetch: context.aiFetch
-                });
-                return result;
-            }
-        }]
+        steps
     });
 
     try {
         const execution = await pipeline.run({ artifact });
-        const step = execution.steps[0];
-        const result = step?.output || createAIResult({
-            status: AI_RESULT_STATUS.FAILED,
-            results: { tags: [] },
-            completedAt: new Date().toISOString(),
-            error: step?.error || {
-                category: 'unknown',
-                retryable: false,
-                message: 'AI pipeline did not return a provider result'
-            }
-        });
+        // Combine results across all steps into one envelope
+        const result = combineStepResults(execution.steps, capabilities);
         const aiMetadata = {
             ...result,
             pipelineId: execution.pipelineId,
@@ -146,6 +139,164 @@ async function executeAI(payload, context, config, taggingConfig, artifact, opti
     } finally {
         await artifact.dispose();
     }
+}
+
+/**
+ * Groups enabled capabilities by their `resolved.groupKey`, then builds pipeline
+ * steps. Capabilities sharing the unified LLM config (groupKey='unified_llm')
+ * can be batched into one MultiCapabilityProcessor call when batchMode='unified'.
+ * Capabilities with their own `customLLM` are isolated in their own group so
+ * each runs against its own endpoint/model/key.
+ */
+function buildCapabilitySteps(factory, config, capabilities, context) {
+    const steps = [];
+    const groups = groupByResolved(capabilities);
+
+    for (const [groupKey, caps] of groups) {
+        const first = caps[0];
+        const providerName = first.resolved.providerName;
+        const providerConfig = first.resolved.providerConfig;
+        if (!factory.has(providerName)) continue;
+        const provider = factory.create(providerName, providerConfig);
+
+        const isUnified = groupKey === 'unified_llm' &&
+            providerName === AI_PROVIDER_NAMES.LLM &&
+            providerConfig.batchMode === 'unified' &&
+            caps.length > 1;
+
+        if (isUnified) {
+            const capNames = caps.map(c => c.name);
+            const policy = provider.getExecutionPolicy();
+            steps.push({
+                id: 'unified_llm',
+                capability: 'multi',
+                timeoutMs: policy.timeoutMs,
+                execute: async ({ artifact: stepArtifact, signal }) => {
+                    const processor = new MultiCapabilityProcessor(provider, capNames);
+                    const { result } = await processor.process({
+                        artifact: stepArtifact,
+                        signal,
+                        fetch: context.aiFetch
+                    });
+                    return result;
+                }
+            });
+        } else {
+            for (const cap of caps) {
+                if (!provider.getCapabilities().includes(cap.name)) continue;
+                const policy = provider.getExecutionPolicy();
+                const capName = cap.name;
+                steps.push({
+                    id: capName,
+                    capability: capName,
+                    timeoutMs: policy.timeoutMs,
+                    execute: async ({ artifact: stepArtifact, signal }) => {
+                        if (capName === 'tagging') {
+                            const processor = new TagProcessor(provider);
+                            const { result } = await processor.process({
+                                artifact: stepArtifact,
+                                signal,
+                                fetch: context.aiFetch
+                            });
+                            return result;
+                        }
+                        // description / ocr: call analyze directly
+                        return provider.analyze(stepArtifact, capName, {
+                            signal,
+                            fetch: context.aiFetch
+                        });
+                    }
+                });
+            }
+        }
+    }
+    return steps;
+}
+
+function groupByResolved(capabilities) {
+    const map = new Map();
+    for (const cap of capabilities) {
+        const key = cap.resolved?.groupKey || `unresolved:${cap.name}`;
+        if (!map.has(key)) map.set(key, []);
+        map.get(key).push(cap);
+    }
+    return map;
+}
+
+/**
+ * Merges step outputs into a single AI result envelope.
+ * - Unified step: results already contain keyed capability data
+ * - Separate steps: each step has its own result; combine into a keyed map
+ */
+function combineStepResults(executionSteps, capabilities) {
+    const outputs = executionSteps.map(s => ({ id: s.stepId, output: s.output, error: s.error }));
+    const succeeded = outputs.filter(s => s.output?.status === AI_RESULT_STATUS.SUCCEEDED);
+    const failed = outputs.filter(s => !s.output || s.output?.status === AI_RESULT_STATUS.FAILED);
+
+    const status = succeeded.length > 0
+        ? (failed.length > 0 ? AI_RESULT_STATUS.PARTIAL : AI_RESULT_STATUS.SUCCEEDED)
+        : AI_RESULT_STATUS.FAILED;
+
+    // Unified mode: one step, results already keyed
+    if (outputs.length === 1 && outputs[0].id === 'unified_llm') {
+        return outputs[0].output || createAIResult({
+            status: AI_RESULT_STATUS.FAILED,
+            results: {},
+            completedAt: new Date().toISOString(),
+            error: outputs[0].error || { category: 'unknown', retryable: false, message: 'Unified AI step failed' }
+        });
+    }
+
+    // Separate mode: merge per-step results into a combined results map
+    const combined = {};
+    for (const step of outputs) {
+        if (!step.output) continue;
+        const r = step.output.results;
+        if (step.id === 'tagging' && r?.tags) combined.tagging = { tags: r.tags };
+        else if (step.id === 'description' && r?.caption !== undefined) combined.description = { caption: r.caption };
+        else if (step.id === 'ocr' && r?.text !== undefined) combined.ocr = { text: r.text };
+    }
+
+    const primary = (succeeded[0] || outputs[0])?.output || createAIResult({
+        status: AI_RESULT_STATUS.FAILED,
+        results: {},
+        completedAt: new Date().toISOString(),
+        error: { category: 'unknown', retryable: false, message: 'AI pipeline produced no result' }
+    });
+
+    return { ...primary, status, results: combined };
+}
+
+/**
+ * Collects enabled capabilities from the resolved config. Each entry carries
+ * the resolved `{ providerName, providerConfig, groupKey }` produced by
+ * resolveCapability, so the pipeline never has to look up a shared provider
+ * registry — a capability configured with its own customLLM runs in isolation.
+ *
+ * When `directory` is provided, each capability is additionally filtered by its
+ * own `effectiveTargetDirectories` — capabilities that follow the unified LLM
+ * inherit the unified LLM's directory scope; custom or wd_tagger capabilities
+ * apply their own. Pass `null` to skip per-cap directory filtering (manual
+ * runs, since the manual runner already limits the file list to the requested
+ * directories).
+ */
+function collectEnabledCapabilities(config, directory) {
+    const caps = [];
+    const capabilities = config.capabilities || {};
+    for (const [name, capConfig] of Object.entries(capabilities)) {
+        if (!capConfig?.enabled || !capConfig.resolved) continue;
+        if (directory !== null && directory !== undefined) {
+            const dirs = capConfig.effectiveTargetDirectories || [];
+            if (!isDirectorySelected(directory, dirs)) continue;
+        }
+        caps.push({
+            name,
+            engine: capConfig.engine,
+            resolved: capConfig.resolved,
+            config: capConfig
+        });
+    }
+    return caps;
 }
 
 export async function mergeAIResult(env, fileId, aiMetadata, options = {}) {
@@ -260,8 +411,8 @@ export async function executeQueuedAI(task, context) {
         return { status: 'skipped', reason: 'external_unsupported' };
     }
 
-    const taggingConfig = config.capabilities?.tagging;
-    if (!config.enabled || !taggingConfig?.enabled) {
+    const capabilities = collectEnabledCapabilities(config, metadata.Directory);
+    if (!config.enabled || capabilities.length === 0) {
         await mergeQueuedResult(context.env, task, createSkippedMetadata(task, 'disabled'));
         return { status: 'skipped', reason: 'disabled' };
     }
@@ -269,7 +420,7 @@ export async function executeQueuedAI(task, context) {
         await mergeQueuedResult(context.env, task, createSkippedMetadata(task, 'unsupported_capability'));
         return { status: 'skipped', reason: 'unsupported_capability' };
     }
-    if (!isDirectorySelected(metadata.Directory, taggingConfig.targetDirectories)) {
+    if (!capabilities.some(cap => cap.name === 'tagging')) {
         await mergeQueuedResult(context.env, task, createSkippedMetadata(task, 'directory_not_selected'));
         return { status: 'skipped', reason: 'directory_not_selected' };
     }
@@ -287,7 +438,7 @@ export async function executeQueuedAI(task, context) {
             { fileId: task.fileId, metadata },
             context,
             config,
-            taggingConfig,
+            capabilities,
             artifact,
             { merge: false, task }
         );

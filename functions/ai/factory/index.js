@@ -1,11 +1,13 @@
 import { WDTaggerProvider } from '../provider/huggingface/wdTagger.js';
 import { OpenAICompatibleProvider } from '../provider/llm/openai.js';
 import { AnthropicProvider } from '../provider/llm/anthropic.js';
+import { UnifiedLLMProvider } from '../provider/llm/unified.js';
 
 export const AI_PROVIDER_NAMES = Object.freeze({
     WD_TAGGER: 'wd_tagger',
     OPENAI: 'openai',
-    ANTHROPIC: 'anthropic'
+    ANTHROPIC: 'anthropic',
+    LLM: 'llm'
 });
 
 export class AIFactory {
@@ -64,6 +66,10 @@ export function createAIFactory(options = {}) {
     factory.register(
         AI_PROVIDER_NAMES.ANTHROPIC,
         config => new AnthropicProvider(config, providerOptions())
+    );
+    factory.register(
+        AI_PROVIDER_NAMES.LLM,
+        config => new UnifiedLLMProvider(config, providerOptions())
     );
     return factory;
 }

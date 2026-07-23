@@ -51,7 +51,45 @@ export class MetadataService {
             }
         }
 
-        if (legacyAI !== undefined || tagsChanged) {
+        // Persist description and ocr fields when the AI result contains them.
+        // On KV backends, trim these to fit the 1024-byte metadata cap alongside
+        // the tags already written above; on non-KV backends there's no cap so
+        // we store the full string.
+        const description = extractDescription(aiMetadata);
+        let descriptionChanged = false;
+        if (typeof description === 'string' && description) {
+            const fitted = fitStringIntoMetadata(this.adapter.env, metadata, 'Description', description);
+            if (fitted !== null) {
+                metadata.Description = fitted;
+                descriptionChanged = true;
+                if (fitted.length < description.length) {
+                    console.warn('[AI] Description truncated to fit KV metadata limit', {
+                        fileId,
+                        original: description.length,
+                        stored: fitted.length
+                    });
+                }
+            }
+        }
+
+        const ocr = extractOCR(aiMetadata);
+        let ocrChanged = false;
+        if (ocr !== null) {
+            const fitted = fitStringIntoMetadata(this.adapter.env, metadata, 'OCR', ocr);
+            if (fitted !== null) {
+                metadata.OCR = fitted;
+                ocrChanged = true;
+                if (fitted.length < ocr.length) {
+                    console.warn('[AI] OCR text truncated to fit KV metadata limit', {
+                        fileId,
+                        original: ocr.length,
+                        stored: fitted.length
+                    });
+                }
+            }
+        }
+
+        if (legacyAI !== undefined || tagsChanged || descriptionChanged || ocrChanged) {
             await db.put(fileId, current.value ?? '', { metadata });
         }
         await db.put(aiTaskKey(fileId), JSON.stringify({
@@ -85,8 +123,12 @@ export async function readAIResultStateFrom(db, fileId) {
 // --- helpers moved verbatim from integration/upload.js ---
 
 // 从 AI 结果中取出标签名并清洗为合法 tag（角色标签含括号等会被转换而非丢弃）。
+// 支持两种 results 形状：
+//   - 独立模式: { tags: [{name, confidence}] }
+//   - 统一模式: { tagging: { tags: [...] }, description: {...}, ocr: {...} }
 function extractAITagNames(aiMetadata) {
-    const tags = aiMetadata?.results?.tags;
+    const results = aiMetadata?.results;
+    const tags = results?.tags ?? results?.tagging?.tags;
     if (!Array.isArray(tags)) return [];
 
     const names = tags
@@ -94,6 +136,50 @@ function extractAITagNames(aiMetadata) {
         .filter(name => typeof name === 'string' && name.length > 0);
 
     return sanitizeAITags(names);
+}
+
+// Extracts an AI-generated description string from either result shape.
+function extractDescription(aiMetadata) {
+    const results = aiMetadata?.results;
+    if (!results) return null;
+    const caption = results.description?.caption ?? results.caption;
+    return typeof caption === 'string' && caption.trim() ? caption.trim() : null;
+}
+
+// Extracts OCR text from either result shape. Returns null when no text was found.
+function extractOCR(aiMetadata) {
+    const results = aiMetadata?.results;
+    if (!results) return null;
+    const text = results.ocr?.text ?? results.text;
+    if (text === null) return null;
+    return typeof text === 'string' && text.trim() ? text.trim() : null;
+}
+
+// Returns the largest prefix of `value` such that setting metadata[field] to
+// it keeps the JSON-encoded metadata within KV's 1024-byte cap. Returns null
+// when even an empty string won't fit (extremely unlikely; the caller then
+// skips the write). On non-KV backends there is no cap, so the full value is
+// returned unchanged.
+function fitStringIntoMetadata(env, metadata, field, value) {
+    if (!isKVDatabase(env)) return value;
+
+    const probe = { ...metadata, [field]: value };
+    if (metadataSize(probe) <= KV_METADATA_MAX_BYTES) return value;
+
+    let low = 0;
+    let high = value.length;
+    let best = null;
+    while (low <= high) {
+        const mid = (low + high) >> 1;
+        const candidate = value.slice(0, mid);
+        if (metadataSize({ ...metadata, [field]: candidate }) <= KV_METADATA_MAX_BYTES) {
+            best = candidate;
+            low = mid + 1;
+        } else {
+            high = mid - 1;
+        }
+    }
+    return best;
 }
 
 function mergeAITagsWithinMetadataLimit(env, metadata, aiTagNames) {
