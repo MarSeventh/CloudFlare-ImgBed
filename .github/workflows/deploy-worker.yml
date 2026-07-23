@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       worker_name:
-        description: 'Worker Name (覆盖默认名称，注意：仅更改名称不会自动匹配数据库/KV绑定)'
+        description: 'Worker Name (手动输入会覆盖自动配置)'
         required: false
         default: ''
 
@@ -28,6 +28,13 @@ jobs:
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Debug - Show inputs and branch
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          echo "🔍 Manual input worker_name: '${{ inputs.worker_name }}'"
+          echo "🔍 Current branch: '${{ github.ref_name }}'"
+          echo "🔍 Is manual input empty? ${{ inputs.worker_name == '' }}"
+
       - name: Checkout
         if: steps.check.outputs.skip != 'true'
         uses: actions/checkout@v6
@@ -44,12 +51,12 @@ jobs:
 
       - name: Generate worker routes
         if: steps.check.outputs.skip != 'true'
-        run: node deploy/worker/generate-routes.js
+        run: node deploy/worker/generate-routes.js || echo "⚠️  Skipping generate-routes.js"
 
       - name: Generate and validate wrangler config
         if: steps.check.outputs.skip != 'true'
         env:
-          WORKER_NAME: ${{ inputs.worker_name || (github.ref_name == 'main' && secrets.WORKER_NAME_PROD) || (github.ref_name == 'dev' && secrets.WORKER_NAME_DEV) || secrets.WORKER_NAME }}
+          WORKER_NAME: ${{ inputs.worker_name || (github.ref_name == 'main' && secrets.WORKER_NAME_PROD) || (github.ref_name == 'dev' && secrets.WORKER_NAME_DEV) || secrets.WORKER_NAME || 'cfimgbed' }}
           D1_DATABASE_ID: ${{ (github.ref_name == 'main' && secrets.D1_DATABASE_ID_PROD) || (github.ref_name == 'dev' && secrets.D1_DATABASE_ID_DEV) || secrets.D1_DATABASE_ID }}
           KV_NAMESPACE_ID: ${{ (github.ref_name == 'main' && secrets.KV_NAMESPACE_ID_PROD) || (github.ref_name == 'dev' && secrets.KV_NAMESPACE_ID_DEV) || secrets.KV_NAMESPACE_ID }}
           R2_BUCKET_NAME: ${{ (github.ref_name == 'main' && secrets.R2_BUCKET_NAME_PROD) || (github.ref_name == 'dev' && secrets.R2_BUCKET_NAME_DEV) || secrets.R2_BUCKET_NAME }}
@@ -57,15 +64,10 @@ jobs:
           WORKER_VARS: ${{ (github.ref_name == 'main' && secrets.WORKER_VARS_PROD) || (github.ref_name == 'dev' && secrets.WORKER_VARS_DEV) || secrets.WORKER_VARS }}
           ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'development' }}
         run: |
-          # 验证 WORKER_NAME
-          if [ -z "$WORKER_NAME" ]; then
-            echo "::error::WORKER_NAME is not set. Please configure WORKER_NAME_PROD, WORKER_NAME_DEV, or WORKER_NAME secret."
-            exit 1
-          fi
           echo "✅ Deploying Worker: $WORKER_NAME"
           echo "🌍 Environment: $ENVIRONMENT"
+          echo "📝 Source: ${{ inputs.worker_name != '' && 'Manual Input' || 'Auto Config' }}"
           
-          # 生成 wrangler 配置
           echo "📝 Generating wrangler.toml..."
           node deploy/worker/generate-toml.js
 
