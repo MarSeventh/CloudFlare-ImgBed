@@ -12,7 +12,11 @@ const corsHeaders = {
     'Access-Control-Max-Age': '86400',
 };
 
-export async function onRequestPost(context) {
+export async function onRequest(context) {
+    if (context.request.method !== 'POST') {
+        return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
+    }
+
     try {
         const payload = await context.request.json();
         const fileIds = normalizeBatchFileIds(payload?.fileIds, MAX_BATCH_SIZE);
@@ -21,9 +25,13 @@ export async function onRequestPost(context) {
         }
         const url = new URL(context.request.url);
         const results = await mapConcurrent(fileIds, DELETE_CONCURRENCY, async (fileId) => {
-            const cdnUrl = `${url.origin}/file/${fileId.split('/').map(encodeURIComponent).join('/')}`;
-            const success = await deleteFile(context.env, fileId, cdnUrl, url);
-            return { fileId, success, error: success ? '' : 'Delete file failed' };
+            try {
+                const cdnUrl = `${url.origin}/file/${fileId.split('/').map(encodeURIComponent).join('/')}`;
+                const success = await deleteFile(context.env, fileId, cdnUrl, url);
+                return { fileId, success, error: success ? '' : 'Delete file failed' };
+            } catch (err) {
+                return { fileId, success: false, error: String(err?.message || err) };
+            }
         });
 
         const deleted = results.filter((item) => item.success).map((item) => item.fileId);
