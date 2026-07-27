@@ -49,7 +49,7 @@ CloudFlare ImgBed is a self-hosted image and file hosting solution for Docker an
       <strong><a href="https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC">SuWei Cloud</a></strong>
     </td>
     <td align="center" width="20%">
-      <strong><a href="https://linux.do/">Linux DO</a></strong>
+      <strong><a href="https://linux.do/u/marseventh/summary">Linux DO</a></strong>
     </td>
   </tr>
   <tr>
@@ -57,7 +57,7 @@ CloudFlare ImgBed is a self-hosted image and file hosting solution for Docker an
     <td align="center"><a href="https://edgeone.ai/?from=github"><img src="readme/edgeone-logo.png" alt="EdgeOne logo" height="25"></a></td>
     <td align="center"><a href="https://www.hncloud.com/activity/activity_2026summer.html?k=MarSeventh"><img src="readme/hncloud-logo.png" alt="HuaNa Cloud logo" height="25"></a></td>
     <td align="center"><a href="https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC"><img src="readme/svyun-logo.png" alt="SuWei Cloud logo" height="25"></a></td>
-    <td align="center"><a href="https://linux.do/"><img src="readme/linuxdo-logo.png" alt="Linux DO logo" height="25"></a></td>
+    <td align="center"><a href="https://linux.do/u/marseventh/summary"><img src="readme/linuxdo-logo.png" alt="Linux DO logo" height="25"></a></td>
   </tr>
   <tr>
     <td align="center"><sub>Provides CDN acceleration and security protection</sub></td>
