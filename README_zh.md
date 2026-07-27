@@ -127,7 +127,13 @@ CloudFlare ImgBed 是一个同时支持 Docker 与 Serverless 部署的开源文
 
   <a href="https://www.cloudflare.com/"><img src="readme/cloudflare-logo.png" alt="Cloudflare Logo" height="25"></a> <a href="https://edgeone.ai/?from=github"><img src="readme/edgeone-logo.png" alt="EdgeOne Logo" height="25"></a>
 
-- **[速维云](https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC)**：提供云计算资源
+- **[华纳云](https://www.hncloud.com/activity/activity_2026summer.html?k=MarSeventh)**：提供稳定、优质的云计算资源
+
+  <a href="https://www.hncloud.com/activity/activity_2026summer.html?k=MarSeventh"><img src="readme/hncloud-logo.png" alt="HuaNa Cloud Logo" height="25"></a>
+
+- **[速维云](https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC)**：提供稳定、优质的云计算资源
+
+  <a href="https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC"><img src="readme/svyun-logo.png" alt="SuWei Cloud Logo" height="25"></a>
 
 - **[Linux DO](https://linux.do/)**：提供社区支持
 

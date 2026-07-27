@@ -123,13 +123,19 @@ Thank you to every sponsor who supports this project! Your support helps sustain
 
 ## 🤝 Partners
 
-- **[Cloudflare](https://www.cloudflare.com/) & [EdgeOne](https://edgeone.ai/?from=github)**: CDN acceleration and security protection
+- **[Cloudflare](https://www.cloudflare.com/) & [EdgeOne](https://edgeone.ai/?from=github)**: Provides CDN acceleration and security protection
 
   <a href="https://www.cloudflare.com/"><img src="readme/cloudflare-logo.png" alt="Cloudflare Logo" height="25"></a> <a href="https://edgeone.ai/?from=github"><img src="readme/edgeone-logo.png" alt="EdgeOne Logo" height="25"></a>
 
-- **[Svyun](https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC)**: Cloud computing resources
+- **[HuaNa Cloud](https://www.hncloud.com/activity/activity_2026summer.html?k=MarSeventh)**: Provides stable and high-quality cloud computing resources
 
-- **[Linux DO](https://linux.do/)**: Community support
+  <a href="https://www.hncloud.com/activity/activity_2026summer.html?k=MarSeventh"><img src="readme/hncloud-logo.png" alt="HuaNa Cloud Logo" height="25"></a>
+  
+- **[SuWei Cloud](https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC)**: Provides stable and high-quality cloud computing resources
+
+  <a href="https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC"><img src="readme/svyun-logo.png" alt="SuWei Cloud Logo" height="25"></a>
+
+- **[Linux DO](https://linux.do/)**: Provides community support
 
 # 6. 👥 Community
 
