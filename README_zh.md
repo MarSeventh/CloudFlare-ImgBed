@@ -49,7 +49,7 @@ CloudFlare ImgBed 是支持 Docker 与 Serverless 部署的自建图床和文件
       <strong><a href="https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC">速维云</a></strong>
     </td>
     <td align="center" width="20%">
-      <strong><a href="https://linux.do/u/marseventh/summary">Linux DO</a></strong>
+      <strong><a href="https://linux.do/t/topic/2578561">Linux DO</a></strong>
     </td>
   </tr>
   <tr>
@@ -57,7 +57,7 @@ CloudFlare ImgBed 是支持 Docker 与 Serverless 部署的自建图床和文件
     <td align="center"><a href="https://edgeone.ai/?from=github"><img src="readme/edgeone-logo.png" alt="EdgeOne Logo" height="25"></a></td>
     <td align="center"><a href="https://www.hncloud.com/activity/activity_2026summer.html?k=MarSeventh"><img src="readme/hncloud-logo.png" alt="华纳云 Logo" height="25"></a></td>
     <td align="center"><a href="https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC"><img src="readme/svyun-logo.png" alt="速维云 Logo" height="25"></a></td>
-    <td align="center"><a href="https://linux.do/u/marseventh/summary"><img src="readme/linuxdo-logo.png" alt="Linux DO Logo" height="25"></a></td>
+    <td align="center"><a href="https://linux.do/t/topic/2578561"><img src="readme/linuxdo-logo.png" alt="Linux DO Logo" height="25"></a></td>
   </tr>
   <tr>
     <td align="center"><sub>提供 CDN 加速及安全防护</sub></td>
