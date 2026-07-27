@@ -28,11 +28,45 @@
 
 # 1. 💡 Introduction
 
-CloudFlare ImgBed is an open-source file hosting solution that supports both Docker and serverless deployments, with multiple backend storage options, including **Telegram**, **Discord**, **Cloudflare R2**, **S3-compatible storage**, **Hugging Face**, **WebDAV**, and more.
-
-It provides essential features covering the entire file lifecycle—including **uploading**, **managing**, **reading**, and **deleting**—along with **authentication**, **directory organization**, **content moderation**, and **random images**. With a comprehensive RESTful API and WebDAV support, it is well suited for self-hosted image hosting, static site asset management, and lightweight file distribution. See the [feature documentation](https://cfbed.sanyue.de/en/guide/features.html) for details.
+CloudFlare ImgBed is a self-hosted image and file hosting solution for Docker and serverless environments, bringing **Telegram**, **Discord**, **Cloudflare R2**, **S3-compatible storage**, **Hugging Face**, **WebDAV**, and more into one management interface. It provides file management, authentication, directory organization, content moderation, a RESTful API, and WebDAV for personal image hosting, website asset management, and lightweight file distribution. **[View all features →](https://cfbed.sanyue.de/en/guide/features.html)**
 
 ![CloudFlare](readme/海报.png)
+
+## 🤝 Partners
+
+<table>
+  <tr>
+    <td align="center" width="20%">
+      <strong><a href="https://www.cloudflare.com/">Cloudflare</a></strong>
+    </td>
+    <td align="center" width="20%">
+      <strong><a href="https://edgeone.ai/?from=github">EdgeOne</a></strong>
+    </td>
+    <td align="center" width="20%">
+      <strong><a href="https://www.hncloud.com/activity/activity_2026summer.html?k=MarSeventh">HuaNa Cloud</a></strong>
+    </td>
+    <td align="center" width="20%">
+      <strong><a href="https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC">SuWei Cloud</a></strong>
+    </td>
+    <td align="center" width="20%">
+      <strong><a href="https://linux.do/">Linux DO</a></strong>
+    </td>
+  </tr>
+  <tr>
+    <td align="center"><a href="https://www.cloudflare.com/"><img src="readme/cloudflare-logo.png" alt="Cloudflare logo" height="25"></a></td>
+    <td align="center"><a href="https://edgeone.ai/?from=github"><img src="readme/edgeone-logo.png" alt="EdgeOne logo" height="25"></a></td>
+    <td align="center"><a href="https://www.hncloud.com/activity/activity_2026summer.html?k=MarSeventh"><img src="readme/hncloud-logo.png" alt="HuaNa Cloud logo" height="25"></a></td>
+    <td align="center"><a href="https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC"><img src="readme/svyun-logo.png" alt="SuWei Cloud logo" height="25"></a></td>
+    <td align="center"><a href="https://linux.do/"><img src="readme/linuxdo-logo.png" alt="Linux DO logo" height="25"></a></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Provides CDN acceleration and security protection</sub></td>
+    <td align="center"><sub>Provides CDN acceleration and security protection</sub></td>
+    <td align="center"><sub>Provides stable and high-quality cloud computing resources</sub></td>
+    <td align="center"><sub>Provides stable and high-quality cloud computing resources</sub></td>
+    <td align="center"><sub>Provides community support</sub></td>
+  </tr>
+</table>
 
 # 2. 🖥️ Demo
 
@@ -103,7 +137,7 @@ An open-source ecosystem grows through community support. Visit the [CloudFlare 
 
 Discover useful plugins, applications, and tutorials, or share your own work with the community. See the [Ecosystem Call for Contributions](https://github.com/MarSeventh/CloudFlare-ImgBed/discussions/606) for submission guidelines. We look forward to your participation!
 
-# 5. 💝 Support & Partners
+# 5. 💝 Support & Sponsors
 
 ## ☕ Support the Project
 
@@ -120,22 +154,6 @@ Maintaining an open source project takes time and effort. If CloudFlare ImgBed h
 Thank you to every sponsor who supports this project! Your support helps sustain ongoing maintenance and drives the continued improvement of CloudFlare ImgBed.
 
 [![Sponsors](https://afdian-sponsors.sanyue.de/image?columns=12)](https://afdian.com/a/marseventh)
-
-## 🤝 Partners
-
-- **[Cloudflare](https://www.cloudflare.com/) & [EdgeOne](https://edgeone.ai/?from=github)**: Provides CDN acceleration and security protection
-
-  <a href="https://www.cloudflare.com/"><img src="readme/cloudflare-logo.png" alt="Cloudflare Logo" height="25"></a> <a href="https://edgeone.ai/?from=github"><img src="readme/edgeone-logo.png" alt="EdgeOne Logo" height="25"></a>
-
-- **[HuaNa Cloud](https://www.hncloud.com/activity/activity_2026summer.html?k=MarSeventh)**: Provides stable and high-quality cloud computing resources
-
-  <a href="https://www.hncloud.com/activity/activity_2026summer.html?k=MarSeventh"><img src="readme/hncloud-logo.png" alt="HuaNa Cloud Logo" height="25"></a>
-  
-- **[SuWei Cloud](https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC)**: Provides stable and high-quality cloud computing resources
-
-  <a href="https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC"><img src="readme/svyun-logo.png" alt="SuWei Cloud Logo" height="25"></a>
-
-- **[Linux DO](https://linux.do/)**: Provides community support
 
 # 6. 👥 Community
 

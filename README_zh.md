@@ -28,11 +28,45 @@
 
 # 1. 💡 项目介绍
 
-CloudFlare ImgBed 是一个同时支持 Docker 与 Serverless 部署的开源文件托管解决方案，可接入的存储渠道包括 **Telegram**、**Discord**、**Cloudflare R2**、**S3 兼容存储**、**Hugging Face**、**WebDAV** 等。
-
-它不仅具备**上传**、**管理**、**读取**、**删除**等覆盖文件全生命周期的基础功能，还提供**身份认证**、**目录组织**、**内容审核**、**随机图**等能力，以及完整的 RESTful API 与 WebDAV 支持，适用于自建图床、静态站资源管理和轻量文件分发场景。详见[功能文档](https://cfbed.sanyue.de/guide/features.html)。
+CloudFlare ImgBed 是支持 Docker 与 Serverless 部署的自建图床和文件托管方案，可将 **Telegram**、**Discord**、**Cloudflare R2**、**S3 兼容存储**、**Hugging Face**、**WebDAV** 等渠道统一接入一个管理界面。项目提供文件管理、身份认证、目录组织、内容审核、RESTful API 与 WebDAV，适用于个人图床、网站资源管理和轻量文件分发。 **[查看完整功能 →](https://cfbed.sanyue.de/guide/features.html)**
 
 ![CloudFlare](readme/海报.png)
+
+## 🤝 合作伙伴
+
+<table>
+  <tr>
+    <td align="center" width="20%">
+      <strong><a href="https://www.cloudflare.com/">Cloudflare</a></strong>
+    </td>
+    <td align="center" width="20%">
+      <strong><a href="https://edgeone.ai/?from=github">EdgeOne</a></strong>
+    </td>
+    <td align="center" width="20%">
+      <strong><a href="https://www.hncloud.com/activity/activity_2026summer.html?k=MarSeventh">华纳云</a></strong>
+    </td>
+    <td align="center" width="20%">
+      <strong><a href="https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC">速维云</a></strong>
+    </td>
+    <td align="center" width="20%">
+      <strong><a href="https://linux.do/">Linux DO</a></strong>
+    </td>
+  </tr>
+  <tr>
+    <td align="center"><a href="https://www.cloudflare.com/"><img src="readme/cloudflare-logo.png" alt="Cloudflare Logo" height="25"></a></td>
+    <td align="center"><a href="https://edgeone.ai/?from=github"><img src="readme/edgeone-logo.png" alt="EdgeOne Logo" height="25"></a></td>
+    <td align="center"><a href="https://www.hncloud.com/activity/activity_2026summer.html?k=MarSeventh"><img src="readme/hncloud-logo.png" alt="华纳云 Logo" height="25"></a></td>
+    <td align="center"><a href="https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC"><img src="readme/svyun-logo.png" alt="速维云 Logo" height="25"></a></td>
+    <td align="center"><a href="https://linux.do/"><img src="readme/linuxdo-logo.png" alt="Linux DO Logo" height="25"></a></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>提供 CDN 加速及安全防护</sub></td>
+    <td align="center"><sub>提供 CDN 加速及安全防护</sub></td>
+    <td align="center"><sub>提供稳定、优质的云计算资源</sub></td>
+    <td align="center"><sub>提供稳定、优质的云计算资源</sub></td>
+    <td align="center"><sub>提供社区支持</sub></td>
+  </tr>
+</table>
 
 # 2. 🖥️ 在线演示
 
@@ -103,7 +137,7 @@ CloudFlare ImgBed 是一个同时支持 Docker 与 Serverless 部署的开源文
 
 您也可以向社区分享自己的作品，提交规范请参见[生态建设征集令](https://github.com/MarSeventh/CloudFlare-ImgBed/discussions/606)，期待您的参与！
 
-# 5. 💝 支持与合作伙伴
+# 5. 💝 支持与赞助
 
 ## ☕ 支持项目
 
@@ -120,22 +154,6 @@ CloudFlare ImgBed 是一个同时支持 Docker 与 Serverless 部署的开源文
 感谢每一位赞助者对本项目的支持！您的支持帮助项目持续维护，也为 CloudFlare ImgBed 的长期改进提供动力。
 
 [![赞助者](https://afdian-sponsors.sanyue.de/image?columns=12)](https://afdian.com/a/marseventh)
-
-## 🤝 合作伙伴
-
-- **[Cloudflare](https://www.cloudflare.com/) & [EdgeOne](https://edgeone.ai/?from=github)**：提供 CDN 加速及安全防护
-
-  <a href="https://www.cloudflare.com/"><img src="readme/cloudflare-logo.png" alt="Cloudflare Logo" height="25"></a> <a href="https://edgeone.ai/?from=github"><img src="readme/edgeone-logo.png" alt="EdgeOne Logo" height="25"></a>
-
-- **[华纳云](https://www.hncloud.com/activity/activity_2026summer.html?k=MarSeventh)**：提供稳定、优质的云计算资源
-
-  <a href="https://www.hncloud.com/activity/activity_2026summer.html?k=MarSeventh"><img src="readme/hncloud-logo.png" alt="HuaNa Cloud Logo" height="25"></a>
-
-- **[速维云](https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC)**：提供稳定、优质的云计算资源
-
-  <a href="https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC"><img src="readme/svyun-logo.png" alt="SuWei Cloud Logo" height="25"></a>
-
-- **[Linux DO](https://linux.do/)**：提供社区支持
 
 # 6. 👥 项目社区
 
