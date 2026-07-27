@@ -34,7 +34,7 @@ CloudFlare ImgBed is a self-hosted image and file hosting solution for Docker an
 
 ## 🤝 Partners
 
-<table>
+<table width="100%">
   <tr>
     <td align="center" width="20%">
       <strong><a href="https://www.cloudflare.com/">Cloudflare</a></strong>

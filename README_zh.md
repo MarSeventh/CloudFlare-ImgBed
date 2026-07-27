@@ -34,7 +34,7 @@ CloudFlare ImgBed 是支持 Docker 与 Serverless 部署的自建图床和文件
 
 ## 🤝 合作伙伴
 
-<table>
+<table width="100%">
   <tr>
     <td align="center" width="20%">
       <strong><a href="https://www.cloudflare.com/">Cloudflare</a></strong>
