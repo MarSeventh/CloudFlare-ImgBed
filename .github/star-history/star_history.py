@@ -120,6 +120,13 @@ def build_parser() -> argparse.ArgumentParser:
         default="GITHUB_TOKEN",
         help="Environment variable containing a GitHub token",
     )
+    refresh.add_argument(
+        "--stargazer-token-env",
+        help=(
+            "Environment variable containing an administrator or collaborator "
+            "PAT for cold-start Stargazers API access"
+        ),
+    )
 
     patch_parser = commands.add_parser(
         "patch-upstream",
@@ -544,6 +551,9 @@ def refresh_data_command(args: argparse.Namespace) -> int:
     if not token:
         print("[error] GitHub token environment variable is empty")
         return 1
+    stargazer_token = ""
+    if args.stargazer_token_env:
+        stargazer_token = os.environ.get(args.stargazer_token_env, "").strip()
     try:
         payload, source = load_best_data(
             repositories=repositories,
@@ -555,10 +565,16 @@ def refresh_data_command(args: argparse.Namespace) -> int:
         }
         current_time = datetime.now(timezone.utc)
         if payload is None:
+            if not stargazer_token:
+                raise RuntimeError(
+                    "cold-start initialization requires a GitHub PAT belonging "
+                    "to an administrator or collaborator of every configured "
+                    "repository"
+                )
             updated = initialize_from_github(
                 repositories=repositories,
                 metadata=metadata,
-                token=token,
+                token=stargazer_token,
                 current_time=current_time,
             )
         else:

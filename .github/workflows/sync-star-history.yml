@@ -81,8 +81,10 @@ jobs:
         env:
           # Normal refreshes read the deployed Pages cache and current repository
           # totals. A missing Pages cache is initialized once from timestamped
-          # stargazers; the hosted Star History chart service is never queried.
+          # stargazers using an administrator/collaborator PAT; the hosted Star
+          # History chart service is never queried.
           GITHUB_JOB_TOKEN: ${{ github.token }}
+          STAR_HISTORY_TOKEN: ${{ secrets.STAR_HISTORY_TOKEN }}
           FORCE_BOOTSTRAP: ${{ github.event_name == 'workflow_dispatch' && inputs.force_bootstrap == true }}
         run: |
           set -euo pipefail
@@ -107,6 +109,7 @@ jobs:
             --repository "${STAR_HISTORY_REPOSITORIES}"
             --output "${data_file}"
             --token-env GITHUB_JOB_TOKEN
+            --stargazer-token-env STAR_HISTORY_TOKEN
           )
 
           # Pages JSON is normally the runtime source of truth. A first
