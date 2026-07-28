@@ -40,7 +40,7 @@ jobs:
           UPSTREAM_REPO: MarSeventh/CloudFlare-ImgBed
           UPSTREAM_BRANCH: main
           ALLOW_BREAKING_UPDATE: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm_breaking_update == true }}
-        run: bash .github/scripts/breaking-update-guard.sh check
+        run: bash .github/breaking-updates/scripts/breaking-update-guard.sh check
 
       - name: Sync upstream changes
         id: sync
@@ -57,7 +57,7 @@ jobs:
         if: steps.sync.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash .github/scripts/breaking-update-guard.sh complete
+        run: bash .github/breaking-updates/scripts/breaking-update-guard.sh complete
 
       - name: Trigger Worker deploy
         if: steps.sync.outcome == 'success'

@@ -1,8 +1,8 @@
 # Breaking update guard / 破坏性更新保护机制
 
-The scheduled upstream synchronization reads `.github/breaking-updates.json` before applying changes. If an enabled update has not been applied to a fork, automatic synchronization is paused and a bilingual issue is created in that fork.
+The scheduled upstream synchronization reads `.github/breaking-updates/breaking-updates.json` before applying changes. If an enabled update has not been applied to a fork, automatic synchronization is paused and a bilingual issue is created in that fork.
 
-定时上游同步会在应用变更前读取 `.github/breaking-updates.json`。如果某项已启用的更新尚未包含在用户 Fork 中，自动同步会暂停，并在该 Fork 中创建中英双语 Issue。
+定时上游同步会在应用变更前读取 `.github/breaking-updates/breaking-updates.json`。如果某项已启用的更新尚未包含在用户 Fork 中，自动同步会暂停，并在该 Fork 中创建中英双语 Issue。
 
 ## Initial rollout / 首次上线
 

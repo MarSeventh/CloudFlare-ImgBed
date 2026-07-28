@@ -171,7 +171,7 @@ CloudFlare ImgBed 是支持 Docker 与 Serverless 部署的自建图床和文件
  <picture>
    <source media="(prefers-color-scheme: dark)" srcset="https://marseventh.github.io/CloudFlare-ImgBed/star-history-dark.svg" />
    <source media="(prefers-color-scheme: light)" srcset="https://marseventh.github.io/CloudFlare-ImgBed/star-history-light.svg" />
-   <img alt="CloudFlare-ImgBed 和 Sanyue-ImgHub Star 趋势图" src="https://marseventh.github.io/CloudFlare-ImgBed/star-history-light.svg" />
+   <img alt="Star-History" src="https://marseventh.github.io/CloudFlare-ImgBed/star-history-light.svg" />
  </picture>
 </a>
 

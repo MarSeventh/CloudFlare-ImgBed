@@ -5,7 +5,7 @@ set -Eeuo pipefail
 MODE="${1:-check}"
 UPSTREAM_REPO="${UPSTREAM_REPO:-MarSeventh/CloudFlare-ImgBed}"
 UPSTREAM_BRANCH="${UPSTREAM_BRANCH:-main}"
-MANIFEST_PATH="${BREAKING_UPDATE_MANIFEST:-.github/breaking-updates.json}"
+MANIFEST_PATH="${BREAKING_UPDATE_MANIFEST:-.github/breaking-updates/breaking-updates.json}"
 PENDING_FILE="${RUNNER_TEMP:-/tmp}/cloudflare-imgbed-pending-breaking-updates.txt"
 ISSUE_TITLE_PREFIX="CloudFlare-ImgBed Update"
 
