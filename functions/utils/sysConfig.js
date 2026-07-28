@@ -112,7 +112,15 @@ export async function fetchSecurityConfig(env, options = {}) {
                     customApi: { url: "", params: [{ key: "ip", value: "{ip}" }], responseFields: [] }
                 }
             },
-            access: { allowedDomains: "", whiteListMode: false, sessionSecure: false, userSessionMaxAge: 14, adminSessionMaxAge: 14 }
+            access: {
+                allowedDomains: "",
+                whiteListMode: false,
+                imageTransformEnabled: false,
+                imageTransformAllowedSizes: "",
+                sessionSecure: false,
+                userSessionMaxAge: 14,
+                adminSessionMaxAge: 14
+            }
         };
     }
 }

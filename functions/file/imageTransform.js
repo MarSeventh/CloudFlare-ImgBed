@@ -13,7 +13,7 @@ const OUTPUT_FORMATS = new Map([
     ['image/svg+xml', 'image/png'],
 ]);
 
-export function parseImageTransform(url, env = {}) {
+export function parseImageTransform(url, accessConfig = {}) {
     const widthResult = parseDimension(url.searchParams, 'width');
     const heightResult = parseDimension(url.searchParams, 'height');
     const fitResult = parseFit(url.searchParams);
@@ -30,6 +30,14 @@ export function parseImageTransform(url, env = {}) {
         return { requested: false };
     }
 
+    if (accessConfig.imageTransformEnabled !== true) {
+        return {
+            requested: true,
+            error: 'Image resizing is disabled',
+            errorStatus: 403,
+        };
+    }
+
     const width = widthResult.value;
     const height = heightResult.value;
     const fit = fitResult.value;
@@ -42,7 +50,7 @@ export function parseImageTransform(url, env = {}) {
     }
 
     const sizeKey = `${width || 'auto'}x${height || 'auto'}`;
-    const allowedSizes = parseAllowedSizes(env.IMAGE_TRANSFORM_ALLOWED_SIZES);
+    const allowedSizes = parseAllowedSizes(accessConfig.imageTransformAllowedSizes);
 
     if (allowedSizes.size > 0 && !allowedSizes.has(sizeKey)) {
         return {
@@ -66,7 +74,7 @@ export function validateImageTransformRequest(request, imageTransform) {
     if (!imageTransform.requested) return null;
 
     if (imageTransform.error) {
-        return imageTransformError(imageTransform.error, 400);
+        return imageTransformError(imageTransform.error, imageTransform.errorStatus || 400);
     }
 
     if (request.method !== 'GET') {
