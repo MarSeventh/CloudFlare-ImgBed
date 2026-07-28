@@ -13,6 +13,7 @@ import { join, resolve, dirname } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { SqliteD1 } from './sqliteD1.js';
 import { LocalR2Storage } from './r2Storage.js';
+import { dockerImageProcessor } from './imageProcessor.js';
 
 const NativeResponse = globalThis.Response;
 
@@ -121,6 +122,7 @@ function createEnv() {
         ...process.env,
         img_d1: sqliteD1,
         img_r2: r2Storage,
+        IMAGE_PROCESSOR: dockerImageProcessor,
     };
 }
 

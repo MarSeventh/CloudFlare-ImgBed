@@ -22,6 +22,10 @@ directory = "../../frontend-dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 
+# Cloudflare Images 原生图片处理
+[images]
+binding = "IMAGES"
+
 [vars]
 # TG_BOT_TOKEN = ""
 # TG_CHAT_ID = ""

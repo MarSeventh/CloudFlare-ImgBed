@@ -18,6 +18,11 @@ import {
     resolveWebDAVCredentials,
 } from '../utils/metadata/channelCredentials.js';
 import { buildCdnFileUrl } from '../utils/metadata/metadataView.js';
+import {
+    parseImageTransform,
+    transformImageResponse,
+    validateImageTransformRequest,
+} from './imageTransform.js';
 
 
 export async function onRequest(context) {  // Contents of context object
@@ -45,6 +50,12 @@ export async function onRequest(context) {  // Contents of context object
 
     const url = new URL(request.url);
     context.url = url;
+
+    context.imageTransform = parseImageTransform(url, env);
+    const imageTransformError = validateImageTransformRequest(request, context.imageTransform);
+    if (imageTransformError) {
+        return imageTransformError;
+    }
 
     const Referer = request.headers.get('Referer')
     context.Referer = Referer;
@@ -80,37 +91,60 @@ export async function onRequest(context) {  // Contents of context object
 
     /* Cloudflare R2渠道 */
     if (imgRecord.metadata?.Channel === 'CloudflareR2') {
-        return await handleR2File(context, fileId, encodedFileName, fileType);
+        const response = await handleR2File(context, fileId, encodedFileName, fileType);
+        return await transformImageResponse(context, response);
     }
 
     /* S3渠道 */
     if (imgRecord.metadata?.Channel === "S3") {
-        return await handleS3File(context, imgRecord.metadata, encodedFileName, fileType);
+        const response = await handleS3File(context, imgRecord.metadata, encodedFileName, fileType);
+        return await transformImageResponse(context, response);
     }
 
     /* Discord 渠道 */
     if (imgRecord.metadata?.Channel === 'Discord') {
         // 检查是否为分片文件
         if (imgRecord.metadata?.IsChunked === true) {
-            return await handleDiscordChunkedFile(context, imgRecord, encodedFileName, fileType);
+            const response = await handleDiscordChunkedFile(context, imgRecord, encodedFileName, fileType);
+            return await transformImageResponse(context, response);
         }
-        return await handleDiscordFile(context, imgRecord.metadata, encodedFileName, fileType);
+        const response = await handleDiscordFile(context, imgRecord.metadata, encodedFileName, fileType);
+        return await transformImageResponse(context, response);
     }
 
     /* HuggingFace 渠道 */
     if (imgRecord.metadata?.Channel === 'HuggingFace') {
-        return await handleHuggingFaceFile(context, imgRecord.metadata, encodedFileName, fileType);
+        const response = await handleHuggingFaceFile(context, imgRecord.metadata, encodedFileName, fileType);
+        return await transformImageResponse(context, response);
     }
 
     /* WebDAV 渠道 */
     if (imgRecord.metadata?.Channel === 'WebDAV') {
-        return await handleWebDAVFile(context, imgRecord.metadata, encodedFileName, fileType);
+        const response = await handleWebDAVFile(context, imgRecord.metadata, encodedFileName, fileType);
+        return await transformImageResponse(context, response);
     }
 
     /* 外链渠道 */
     if (imgRecord.metadata?.Channel === 'External') {
-        // 直接重定向到外链
-        return Response.redirect(imgRecord.metadata?.ExternalLink, 302);
+        if (!context.imageTransform.requested) {
+            // 未请求图片处理时维持原有的外链重定向逻辑
+            return Response.redirect(imgRecord.metadata?.ExternalLink, 302);
+        }
+
+        try {
+            const response = await fetch(imgRecord.metadata?.ExternalLink);
+            if (!response.ok) return response;
+
+            const headers = new Headers(response.headers);
+            setCommonHeaders(headers, encodedFileName, fileType, getFileCacheControl(context));
+            return await transformImageResponse(context, new Response(response.body, {
+                status: response.status,
+                statusText: response.statusText,
+                headers,
+            }));
+        } catch (error) {
+            return new Response(`Error: Failed to fetch external image - ${error.message}`, { status: 500 });
+        }
     }
 
     /* Telegram及Telegraph渠道 */
@@ -126,7 +160,8 @@ export async function onRequest(context) {  // Contents of context object
         } else if (imgRecord.metadata?.Channel === 'TelegramNew') {
             // 检查是否为分片文件
             if (imgRecord.metadata?.IsChunked === true) {
-                return await handleTelegramChunkedFile(context, imgRecord, encodedFileName, fileType);
+                const response = await handleTelegramChunkedFile(context, imgRecord, encodedFileName, fileType);
+                return await transformImageResponse(context, response);
             }
 
             TgFileID = imgRecord.metadata?.TgFileId;
@@ -170,7 +205,7 @@ export async function onRequest(context) {  // Contents of context object
             headers,
         });
 
-        return newRes;
+        return await transformImageResponse(context, newRes);
     } catch (error) {
         return new Response('Error: ' + error, { status: 500 });
     }

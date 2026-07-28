@@ -29,6 +29,9 @@ compatibility_flags = ["global_fetch_strictly_public"]
 directory = "../../frontend-dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
+
+[images]
+binding = "IMAGES"
 `;
 
 // D1 数据库
