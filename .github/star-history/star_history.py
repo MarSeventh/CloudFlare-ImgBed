@@ -3,8 +3,8 @@
 
 The three subcommands form one pipeline:
 
-* ``refresh-data`` extends the public date/count cache with one GitHub
-  repository-metadata request per configured repository;
+* ``refresh-data`` extends the public date/count cache and bootstraps missing
+  Pages data from GitHub's timestamped Stargazers API;
 * ``patch-upstream`` seeds a pinned official backend from that local cache;
 * ``render`` validates and saves the official localhost-rendered SVG pair.
 
@@ -27,7 +27,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -113,7 +113,6 @@ def build_parser() -> argparse.ArgumentParser:
         required="STAR_HISTORY_REPOSITORIES" not in os.environ,
         help="Comma-separated GitHub repositories in owner/name form",
     )
-    refresh.add_argument("--seed-file", type=Path, required=True)
     refresh.add_argument("--deployed-url")
     refresh.add_argument("--output", type=Path, required=True)
     refresh.add_argument(
@@ -251,42 +250,6 @@ def validate_data(
     return payload
 
 
-def validate_legacy_seed(
-    payload: Any, repositories: Tuple[str, ...]
-) -> Dict[str, Any]:
-    if not isinstance(payload, dict) or payload.get("schema_version") != 2:
-        raise ValueError("legacy Star History seed has an unsupported schema")
-    series = payload.get("series")
-    if not isinstance(series, list) or len(series) != len(repositories):
-        raise ValueError("legacy Star History seed must contain every repository")
-    for index, repository in enumerate(repositories):
-        item = series[index]
-        if not isinstance(item, dict) or str(item.get("repository", "")).lower() != repository:
-            raise ValueError("legacy Star History repository order is invalid")
-        reconstruction = item.get("reconstruction")
-        snapshots = item.get("snapshots")
-        if not isinstance(reconstruction, dict) or not isinstance(snapshots, list):
-            raise ValueError("legacy Star History series is malformed")
-        daily = reconstruction.get("daily")
-        if not isinstance(daily, list):
-            raise ValueError("legacy Star History reconstruction is malformed")
-        for point in daily:
-            datetime.fromisoformat(point["date"])
-            count = point.get("stars")
-            if isinstance(count, bool) or not isinstance(count, int) or count < 0:
-                raise ValueError("legacy Star History count is invalid")
-        for snapshot in snapshots:
-            datetime.fromisoformat(str(snapshot["at"]).replace("Z", "+00:00"))
-            count = snapshot.get("stars")
-            if isinstance(count, bool) or not isinstance(count, int) or count < 0:
-                raise ValueError("legacy Star History snapshot is invalid")
-    return payload
-
-
-def read_json_file(path: Path) -> Dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
 def download_json(url: str) -> Dict[str, Any]:
     parsed = urllib.parse.urlsplit(url)
     if parsed.scheme != "https" or not parsed.netloc:
@@ -305,9 +268,8 @@ def download_json(url: str) -> Dict[str, Any]:
 def load_best_data(
     *,
     repositories: Tuple[str, ...],
-    seed_file: Path,
     deployed_url: Optional[str],
-) -> Tuple[Dict[str, Any], str]:
+) -> Tuple[Optional[Dict[str, Any]], str]:
     if deployed_url:
         try:
             deployed = validate_data(download_json(deployed_url), repositories)
@@ -322,17 +284,13 @@ def load_best_data(
                     "deployed Pages cache request failed; preserving the last "
                     "deployment: HTTP {0}".format(status)
                 ) from exc
-            print("[data] deployed cache not found; using repository seed")
+            print("[data] deployed cache not found; initializing from GitHub API")
         except (OSError, ValueError, json.JSONDecodeError, urllib.error.URLError) as exc:
             raise RuntimeError(
                 "deployed Pages cache is unavailable or invalid; preserving "
                 "the last deployment: {0}".format(exc)
             ) from exc
-    seed = read_json_file(seed_file)
-    try:
-        return validate_data(seed, repositories), "repository seed"
-    except ValueError:
-        return validate_legacy_seed(seed, repositories), "legacy repository seed"
+    return None, "GitHub Stargazers API"
 
 
 def fetch_repository_metadata(repository: str, token: str) -> Dict[str, Any]:
@@ -373,6 +331,79 @@ def fetch_repository_metadata(repository: str, token: str) -> Dict[str, Any]:
     raise RuntimeError("GitHub repository metadata request failed: {0}".format(last_error))
 
 
+def fetch_stargazer_timestamps(repository: str, token: str) -> List[datetime]:
+    timestamps: List[datetime] = []
+    page = 1
+
+    while True:
+        url = (
+            "https://api.github.com/repos/{0}/stargazers?per_page=100&page={1}"
+        ).format(repository, page)
+        request = urllib.request.Request(
+            url,
+            headers={
+                "Accept": "application/vnd.github.star+json",
+                "Authorization": "Bearer {0}".format(token),
+                "User-Agent": USER_AGENT,
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+        )
+        last_error: Optional[Exception] = None
+        page_timestamps: Optional[List[datetime]] = None
+        has_next_page = False
+
+        for attempt in range(1, 4):
+            try:
+                with urllib.request.urlopen(request, timeout=30) as response:
+                    body = response.read(MAX_JSON_BYTES + 1)
+                    link_header = response.headers.get("Link", "")
+                if len(body) > MAX_JSON_BYTES:
+                    raise ValueError("GitHub Stargazers API response is too large")
+                payload = json.loads(body.decode("utf-8"))
+                if not isinstance(payload, list):
+                    raise ValueError("GitHub Stargazers API returned a non-array payload")
+
+                parsed_page: List[datetime] = []
+                for item in payload:
+                    if not isinstance(item, dict):
+                        raise ValueError("GitHub Stargazers API returned an invalid item")
+                    starred_at = item.get("starred_at")
+                    if not isinstance(starred_at, str):
+                        raise ValueError("GitHub Stargazers API omitted starred_at")
+                    parsed_page.append(
+                        datetime.fromisoformat(
+                            starred_at.replace("Z", "+00:00")
+                        ).astimezone(timezone.utc)
+                    )
+                page_timestamps = parsed_page
+                has_next_page = 'rel="next"' in link_header
+                break
+            except (
+                OSError,
+                ValueError,
+                json.JSONDecodeError,
+                urllib.error.URLError,
+            ) as exc:
+                last_error = exc
+                if attempt < 3:
+                    time.sleep(attempt * 2)
+
+        if page_timestamps is None:
+            raise RuntimeError(
+                "GitHub Stargazers API request failed for {0} page {1}: {2}".format(
+                    repository, page, last_error
+                )
+            )
+
+        timestamps.extend(page_timestamps)
+        if not has_next_page:
+            break
+        page += 1
+
+    timestamps.sort()
+    return timestamps
+
+
 def download_avatar_data_url(url: str) -> str:
     parsed = urllib.parse.urlsplit(url)
     if parsed.scheme != "https" or parsed.hostname != "avatars.githubusercontent.com":
@@ -390,6 +421,75 @@ def download_avatar_data_url(url: str) -> str:
         content_type,
         base64.b64encode(body).decode("ascii"),
     )
+
+
+def initialize_from_github(
+    *,
+    repositories: Tuple[str, ...],
+    metadata: Dict[str, Dict[str, Any]],
+    token: str,
+    current_time: datetime,
+) -> Dict[str, Any]:
+    avatar_cache: Dict[str, str] = {}
+    runtime_series: List[Dict[str, Any]] = []
+
+    for repository in repositories:
+        created_at = datetime.fromisoformat(
+            metadata[repository]["created_at"].replace("Z", "+00:00")
+        ).astimezone(timezone.utc).replace(microsecond=0)
+        current_second = current_time.astimezone(timezone.utc).replace(microsecond=0)
+        if created_at >= current_second:
+            created_at = current_second - timedelta(seconds=1)
+
+        daily_records: Dict[date, Tuple[datetime, int]] = {}
+        timestamps = fetch_stargazer_timestamps(repository, token)
+        for count, starred_at in enumerate(timestamps, start=1):
+            if starred_at > current_time:
+                raise ValueError(
+                    "GitHub Stargazers API returned a future timestamp for {0}".format(
+                        repository
+                    )
+                )
+            daily_records[starred_at.date()] = (starred_at, count)
+
+        records_by_time: Dict[datetime, int] = {created_at: 0}
+        for starred_at, count in daily_records.values():
+            records_by_time[starred_at] = count
+        record_points = sorted(records_by_time.items())
+        if len(record_points) < 2:
+            record_points.append((current_second, len(timestamps)))
+
+        avatar_url = metadata[repository]["avatar_url"]
+        if avatar_url not in avatar_cache:
+            avatar_cache[avatar_url] = download_avatar_data_url(avatar_url)
+        series = {
+            "repository": repository,
+            "logo_url": avatar_cache[avatar_url],
+            "star_records": [
+                {"date": format_record_date(at), "count": count}
+                for at, count in record_points
+            ],
+        }
+        series, _ = update_current_record(
+            series,
+            repository=repository,
+            star_count=metadata[repository]["star_count"],
+            current_time=current_time,
+        )
+        runtime_series.append(series)
+        print(
+            "[data] initialized {0} from {1} timestamped stargazers".format(
+                repository, len(timestamps)
+            )
+        )
+
+    initialized = {
+        "format": DATA_FORMAT,
+        "schema_version": SCHEMA_VERSION,
+        "updated_at": current_time.isoformat().replace("+00:00", "Z"),
+        "series": runtime_series,
+    }
+    return validate_data(initialized, repositories)
 
 
 def update_current_record(
@@ -415,59 +515,6 @@ def update_current_record(
         records.append(record)
     _validate_runtime_series(updated, repository)
     return updated, True
-
-
-def migrate_legacy_seed(
-    payload: Dict[str, Any],
-    *,
-    repositories: Tuple[str, ...],
-    metadata: Dict[str, Dict[str, Any]],
-    current_time: datetime,
-) -> Dict[str, Any]:
-    validate_legacy_seed(payload, repositories)
-    avatar_cache: Dict[str, str] = {}
-    runtime_series: List[Dict[str, Any]] = []
-    for index, repository in enumerate(repositories):
-        legacy = payload["series"][index]
-        records_by_time: Dict[datetime, int] = {}
-        for point in legacy["reconstruction"]["daily"]:
-            point_day = datetime.fromisoformat(point["date"]).date()
-            end_of_day = datetime(
-                point_day.year,
-                point_day.month,
-                point_day.day,
-                tzinfo=timezone.utc,
-            ) + timedelta(days=1)
-            records_by_time[end_of_day] = point["stars"]
-        for snapshot in legacy["snapshots"]:
-            at = datetime.fromisoformat(snapshot["at"].replace("Z", "+00:00"))
-            records_by_time[at.astimezone(timezone.utc)] = snapshot["stars"]
-        records = [
-            {"date": format_record_date(at), "count": records_by_time[at]}
-            for at in sorted(records_by_time)
-        ]
-        avatar_url = metadata[repository]["avatar_url"]
-        if avatar_url not in avatar_cache:
-            avatar_cache[avatar_url] = download_avatar_data_url(avatar_url)
-        series = {
-            "repository": repository,
-            "logo_url": avatar_cache[avatar_url],
-            "star_records": records,
-        }
-        series, _ = update_current_record(
-            series,
-            repository=repository,
-            star_count=metadata[repository]["star_count"],
-            current_time=current_time,
-        )
-        runtime_series.append(series)
-    migrated = {
-        "format": DATA_FORMAT,
-        "schema_version": SCHEMA_VERSION,
-        "updated_at": current_time.isoformat().replace("+00:00", "Z"),
-        "series": runtime_series,
-    }
-    return validate_data(migrated, repositories)
 
 
 def atomic_write_json(path: Path, payload: Dict[str, Any]) -> None:
@@ -500,7 +547,6 @@ def refresh_data_command(args: argparse.Namespace) -> int:
     try:
         payload, source = load_best_data(
             repositories=repositories,
-            seed_file=args.seed_file,
             deployed_url=args.deployed_url,
         )
         metadata = {
@@ -508,14 +554,13 @@ def refresh_data_command(args: argparse.Namespace) -> int:
             for repository in repositories
         }
         current_time = datetime.now(timezone.utc)
-        if payload.get("format") != DATA_FORMAT:
-            updated = migrate_legacy_seed(
-                payload,
+        if payload is None:
+            updated = initialize_from_github(
                 repositories=repositories,
                 metadata=metadata,
+                token=token,
                 current_time=current_time,
             )
-            source = "legacy repository seed"
         else:
             updated = copy.deepcopy(payload)
             changed = False

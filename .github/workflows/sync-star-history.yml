@@ -27,6 +27,7 @@ env:
 jobs:
   render-and-deploy:
     name: Render with official source and deploy to Pages
+    if: ${{ github.repository == 'MarSeventh/CloudFlare-ImgBed' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment:
@@ -72,9 +73,9 @@ jobs:
         id: render
         shell: bash
         env:
-          # One repository-metadata request per configured repository reads the
-          # current totals. Individual
-          # stargazers and the hosted Star History chart service are not queried.
+          # Normal refreshes read the deployed Pages cache and current repository
+          # totals. A missing Pages cache is initialized once from timestamped
+          # stargazers; the hosted Star History chart service is never queried.
           GITHUB_JOB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -95,11 +96,10 @@ jobs:
           }
           trap cleanup EXIT
 
-          # Pages JSON is the runtime source of truth. The committed bootstrap
-          # seed is used only when the first deployment path returns HTTP 404.
+          # Pages JSON is the runtime source of truth. On a first deployment,
+          # the script reconstructs history from GitHub's Stargazers API.
           python3 .github/star-history/star_history.py refresh-data \
             --repository "${STAR_HISTORY_REPOSITORIES}" \
-            --seed-file .github/star-history/history.json \
             --deployed-url "${STAR_HISTORY_PAGES_URL}/star-history-data.json" \
             --output "${data_file}" \
             --token-env GITHUB_JOB_TOKEN
