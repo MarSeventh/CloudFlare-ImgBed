@@ -6,6 +6,12 @@ on:
   schedule:
     - cron: "17 3 * * 1"
   workflow_dispatch:
+    inputs:
+      force_bootstrap:
+        description: "Rebuild all Star History data from the GitHub API instead of the deployed Pages cache"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -77,6 +83,7 @@ jobs:
           # totals. A missing Pages cache is initialized once from timestamped
           # stargazers; the hosted Star History chart service is never queried.
           GITHUB_JOB_TOKEN: ${{ github.token }}
+          FORCE_BOOTSTRAP: ${{ github.event_name == 'workflow_dispatch' && inputs.force_bootstrap == true }}
         run: |
           set -euo pipefail
 
@@ -96,13 +103,25 @@ jobs:
           }
           trap cleanup EXIT
 
-          # Pages JSON is the runtime source of truth. On a first deployment,
-          # the script reconstructs history from GitHub's Stargazers API.
-          python3 .github/star-history/star_history.py refresh-data \
-            --repository "${STAR_HISTORY_REPOSITORIES}" \
-            --deployed-url "${STAR_HISTORY_PAGES_URL}/star-history-data.json" \
-            --output "${data_file}" \
+          refresh_args=(
+            --repository "${STAR_HISTORY_REPOSITORIES}"
+            --output "${data_file}"
             --token-env GITHUB_JOB_TOKEN
+          )
+
+          # Pages JSON is normally the runtime source of truth. A first
+          # deployment or an explicitly forced bootstrap reconstructs history
+          # from GitHub's timestamped Stargazers API.
+          if [[ "${FORCE_BOOTSTRAP}" == "true" ]]; then
+            echo "[data] forced API bootstrap requested"
+          else
+            refresh_args+=(
+              --deployed-url "${STAR_HISTORY_PAGES_URL}/star-history-data.json"
+            )
+          fi
+
+          python3 .github/star-history/star_history.py refresh-data \
+            "${refresh_args[@]}"
 
           # Seed the pinned official backend cache while leaving its JSDOM,
           # XYChart, xkcd styling, theme handling, and SVGO renderer unchanged.
