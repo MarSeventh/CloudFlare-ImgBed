@@ -27,7 +27,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -448,7 +448,9 @@ def initialize_from_github(
         if created_at >= current_second:
             created_at = current_second - timedelta(seconds=1)
 
-        daily_records: Dict[date, Tuple[datetime, int]] = {}
+        # Match the ongoing weekly workflow cadence and avoid preserving noisy
+        # day-to-day changes in a freshly reconstructed chart.
+        weekly_records: Dict[Tuple[int, int], Tuple[datetime, int]] = {}
         timestamps = fetch_stargazer_timestamps(repository, token)
         for count, starred_at in enumerate(timestamps, start=1):
             if starred_at > current_time:
@@ -457,10 +459,11 @@ def initialize_from_github(
                         repository
                     )
                 )
-            daily_records[starred_at.date()] = (starred_at, count)
+            iso_week = starred_at.isocalendar()
+            weekly_records[(iso_week.year, iso_week.week)] = (starred_at, count)
 
         records_by_time: Dict[datetime, int] = {created_at: 0}
-        for starred_at, count in daily_records.values():
+        for starred_at, count in weekly_records.values():
             records_by_time[starred_at] = count
         record_points = sorted(records_by_time.items())
         if len(record_points) < 2:
@@ -485,8 +488,9 @@ def initialize_from_github(
         )
         runtime_series.append(series)
         print(
-            "[data] initialized {0} from {1} timestamped stargazers".format(
-                repository, len(timestamps)
+            "[data] initialized {0} from {1} timestamped stargazers "
+            "({2} weekly samples)".format(
+                repository, len(timestamps), len(weekly_records)
             )
         )
 
