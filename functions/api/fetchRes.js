@@ -4,6 +4,49 @@
  */
 import { dualAuthCheck } from '../utils/auth/dualAuth.js';
 
+const IS_NODE_RUNTIME = typeof process !== 'undefined' && Boolean(process.versions?.node);
+const HOP_BY_HOP_HEADERS = [
+    'connection',
+    'keep-alive',
+    'proxy-authenticate',
+    'proxy-authorization',
+    'te',
+    'trailer',
+    'transfer-encoding',
+    'upgrade'
+];
+
+/**
+ * Build response headers that are safe to send on a new proxy response.
+ * Node's fetch transparently decompresses upstream bodies while retaining
+ * Content-Encoding/Content-Length, so those headers must be removed there.
+ *
+ * @param {Headers} responseHeaders - headers returned by the upstream server
+ * @returns {Headers}
+ */
+function createProxyHeaders(responseHeaders) {
+    const headers = new Headers(responseHeaders);
+
+    for (const name of HOP_BY_HOP_HEADERS) {
+        headers.delete(name);
+    }
+
+    if (IS_NODE_RUNTIME) {
+        headers.delete('content-encoding');
+        headers.delete('content-length');
+    }
+
+    return headers;
+}
+
+function fetchTarget(url) {
+    const options = { redirect: 'manual' };
+    if (IS_NODE_RUNTIME) {
+        options.headers = { 'Accept-Encoding': 'identity' };
+    }
+    return fetch(url.toString(), options);
+}
+
 /**
  * Determine whether a hostname refers to a private, loopback, link-local,
  * cloud-metadata, or otherwise internal network address. Used to prevent
@@ -120,10 +163,11 @@ export async function onRequest(context) {
 
     // Follow redirects manually so a permitted host cannot redirect us onto
     // an internal address without re-validation.
-    let response = await fetch(parsed.toString(), { redirect: 'manual' });
+    let currentUrl = parsed;
+    let response = await fetchTarget(currentUrl);
     let hops = 0;
     while (response.status >= 300 && response.status < 400 && response.headers.get('location') && hops < 5) {
-        const next = new URL(response.headers.get('location'), parsed);
+        const next = new URL(response.headers.get('location'), currentUrl);
         if ((next.protocol !== 'http:' && next.protocol !== 'https:') ||
             next.username || next.password ||
             isPrivateHostname(next.hostname)) {
@@ -132,11 +176,12 @@ export async function onRequest(context) {
                 headers: { 'Content-Type': 'application/json' }
             });
         }
-        response = await fetch(next.toString(), { redirect: 'manual' });
+        currentUrl = next;
+        response = await fetchTarget(currentUrl);
         hops++;
     }
 
-    const headers = new Headers(response.headers);
+    const headers = createProxyHeaders(response.headers);
     return new Response(response.body, {
         headers: headers,
         status: response.status
