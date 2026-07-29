@@ -23,6 +23,7 @@ import {
     transformImageRequestViaUrl,
     transformImageResponse,
     validateImageTransformRequest,
+    validateImageTransformSource,
 } from './imageTransform.js';
 
 
@@ -88,6 +89,14 @@ export async function onRequest(context) {  // Contents of context object
     let accessRes = await returnWithCheck(context, imgRecord);
     if (accessRes.status !== 200) {
         return accessRes; // 如果不可访问，直接返回
+    }
+
+    const imageSourceValidation = validateImageTransformSource(context.imageTransform, env, fileType, fileName);
+    if (imageSourceValidation?.response) {
+        return imageSourceValidation.response;
+    }
+    if (imageSourceValidation?.fallbackToOriginal) {
+        context.imageTransform = { requested: false };
     }
 
     // 未配置原生图片处理器时，通过同域名原图 URL 调用 Cloudflare
