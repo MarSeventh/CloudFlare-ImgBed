@@ -1,0 +1,11 @@
+{
+  "name": "@cloudflare-imgbed/server",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@hono/node-server": "^1.13.8",
+    "better-sqlite3": "^11.9.1",
+    "hono": "^4.7.4",
+    "sharp": "0.34.5"
+  }
+}

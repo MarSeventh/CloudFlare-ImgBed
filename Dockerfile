@@ -3,10 +3,13 @@ FROM node:22-slim AS dependencies
 WORKDIR /app
 
 COPY package.json package-lock.json ./
+COPY deploy/common/package.json ./deploy/common/package.json
+COPY deploy/server/package.json ./deploy/server/package.json
+COPY deploy/worker/package.json ./deploy/worker/package.json
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends python3 make g++ && \
-    npm ci --omit=dev --include=optional && \
+    npm ci --workspace=@cloudflare-imgbed/common --workspace=@cloudflare-imgbed/server --omit=dev && \
     rm -rf /root/.npm /var/lib/apt/lists/* /tmp/*
 
 FROM node:22-slim AS runtime

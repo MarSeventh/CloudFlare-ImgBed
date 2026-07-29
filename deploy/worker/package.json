@@ -1,0 +1,9 @@
+{
+  "name": "@cloudflare-imgbed/worker",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@cloudflare/pages-plugin-sentry": "^1.1.3",
+    "@sentry/tracing": "^7.114.0"
+  }
+}
