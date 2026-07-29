@@ -107,27 +107,19 @@ export async function transformImageRequestViaUrl(context) {
     sourceUrl.searchParams.delete('height');
     sourceUrl.searchParams.delete('fit');
 
-    const sourceHeaders = new Headers(request.headers);
-    for (const name of [
-        'If-Match',
-        'If-Modified-Since',
-        'If-None-Match',
-        'If-Range',
-        'If-Unmodified-Since',
-        'Range',
-    ]) {
-        sourceHeaders.delete(name);
-    }
+    const transformOptions = Object.entries(imageTransform.options)
+        .map(([name, value]) => `${name}=${encodeURIComponent(value)}`)
+        .join(',');
+    const transformUrl = new URL(
+        `/cdn-cgi/image/${transformOptions}${sourceUrl.pathname}${sourceUrl.search}`,
+        sourceUrl.origin
+    );
 
     try {
-        return await fetch(new Request(sourceUrl, {
+        return await fetch(new Request(transformUrl, {
             method: 'GET',
-            headers: sourceHeaders,
-        }), {
-            cf: {
-                image: imageTransform.options,
-            },
-        });
+            headers: request.headers,
+        }));
     } catch (error) {
         console.error('URL image transformation failed:', error);
         return imageTransformError(
