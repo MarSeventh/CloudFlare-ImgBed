@@ -97,14 +97,37 @@ export function handleHeadRequest(headers, etag = null) {
     });
 }
 
+const UPSTREAM_FILE_REQUEST_HEADERS = [
+    'Range',
+    'If-Range',
+    'If-Match',
+    'If-None-Match',
+    'If-Modified-Since',
+    'If-Unmodified-Since',
+];
+
+function buildUpstreamFileRequestHeaders(requestHeaders) {
+    const headers = new Headers();
+
+    for (const headerName of UPSTREAM_FILE_REQUEST_HEADERS) {
+        const value = requestHeaders.get(headerName);
+        if (value !== null) {
+            headers.set(headerName, value);
+        }
+    }
+
+    return headers;
+}
+
 export async function getFileContent(request, targetUrl, max_retries = 2) {
+    const method = request.method === 'HEAD' ? 'HEAD' : 'GET';
+    const headers = buildUpstreamFileRequestHeaders(request.headers);
     let retries = 0;
     while (retries <= max_retries) {
         try {
             const response = await fetch(targetUrl, {
-                method: request.method,
-                headers: request.headers,
-                body: request.body,
+                method,
+                headers,
             });
             if (response.ok || response.status === 304) {
                 return response;
