@@ -7,10 +7,8 @@ const OUTPUT_FORMATS = new Map([
     ['image/png', 'image/png'],
     ['image/webp', 'image/webp'],
     ['image/avif', 'image/avif'],
-    // Images binding does not encode GIF or SVG. WebP preserves GIF animation
-    // while PNG preserves SVG transparency.
-    ['image/gif', 'image/webp'],
-    ['image/svg+xml', 'image/png'],
+    ['image/gif', 'image/gif'],
+    ['image/svg+xml', 'image/svg+xml'],
 ]);
 
 export function parseImageTransform(url, accessConfig = {}) {

@@ -20,6 +20,18 @@ sharp.concurrency(concurrency);
 export const dockerImageProcessor = {
     async transform(stream, options) {
         const input = await readStreamWithLimit(stream, MAX_INPUT_BYTES);
+
+        // SVG is inherently scalable. Keep the source document unchanged,
+        // matching Cloudflare Image Transformations behavior.
+        if (options.sourceType === 'image/svg+xml') {
+            return new Response(input, {
+                headers: {
+                    'Content-Type': options.sourceType,
+                    'Content-Length': input.byteLength.toString(),
+                },
+            });
+        }
+
         const animated = options.sourceType === 'image/gif' || options.sourceType === 'image/webp';
 
         let pipeline = sharp(input, {
@@ -62,6 +74,8 @@ function applyOutputFormat(pipeline, outputFormat) {
             return pipeline.webp();
         case 'image/avif':
             return pipeline.avif();
+        case 'image/gif':
+            return pipeline.gif();
         default:
             throw new Error(`Unsupported Docker image output format: ${outputFormat}`);
     }
