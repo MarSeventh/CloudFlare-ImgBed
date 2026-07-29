@@ -4,9 +4,7 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "deploy/common",
-    "deploy/server",
-    "deploy/worker"
+    "deploy/profiles/*"
   ],
   "scripts": {
     "ci-test": "concurrently --kill-others \"npm start\" \"wait-on http://localhost:8080 && mocha\"",

@@ -3,9 +3,7 @@ FROM node:22-slim AS dependencies
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-COPY deploy/common/package.json ./deploy/common/package.json
-COPY deploy/server/package.json ./deploy/server/package.json
-COPY deploy/worker/package.json ./deploy/worker/package.json
+COPY deploy/profiles ./deploy/profiles
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends python3 make g++ && \
@@ -24,6 +22,7 @@ ENV NODE_ENV=production
 
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY package.json ./
+COPY deploy/profiles ./deploy/profiles
 COPY frontend-dist ./frontend-dist
 COPY functions ./functions
 COPY database ./database

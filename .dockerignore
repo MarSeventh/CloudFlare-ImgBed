@@ -10,8 +10,7 @@ Dockerfile
 .wrangler
 data
 readme
-deploy/worker/*
-!deploy/worker/package.json
+deploy/worker
 docker-compose.yml
 wrangler.toml
 *.md
