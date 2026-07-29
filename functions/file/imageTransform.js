@@ -115,18 +115,13 @@ export async function transformImageRequestViaUrl(context) {
         sourceUrl.origin
     );
 
-    try {
-        return await fetch(new Request(transformUrl, {
-            method: 'GET',
-            headers: request.headers,
-        }));
-    } catch (error) {
-        console.error('URL image transformation failed:', error);
-        return imageTransformError(
-            `Image transformation failed: ${error.message || 'unknown error'}`,
-            422
-        );
-    }
+    return new Response(null, {
+        status: 302,
+        headers: {
+            'Location': transformUrl.toString(),
+            'Cache-Control': 'private, no-store, max-age=0',
+        },
+    });
 }
 
 export async function transformImageResponse(context, response) {
