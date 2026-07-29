@@ -273,7 +273,15 @@ function canTransformImageType(env, sourceType) {
         return false;
     }
 
-    return sourceType !== 'image/gif' || hasConfiguredStreamImageProcessor(env);
+    if (sourceType === 'image/gif') {
+        return hasConfiguredStreamImageProcessor(env);
+    }
+
+    if (sourceType === 'image/avif') {
+        return hasConfiguredImageProcessor(env);
+    }
+
+    return true;
 }
 
 function parseDimension(searchParams, name) {
