@@ -90,6 +90,53 @@ export function validateImageTransformRequest(request, imageTransform) {
     return null;
 }
 
+export async function transformImageRequestViaUrl(context) {
+    const { env, imageTransform, request } = context;
+    if (!imageTransform?.requested || hasConfiguredImageProcessor(env)) {
+        return null;
+    }
+
+    // Image Resizing fetches the source through this same file route. Never
+    // start another transformation for that internal source request.
+    if (/image-resizing/i.test(request.headers.get('Via') || '')) {
+        return null;
+    }
+
+    const sourceUrl = new URL(request.url);
+    sourceUrl.searchParams.delete('width');
+    sourceUrl.searchParams.delete('height');
+    sourceUrl.searchParams.delete('fit');
+
+    const sourceHeaders = new Headers(request.headers);
+    for (const name of [
+        'If-Match',
+        'If-Modified-Since',
+        'If-None-Match',
+        'If-Range',
+        'If-Unmodified-Since',
+        'Range',
+    ]) {
+        sourceHeaders.delete(name);
+    }
+
+    try {
+        return await fetch(new Request(sourceUrl, {
+            method: 'GET',
+            headers: sourceHeaders,
+        }), {
+            cf: {
+                image: imageTransform.options,
+            },
+        });
+    } catch (error) {
+        console.error('URL image transformation failed:', error);
+        return imageTransformError(
+            `Image transformation failed: ${error.message || 'unknown error'}`,
+            422
+        );
+    }
+}
+
 export async function transformImageResponse(context, response) {
     const imageTransform = context.imageTransform;
     if (!imageTransform?.requested || response.status !== 200 || !response.body) {
@@ -157,6 +204,16 @@ async function runImageTransform(env, stream, options, sourceType, outputFormat)
     const error = new Error('no image processor is configured');
     error.statusCode = 501;
     throw error;
+}
+
+function hasConfiguredImageProcessor(env) {
+    const images = env?.IMAGES;
+    if (images && typeof images.input === 'function') {
+        return true;
+    }
+
+    const processor = env?.IMAGE_PROCESSOR;
+    return Boolean(processor && typeof processor.transform === 'function');
 }
 
 function parseDimension(searchParams, name) {

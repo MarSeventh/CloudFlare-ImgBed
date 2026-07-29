@@ -20,6 +20,7 @@ import {
 import { buildCdnFileUrl } from '../utils/metadata/metadataView.js';
 import {
     parseImageTransform,
+    transformImageRequestViaUrl,
     transformImageResponse,
     validateImageTransformRequest,
 } from './imageTransform.js';
@@ -87,6 +88,13 @@ export async function onRequest(context) {  // Contents of context object
     let accessRes = await returnWithCheck(context, imgRecord);
     if (accessRes.status !== 200) {
         return accessRes; // 如果不可访问，直接返回
+    }
+
+    // 未配置原生图片处理器时，通过同域名原图 URL 调用 Cloudflare
+    // Image Transformations。Worker 和 Docker 仍使用原有处理器。
+    const urlTransformResponse = await transformImageRequestViaUrl(context);
+    if (urlTransformResponse) {
+        return urlTransformResponse;
     }
 
     /* Cloudflare R2渠道 */
