@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   imgbed:
     image: marseventh/cloudflare-imgbed:latest
