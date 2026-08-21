@@ -22,6 +22,8 @@
     <link href="./css/chunk-vendors.f9cd4701.css" rel="stylesheet">
     <link href="./css/app.75711fde.css" rel="stylesheet">
 
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
     <style>
         /* * [防御性 CSS] 
          * 因为 Vue app 自己的 CSS 可能会把整个网页背景变成白色，
@@ -34,6 +36,14 @@
 
         /* * 给图床应用创造一个独立的“沙盒”空间，
          * 保证它内部的颜色和布局正常显示，不受外部赛博风格干扰。
+
+        /* 必须在绝对的第一行引入字体 */
+        /* @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap'); */
+
+        /* 全局字体应用规则 (排除图标) */
+        *:not(i) {
+            font-family: 'JetBrains Mono' !important;
+        }
          */
         #app-sandbox {
             width: 100%;
