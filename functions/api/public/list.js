@@ -106,10 +106,9 @@ async function getPublicFileList(context, url, dir, recursive) {
     await cache.put(cacheKey, new Response(JSON.stringify(cacheData), {
         headers: {
             "Content-Type": "application/json",
+            "Cache-Control": "public, max-age=86400",
         }
-    }), {
-        expirationTtl: 24 * 60 * 60
-    });
+    }));
 
     cacheData.fromCache = false;
     return cacheData;
