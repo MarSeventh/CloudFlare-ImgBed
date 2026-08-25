@@ -18,8 +18,8 @@ export async function onRequest(context) {
             } catch (error) {
                 userConfig[config.id] = config.value;
             }
-        } else if (config.type === 'boolean' && config.default !== undefined) {
-            // 布尔类型使用默认值
+        } else if (config.default !== undefined) {
+            // 未配置的项目使用其声明的默认值
             userConfig[config.id] = config.default;
         }
     }
