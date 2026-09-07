@@ -105,10 +105,11 @@ jobs:
       - name: Generate wrangler config
         if: steps.check.outputs.skip != 'true'
         env:
-          WORKER_NAME: ${{ inputs.worker_name || secrets.WORKER_NAME }}
+          # 當分支是 uat 時，覆蓋為 UAT 專用名稱與 ID
+          WORKER_NAME: ${{ github.ref == 'refs/heads/uat' && 'imgbed-uat' || (inputs.worker_name || secrets.WORKER_NAME) }}
           D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
-          KV_NAMESPACE_ID: ${{ secrets.KV_NAMESPACE_ID }}
-          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          KV_NAMESPACE_ID: ${{ github.ref == 'refs/heads/uat' && secrets.KV_NAMESPACE_ID_UAT || secrets.KV_NAMESPACE_ID }}
+          R2_BUCKET_NAME: ${{ github.ref == 'refs/heads/uat' && 'imgbed-uat' || secrets.R2_BUCKET_NAME }}
           WORKER_VARS: ${{ secrets.WORKER_VARS }}
         run: node deploy/worker/generate-toml.js
 
