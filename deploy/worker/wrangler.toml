@@ -42,3 +42,5 @@ bucket_name = "imgbed_uat"
 [[kv_namespaces]]
 binding = "img_url_uat"
 id = "7568869479e64aa4b4019f2f11dda8d1"
+
+
