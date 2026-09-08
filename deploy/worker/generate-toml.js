@@ -62,11 +62,15 @@ bucket_name = "${env.R2_BUCKET_NAME}"
 `;
 }
 
-// 业务环境变量（从 JSON 解析）
+// 業務环境变量（从 JSON 解析）
 if (env.WORKER_VARS) {
     try {
         const vars = JSON.parse(env.WORKER_VARS);
-        const entries = Object.entries(vars);
+        
+        // 關鍵修復：濾除不應該放在 [vars] 純字串區塊的資源綁定 Key
+        const systemKeys = ['KV_NAMESPACE_ID', 'R2_BUCKET_NAME', 'D1_DATABASE_ID', 'WORKER_NAME'];
+        const entries = Object.entries(vars).filter(([key]) => !systemKeys.includes(key));
+
         if (entries.length > 0) {
             toml += '\n[vars]\n';
             for (const [key, value] of entries) {
