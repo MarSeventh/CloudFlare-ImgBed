@@ -42,4 +42,3 @@ binding = "IMAGES"
 # [[kv_namespaces]]
 # binding = "img_url"
 # id = ""
-
