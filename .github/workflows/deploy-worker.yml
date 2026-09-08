@@ -107,8 +107,8 @@ jobs:
         env:
           WORKER_NAME: ${{ github.ref_name == 'uat' && 'imgbed-uat' || (inputs.worker_name || secrets.WORKER_NAME) }}
           D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
-          KV_NAMESPACE_ID: ${{ github.ref_name == 'uat' && '7568869479e64aa4b4019f2f11dda8d1' || secrets.KV_NAMESPACE_ID }}
-          R2_BUCKET_NAME: ${{ github.ref_name == 'uat' && 'imgbed-uat' || secrets.R2_BUCKET_NAME }}
+          KV_NAMESPACE_ID: ${{ github.ref_name == 'uat' && secrets.UAT_KV_NAMESPACE_ID || secrets.KV_NAMESPACE_ID }}
+          R2_BUCKET_NAME: ${{ github.ref_name == 'uat' && secrets.UAT_R2_BUCKET_NAME || secrets.R2_BUCKET_NAME }}
           WORKER_VARS: ${{ secrets.WORKER_VARS }}
         run: node deploy/worker/generate-toml.js
 
