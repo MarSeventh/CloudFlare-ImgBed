@@ -36,37 +36,43 @@ CloudFlare ImgBed is a self-hosted image and file hosting solution for Docker an
 
 <table width="100%">
   <tr>
-    <td align="center" width="20%">
+    <td align="center" width="16.67%">
       <strong><a href="https://www.cloudflare.com/">Cloudflare</a></strong>
     </td>
-    <td align="center" width="20%">
+    <td align="center" width="16.67%">
       <strong><a href="https://edgeone.ai/?from=github">EdgeOne</a></strong>
     </td>
-    <td align="center" width="20%">
+    <td align="center" width="16.67%">
+      <strong><a href="https://www.packyapi.ai/register?aff=u0Ka">PackyCode</a></strong>
+    </td>
+    <td align="center" width="16.67%">
       <strong><a href="https://www.hncloud.com/activity/activity_2026summer.html?k=MarSeventh">HuaNa Cloud</a></strong>
     </td>
-    <td align="center" width="20%">
+    <td align="center" width="16.67%">
       <strong><a href="https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC">SuWei Cloud</a></strong>
     </td>
-    <td align="center" width="20%">
+    <td align="center" width="16.67%">
       <strong><a href="https://linux.do/t/topic/2578561">Linux DO</a></strong>
     </td>
   </tr>
   <tr>
-    <td align="center"><a href="https://www.cloudflare.com/"><img src="readme/cloudflare-logo.png" alt="Cloudflare logo" height="25"></a></td>
-    <td align="center"><a href="https://edgeone.ai/?from=github"><img src="readme/edgeone-logo.png" alt="EdgeOne logo" height="25"></a></td>
-    <td align="center"><a href="https://www.hncloud.com/activity/activity_2026summer.html?k=MarSeventh"><img src="readme/hncloud-logo.png" alt="HuaNa Cloud logo" height="25"></a></td>
-    <td align="center"><a href="https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC"><img src="readme/svyun-logo.png" alt="SuWei Cloud logo" height="25"></a></td>
-    <td align="center"><a href="https://linux.do/t/topic/2578561"><img src="readme/linuxdo-logo.png" alt="Linux DO logo" height="25"></a></td>
+    <td align="center"><a href="https://www.cloudflare.com/"><img src="readme/partners/cloudflare-logo.png" alt="Cloudflare logo" height="25"></a></td>
+    <td align="center"><a href="https://edgeone.ai/?from=github"><picture><source media="(prefers-color-scheme: dark)" srcset="readme/partners/edgeone-logo-dark.png"><img src="readme/partners/edgeone-logo.png" alt="EdgeOne logo" height="25"></picture></a></td>
+    <td align="center"><a href="https://www.packyapi.ai/register?aff=u0Ka"><picture><source media="(prefers-color-scheme: dark)" srcset="readme/partners/packycode-logo-dark.png"><img src="readme/partners/packycode-logo.png" alt="PackyCode logo" height="25"></picture></a></td>
+    <td align="center"><a href="https://www.hncloud.com/activity/activity_2026summer.html?k=MarSeventh"><picture><source media="(prefers-color-scheme: dark)" srcset="readme/partners/hncloud-logo-dark.png"><img src="readme/partners/hncloud-logo.png" alt="HuaNa Cloud logo" height="25"></picture></a></td>
+    <td align="center"><a href="https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC"><picture><source media="(prefers-color-scheme: dark)" srcset="readme/partners/svyun-logo-dark.png"><img src="readme/partners/svyun-logo.png" alt="SuWei Cloud logo" height="25"></picture></a></td>
+    <td align="center"><a href="https://linux.do/t/topic/2578561"><picture><source media="(prefers-color-scheme: dark)" srcset="readme/partners/linuxdo-logo.png"><img src="readme/partners/linuxdo-logo-light.png" alt="Linux DO logo" height="25"></picture></a></td>
   </tr>
   <tr>
     <td align="center"><sub>Provides CDN acceleration and security protection</sub></td>
     <td align="center"><sub>Provides CDN acceleration and security protection</sub></td>
+    <td align="center"><sub>Provides comprehensive, highly available API services for leading AI models, with RMB top-ups at a 1:1 rate. New users receive a first top-up discount and free credits.</sub></td>
     <td align="center"><sub>Provides stable and high-quality cloud computing resources</sub></td>
     <td align="center"><sub>Provides stable and high-quality cloud computing resources</sub></td>
     <td align="center"><sub>Provides community support</sub></td>
   </tr>
 </table>
+
 
 # 2. 🖥️ Demo
 
