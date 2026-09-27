@@ -66,7 +66,7 @@ CloudFlare ImgBed is a self-hosted image and file hosting solution for Docker an
   <tr>
     <td align="center"><sub>Provides CDN acceleration and security protection</sub></td>
     <td align="center"><sub>Provides CDN acceleration and security protection</sub></td>
-    <td align="center"><sub>Provides comprehensive, highly available API services for leading AI models, with RMB top-ups at a 1:1 rate. New users receive a first top-up discount and free credits.</sub></td>
+    <td align="center"><sub>Provides highly available API services for leading AI models. New users receive a first top-up discount and free credits.</sub></td>
     <td align="center"><sub>Provides stable and high-quality cloud computing resources</sub></td>
     <td align="center"><sub>Provides stable and high-quality cloud computing resources</sub></td>
     <td align="center"><sub>Provides community support</sub></td>
