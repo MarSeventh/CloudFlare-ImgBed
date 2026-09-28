@@ -23,17 +23,17 @@ export async function onRequest(context) {  // Contents of context object
     context.url = url;
 
     // 读取各项配置，存入 context
-    const securityConfig = await fetchSecurityConfig(env);
-    const uploadConfig = await fetchUploadConfig(env, context);
-
-    context.securityConfig = securityConfig;
-    context.uploadConfig = uploadConfig;
-
     // 鉴权
     const requiredPermission = 'upload';
     if (!await userAuthCheck(env, url, request, requiredPermission)) {
         return UnauthorizedResponse('Unauthorized');
     }
+
+    const securityConfig = await fetchSecurityConfig(env);
+    const uploadConfig = await fetchUploadConfig(env, context);
+
+    context.securityConfig = securityConfig;
+    context.uploadConfig = uploadConfig;
 
     // 获得上传IP
     const uploadIp = getUploadIp(request);
