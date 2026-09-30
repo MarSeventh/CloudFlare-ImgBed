@@ -1,6 +1,8 @@
 services:
   imgbed:
     image: marseventh/cloudflare-imgbed:latest
+    # environment:
+    #   AI_CONFIG_SECRET: "" # 填写至少 32 个字符的随机密钥，用于加密保存 AI 供应商 API Key
     ports:
       - "7658:8080"
     volumes:

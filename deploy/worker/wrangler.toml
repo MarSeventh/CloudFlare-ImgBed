@@ -27,6 +27,7 @@ not_found_handling = "single-page-application"
 binding = "IMAGES"
 
 [vars]
+# AI_CONFIG_SECRET = "" # 至少 32 个字符的随机密钥，用于加密保存 AI 供应商 API Key
 # TG_BOT_TOKEN = ""
 # TG_CHAT_ID = ""
 

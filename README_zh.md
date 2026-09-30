@@ -28,7 +28,7 @@
 
 # 1. 💡 项目介绍
 
-CloudFlare ImgBed 是支持 Docker 与 Serverless 部署的自建图床和文件托管方案，可将 **Telegram**、**Discord**、**Cloudflare R2**、**S3 兼容存储**、**Hugging Face**、**WebDAV** 等渠道统一接入一个管理界面。项目提供文件管理、身份认证、目录组织、内容审核、RESTful API 与 WebDAV，适用于个人图床、网站资源管理和轻量文件分发。 **[查看完整功能 →](https://cfbed.sanyue.de/guide/features.html)**
+CloudFlare ImgBed 是支持 Docker 与 Serverless 部署的自建图床和文件托管方案，可将 **Telegram**、**Discord**、**Cloudflare R2**、**S3 兼容存储**、**Hugging Face**、**WebDAV** 等渠道统一接入一个管理界面。项目提供文件管理、身份认证、目录组织、内容审核、RESTful API 与 WebDAV，同时也在不断增加 AI 驱动的图片标签识别等个性化能力，适用于个人图床、网站资源管理和轻量文件分发。 **[查看完整功能 →](https://cfbed.sanyue.de/guide/features.html)**
 
 ![CloudFlare](readme/海报.png)
 
@@ -66,12 +66,14 @@ CloudFlare ImgBed 是支持 Docker 与 Serverless 部署的自建图床和文件
   <tr>
     <td align="center"><sub>提供 CDN 加速及安全防护</sub></td>
     <td align="center"><sub>提供 CDN 加速及安全防护</sub></td>
-    <td align="center"><sub>提供全面、高可用性的顶级大模型 API 服务，人民币 1:1 充值，新用户立享首充折扣与免费额度</sub></td>
-    <td align="center"><sub>提供稳定、优质的云计算资源</sub></td>
-    <td align="center"><sub>提供稳定、优质的云计算资源</sub></td>
+    <td align="center"><sub>提供稳定、高性价比的顶级大模型 API 服务，一站搞定文案、图片和代码，通过本项目链接注册立享充值折扣与免费额度！</sub></td>
+    <td align="center"><sub>提供稳定、优质的云计算资源，通过本项目链接注册立享超值优惠！</sub></td>
+    <td align="center"><sub>提供稳定、优质的云计算资源，通过本项目链接注册立享超值优惠！</sub></td>
     <td align="center"><sub>提供社区支持</sub></td>
   </tr>
 </table>
+
+
 
 
 # 2. 🖥️ 在线演示

@@ -20,6 +20,8 @@ import * as apiManageBatchIndexChunk from '../../functions/api/manage/batch/inde
 import * as apiManageBatchIndexConfig from '../../functions/api/manage/batch/index/config.js';
 import * as apiManageBatchIndexFinalize from '../../functions/api/manage/batch/index/finalize.js';
 import * as apiManageBatchRestoreChunk from '../../functions/api/manage/batch/restore/chunk.js';
+import * as apiManageAiTags from '../../functions/api/manage/ai/tags.js';
+import * as apiManageAiTest from '../../functions/api/manage/ai/test.js';
 import * as apiManageBatchList from '../../functions/api/manage/batch/list.js';
 import * as apiManageBatchSettings from '../../functions/api/manage/batch/settings.js';
 import * as apiManageCusConfigBlockip from '../../functions/api/manage/cusConfig/blockip.js';
@@ -28,10 +30,12 @@ import * as apiManageCusConfigFiles from '../../functions/api/manage/cusConfig/f
 import * as apiManageCusConfigList from '../../functions/api/manage/cusConfig/list.js';
 import * as apiManageCusConfigWhiteip from '../../functions/api/manage/cusConfig/whiteip.js';
 import * as apiManageDeleteBatch from '../../functions/api/manage/delete/batch.js';
+import * as apiManageSysConfigAi from '../../functions/api/manage/sysConfig/ai.js';
 import * as apiManageSysConfigOthers from '../../functions/api/manage/sysConfig/others.js';
 import * as apiManageSysConfigPage from '../../functions/api/manage/sysConfig/page.js';
 import * as apiManageSysConfigSecurity from '../../functions/api/manage/sysConfig/security.js';
 import * as apiManageSysConfigUpload from '../../functions/api/manage/sysConfig/upload.js';
+import * as apiManageTagsApply from '../../functions/api/manage/tags/apply.js';
 import * as apiManageTagsAutocomplete from '../../functions/api/manage/tags/autocomplete.js';
 import * as apiManageTagsBatch from '../../functions/api/manage/tags/batch.js';
 import * as apiAuthAdminLogin from '../../functions/api/auth/adminLogin.js';
@@ -71,6 +75,8 @@ const routes = [
     { path: '/api/manage/batch/index/config', module: apiManageBatchIndexConfig, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/manage/batch/index/finalize', module: apiManageBatchIndexFinalize, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/manage/batch/restore/chunk', module: apiManageBatchRestoreChunk, middlewares: [mw_api, mw_api_manage] },
+    { path: '/api/manage/ai/tags', module: apiManageAiTags, middlewares: [mw_api, mw_api_manage] },
+    { path: '/api/manage/ai/test', module: apiManageAiTest, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/manage/batch/list', module: apiManageBatchList, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/manage/batch/settings', module: apiManageBatchSettings, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/manage/cusConfig/blockip', module: apiManageCusConfigBlockip, middlewares: [mw_api, mw_api_manage] },
@@ -79,10 +85,12 @@ const routes = [
     { path: '/api/manage/cusConfig/list', module: apiManageCusConfigList, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/manage/cusConfig/whiteip', module: apiManageCusConfigWhiteip, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/manage/delete/batch', module: apiManageDeleteBatch, middlewares: [mw_api, mw_api_manage] },
+    { path: '/api/manage/sysConfig/ai', module: apiManageSysConfigAi, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/manage/sysConfig/others', module: apiManageSysConfigOthers, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/manage/sysConfig/page', module: apiManageSysConfigPage, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/manage/sysConfig/security', module: apiManageSysConfigSecurity, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/manage/sysConfig/upload', module: apiManageSysConfigUpload, middlewares: [mw_api, mw_api_manage] },
+    { path: '/api/manage/tags/apply', module: apiManageTagsApply, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/manage/tags/autocomplete', module: apiManageTagsAutocomplete, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/manage/tags/batch', module: apiManageTagsBatch, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/auth/adminLogin', module: apiAuthAdminLogin, middlewares: [mw_api] },

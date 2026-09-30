@@ -62,13 +62,18 @@ bucket_name = "${env.R2_BUCKET_NAME}"
 `;
 }
 
+toml += `
+[vars]
+# AI_CONFIG_SECRET = "" # 至少 32 个字符的随机密钥，用于加密保存 AI 供应商 API Key
+# Workers 生产环境：npx wrangler secret put AI_CONFIG_SECRET --config deploy/worker/wrangler.toml
+`;
+
 // 业务环境变量（从 JSON 解析）
 if (env.WORKER_VARS) {
     try {
         const vars = JSON.parse(env.WORKER_VARS);
         const entries = Object.entries(vars);
         if (entries.length > 0) {
-            toml += '\n[vars]\n';
             for (const [key, value] of entries) {
                 toml += `${key} = "${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\n`;
             }

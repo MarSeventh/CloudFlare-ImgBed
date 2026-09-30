@@ -48,13 +48,11 @@ function UnauthorizedException(reason) {
  * @returns {string} 需要的权限类型
  */
 function extractRequiredPermission(pathname) {
-  const pathParts = pathname.toLowerCase().split('/');
-
-  if (pathParts.includes('delete')) {
+  const path = pathname.toLowerCase().replace(/\/$/, '');
+  if (path === '/api/manage/delete' || path.startsWith('/api/manage/delete/')) {
     return 'delete';
   }
-
-  if (pathParts.includes('list')) {
+  if (path === '/api/manage/list' || path.startsWith('/api/manage/list/') || path === '/api/manage/batch/list') {
     return 'list';
   }
 
