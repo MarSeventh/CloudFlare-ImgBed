@@ -1,7 +1,7 @@
 import { createAIContext } from '../../../utils/ai/index.js';
 import { getDatabase } from '../../../utils/databaseAdapter.js';
 import { APIError, json, readBoundedBody, errorResult, errorResponse } from '../../../utils/apiResponse.js';
-import { validateFileId, fileIdentity } from '../../../services/tags.js';
+import { validateFileId, fileIdentity } from '../../../utils/tagService.js';
 
 const MAX_IMAGE_BYTES = 256 * 1024;
 const ORIGINAL_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif']);

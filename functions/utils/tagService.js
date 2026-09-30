@@ -1,9 +1,9 @@
-import { getDatabase } from '../utils/databaseAdapter.js';
-import { batchAddFilesToIndex } from '../utils/indexManager.js';
-import { cleanPersistedMetadata } from '../utils/metadata/metadataSecurity.js';
-import { mergeTags, validateTag } from '../utils/tagHelpers.js';
-import { purgePublicFileListCache, purgeRandomFileListCache } from '../utils/purgeCache.js';
-import { APIError, errorResult } from '../utils/apiResponse.js';
+import { getDatabase } from './databaseAdapter.js';
+import { batchAddFilesToIndex } from './indexManager.js';
+import { cleanPersistedMetadata } from './metadata/metadataSecurity.js';
+import { mergeTags, validateTag } from './tagHelpers.js';
+import { purgePublicFileListCache, purgeRandomFileListCache } from './purgeCache.js';
+import { APIError, errorResult } from './apiResponse.js';
 
 const encoder = new TextEncoder();
 export function validateFileId(fileId) {

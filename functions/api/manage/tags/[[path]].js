@@ -1,5 +1,5 @@
 import { getDatabase } from "../../../utils/databaseAdapter.js";
-import { applyTagItems, validateFileId } from "../../../services/tags.js";
+import { applyTagItems, validateFileId } from "../../../utils/tagService.js";
 import { APIError, json, readJSON, errorResponse } from "../../../utils/apiResponse.js";
 
 export async function onRequest(context) {

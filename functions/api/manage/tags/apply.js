@@ -1,4 +1,4 @@
-import { applyTagItems } from '../../../services/tags.js';
+import { applyTagItems } from '../../../utils/tagService.js';
 import { APIError, json, readJSON, errorResponse } from '../../../utils/apiResponse.js';
 
 export async function onRequestPost(context) {
