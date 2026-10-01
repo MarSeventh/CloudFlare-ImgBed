@@ -26,17 +26,8 @@ on:
 # 可选：
 #   R2_BUCKET_NAME        - R2 存储桶名称
 #   WORKER_NAME           - Worker 名称（默认 cloudflare-imgbed，手动触发时可在界面覆盖）
-#   WORKER_VARS           - JSON 格式的业务环境变量，兼容直接值写法。
-#                           对象写法支持 value 和可选 type（text/secret，默认 text）。
-#                           text 随 Worker 部署，secret 在部署后统一上传为 Cloudflare Secret。
+#   WORKER_VARS           - JSON 格式的业务环境变量，支持 value 和可选 type（text/secret，默认 text）。
 #                           非必要不建议配置，业务设置请在管理面板中配置。
-# 示例（请替换密钥，迁移现有配置时保持密钥值不变）：
-# {
-#   "CUSTOM_DOMAIN": "https://img.example.com",
-#   "TG_CHAT_ID": { "value": "123456", "type": "text" },
-#   "AI_CONFIG_SECRET": { "value": "至少32个字符的随机密钥", "type": "secret" },
-#   "TG_BOT_TOKEN": { "value": "你的Bot Token", "type": "secret" }
-# }
 
 jobs:
   deploy:
