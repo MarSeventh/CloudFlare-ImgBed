@@ -2,6 +2,7 @@
 data/*
 node_modules
 /wrangler.toml
+/deploy/worker/worker-secrets.json
 .DS_Store
 
 *.sqlite

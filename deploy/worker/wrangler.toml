@@ -5,9 +5,11 @@
 # 1. D1 数据库 - 取消注释并填入你的 database_id
 # 2. R2 存储桶 - 取消注释并填入你的 bucket_name
 # 3. KV 命名空间 - 如果使用 KV 而非 D1，取消注释并填入 id
-# 4. 环境变量 - 在 [vars] 中配置
+# 4. 普通环境变量 - 在 [vars] 中配置；敏感值请使用 wrangler secret put/bulk
 #
-# GitHub Actions 部署时会自动从 Secrets/Variables 生成此文件，
+# GitHub Actions 部署时会自动从 GitHub Secrets 生成此文件，
+# WORKER_VARS 支持 { "变量名": { "value": "值", "type": "text或secret" } }，
+# type 默认为 text，secret 会在部署后统一上传，不写入 [vars]。
 # 无需手动编辑。详见 .github/workflows/deploy-worker.yml
 
 name = "cloudflare-imgbed"
@@ -27,7 +29,7 @@ not_found_handling = "single-page-application"
 binding = "IMAGES"
 
 [vars]
-# AI_CONFIG_SECRET = "" # 至少 32 个字符的随机密钥，用于加密保存 AI 供应商 API Key
+# AI_CONFIG_SECRET 请配置为 Secret，值为至少 32 个字符的随机密钥。
 # TG_BOT_TOKEN = ""
 # TG_CHAT_ID = ""
 
