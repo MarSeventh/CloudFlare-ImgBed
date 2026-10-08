@@ -1,4 +1,5 @@
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import { createS3Client } from '../utils/storage/s3Client.js';
+import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { fetchSecurityConfig } from "../utils/sysConfig";
 import { TelegramAPI } from "../utils/storage/telegramAPI";
 import { DiscordAPI } from "../utils/storage/discordAPI";
@@ -815,15 +816,7 @@ async function handleS3FileViaAPI(context, metadata, encodedFileName, fileType) 
     const db = getDatabase(env);
     const s3Credentials = await resolveS3Credentials(db, env, metadata);
 
-    const s3Client = new S3Client({
-        region: s3Credentials.region || "auto",
-        endpoint: s3Credentials.endpoint,
-        credentials: {
-            accessKeyId: s3Credentials.accessKeyId,
-            secretAccessKey: s3Credentials.secretAccessKey
-        },
-        forcePathStyle: s3Credentials.pathStyle || false
-    });
+    const s3Client = createS3Client(s3Credentials);
 
     const bucketName = s3Credentials.bucketName;
     const key = s3Credentials.key;

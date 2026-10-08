@@ -1,8 +1,9 @@
+import { createS3Client } from '../utils/storage/s3Client.js';
 /* ======= 客户端分块上传处理 ======= */
 import { createResponse, selectConsistentChannel, getUploadIp, getIPAddress, buildUniqueFileId, endUpload } from './uploadTools';
 import { TelegramAPI } from '../utils/storage/telegramAPI';
 import { DiscordAPI } from '../utils/storage/discordAPI';
-import { S3Client, CreateMultipartUploadCommand, UploadPartCommand, AbortMultipartUploadCommand } from "@aws-sdk/client-s3";
+import { CreateMultipartUploadCommand, UploadPartCommand, AbortMultipartUploadCommand } from "@aws-sdk/client-s3";
 import { getDatabase, checkDatabaseConfig } from '../utils/databaseAdapter.js';
 import { fetchPageConfig } from '../utils/sysConfig.js';
 
@@ -475,14 +476,9 @@ async function uploadSingleChunkToS3Multipart(context, chunkData, chunkIndex, to
             return { success: false, error: 'No S3 channel provided' };
         }
 
-        const { endpoint, pathStyle, accessKeyId, secretAccessKey, bucketName, region } = s3Channel;
+        const { bucketName } = s3Channel;
 
-        const s3Client = new S3Client({
-            region: region || "auto",
-            endpoint,
-            credentials: { accessKeyId, secretAccessKey },
-            forcePathStyle: pathStyle
-        });
+        const s3Client = createS3Client(s3Channel);
 
         const multipartKey = `multipart_${uploadId}`;
 
@@ -999,14 +995,9 @@ export async function cleanupFailedMultipartUploads(context, uploadId, uploadCha
             }
 
             if (s3Channel) {
-                const { endpoint, pathStyle, accessKeyId, secretAccessKey, bucketName, region } = s3Channel;
+                const { bucketName } = s3Channel;
 
-                const s3Client = new S3Client({
-                    region: region || "auto",
-                    endpoint,
-                    credentials: { accessKeyId, secretAccessKey },
-                    forcePathStyle: pathStyle
-                });
+                const s3Client = createS3Client(s3Channel);
 
                 await s3Client.send(new AbortMultipartUploadCommand({
                     Bucket: bucketName,

@@ -20,6 +20,7 @@ export async function resolveS3Credentials(db, env, metadata = {}) {
       accessKeyId: channel.accessKeyId,
       secretAccessKey: channel.secretAccessKey,
       cdnDomain: channel.cdnDomain || '',
+      userAgent: channel.userAgent || '',
       key: metadata.S3FileKey,
     };
   }
@@ -32,6 +33,7 @@ export async function resolveS3Credentials(db, env, metadata = {}) {
     accessKeyId: '',
     secretAccessKey: '',
     cdnDomain: '',
+    userAgent: '',
     key: metadata.S3FileKey,
   });
 }

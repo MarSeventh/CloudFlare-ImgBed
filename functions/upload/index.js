@@ -1,3 +1,4 @@
+import { createS3Client } from '../utils/storage/s3Client.js';
 import { userAuthCheck, UnauthorizedResponse } from "../utils/auth/userAuth";
 import { fetchUploadConfig, fetchSecurityConfig, fetchPageConfig } from "../utils/sysConfig";
 import {
@@ -11,7 +12,7 @@ import { TelegramAPI } from "../utils/storage/telegramAPI";
 import { DiscordAPI } from "../utils/storage/discordAPI";
 import { HuggingFaceAPI } from "../utils/storage/huggingfaceAPI";
 import { WebDAVAPI } from "../utils/storage/webdavAPI";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getDatabase } from '../utils/databaseAdapter.js';
 
 
@@ -365,18 +366,10 @@ async function uploadFileToS3(context, fullId, metadata, returnLink) {
         return createResponse('Error: No S3 channel provided', { status: 400 });
     }
 
-    const { endpoint, pathStyle, accessKeyId, secretAccessKey, bucketName, region } = s3Channel;
+    const { bucketName } = s3Channel;
 
     // 创建 S3 客户端
-    const s3Client = new S3Client({
-        region: region || "auto", // R2 可用 "auto"
-        endpoint, // 自定义 S3 端点
-        credentials: {
-            accessKeyId,
-            secretAccessKey
-        },
-        forcePathStyle: pathStyle // 是否启用路径风格
-    });
+    const s3Client = createS3Client(s3Channel);
 
     // 获取文件
     const file = formdata.get("file");

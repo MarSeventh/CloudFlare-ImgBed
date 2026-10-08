@@ -1,7 +1,8 @@
+import { createS3Client } from '../utils/storage/s3Client.js';
 /* ========== 分块合并处理 ========== */
 import { createResponse, getUploadIp, getIPAddress, selectConsistentChannel, buildUniqueFileId, endUpload, sanitizeUploadFolder } from './uploadTools';
 import { retryFailedChunks, cleanupFailedMultipartUploads, checkChunkUploadStatuses, cleanupChunkData, cleanupUploadSession } from './chunkUpload';
-import { S3Client, CompleteMultipartUploadCommand } from "@aws-sdk/client-s3";
+import { CompleteMultipartUploadCommand } from "@aws-sdk/client-s3";
 import { getDatabase } from '../utils/databaseAdapter.js';
 import { fetchPageConfig } from '../utils/sysConfig.js';
 
@@ -342,14 +343,9 @@ async function mergeS3ChunksInfo(context, uploadId, completedChunks, metadata) {
 
         console.log(`Merging S3 chunks for uploadId: ${uploadId}, selected channel: ${s3Channel.name || 'default'}`);
 
-        const { endpoint, pathStyle, accessKeyId, secretAccessKey, bucketName, region } = s3Channel;
+        const { bucketName } = s3Channel;
 
-        const s3Client = new S3Client({
-            region: region || "auto",
-            endpoint,
-            credentials: { accessKeyId, secretAccessKey },
-            forcePathStyle: pathStyle
-        });
+        const s3Client = createS3Client(s3Channel);
 
         const multipartKey = `multipart_${uploadId}`;
 

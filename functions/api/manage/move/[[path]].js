@@ -1,4 +1,5 @@
-import { S3Client, CopyObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { createS3Client } from '../../../utils/storage/s3Client.js';
+import { CopyObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { purgeCFCache, purgeRandomFileListCache, purgePublicFileListCache } from "../../../utils/purgeCache";
 import { moveFileInIndex, batchMoveFilesInIndex } from "../../../utils/indexManager.js";
 import { getDatabase } from '../../../utils/databaseAdapter.js';
@@ -205,15 +206,7 @@ async function moveFile(env, fileId, newFileId, cdnUrl, url) {
 async function moveS3File(env, img, newFileId) {
     const db = getDatabase(env);
     const s3Credentials = await resolveS3Credentials(db, env, img.metadata);
-    const s3Client = new S3Client({
-        region: s3Credentials.region || "auto",
-        endpoint: s3Credentials.endpoint,
-        credentials: {
-            accessKeyId: s3Credentials.accessKeyId,
-            secretAccessKey: s3Credentials.secretAccessKey
-        },
-        forcePathStyle: s3Credentials.pathStyle || false // 是否启用路径风格
-    });
+    const s3Client = createS3Client(s3Credentials);
 
     const bucketName = s3Credentials.bucketName;
     const oldKey = s3Credentials.key;
