@@ -66,16 +66,20 @@ html.entry-loading #app {
   letter-spacing: 0.035em;
   text-align: center;
   overflow-wrap: anywhere;
+  -webkit-font-smoothing: antialiased;
 }
 
 .entry-loader-letter {
   display: inline-block;
   white-space: pre;
+  backface-visibility: hidden;
+  will-change: transform;
   animation: entry-letter-wave var(--entry-wave-duration, 1800ms) ease-in-out infinite;
   animation-delay: var(--letter-delay, 0ms);
 }
 
 .entry-loader-progress {
+  --entry-segment-width: min(64px, 20vw);
   position: relative;
   width: min(220px, 65vw);
   padding-top: 40px;
@@ -89,18 +93,18 @@ html.entry-loading #app {
 }
 
 .entry-loader-bar {
-  width: 100%;
-  height: 100%;
-  border-radius: inherit;
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: var(--entry-segment-width);
+  height: 3px;
+  border-radius: 999px;
   background: var(--entry-accent);
-  transform-origin: left center;
-  transform: scaleX(0);
-  animation: entry-progress-fill 3600ms linear infinite;
 }
 
 .entry-loader-duck-travel {
   position: absolute;
-  inset: 0 0 3px;
+  inset: 0 var(--entry-segment-width) 0 0;
   transform: translateX(0);
   animation: entry-progress-travel 3600ms linear infinite;
 }
@@ -111,6 +115,7 @@ html.entry-loading #app {
   height: 40px;
   overflow: visible;
   color: var(--entry-duck);
+  margin-left: var(--entry-segment-width);
   transform: translateX(-50%);
 }
 
@@ -132,7 +137,6 @@ html.entry-loading #app {
 }
 
 /* 只提升短暂存在的小图层，避免每帧重绘 SVG 内部节点。 */
-.entry-loader-bar,
 .entry-loader-duck-travel,
 .entry-duck-head {
   will-change: transform;
@@ -159,13 +163,8 @@ html.entry-loading #app {
 
 @keyframes entry-letter-wave {
   /* 上浮与回落各占半个周期，首尾速度连续，不在基线长时间停顿。 */
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-5px); }
-}
-
-@keyframes entry-progress-fill {
-  0% { transform: scaleX(0); }
-  100% { transform: scaleX(1); }
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -5px, 0); }
 }
 
 @keyframes entry-progress-travel {
@@ -202,7 +201,6 @@ html.entry-loading #app {
   }
 
   .entry-loader-bar {
-    transform: scaleX(0.5);
     opacity: 0.6;
   }
 

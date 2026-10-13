@@ -8,6 +8,8 @@
   const startedAt = performance.now();
   const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
   let title = '';
+  let titleRevealed = false;
+  let waveStartedAt;
   let titleUpdatedAt = startedAt;
   let completion;
   const animations = new Set();
@@ -41,9 +43,17 @@
       span.style.setProperty('--letter-delay', `${(index / letters.length - 1) * waveDuration}ms`);
       return span;
     }));
-    // 无缓存或配置较晚返回时，名称也渐显，不突然出现在已经亮起的画面中。
-    if (performance.now() - startedAt >= 420 && !motionPreference.matches && typeof name.animate === 'function') {
-      const reveal = name.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 280, easing: 'ease-out' });
+    // 字符共用波浪时间轴，名称更新时保持各字符的动画相位。
+    waveStartedAt ??= document.timeline.currentTime ?? performance.now();
+    name.getAnimations({ subtree: true }).forEach(animation => {
+      if (animation.animationName === 'entry-letter-wave') animation.startTime = waveStartedAt;
+    });
+    // 名称仅在首次就绪时渐显；配置更新保持当前亮度与渐显时间轴。
+    const revealTitle = !titleRevealed && Boolean(nextTitle);
+    if (nextTitle) titleRevealed = true;
+    if (revealTitle && performance.now() - startedAt >= 420 && !motionPreference.matches && typeof name.animate === 'function') {
+      const reveal = name.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 280, easing: 'ease-out', fill: 'backwards' });
+      reveal.startTime = document.timeline.currentTime;
       animations.add(reveal);
       reveal.finished.catch(() => {}).finally(() => {
         reveal.cancel();
@@ -52,20 +62,10 @@
     }
   };
 
-  // 复用 Vuex 持久化的配置，让再次访问时在应用下载前就显示正确名称与主题。
-  try {
-    const cached = JSON.parse(localStorage.getItem('vuex') || '{}');
-    const hour = new Date().getHours();
-    const dark = cached.cusDarkMode && cached.useDarkMode !== null && cached.useDarkMode !== undefined
-      ? cached.useDarkMode
-      : window.matchMedia('(prefers-color-scheme: dark)').matches || hour >= 22 || hour < 6;
-    root.classList.toggle('dark', Boolean(dark));
-    updateConfig(cached.userConfig);
-  } catch {
-    // 隐私模式禁用存储或缓存损坏时，等待最新配置后再显示名称。
-    root.classList.toggle('dark', window.matchMedia('(prefers-color-scheme: dark)').matches);
-    updateConfig(null);
-  }
+  // 主题已在 head 中初始化；缓存与最新配置都独立于背景图和应用脚本。
+  const bootstrap = window.__siteEntryBootstrap;
+  updateConfig(bootstrap?.config);
+  bootstrap?.configReady.then(config => updateConfig(config || bootstrap.config, undefined, true));
 
   const sleep = duration => new Promise(resolve => setTimeout(resolve, duration));
   const preserveAnimations = mutate => {
@@ -112,9 +112,37 @@
       .map(target => ({ ...target, offset: ({ left: [-48, 0], right: [48, 0], down: [0, -36], up: [0, 44] })[target.direction] || [0, 44] }))
       .sort((a, b) => a.rect.top - b.rect.top || a.rect.left - b.rect.left);
 
+    // 毛玻璃容器保持不透明，位移与内容层渐显共用时间轴。
+    // 渐显作用于内容层，避免容器隔断子层的背景采样。
+    const glassAncestors = new Set();
+    elements.forEach(({ element }) => {
+      element.querySelectorAll('*').forEach(child => {
+        const style = getComputedStyle(child);
+        if ((style.backdropFilter || style.webkitBackdropFilter || 'none') === 'none') return;
+        for (let parent = child.parentElement; parent && element.contains(parent); parent = parent.parentElement) {
+          glassAncestors.add(parent);
+        }
+      });
+    });
+    const fadeLayers = element => glassAncestors.has(element)
+      ? Array.from(element.children).flatMap(fadeLayers)
+      : [{ element, opacity: getComputedStyle(element).opacity }];
+    const targets = elements.map(target => ({
+      ...target,
+      layers: fadeLayers(target.element).filter(layer => layer.element === target.element
+        || (Number(layer.opacity) > 0 && layer.element.getClientRects().length > 0))
+    }));
+    const track = animation => {
+      animations.add(animation);
+      animation.finished.catch(() => {}).finally(() => {
+        animation.cancel();
+        animations.delete(animation);
+      });
+    };
+
     // 相邻元素同步进入；其他内容的位移也限制在邻居间距内，防止交错。
     const groupDelays = new Map();
-    elements.forEach(({ element, rect, offset, group }, index) => {
+    targets.forEach(({ element, rect, offset, group, layers }, index) => {
       if (typeof element.animate !== 'function') return;
       let [x, y] = offset;
       elements.forEach(other => {
@@ -130,20 +158,32 @@
       const delay = 100 + Math.min(index * 45, 270);
       if (group && !groupDelays.has(group)) groupDelays.set(group, delay);
       // 独立 translate/scale 保留组件原有 transform（居中、悬停、标题浮动等）。
-      const animation = element.animate([
-        { opacity: 0, translate: `${x}px ${y}px`, scale: '0.97' },
-        { opacity: getComputedStyle(element).opacity, translate: '0px 0px', scale: '1' }
-      ], {
+      const timing = {
         duration: 680,
         delay: group ? groupDelays.get(group) : delay,
         easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
         fill: 'backwards'
-      });
-      animations.add(animation);
-      animation.finished.catch(() => {}).finally(() => {
-        animation.cancel();
-        animations.delete(animation);
-      });
+      };
+      const frames = [
+        { translate: `${x}px ${y}px`, scale: '0.97' },
+        { translate: '0px 0px', scale: '1' }
+      ];
+      if (!glassAncestors.has(element)) {
+        frames[0].opacity = 0;
+        frames[1].opacity = layers[0].opacity;
+      }
+      const movement = element.animate(frames, timing);
+      movement.startTime = document.timeline.currentTime;
+      track(movement);
+      if (glassAncestors.has(element)) {
+        layers.forEach(layer => {
+          if (typeof layer.element.animate !== 'function') return;
+          const fade = layer.element.animate([{ opacity: 0 }, { opacity: layer.opacity }], timing);
+          // 使用完全相同的起点，避免多层渐显之间产生错位。
+          fade.startTime = movement.startTime;
+          track(fade);
+        });
+      }
     });
   };
 
