@@ -175,6 +175,12 @@
       const movement = element.animate(frames, timing);
       movement.startTime = document.timeline.currentTime;
       track(movement);
+      // 持续动画在所属区域飞入完成后启动，避免两段位移叠加。
+      const idleElements = Array.from(element.querySelectorAll('[data-entry-idle]'));
+      idleElements.forEach(idle => { idle.style.animationPlayState = 'paused'; });
+      movement.finished.catch(() => {}).finally(() => {
+        idleElements.forEach(idle => { idle.style.removeProperty('animation-play-state'); });
+      });
       if (glassAncestors.has(element)) {
         layers.forEach(layer => {
           if (typeof layer.element.animate !== 'function') return;
