@@ -1,3 +1,5 @@
+import { IMAGE_TYPES_BY_EXTENSION } from '../utils/mimeTypes.js';
+
 const MAX_IMAGE_DIMENSION = 4096;
 const MAX_IMAGE_INPUT_BYTES = 20 * 1024 * 1024;
 
@@ -8,19 +10,6 @@ const OUTPUT_FORMATS = new Map([
     ['image/webp', 'image/webp'],
     ['image/avif', 'image/avif'],
     ['image/gif', 'image/gif'],
-]);
-
-const IMAGE_TYPES_BY_EXTENSION = new Map([
-    ['jpg', 'image/jpeg'],
-    ['jpeg', 'image/jpeg'],
-    ['jpe', 'image/jpeg'],
-    ['jfif', 'image/jpeg'],
-    ['png', 'image/png'],
-    ['webp', 'image/webp'],
-    ['avif', 'image/avif'],
-    ['gif', 'image/gif'],
-    ['svg', 'image/svg+xml'],
-    ['svgz', 'image/svg+xml'],
 ]);
 
 export function parseImageTransform(url, accessConfig = {}) {

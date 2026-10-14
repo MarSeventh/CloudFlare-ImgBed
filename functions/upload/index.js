@@ -6,6 +6,7 @@ import {
     moderateContent, purgeCDNCache, isBlockedUploadIp, buildUniqueFileId, endUpload, getImageDimensions,
     sanitizeUploadFolder
 } from "./uploadTools";
+import { resolveFileType } from "../utils/mimeTypes";
 import { initializeChunkedUpload, handleChunkUpload, uploadLargeFileToTelegram, handleCleanupRequest } from "./chunkUpload";
 import { handleChunkMerge } from "./chunkMerge";
 import { TelegramAPI } from "../utils/storage/telegramAPI";
@@ -134,8 +135,11 @@ async function processFileUpload(context, formdata = null) {
     // 获取文件信息
     const time = new Date().getTime();
     const file = formdata.get('file');
-    const fileType = file.type;
     let fileName = file.name;
+    // 部分客户端（同步工具、脚本）不提供有效的 Content-Type，按扩展名兜底推断。
+    // 否则图片会被记成 application/octet-stream，导致随机图类型过滤、尺寸提取、
+    // 图片处理校验全部失效。
+    const fileType = resolveFileType(fileName, file.type);
     const fileSizeBytes = file.size; // 文件大小，单位字节
     const fileSize = (fileSizeBytes / 1024 / 1024).toFixed(2); // 文件大小，单位MB
 
