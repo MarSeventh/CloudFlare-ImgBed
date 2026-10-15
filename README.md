@@ -167,6 +167,8 @@ Thank you to every sponsor who supports this project! Your support helps sustain
 
 Thank you to everyone who has contributed code, documentation, ideas, and feedback!
 
+Read the [contribution guide](CONTRIBUTING.md) for repository selection, PR targets, coding conventions and validation requirements.
+
 [![Contributors](https://contrib.rocks/image?repo=Marseventh/Cloudflare-ImgBed)](https://github.com/MarSeventh/CloudFlare-ImgBed/graphs/contributors)
 
 ## ⭐ Star History

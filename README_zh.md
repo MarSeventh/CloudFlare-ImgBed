@@ -169,6 +169,8 @@ CloudFlare ImgBed 是支持 Docker 与 Serverless 部署的自建图床和文件
 
 感谢所有为项目贡献代码、文档、创意和反馈的开发者！
 
+参与前请阅读[贡献指南](CONTRIBUTING.md)（英文），了解仓库分工、PR 目标分支、代码约定和验证要求。
+
 [![贡献者](https://contrib.rocks/image?repo=Marseventh/Cloudflare-ImgBed)](https://github.com/MarSeventh/CloudFlare-ImgBed/graphs/contributors)
 
 ## ⭐ Star 趋势
