@@ -34,9 +34,14 @@ export function memoryDatabase() {
     return {
         records,
         async get(key) { return records.get(key)?.value ?? null; },
-        async getWithMetadata(key) { return records.get(key) ?? null; },
+        async getWithMetadata(key) { return structuredClone(records.get(key) ?? null); },
         async put(key, value, options = {}) { records.set(key, { value, metadata: structuredClone(options.metadata || {}) }); },
         async delete(key) { records.delete(key); },
-        async list({ prefix = '' } = {}) { return { keys: [...records.keys()].filter(key => key.startsWith(prefix)).map(name => ({ name })) }; },
+        async list({ prefix = '' } = {}) {
+            return {
+                keys: [...records.keys()].filter(key => key.startsWith(prefix)).sort().map(name => ({ name, metadata: structuredClone(records.get(name).metadata) })),
+                list_complete: true,
+            };
+        },
     };
 }

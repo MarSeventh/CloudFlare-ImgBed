@@ -2,20 +2,9 @@ import assert from 'node:assert/strict';
 import { File } from 'node:buffer';
 import { loadFunction, memoryDatabase } from './helpers/loadFunction.js';
 import * as responses from '../functions/utils/apiResponse.js';
-import * as fileTools from '../functions/file/fileTools.js';
-import * as imageTransform from '../functions/file/imageTransform.js';
-import * as adaptive from '../functions/random/adaptive.js';
+import { png } from './helpers/files.js';
 
-function png() {
-    const bytes = new Uint8Array(24);
-    bytes.set([137, 80, 78, 71]);
-    const view = new DataView(bytes.buffer);
-    view.setUint32(16, 400);
-    view.setUint32(20, 200);
-    return bytes;
-}
-
-describe('MIME flow integration', () => {
+describe('upload', () => {
     let db, tools, mocks, storage, waits;
 
     beforeEach(async () => {
@@ -23,6 +12,7 @@ describe('MIME flow integration', () => {
         storage = {};
         waits = [];
         tools = await loadFunction('functions/upload/uploadTools.js', { getDatabase: () => db });
+        const { UnauthorizedResponse } = await loadFunction('functions/utils/auth/userAuth.js');
         mocks = {
             ...tools,
             ...responses,
@@ -38,6 +28,7 @@ describe('MIME flow integration', () => {
             }),
             fetchPageConfig: async () => ({ config: [] }),
             userAuthCheck: async () => true,
+            UnauthorizedResponse,
             isBlockedUploadIp: async () => false,
             getIPAddress: async () => '',
             getUploadIp: () => '',
@@ -77,6 +68,45 @@ describe('MIME flow integration', () => {
             securityConfig: { upload: { moderate: { enabled: false } } },
         };
     }
+
+    it('requires upload permission before parsing a file or writing to storage', async () => {
+        const route = await loadFunction('functions/upload/index.js', {
+            ...mocks,
+            userAuthCheck: async (env, url, request, permission) => {
+                assert.equal(permission, 'upload');
+                return false;
+            },
+        });
+        const response = await route.onRequest(context('https://test/upload?uploadChannel=cfr2'));
+        assert.equal(response.status, 401);
+        assert.equal(response.headers.get('Cache-Control'), 'no-store');
+        assert.equal(db.records.size, 0);
+        assert.deepEqual(storage, {});
+    });
+
+    it('blocks forbidden upload IPs before parsing or storing a file', async () => {
+        const route = await loadFunction('functions/upload/index.js', { ...mocks, isBlockedUploadIp: async () => true });
+        const response = await route.onRequest(context('https://test/upload?uploadChannel=cfr2'));
+        assert.equal(response.status, 403);
+        assert.equal(db.records.size, 0);
+        assert.deepEqual(storage, {});
+    });
+
+    it('sanitizes destination directories and avoids overwriting duplicate original filenames', async () => {
+        const route = await loadFunction('functions/upload/index.js', mocks);
+        await db.put('_/photos/photo.png', 'existing', { metadata: { FileName: 'keep.png' } });
+        const form = new FormData();
+        form.set('file', new File([png()], 'photo.png', { type: 'image/png' }));
+        const response = await route.onRequest(context('https://test/upload?uploadChannel=cfr2&uploadNameType=origin&uploadFolder=..%2Fphotos%2F%2F', form));
+        assert.equal(response.status, 200);
+        assert.equal(decodeURI((await response.json())[0].src), '/file/_/photos/photo(1).png');
+        const record = await db.getWithMetadata('_/photos/photo(1).png');
+        assert.equal(record.metadata.Directory, '_/photos/');
+        assert.equal(record.metadata.FileName, 'photo.png');
+        assert.equal(record.metadata.FileSizeBytes, png().length);
+        assert.equal(await db.get('_/photos/photo.png'), 'existing');
+        await Promise.all(waits);
+    });
 
     for (const channel of ['cfr2', 's3', 'webdav']) {
         for (const [type, expected] of [['application/octet-stream; charset=binary', 'image/png'], ['application/pdf; name=Test', 'application/pdf; name=test']]) {
@@ -200,98 +230,4 @@ describe('MIME flow integration', () => {
         await Promise.all(waits);
     });
 
-    it('preserves strict list filtering, OR selection, and generic historical metadata', async () => {
-        const index = await loadFunction('functions/utils/indexManager.js', mocks);
-        const files = [
-            { id: 'a.png', metadata: { FileType: 'image/png' } },
-            { id: 'b.mp4', metadata: { FileType: 'video/mp4' } },
-            { id: 'c.bin', metadata: { FileType: 'application/x-image' } },
-            { id: 'old.png', metadata: { FileType: 'application/octet-stream' } },
-        ];
-        await db.put('manage@index@meta', JSON.stringify({ chunkCount: 1, totalCount: files.length }));
-        await db.put('manage@index_0', JSON.stringify(files));
-        const ctx = context('https://test/api/manage/list', '');
-        const images = await index.readIndex(ctx, { count: -1, fileType: ['image'] });
-        assert.equal(images.success, true);
-        assert.deepEqual(images.files.map(file => file.id), ['a.png']);
-        const mixed = await index.readIndex(ctx, { count: -1, fileType: ['image', 'video'] });
-        assert.deepEqual(mixed.files.map(file => file.id), ['a.png', 'b.mp4']);
-        const other = await index.readIndex(ctx, { count: -1, fileType: ['other'] });
-        assert.deepEqual(other.files.map(file => file.id), ['c.bin', 'old.png']);
-        assert.equal((await index.readIndex(ctx, { count: -1, fileType: ['bogus'] })).files.length, 0);
-    });
-
-    it('normalizes AI preview MIME while retaining format, signature, and size checks', async () => {
-        const calls = [];
-        const route = await loadFunction('functions/api/manage/ai/tags.js', {
-            ...mocks,
-            createAIContext: () => ({
-                getConfig: async () => ({ enabled: true, capabilities: { 'image.tags': { enabled: true } }, execution: { maxBatchSize: 5, concurrency: 1, requestDeadlineMs: 10000 } }),
-                invoke: async options => { calls.push(options); return { data: { tags: ['test'] } }; },
-            }),
-            validateFileId: () => {},
-            fileIdentity: async () => 'identity',
-        });
-        for (const [original, preview, bytes, error] of [
-            ['IMAGE/PNG; charset=binary', 'image/png; charset=binary', png(), null],
-            ['image/svg+xml', 'image/png', png(), 'UNSUPPORTED_INPUT'],
-            ['image/png', 'image/png', new Uint8Array(24), 'INVALID_IMAGE'],
-            ['image/png', 'image/svg+xml', png(), 'INVALID_IMAGE'],
-            ['image/png', 'image/png', new Uint8Array(256 * 1024 + 1), 'INVALID_IMAGE'],
-        ]) {
-            await db.put('photo.png', '', { metadata: { FileType: original } });
-            const form = new FormData();
-            form.set('items', JSON.stringify([{ fileId: 'photo.png' }]));
-            form.set('image0', new File([bytes], 'preview.png', { type: preview }));
-            const response = await route.onRequest(context('https://test/api/manage/ai/tags', form));
-            const { results } = await response.json();
-            assert.equal(results[0].error?.code ?? null, error);
-        }
-        assert.equal(calls.length, 1);
-        assert.equal(calls[0].input.image.startsWith('data:image/png;base64,'), true);
-    });
-
-    it('keeps content= working through the random API for records without a known type', async () => {
-        const previousCaches = globalThis.caches;
-        const route = await loadFunction('functions/random/index.js', {
-            ...adaptive,
-            fetchOthersConfig: async () => ({ randomImageAPI: { enabled: true, allowedDir: '' } }),
-        });
-        try {
-            globalThis.caches = { default: { match: async () => new Response(JSON.stringify([{ name: 'notes.unknown', FileType: '' }])) } };
-            const response = await route.onRequest({ request: new Request('https://test/random?content='), env: {} });
-            assert.deepEqual(await response.json(), { url: '/file/notes.unknown' });
-            const filtered = await route.onRequest({ request: new Request('https://test/random'), env: {} });
-            assert.deepEqual(await filtered.json(), {});
-        } finally {
-            if (previousCaches === undefined) delete globalThis.caches;
-            else globalThis.caches = previousCaches;
-        }
-    });
-
-    it('preserves GET/HEAD/Range response behavior and Content-Type parameters without historical inference', async () => {
-        const route = await loadFunction('functions/file/[[path]].js', {
-            ...mocks, ...fileTools, ...imageTransform,
-            fetchSecurityConfig: async () => ({ access: { whiteListMode: false } }),
-        });
-        for (const [type, expected] of [[' Application/PDF ; name=Photo ', 'application/pdf; name=Photo'], ['application/octet-stream', 'application/octet-stream']]) {
-            await db.put('photo.jpg', '', { metadata: { Channel: 'CloudflareR2', FileName: 'photo.jpg', FileType: type } });
-            for (const [method, range] of [['GET', false], ['HEAD', false], ['GET', true]]) {
-                const ctx = context('https://test/file/photo.jpg', '');
-                ctx.request = new Request(ctx.url, { method, headers: range ? { Range: 'bytes=0-1' } : {} });
-                ctx.params = { path: 'photo.jpg' };
-                ctx.env.img_r2.get = async (id, options) => ({
-                    body: new Response(range ? 'so' : 'source').body,
-                    size: 6,
-                    range: options?.range,
-                    writeHttpMetadata(headers) { headers.set('Content-Type', 'application/octet-stream'); },
-                });
-                const response = await route.onRequest(ctx);
-                assert.equal(response.status, range ? 206 : 200);
-                assert.equal(response.headers.get('Content-Type'), expected);
-                assert.equal(await response.text(), method === 'HEAD' ? '' : range ? 'so' : 'source');
-                if (range) assert.equal(response.headers.get('Content-Range'), 'bytes 0-1/6');
-            }
-        }
-    });
 });

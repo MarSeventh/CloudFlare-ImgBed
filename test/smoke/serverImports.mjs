@@ -11,6 +11,12 @@ const routes = [
     ['../../functions/file/[[path]].js', 'onRequest'],
     ['../../functions/dav/[[path]].js', 'onRequest'],
     ['../../functions/api/manage/ai/tags.js', 'onRequest'],
+    ['../../functions/api/manage/list.js', 'onRequest'],
+    ['../../functions/api/manage/delete/[[path]].js', 'onRequest'],
+    ['../../functions/api/manage/delete/batch.js', 'onRequest'],
+    ['../../functions/api/manage/metadata/[[path]].js', 'onRequest'],
+    ['../../functions/api/manage/rename/[[path]].js', 'onRequest'],
+    ['../../functions/api/manage/move/[[path]].js', 'onRequest'],
 ];
 
 for (const [path, handler] of routes) {
