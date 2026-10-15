@@ -2,6 +2,8 @@ import { fetchSecurityConfig } from "../utils/sysConfig";
 import { purgeCFCache, purgeRandomFileListCache, purgePublicFileListCache } from "../utils/purgeCache";
 import { addFileToIndex } from "../utils/indexManager.js";
 import { getDatabase } from '../utils/databaseAdapter.js';
+import { resolveFileExt } from '../utils/mimeTypes.js';
+export { isExtValid, resolveFileExt } from '../utils/mimeTypes.js';
 
 // 统一的响应创建函数
 export function createResponse(body, options = {}) {
@@ -170,36 +172,6 @@ export function sanitizeUploadFolder(folder) {
 
     return sanitizedSegments.join('/');
 }
-
-// 检查文件扩展名是否有效
-export function isExtValid(fileExt) {
-    return ['jpeg', 'jpg', 'png', 'gif', 'webp',
-        'mp4', 'mp3', 'ogg',
-        'mp3', 'wav', 'flac', 'aac', 'opus',
-        'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'pdf',
-        'txt', 'md', 'json', 'xml', 'html', 'css', 'js', 'ts', 'go', 'java', 'php', 'py', 'rb', 'sh', 'bat', 'cmd', 'ps1', 'psm1', 'psd', 'ai', 'sketch', 'fig', 'svg', 'eps', 'zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'apk', 'exe', 'msi', 'dmg', 'iso', 'torrent', 'webp', 'ico', 'svg', 'ttf', 'otf', 'woff', 'woff2', 'eot', 'apk', 'crx', 'xpi', 'deb', 'rpm', 'jar', 'war', 'ear', 'img', 'iso', 'vdi', 'ova', 'ovf', 'qcow2', 'vmdk', 'vhd', 'vhdx', 'pvm', 'dsk', 'hdd', 'bin', 'cue', 'mds', 'mdf', 'nrg', 'ccd', 'cif', 'c2d', 'daa', 'b6t', 'b5t', 'bwt', 'isz', 'isz', 'cdi', 'flp', 'uif', 'xdi', 'sdi'
-    ].includes(fileExt);
-}
-/**
- * 从文件名和文件类型中解析出有效的文件扩展名
- * @param {string} fileName - 文件名
- * @param {string} fileType - MIME 类型，如 'image/png'
- * @returns {string} 文件扩展名
- */
-export function resolveFileExt(fileName, fileType = 'application/octet-stream') {
-    let fileExt = fileName.split('.').pop();
-    if (fileExt && fileExt !== fileName && isExtValid(fileExt)) {
-        return fileExt;
-    }
-    // 文件名中无有效扩展名，尝试从 MIME 类型中提取
-    const typePart = fileType.split('/').pop();
-    if (typePart && typePart !== fileType) {
-        return typePart;
-    }
-    return 'bin';
-}
-
-
 
 /**
  * 从图片文件头部提取尺寸信息

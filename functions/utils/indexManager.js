@@ -38,6 +38,7 @@
  */
 
 import { getDatabase, checkDatabaseConfig } from './databaseAdapter.js';
+import { getFileTypeCategory } from './mimeTypes.js';
 
 const INDEX_KEY = 'manage@index';
 const INDEX_META_KEY = 'manage@index@meta'; // 索引元数据键
@@ -609,21 +610,7 @@ export async function readIndex(context, options = {}) {
         // 'other' 匹配不属于以上三类的文件
         if (fileTypeArr.length > 0) {
             filteredFiles = filteredFiles.filter(file => {
-                const mimeType = file.metadata.FileType || '';
-                return fileTypeArr.some(ft => {
-                    if (ft === 'image') {
-                        return mimeType.startsWith('image/');
-                    } else if (ft === 'video') {
-                        return mimeType.startsWith('video/');
-                    } else if (ft === 'audio') {
-                        return mimeType.startsWith('audio/');
-                    } else if (ft === 'other') {
-                        return !mimeType.startsWith('image/') && 
-                               !mimeType.startsWith('video/') && 
-                               !mimeType.startsWith('audio/');
-                    }
-                    return false;
-                });
+                return fileTypeArr.includes(getFileTypeCategory(file.metadata.FileType));
             });
         }
 

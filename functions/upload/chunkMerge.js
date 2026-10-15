@@ -5,6 +5,7 @@ import { retryFailedChunks, cleanupFailedMultipartUploads, checkChunkUploadStatu
 import { CompleteMultipartUploadCommand } from "@aws-sdk/client-s3";
 import { getDatabase } from '../utils/databaseAdapter.js';
 import { fetchPageConfig } from '../utils/sysConfig.js';
+import { resolveFileType } from '../utils/mimeTypes.js';
 
 // 处理分块合并
 export async function handleChunkMerge(context) {
@@ -34,6 +35,8 @@ export async function handleChunkMerge(context) {
         }
 
         const sessionInfo = JSON.parse(sessionData);
+        // 未重复发送类型时沿用会话中的明确类型，再对通用值按文件名兜底。
+        originalFileType = resolveFileType(originalFileName, originalFileType || sessionInfo.originalFileType);
 
         // 验证会话信息
         if (sessionInfo.originalFileName !== originalFileName ||

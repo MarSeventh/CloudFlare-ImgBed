@@ -11,6 +11,7 @@
  */
 
 import { HuggingFaceAPI } from '../../utils/storage/huggingfaceAPI.js';
+import { resolveFileType } from '../../utils/mimeTypes.js';
 import { fetchUploadConfig } from '../../utils/sysConfig.js';
 import { userAuthCheck, UnauthorizedResponse } from '../../utils/auth/userAuth.js';
 import { buildUniqueFileId, getUploadIp, isBlockedUploadIp, createResponse } from '../uploadTools.js';
@@ -38,7 +39,7 @@ export async function onRequestPost(context) {
 
         const body = await request.json();
         const { fileSize, fileName, fileType, sha256, fileSample, channelName, uploadNameType, uploadFolder } = body;
-        const normalizedFileType = fileType || 'application/octet-stream';
+        const normalizedFileType = resolveFileType(fileName, fileType);
 
         if (!fileSize || !fileName || !sha256 || !fileSample) {
             return createResponse(JSON.stringify({

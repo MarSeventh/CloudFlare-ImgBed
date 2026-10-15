@@ -6,6 +6,7 @@ import { DiscordAPI } from '../utils/storage/discordAPI';
 import { CreateMultipartUploadCommand, UploadPartCommand, AbortMultipartUploadCommand } from "@aws-sdk/client-s3";
 import { getDatabase, checkDatabaseConfig } from '../utils/databaseAdapter.js';
 import { fetchPageConfig } from '../utils/sysConfig.js';
+import { resolveFileType } from '../utils/mimeTypes.js';
 
 // 初始化分块上传
 export async function initializeChunkedUpload(context) {
@@ -17,7 +18,7 @@ export async function initializeChunkedUpload(context) {
         const formdata = await request.formData();
 
         const originalFileName = formdata.get('originalFileName');
-        const originalFileType = formdata.get('originalFileType');
+        const originalFileType = resolveFileType(originalFileName, formdata.get('originalFileType'));
         const totalChunks = parseInt(formdata.get('totalChunks'));
 
         if (!originalFileName || !originalFileType || !totalChunks) {
@@ -98,7 +99,7 @@ export async function handleChunkUpload(context) {
         const totalChunks = parseInt(formdata.get('totalChunks'));
         const uploadId = formdata.get('uploadId');
         const originalFileName = formdata.get('originalFileName');
-        const originalFileType = formdata.get('originalFileType');
+        const originalFileType = resolveFileType(originalFileName, formdata.get('originalFileType'));
 
         if (!chunk || chunkIndex === null || !totalChunks || !uploadId || !originalFileName || !originalFileType) {
             return createResponse('Error: Missing chunk upload parameters', { status: 400 });
@@ -384,7 +385,9 @@ async function uploadSingleChunkToR2Multipart(context, chunkData, chunkIndex, to
         if (chunkIndex === 0) {
             finalFileId = await buildUniqueFileId(context, originalFileName, originalFileType);
 
-            const multipartUpload = await R2DataBase.createMultipartUpload(finalFileId);
+            const multipartUpload = await R2DataBase.createMultipartUpload(finalFileId, {
+                httpMetadata: { contentType: originalFileType },
+            });
             const multipartInfo = {
                 uploadId: multipartUpload.uploadId,
                 key: finalFileId
@@ -855,7 +858,7 @@ async function retrySingleChunk(context, chunk, uploadChannel, maxRetries = 5, r
 
         const chunkData = chunkRecord.value;
         const originalFileName = chunkRecord.metadata?.originalFileName || 'unknown';
-        const originalFileType = chunkRecord.metadata?.originalFileType || 'application/octet-stream';
+        const originalFileType = resolveFileType(originalFileName, chunkRecord.metadata?.originalFileType);
         const uploadId = chunkRecord.metadata?.uploadId;
         const totalChunks = chunkRecord.metadata?.totalChunks || 1;
 

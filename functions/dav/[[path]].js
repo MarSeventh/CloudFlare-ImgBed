@@ -2,6 +2,7 @@
 import { fetchOthersConfig } from "../utils/sysConfig";
 import { getDatabase } from "../utils/databaseAdapter";
 import { createApiToken } from "../api/manage/apiTokens";
+import { normalizeFileType } from '../utils/mimeTypes.js';
 
 export async function onRequest(context) {
     const { request, env } = context;
@@ -555,6 +556,6 @@ function createFileXml(file) {
         : new Date();
     const creationDate = fileTime.toISOString();
     const lastModified = fileTime.toUTCString();
-    const contentType = file.metadata && file.metadata['FileType'] ? file.metadata['FileType'] : "application/octet-stream";
+    const contentType = normalizeFileType(file.metadata?.FileType) || 'application/octet-stream';
     return `<D:response><D:href>${encodeURI(`/dav/${file.name}`)}</D:href><D:propstat><D:prop><D:displayname>${file.name.split('/').pop()}</D:displayname><D:resourcetype/><D:creationdate>${creationDate}</D:creationdate><D:getlastmodified>${lastModified}</D:getlastmodified><D:getcontentlength>${fileSize}</D:getcontentlength><D:getcontenttype>${contentType}</D:getcontenttype></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>`;
 }
