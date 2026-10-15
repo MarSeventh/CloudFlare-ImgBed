@@ -1,4 +1,5 @@
 import { fetchOthersConfig } from "../utils/sysConfig";
+import { matchesFileType } from "../utils/mimeTypes";
 import { readIndex } from "../utils/indexManager";
 import { detectDevice, resolveOrientation, addClientHintsHeaders } from "./adaptive.js";
 
@@ -92,8 +93,9 @@ export async function onRequest(context) {
     // 调用randomFileList接口，读取KV数据库中的所有记录
     let allRecords = await getRandomFileList(context, requestUrl, dir);
 
-    // 筛选出符合fileType要求的记录
-    allRecords = allRecords.filter(item => { return fileType.some(type => item.FileType?.includes(type)) });
+    // 筛选出符合fileType要求的记录。FileType 缺失或为通用类型时按扩展名兜底，
+    // 兼容历史上被记成 application/octet-stream 的图片。
+    allRecords = allRecords.filter(item => matchesFileType(item.FileType, item.name, fileType));
 
     // 保存过滤前的记录，用于自适应模式降级
     const allRecordsBeforeOrientationFilter = allRecords;
