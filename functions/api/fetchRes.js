@@ -16,6 +16,10 @@ const HOP_BY_HOP_HEADERS = [
     'upgrade'
 ];
 
+// Many file hosts (download portals, CDNs with bot protection) reject
+// requests without a browser-like User-Agent, so always send one.
+const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36 Edg/121.0.0.0';
+
 /**
  * Build response headers that are safe to send on a new proxy response.
  * Node's fetch transparently decompresses upstream bodies while retaining
@@ -39,10 +43,18 @@ function createProxyHeaders(responseHeaders) {
     return headers;
 }
 
-function fetchTarget(url) {
-    const options = { redirect: 'manual' };
+function fetchTarget(url, referer) {
+    const options = {
+        redirect: 'manual',
+        headers: {
+            'User-Agent': BROWSER_UA,
+            'Accept': '*/*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            ...(referer ? { 'Referer': referer } : {}),
+        }
+    };
     if (IS_NODE_RUNTIME) {
-        options.headers = { 'Accept-Encoding': 'identity' };
+        options.headers['Accept-Encoding'] = 'identity';
     }
     return fetch(url.toString(), options);
 }
@@ -125,6 +137,8 @@ export async function onRequest(context) {
     if (targetUrl === undefined) {
         return new Response('URL is required', { status: 400 })
     }
+    // Optional: a Referer to send when fetching the target (some hosts require it).
+    const referer = typeof jsonRequest.referer === 'string' && jsonRequest.referer.trim() ? jsonRequest.referer.trim() : undefined;
 
     // Validate the target URL to mitigate SSRF (CWE-918).
     let parsed;
@@ -164,7 +178,7 @@ export async function onRequest(context) {
     // Follow redirects manually so a permitted host cannot redirect us onto
     // an internal address without re-validation.
     let currentUrl = parsed;
-    let response = await fetchTarget(currentUrl);
+    let response = await fetchTarget(currentUrl, referer);
     let hops = 0;
     while (response.status >= 300 && response.status < 400 && response.headers.get('location') && hops < 5) {
         const next = new URL(response.headers.get('location'), currentUrl);
@@ -177,7 +191,7 @@ export async function onRequest(context) {
             });
         }
         currentUrl = next;
-        response = await fetchTarget(currentUrl);
+        response = await fetchTarget(currentUrl, referer);
         hops++;
     }
 
