@@ -126,7 +126,18 @@ AnimeLK Storage supports files from small images up to **2 GB and beyond** throu
 
 Running the Docker/Node server (`docker compose up -d`) uses **local disk storage** with no request-body limits at all — 2 GB+ files work out of the box, limited only by your disk space. This is completely free software; run it on your own hardware or any free-tier VPS.
 
-References: [Cloudflare Workers limits](https://developers.cloudflare.com/workers/platform/limits/) · [Cloudflare R2 pricing](https://developers.cloudflare.com/r2/pricing/)
+## Full-file Telegram uploads (one clean MP4, no chunks)
+
+The cloud Telegram Bot API caps bot uploads at **50 MB** — that's why uploads are chunked by default. If you run the app self-hosted, you can remove that cap with **Telegram's own open-source [Bot API server](https://github.com/tdlib/telegram-bot-api)** in `--local` mode (2,000 MB uploads, unlimited downloads), which the provided `docker-compose.yml` already includes as a `telegram-bot-api` service:
+
+1. Get a free `api_id` + `api_hash` at [my.telegram.org](https://my.telegram.org) → *API development tools*
+2. Put them in a `.env` file next to `docker-compose.yml` (`TG_API_ID=...`, `TG_API_HASH=...`)
+3. `docker compose up -d`
+4. In **Manage → Upload Settings → your Telegram channel**, set the **Proxy URL** to `http://telegram-bot-api:8088`
+
+The app reads `TG_MAX_SINGLE_MB=1900` (already set in the compose file) and sends files up to 1.9 GB to Telegram as **one single document** — perfect for the bundled GitHub Actions episode workflow (`tools/github-workflows/episode-to-animestorage.yml`, set *Upload mode* = `full`). Without the local server the app keeps the safe 16 MB chunked behavior automatically.
+
+References: [Cloudflare Workers limits](https://developers.cloudflare.com/workers/platform/limits/) · [Cloudflare R2 pricing](https://developers.cloudflare.com/r2/pricing/) · [Telegram Bot API limits](https://core.telegram.org/bots/api)
 
 # 5. 📚 Documentation
 

@@ -5,10 +5,13 @@ export class TelegramAPI {
     constructor(botToken, proxyUrl = '') {
         this.botToken = botToken;
         this.proxyUrl = proxyUrl;
-        // 如果设置了代理域名，使用代理域名，否则使用官方 API
-        const apiDomain = proxyUrl ? `https://${proxyUrl}` : 'https://api.telegram.org';
+        // If a proxy domain is set, use it, otherwise use the official API.
+        // An explicit http:// or https:// prefix is respected (needed for a
+        // self-hosted Bot API server, which usually runs on plain HTTP);
+        // a bare domain keeps working over https:// as before.
+        const apiDomain = (proxyUrl ? (/^https?:\/\//i.test(proxyUrl) ? proxyUrl : `https://${proxyUrl}`) : 'https://api.telegram.org').replace(/\/+$/, '');
         this.baseURL = `${apiDomain}/bot${this.botToken}`;
-        this.fileDomain = proxyUrl ? `https://${proxyUrl}` : 'https://api.telegram.org';
+        this.fileDomain = apiDomain;
         this.defaultHeaders = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36 Edg/121.0.0.0"
         };

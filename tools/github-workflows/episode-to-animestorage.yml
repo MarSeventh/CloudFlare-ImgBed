@@ -61,6 +61,12 @@ on:
         required: false
         default: ''
         type: string
+      uploadMode:
+        description: 'How to send the file to AnimeLK Storage (full requires the self-hosted Bot API server + TG_MAX_SINGLE_MB)'
+        required: false
+        default: full
+        type: choice
+        options: [full, chunked]
 
 permissions:
   contents: read
@@ -649,19 +655,20 @@ jobs:
 
       - name: Upload to AnimeLK Storage
         if: inputs.target == 'animelk'
-        timeout-minutes: 30
+        timeout-minutes: 60
         env:
           STORAGE_URL: ${{ secrets.STORAGE_URL }}
           STORAGE_TOKEN: ${{ secrets.STORAGE_TOKEN }}
           STORAGE_AUTHCODE: ${{ secrets.STORAGE_AUTHCODE }}
           STORAGE_CHANNEL: ${{ inputs.storageChannel || 'telegram' }}
           STORAGE_FOLDER: ${{ inputs.storageFolder }}
+          STORAGE_MODE: ${{ inputs.uploadMode || 'full' }}
         run: |
           set -o pipefail
 
           FILE="${NAME_IN// /_}.mp4"
-          CHUNK_BYTES=16777216   # 16 MB - same chunk size the web uploader uses
-          PARALLEL=3             # chunks in flight at once (same as the web uploader)
+          CHUNK_BYTES=16777216   # 16 MB - matches the app's default Telegram single-file limit
+          PARALLEL=3             # chunks in flight at once (chunked mode)
 
           if [ -z "$STORAGE_URL" ]; then
             echo "::error::STORAGE_URL secret is empty - set it to your AnimeLK Storage base url"
@@ -673,10 +680,12 @@ jobs:
             exit 1
           fi
           STORAGE_CHANNEL="${STORAGE_CHANNEL:-telegram}"
+          STORAGE_MODE="${STORAGE_MODE:-full}"
           [ -s "$FILE" ] || { echo "::error::$FILE is missing - the download step must finish before this one"; exit 1; }
           FILE_SIZE=$(stat -c%s "$FILE")
+          FILE_SIZE_MB=$((FILE_SIZE / 1048576))
           echo "file    : $FILE ($FILE_SIZE bytes)"
-          echo "storage : $STORAGE_URL (channel: $STORAGE_CHANNEL)"
+          echo "storage : $STORAGE_URL (channel: $STORAGE_CHANNEL, mode: $STORAGE_MODE)"
 
           # ---- auth (API token preferred, site authCode as fallback) --------
           AUTH=()
@@ -697,90 +706,145 @@ jobs:
           fi
           BASE_QS="uploadChannel=${STORAGE_CHANNEL}${EXTRA_QS}${AUTHQS}"
 
-          # ---- split the mp4 into 16 MB chunks ------------------------------
-          rm -f chunk_* chunk-reply-*
-          split -b "$CHUNK_BYTES" -d -a 3 "$FILE" chunk_
-          CHUNKS=(chunk_*)
-          TOTAL=${#CHUNKS[@]}
-          if [ "$TOTAL" -lt 1 ]; then echo "::error::split produced no chunks"; exit 1; fi
-          echo "chunks  : $TOTAL x up to $CHUNK_BYTES bytes"
+          # parse a link out of either response shape:
+          #   non-chunked:  [{"src":"..."}]
+          #   chunk merge:  {"success":true,"result":[{"src":"..."}]}
+          extract_link () {
+            node -e "
+              const r = JSON.parse(require('fs').readFileSync('$1', 'utf8'));
+              let link = '';
+              if (Array.isArray(r)) link = String((r[0] && r[0].src) || '');
+              else if (r && r.result && r.result[0]) link = String(r.result[0].src || '');
+              else if (r && r.src) link = String(r.src);
+              process.stdout.write(link);
+            "
+          }
 
-          # ---- init the chunked upload session ------------------------------
-          INIT_RESP=init-response.json
-          HTTP_CODE=$(curl -sS --retry 3 --retry-delay 5 --retry-all-errors --max-time 120 \
-            -o "$INIT_RESP" -w '%{http_code}' "${AUTH[@]}" \
-            -F "originalFileName=$FILE" \
-            -F "originalFileType=video/mp4" \
-            -F "totalChunks=$TOTAL" \
-            "$STORAGE_URL/upload?initChunked=true&$BASE_QS")
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "::error::chunk init failed with HTTP $HTTP_CODE"; [ -s "$INIT_RESP" ] && cat "$INIT_RESP"; exit 1
-          fi
-          UPLOAD_ID=$(node -e "const r=JSON.parse(require('fs').readFileSync('$INIT_RESP','utf8'));process.stdout.write(String(r.uploadId||''))")
-          if [ -z "$UPLOAD_ID" ]; then
-            echo "::error::chunk init did not return an uploadId"; cat "$INIT_RESP"; exit 1
-          fi
-          echo "session : $UPLOAD_ID"
-
-          # ---- push chunks, 3 at a time, 3 retries each ---------------------
-          upload_chunk () {
-            C="$1"
-            IDX=$((10#${C##*_}))
+          if [ "$STORAGE_MODE" != "chunked" ]; then
+            # =============================================================
+            # FULL-FILE MODE - the whole mp4 in ONE request.
+            # Needs the app self-hosted with the local Bot API server
+            # (TG_MAX_SINGLE_MB env + channel proxy URL set), otherwise
+            # Telegram's 50 MB bot cap / Cloudflare's 100 MB body cap apply.
+            # =============================================================
+            echo "sending full file ($FILE_SIZE_MB MB) in one request..."
+            MERGE_RESP=upload-response.json
             TRY=1
-            local -a AH=()
-            [ -n "$STORAGE_TOKEN" ] && AH=(-H "Authorization: Bearer $STORAGE_TOKEN")
             while [ $TRY -le 3 ]; do
-              RC_FILE="chunk-reply-$IDX.json"
-              HTTP_CODE=$(curl -sS --max-time 300 -o "$RC_FILE" -w '%{http_code}' \
-                "${AH[@]}" \
-                -F "file=@$C;filename=$C" \
-                -F "chunkIndex=$IDX" \
-                -F "totalChunks=$TOTAL" \
-                -F "uploadId=$UPLOAD_ID" \
-                -F "originalFileName=$FILE" \
-                -F "originalFileType=video/mp4" \
-                "$STORAGE_URL/upload?chunked=true&$BASE_QS")
-              CURL_RC=$?
-              if [ "$CURL_RC" = "0" ] && [ "$HTTP_CODE" = "200" ]; then
-                echo "chunk $((IDX+1))/$TOTAL ok"
-                rm -f "$RC_FILE"
-                return 0
+              HTTP_CODE=$(curl -sS --max-time 9000 -o "$MERGE_RESP" -w '%{http_code}' \
+                "${AUTH[@]}" \
+                -F "file=@$FILE;type=video/mp4" \
+                "$STORAGE_URL/upload?uploadNameType=default&returnFormat=full&$BASE_QS")
+              if [ "$HTTP_CODE" = "200" ]; then
+                break
               fi
-              echo "::warning::chunk $IDX attempt $TRY failed (HTTP $HTTP_CODE, curl rc $CURL_RC) - retrying"
+              if [ "$HTTP_CODE" = "413" ]; then
+                echo "::error::HTTP 413 - the file was too large for one request. If the app runs on Cloudflare (100 MB cap) use uploadMode=chunked; if self-hosted, check TG_MAX_SINGLE_MB and the local Bot API server."
+                exit 1
+              fi
+              echo "::warning::full-file upload attempt $TRY failed (HTTP $HTTP_CODE) - retrying"
+              [ -s "$MERGE_RESP" ] && head -c 400 "$MERGE_RESP" && echo
               TRY=$((TRY+1))
-              sleep $((TRY*3))
+              sleep $((TRY*10))
             done
-            echo "::error::chunk $IDX failed after 3 attempts"
-            return 1
-          }
-          export -f upload_chunk
-          export STORAGE_TOKEN STORAGE_URL BASE_QS UPLOAD_ID TOTAL FILE
-          printf '%s\n' "${CHUNKS[@]}" | xargs -P "$PARALLEL" -I'{}' bash -c 'upload_chunk "$@"' _ '{}' || {
-            echo "::error::one or more chunks failed to upload - aborting"; exit 1
-          }
+            if [ "$HTTP_CODE" != "200" ]; then
+              echo "::error::full-file upload failed after 3 attempts (last HTTP $HTTP_CODE) - try uploadMode=chunked"
+              exit 1
+            fi
+            LINK=$(extract_link "$MERGE_RESP")
+            if [ -z "$LINK" ]; then
+              echo "::error::upload did not return a link"; head -c 400 "$MERGE_RESP"; exit 1
+            fi
+            echo "uploaded: one single Telegram file"
+            echo "chunks_sent: 0" > /dev/null
+            TOTAL=1
+          else
+            # =============================================================
+            # CHUNKED MODE - 16 MB chunks, 3 in parallel, merged server-side
+            # =============================================================
+            rm -f chunk_* chunk-reply-*
+            split -b "$CHUNK_BYTES" -d -a 3 "$FILE" chunk_
+            CHUNKS=(chunk_*)
+            TOTAL=${#CHUNKS[@]}
+            if [ "$TOTAL" -lt 1 ]; then echo "::error::split produced no chunks"; exit 1; fi
+            echo "chunks  : $TOTAL x up to $CHUNK_BYTES bytes"
 
-          # ---- merge on the server -> final /file/ link ----------------------
-          MERGE_RESP=merge-response.json
-          HTTP_CODE=$(curl -sS --retry 3 --retry-delay 5 --retry-all-errors --max-time 300 \
-            -o "$MERGE_RESP" -w '%{http_code}' "${AUTH[@]}" \
-            -F "uploadId=$UPLOAD_ID" \
-            -F "totalChunks=$TOTAL" \
-            -F "originalFileName=$FILE" \
-            -F "originalFileType=video/mp4" \
-            "$STORAGE_URL/upload?chunked=true&merge=true&returnFormat=full&$BASE_QS")
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "::error::chunk merge failed with HTTP $HTTP_CODE"; [ -s "$MERGE_RESP" ] && cat "$MERGE_RESP"; exit 1
+            INIT_RESP=init-response.json
+            HTTP_CODE=$(curl -sS --retry 3 --retry-delay 5 --retry-all-errors --max-time 120 \
+              -o "$INIT_RESP" -w '%{http_code}' "${AUTH[@]}" \
+              -F "originalFileName=$FILE" \
+              -F "originalFileType=video/mp4" \
+              -F "totalChunks=$TOTAL" \
+              "$STORAGE_URL/upload?initChunked=true&$BASE_QS")
+            if [ "$HTTP_CODE" != "200" ]; then
+              echo "::error::chunk init failed with HTTP $HTTP_CODE"; [ -s "$INIT_RESP" ] && cat "$INIT_RESP"; exit 1
+            fi
+            UPLOAD_ID=$(node -e "const r=JSON.parse(require('fs').readFileSync('$INIT_RESP','utf8'));process.stdout.write(String(r.uploadId||''))")
+            if [ -z "$UPLOAD_ID" ]; then
+              echo "::error::chunk init did not return an uploadId"; cat "$INIT_RESP"; exit 1
+            fi
+            echo "session : $UPLOAD_ID"
+
+            upload_chunk () {
+              C="$1"
+              IDX=$((10#${C##*_}))
+              TRY=1
+              local -a AH=()
+              [ -n "$STORAGE_TOKEN" ] && AH=(-H "Authorization: Bearer $STORAGE_TOKEN")
+              while [ $TRY -le 3 ]; do
+                RC_FILE="chunk-reply-$IDX.json"
+                HTTP_CODE=$(curl -sS --max-time 300 -o "$RC_FILE" -w '%{http_code}' \
+                  "${AH[@]}" \
+                  -F "file=@$C;filename=$C" \
+                  -F "chunkIndex=$IDX" \
+                  -F "totalChunks=$TOTAL" \
+                  -F "uploadId=$UPLOAD_ID" \
+                  -F "originalFileName=$FILE" \
+                  -F "originalFileType=video/mp4" \
+                  "$STORAGE_URL/upload?chunked=true&$BASE_QS")
+                CURL_RC=$?
+                if [ "$CURL_RC" = "0" ] && [ "$HTTP_CODE" = "200" ]; then
+                  echo "chunk $((IDX+1))/$TOTAL ok"
+                  rm -f "$RC_FILE"
+                  return 0
+                fi
+                echo "::warning::chunk $IDX attempt $TRY failed (HTTP $HTTP_CODE, curl rc $CURL_RC) - retrying"
+                TRY=$((TRY+1))
+                sleep $((TRY*3))
+              done
+              echo "::error::chunk $IDX failed after 3 attempts"
+              return 1
+            }
+            export -f upload_chunk
+            export STORAGE_TOKEN STORAGE_URL BASE_QS UPLOAD_ID TOTAL FILE
+            printf '%s\n' "${CHUNKS[@]}" | xargs -P "$PARALLEL" -I'{}' bash -c 'upload_chunk "$@"' _ '{}' || {
+              echo "::error::one or more chunks failed to upload - aborting"; exit 1
+            }
+
+            MERGE_RESP=merge-response.json
+            HTTP_CODE=$(curl -sS --retry 3 --retry-delay 5 --retry-all-errors --max-time 300 \
+              -o "$MERGE_RESP" -w '%{http_code}' "${AUTH[@]}" \
+              -F "uploadId=$UPLOAD_ID" \
+              -F "totalChunks=$TOTAL" \
+              -F "originalFileName=$FILE" \
+              -F "originalFileType=video/mp4" \
+              "$STORAGE_URL/upload?chunked=true&merge=true&returnFormat=full&$BASE_QS")
+            if [ "$HTTP_CODE" != "200" ]; then
+              echo "::error::chunk merge failed with HTTP $HTTP_CODE"; [ -s "$MERGE_RESP" ] && cat "$MERGE_RESP"; exit 1
+            fi
+            LINK=$(extract_link "$MERGE_RESP")
+            if [ -z "$LINK" ]; then
+              echo "::error::merge did not return a link"; cat "$MERGE_RESP"; exit 1
+            fi
+            rm -f chunk_* chunk-reply-*
           fi
-          LINK=$(node -e "const r=JSON.parse(require('fs').readFileSync('$MERGE_RESP','utf8'));process.stdout.write(String((r.result&&r.result[0]&&r.result[0].src)||''))")
-          if [ -z "$LINK" ]; then
-            echo "::error::merge did not return a link"; cat "$MERGE_RESP"; exit 1
-          fi
+
           case "$LINK" in
             http*) : ;;
             /*) LINK="$STORAGE_URL$LINK" ;;
           esac
 
-          echo "uploaded: $LINK"
+          echo "link    : $LINK"
           echo "link=$LINK" >> "$GITHUB_OUTPUT"
 
           if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
@@ -792,14 +856,10 @@ jobs:
               echo "| link | $LINK |"
               echo "| file | $FILE |"
               echo "| size | $FILE_SIZE bytes |"
-              echo "| chunks | $TOTAL |"
+              echo "| mode | $STORAGE_MODE |"
               echo "| channel | $STORAGE_CHANNEL |"
             } >> "$GITHUB_STEP_SUMMARY"
           fi
-
-          rm -f chunk_* chunk-reply-*
-
-
 
       # ─────────────────────────────────────────────────────────────────────
       # abyss hand-off

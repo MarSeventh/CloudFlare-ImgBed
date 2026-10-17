@@ -1,10 +1,40 @@
 services:
   animelk-storage:
     image: marseventh/cloudflare-imgbed:latest
-    # environment:
-    #   AI_CONFIG_SECRET: "" # Enter a random secret of at least 32 characters, used to encrypt saved AI provider API keys
+    environment:
+      # Enter a random secret of at least 32 characters, used to encrypt saved AI provider API keys
+      # AI_CONFIG_SECRET: ""
+      # Allow FULL single-request Telegram uploads (up to 1900 MB).
+      # Requires the telegram-bot-api service below (--local mode) and the
+      # Telegram channel's "Proxy URL" setting set to http://telegram-bot-api:8088
+      TG_MAX_SINGLE_MB: "1900"
     ports:
       - "7658:8080"
     volumes:
       - ./data:/app/data
+    restart: unless-stopped
+    depends_on:
+      - telegram-bot-api
+
+  # Self-hosted Telegram Bot API server (--local mode).
+  # Lifts the bot limits from 50 MB upload / 20 MB download to
+  # 2000 MB upload / unlimited download, so full MP4 files can be sent
+  # to your Telegram channel in ONE request and streamed back by the app.
+  #
+  # One-time setup:
+  #   1. Get free api_id + api_hash at https://my.telegram.org (API development tools)
+  #   2. Put them in a .env file next to this compose file:
+  #        TG_API_ID=123456
+  #        TG_API_HASH=abcdef0123456789abcdef0123456789
+  #   3. docker compose up -d
+  #   4. In AnimeLK Storage -> Manage -> Upload Settings -> your Telegram channel,
+  #      set Proxy URL to:  http://telegram-bot-api:8088
+  telegram-bot-api:
+    image: aiogram/telegram-bot-api:latest
+    environment:
+      TELEGRAM_API_ID: ${TG_API_ID}
+      TELEGRAM_API_HASH: ${TG_API_HASH}
+    command: ["--local", "--http-port", "8088", "--dir=/var/lib/telegram-bot-api"]
+    volumes:
+      - ./telegram-api-data:/var/lib/telegram-bot-api
     restart: unless-stopped
