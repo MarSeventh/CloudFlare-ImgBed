@@ -1,14 +1,14 @@
 /**
- * 根据环境变量生成 deploy/worker/wrangler.toml
- * 用于 GitHub Actions 部署，从 GitHub Secrets 读取配置
- * 
- * 环境变量：
- *   WORKER_NAME      - Worker 名称（默认 cloudflare-imgbed）
+ * Generates deploy/worker/wrangler.toml from environment variables.
+ * Used by GitHub Actions deployments; configuration is read from GitHub Secrets.
+ *
+ * Environment variables:
+ *   WORKER_NAME      - Worker name (default: animelk-storage)
  *   D1_DATABASE_ID   - D1 数据库 ID
  *   KV_NAMESPACE_ID  - KV 命名空间 ID
  *   R2_BUCKET_NAME   - R2 存储桶名称
  *   WORKER_VARS      - JSON 对象，值可直接填写或使用 { value, type: 'text' | 'secret' }
- *                     type 默认 text；secret 单独生成文件供部署后批量上传
+ *                     type defaults to text; secrets are written to a separate file for batch upload after deployment.
  */
 
 import { appendFileSync, writeFileSync } from 'fs';
@@ -19,9 +19,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const outputPath = join(__dirname, 'wrangler.toml');
 
 const env = process.env;
-const name = env.WORKER_NAME || 'cloudflare-imgbed';
+const name = env.WORKER_NAME || 'animelk-storage';
 
-// 先验证全部配置，避免错误的 secret 配置被降级成普通变量或被静默跳过。
+// Validate the full configuration first, so a bad secret config is never downgraded to a plain variable or silently skipped.
 const textVars = Object.create(null);
 const secretVars = Object.create(null);
 if (env.WORKER_VARS) {
@@ -29,7 +29,7 @@ if (env.WORKER_VARS) {
     try {
         vars = JSON.parse(env.WORKER_VARS);
     } catch {
-        // JSON 解析错误可能包含原始密钥片段，不输出解析器的错误信息。
+        // JSON parse errors may contain raw secret fragments; do not print the parser's error message.
         console.error('Error: WORKER_VARS must be a valid JSON object.');
         process.exit(1);
     }
@@ -74,7 +74,7 @@ not_found_handling = "single-page-application"
 binding = "IMAGES"
 `;
 
-// D1 数据库
+// D1 database
 if (env.D1_DATABASE_ID) {
     toml += `
 [[d1_databases]]
@@ -84,7 +84,7 @@ database_id = "${env.D1_DATABASE_ID}"
 `;
 }
 
-// KV 命名空间
+// KV namespace
 if (env.KV_NAMESPACE_ID) {
     toml += `
 [[kv_namespaces]]
@@ -93,7 +93,7 @@ id = "${env.KV_NAMESPACE_ID}"
 `;
 }
 
-// R2 存储桶
+// R2 bucket
 if (env.R2_BUCKET_NAME) {
     toml += `
 [[r2_buckets]]
@@ -104,10 +104,10 @@ bucket_name = "${env.R2_BUCKET_NAME}"
 
 toml += `
 [vars]
-# Secret 类型的变量在部署后单独上传，不写入此配置。
+# Secret-type variables are uploaded separately after deployment and are not written to this config.
 `;
 
-// JSON 字符串转义适用于 TOML 基本字符串，另外转义 TOML 禁止的 DEL 字符。
+// JSON string escaping fits TOML basic strings; also escape the DEL character, which TOML forbids.
 const tomlString = (value) => JSON.stringify(value).replace(/\u007f/g, '\\u007f');
 const configWithoutVars = toml;
 for (const [key, value] of Object.entries(textVars)) {
@@ -126,7 +126,7 @@ if (env.GITHUB_OUTPUT) {
     appendFileSync(env.GITHUB_OUTPUT, `has_secrets=${hasSecrets}\n${hasSecrets ? `secrets_path=${secretsPath}\n` : ''}`);
 }
 
-// 所有业务变量的值都隐藏，避免依赖变量命名规则判断是否敏感。
+// Hide all business variable values, so sensitivity never depends on variable naming conventions.
 const safeToml = configWithoutVars
     .replace(/database_id = ".*"/g, 'database_id = "***"')
     .replace(/(id = )".*"/g, '$1"***"')

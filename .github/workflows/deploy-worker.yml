@@ -25,7 +25,7 @@ on:
 #
 # 可选：
 #   R2_BUCKET_NAME        - R2 存储桶名称
-#   WORKER_NAME           - Worker 名称（默认 cloudflare-imgbed，手动触发时可在界面覆盖）
+#   WORKER_NAME           - Worker name (default: animelk-storage; can be overridden in the UI on manual trigger)
 #   WORKER_VARS           - JSON 格式的业务环境变量，支持 value 和可选 type（text/secret，默认 text）。
 #                           非必要不建议配置，业务设置请在管理面板中配置。
 

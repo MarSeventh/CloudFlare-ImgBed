@@ -1,4 +1,4 @@
-# Contributing to CloudFlare ImgBed
+# Contributing to AnimeLK Storage
 
 Thank you for contributing code, documentation, tests, ideas or reproducible bug reports. Please follow the project's [Code of Conduct](CODE_OF_CONDUCT.md) when participating.
 

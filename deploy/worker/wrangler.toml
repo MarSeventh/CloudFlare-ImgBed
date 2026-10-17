@@ -1,35 +1,33 @@
-# Cloudflare Workers 部署配置
-# 使用方式: npx wrangler deploy --config deploy/worker/wrangler.toml
+# AnimeLK Storage - Cloudflare Workers deployment configuration
+# Usage: npx wrangler deploy --config deploy/worker/wrangler.toml
 #
-# 部署前需要配置以下 binding：
-# 1. D1 数据库 - 取消注释并填入你的 database_id
-# 2. R2 存储桶 - 取消注释并填入你的 bucket_name
-# 3. KV 命名空间 - 如果使用 KV 而非 D1，取消注释并填入 id
-# 4. 普通环境变量 - 在 [vars] 中配置；敏感值请使用 wrangler secret put/bulk
+# Configure the following bindings before deploying:
+# 1. D1 database - uncomment and fill in your database_id
+# 2. R2 bucket - uncomment and fill in your bucket_name
+# 3. KV namespace - if using KV instead of D1, uncomment and fill in the id
+# 4. Plain environment variables - configure under [vars]; for sensitive values use wrangler secret put/bulk
 #
-# GitHub Actions 部署时会自动从 GitHub Secrets 生成此文件，
-# WORKER_VARS 支持 { "变量名": { "value": "值", "type": "text或secret" } }，
-# type 默认为 text，secret 会在部署后统一上传，不写入 [vars]。
-# 无需手动编辑。详见 .github/workflows/deploy-worker.yml
+# When deploying via GitHub Actions, this file is generated automatically from GitHub Secrets.
+# WORKER_VARS supports { "variable": { "value": "...", "type": "text|secret" } },
+# type defaults to text; secrets are uploaded after deployment and are not written to [vars].
+# No manual editing needed. See .github/workflows/deploy-worker.yml for details.
 
-name = "cloudflare-imgbed"
+name = "animelk-storage"
 main = "index.js"
 compatibility_date = "2024-08-21"
-# 让 Worker 对自身 zone 的 fetch() 走公网入口，不要直连 origin。
+# Make the Worker's own fetch() to its zone go through the public entry, not directly to origin.
 compatibility_flags = ["global_fetch_strictly_public"]
 
-# 静态资源（前端文件）
 [assets]
 directory = "../../frontend-dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 
-# Cloudflare Images 原生图片处理
 [images]
 binding = "IMAGES"
 
 [vars]
-# AI_CONFIG_SECRET 请配置为 Secret，值为至少 32 个字符的随机密钥。
+# AI_CONFIG_SECRET should be configured as a Secret: a random secret of at least 32 characters.
 # TG_BOT_TOKEN = ""
 # TG_CHAT_ID = ""
 
@@ -45,3 +43,4 @@ binding = "IMAGES"
 # [[kv_namespaces]]
 # binding = "img_url"
 # id = ""
+# Secret-type variables are uploaded separately after deployment and are not written to this config.

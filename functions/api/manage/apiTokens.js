@@ -232,7 +232,7 @@ function generateApiToken() {
     const array = new Uint8Array(32);
     crypto.getRandomValues(array);
     const hex = Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('');
-    return 'imgbed_' + hex;
+    return 'animelk_' + hex;
 }
 
 // 生成Token ID（使用密码学安全随机数）
