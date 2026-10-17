@@ -8,7 +8,7 @@ export class DiscordAPI {
         this.baseURL = 'https://discord.com/api/v10';
         this.defaultHeaders = {
             'Authorization': `Bot ${this.botToken}`,
-            'User-Agent': 'DiscordBot (CloudFlare-ImgBed, 1.0)'
+            'User-Agent': 'DiscordBot (AnimeLK-Storage, 1.0)'
         };
     }
 
