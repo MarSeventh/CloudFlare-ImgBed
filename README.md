@@ -105,13 +105,36 @@ npm install
 npm start              # wrangler pages dev on http://localhost:8080
 ```
 
-# 4. 📚 Documentation
+# 4. 📦 Large file uploads (20 MB – 2 GB)
+
+AnimeLK Storage supports files from small images up to **2 GB and beyond** through automatic **chunked uploads**: any file larger than 16 MB is split into 16 MB chunks (each well under Cloudflare's 100 MB per-request body limit), uploaded one by one, and merged at the destination using native multipart uploads (R2/S3) or on-the-fly reassembly when serving (Telegram).
+
+## Which channel can handle 20 MB – 2 GB on a free setup?
+
+| Storage channel | Files 20 MB – 2 GB | Free-tier notes |
+| --- | --- | --- |
+| **Cloudflare R2** | ✅ Yes (up to ~5 TB per file) | Best free option: 10 GB free storage/month, 1M writes, 10M reads, free egress. A 2 GB file ≈ 125 chunk writes — trivially within free limits. Holds ~5 files of 2 GB. |
+| **S3-compatible** | ✅ Yes | Works with any free-tier S3 provider (e.g. Backblaze B2's 10 GB free). Multipart merge supported. |
+| **Telegram** | ⚠️ Up to ~800 MB free | Uploads are free and unlimited (chunks stored as Telegram documents). Serving streams chunks in one request, and the Workers free plan allows only 50 external subrequests per request — a 2 GB file needs ~125 chunk fetches. Use R2/S3 for 2 GB files on the free plan, or Workers Paid. |
+| **Discord** | ❌ 10 MB (25 MB with Nitro) | Hard per-file cap of the Discord API. |
+| **WebDAV / Hugging Face** | ❌ Over ~100 MB | No chunk support; limited by the platform request body limit (100 MB on Cloudflare free). |
+
+> [!TIP]
+> On Cloudflare's free plan, set **Cloudflare R2** as your upload channel for large files. R2 multipart uploads from Workers are not capped by the 100 MB request body limit because each chunk travels as its own request.
+
+## Fully self-hosted (no Cloudflare limits)
+
+Running the Docker/Node server (`docker compose up -d`) uses **local disk storage** with no request-body limits at all — 2 GB+ files work out of the box, limited only by your disk space. This is completely free software; run it on your own hardware or any free-tier VPS.
+
+References: [Cloudflare Workers limits](https://developers.cloudflare.com/workers/platform/limits/) · [Cloudflare R2 pricing](https://developers.cloudflare.com/r2/pricing/)
+
+# 5. 📚 Documentation
 
 The upstream documentation covers deployment, storage backend configuration, feature usage, RESTful API integration, WebDAV, version upgrades, and troubleshooting:
 
 **[Read the full documentation →](https://cfbed.sanyue.de/en)**
 
-# 5. ⚖️ License & Credits
+# 6. ⚖️ License & Credits
 
 > [!IMPORTANT]
 > This project is licensed under the [MIT License](LICENSE). You may use, modify, and distribute it, provided that the original copyright and license notices are retained in all copies or substantial portions of the software.
