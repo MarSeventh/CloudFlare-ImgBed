@@ -464,10 +464,19 @@ async function uploadFileToTelegram(context, fullId, metadata, fileExt, fileName
 
     const telegramAPI = new TelegramAPI(tgBotToken, tgProxyUrl);
 
-    // 16MB 分片阈值 (TG Bot getFile download limit: 20MB, leave 4MB safety margin)
-    const CHUNK_SIZE = 16 * 1024 * 1024; // 16MB
+    // Single-file Telegram upload limit.
+    // Default 16MB fits the cloud Bot API (50MB upload cap, 20MB getFile limit, safety margin).
+    // To send FULL files (up to 1900MB) in ONE request, point the channel's proxy URL at a
+    // self-hosted Bot API server in --local mode (2GB upload / no download limit) and set
+    // the TG_MAX_SINGLE_MB environment variable, e.g. TG_MAX_SINGLE_MB=1900.
+    const FALLBACK_CHUNK_SIZE = 16 * 1024 * 1024; // 16MB
+    const MAX_SINGLE_TELEGRAM = 1900 * 1024 * 1024; // 1900MB hard cap (local Bot API allows 2000MB)
+    const configuredMb = parseInt(env.TG_MAX_SINGLE_MB);
+    const singleFileSizeLimit = (Number.isFinite(configuredMb) && configuredMb > 0)
+        ? Math.min(configuredMb * 1024 * 1024, MAX_SINGLE_TELEGRAM)
+        : FALLBACK_CHUNK_SIZE;
 
-    if (fileSize > CHUNK_SIZE) {
+    if (fileSize > singleFileSizeLimit) {
         // 大文件分片上传
         return await uploadLargeFileToTelegram(context, file, fullId, metadata, fileName, fileType, returnLink, tgBotToken, tgChatId, tgChannel);
     }
