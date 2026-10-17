@@ -1,6 +1,9 @@
 services:
   animelk-storage:
-    image: marseventh/cloudflare-imgbed:latest
+    # Build from this repo (needed! the upstream Docker Hub image does NOT
+    # include the TG_MAX_SINGLE_MB full-file upload feature).
+    build: .
+    image: animelk-storage:local
     environment:
       # Enter a random secret of at least 32 characters, used to encrypt saved AI provider API keys
       # AI_CONFIG_SECRET: ""
