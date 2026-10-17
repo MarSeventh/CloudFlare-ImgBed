@@ -1,0 +1,894 @@
+name: Convert episode to mp4  (single file)
+
+# ONE FILE VERSION — the whole resolver is written out by the workflow itself,
+# so there is nothing else to add to the repo.
+#
+# animesuge.cz never puts a stream url in the episode page: the player is built
+# at runtime through its own api and the final url is AES encrypted. This walks
+# the real chain on the runner:
+#   episode page -> /ajax/episode/list/<id> -> /ajax/server/list -> /ajax/server
+#   -> player page -> /stream/getSourcesNew -> AES decrypt -> master.m3u8
+# and downloads the segments itself (the CDN prepends a fake PNG header to each
+# .ts segment, which breaks ffmpeg's probing), then remuxes to mp4 with ffmpeg.
+
+on:
+  workflow_dispatch:
+    inputs:
+      page:
+        description: 'Episode page url  (https://animesuge.cz/anime/<slug>/ep-1)'
+        required: true
+        type: string
+      name:
+        description: 'Output name (no spaces)'
+        required: true
+        type: string
+      quality:
+        description: 'best | 1080 | 720 | 480 | 360'
+        required: false
+        default: best
+        type: string
+      lang:
+        description: 'Audio track / server group'
+        required: false
+        type: choice
+        options: [sub, dub]
+        default: sub
+      server:
+        description: 'Force one server by name or sv-id (empty = try all)'
+        required: false
+        default: ''
+        type: string
+      limit:
+        description: 'Convert only the first N seconds (0 = whole episode, use 20 for a quick test)'
+        required: false
+        default: '0'
+        type: string
+
+      target:
+        description: 'Where to send the finished mp4'
+        required: false
+        default: animelk
+        type: choice
+        options: [animelk, abyss]
+      storageChannel:
+        description: 'AnimeLK Storage upload channel (when target = animelk)'
+        required: false
+        default: telegram
+        type: choice
+        options: [telegram, cfr2, s3]
+      storageFolder:
+        description: 'AnimeLK Storage folder (optional)'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    env:
+      PAGE: ${{ inputs.page }}
+      NAME_IN: ${{ inputs.name }}
+      QUALITY: ${{ inputs.quality }}
+      LANG: ${{ inputs.lang }}
+      SERVER: ${{ inputs.server }}
+      LIMIT: ${{ inputs.limit }}
+      UA: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+
+    steps:
+      # The static ffmpeg builds segfault on the runner, so use the distro ffmpeg.
+      - name: Install ffmpeg
+        timeout-minutes: 10
+        run: |
+          if command -v ffmpeg >/dev/null 2>&1 && command -v ffprobe >/dev/null 2>&1; then
+            echo "ffmpeg already on the runner, skipping install"
+          else
+            for i in 1 2 3; do
+              if sudo timeout 120 apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=20 update -qq \
+                 && sudo timeout 300 apt-get install -y -qq ffmpeg; then
+                break
+              fi
+              echo "::warning::apt attempt $i failed, retrying"
+              sleep 5
+            done
+          fi
+          ffmpeg -version | head -n1
+
+      - name: Write the resolver script
+        run: |
+          cat > resolve-m3u8.mjs <<'RESOLVER_EOF'
+          #!/usr/bin/env node
+          /**
+           * resolve-m3u8.mjs — AnimeSuge (animesuge.cz) episode page  ->  playable HLS URL
+           *
+           *  Why the old "grep the page for .m3u8" approach can never work:
+           *  the episode page ships no stream URL at all. The player is built at runtime
+           *  through three JSON/HTML endpoints and the final URL is AES encrypted:
+           *
+           *   page  ->  /ajax/episode/list/<animeId>          (episode -> data-ids)
+           *         ->  /ajax/server/list?servers=<ids>       (server -> data-link-id)
+           *         ->  /ajax/server?get=<link-id>            (player page URL)
+           *   player page -> <data-id> on #megaplay-player
+           *         ->  /stream/getSourcesNew?id=<data-id>     (JSON with "enc")
+           *         ->  AES-256-CBC decrypt  ->  { file: "<master.m3u8>" }
+           *
+           *  Usage:
+           *    node resolve-m3u8.mjs <episode-page-url> [--lang sub|dub] [--quality best|1080|720|480]
+           *                          [--server <name|sv-id>] [--out resolved.json]
+           *
+           *  stdout : a single-line JSON object (also written to --out when given)
+           *  stderr : human readable progress
+           *
+           *  Exit code 0 = found a stream, anything else = failure (message on stderr).
+           */
+
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+
+          const UA =
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+            '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+          // Key/IV scraped from the player's own JS (lib/app.main.js, lib/newclient.min.js).
+          // The payload is AES-256-CBC with the 16 byte secret zero padded up to 32 bytes.
+          const ENC_KEY = 'i?LMTAx0Q6,:}50U';
+          const ENC_IV = "W0;27ToaUpl_P%'c";
+
+          const log = (...a) => console.error('[resolve]', ...a);
+          class Fatal extends Error {}
+          const die = (msg) => {
+            throw new Fatal(msg);
+          };
+
+          // ---------------------------------------------------------------- CLI
+
+          function parseArgs(argv) {
+            const args = { page: '', lang: 'sub', quality: 'best', server: '', out: '' };
+            const rest = [];
+            for (let i = 0; i < argv.length; i++) {
+              const a = argv[i];
+              if (a === '--lang') args.lang = String(argv[++i] || 'sub').toLowerCase();
+              else if (a === '--quality') args.quality = String(argv[++i] || 'best');
+              else if (a === '--server') args.server = String(argv[++i] || '');
+              else if (a === '--out') args.out = String(argv[++i] || '');
+              else rest.push(a);
+            }
+            args.page = rest[0] || '';
+            return args;
+          }
+
+          // ---------------------------------------------------------------- http
+
+          async function req(url, { referer, xhr = true, timeout = 30000 } = {}) {
+            const ctrl = new AbortController();
+            const t = setTimeout(() => ctrl.abort(), timeout);
+            try {
+              const res = await fetch(url, {
+                signal: ctrl.signal,
+                redirect: 'follow',
+                headers: {
+                  'User-Agent': UA,
+                  Accept: '*/*',
+                  'Accept-Language': 'en-US,en;q=0.9',
+                  ...(xhr ? { 'X-Requested-With': 'XMLHttpRequest' } : {}),
+                  ...(referer ? { Referer: referer } : {}),
+                },
+              });
+              const body = await res.text();
+              return { status: res.status, body, url: res.url };
+            } finally {
+              clearTimeout(t);
+            }
+          }
+
+          function expect(cond, msg, extra) {
+            if (cond) return;
+            const err = new Error(msg);
+            err.detail = extra ? String(extra).slice(0, 800) : '';
+            throw err;
+          }
+
+          /** Never call process.exit(): it aborts with pending sockets (libuv assertion on
+           *  Windows). Set the exit code and let node drain instead. */
+          function fatal(e) {
+            if (e && e.detail) console.error('[resolve] unexpected response:\n' + e.detail);
+            console.error('[resolve] FATAL:', e && e.message ? e.message : String(e));
+            process.exitCode = 1;
+          }
+
+          // ---------------------------------------------------------------- steps
+
+          function readPageMeta(html, pageUrl) {
+            const animeId = (html.match(/mangaId\s*=\s*(\d+)/) || [])[1];
+            const epFromUrl = (pageUrl.match(/\/ep-([0-9.]+)/) || [])[1];
+            const epAttr = (html.match(/data-ep-name="([^"]*)"/) || [])[1];
+            return { animeId, episode: epFromUrl || epAttr };
+          }
+
+          function findEpisodeIds(listHtml, episode) {
+            const anchors = [...listHtml.matchAll(/<a\b[^>]*data-num="[^"]*"[^>]*>/g)].map((m) => m[0]);
+            if (!anchors.length) return null;
+            const attr = (tag, name) => (tag.match(new RegExp(name + '="([^"]*)"')) || [])[1] || '';
+            const want = String(episode ?? '').trim();
+
+            let pick =
+              anchors.find((a) => attr(a, 'data-slug') === want) ||
+              anchors.find((a) => attr(a, 'data-num').replace(/[^0-9.]/g, '') === want);
+            if (!pick && anchors.length === 1) pick = anchors[0];
+            if (!pick) return null;
+            return { ids: attr(pick, 'data-ids'), slug: attr(pick, 'data-slug'), num: attr(pick, 'data-num') };
+          }
+
+          function parseServers(serverListHtml) {
+            // The list is grouped in <div class="server-type ..." data-type="sub|dub"> blocks.
+            const parts = serverListHtml.split(/<div[^>]*class="server-type[^"]*"[^>]*>/);
+            const groups = [];
+            for (let i = 1; i < parts.length; i++) {
+              const type = (parts[i - 1] === '' ? parts[i] : parts[i]).match(/^[^>]*data-type="([^"]+)"/);
+              groups.push({ type: type ? type[1] : 'sub', html: parts[i] });
+            }
+            const out = [];
+            for (const g of groups) {
+              const bodies = g.html.split('<div class="server"').slice(1);
+              for (const b of bodies) {
+                const linkId = (b.match(/data-link-id="([^"]*)"/) || [])[1];
+                const svId = (b.match(/data-sv-id="([^"]*)"/) || [])[1];
+                const name = (b.match(/<span>([^<]*)<\/span>/) || [])[1];
+                if (linkId) out.push({ type: g.type, linkId, svId, name: (name || '').trim() });
+              }
+            }
+            return out;
+          }
+
+          function decryptSources(enc) {
+            const key = Buffer.alloc(32);
+            Buffer.from(ENC_KEY, 'utf8').copy(key, 0, 0, 16);
+            const iv = Buffer.from(ENC_IV, 'utf8').subarray(0, 16);
+            const raw = Buffer.from(String(enc).replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+            const d = crypto.createDecipheriv('aes-256-cbc', key, iv);
+            d.setAutoPadding(false);
+            const text = Buffer.concat([d.update(raw), d.final()]).toString('utf8');
+            const json = text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1);
+            return JSON.parse(json);
+          }
+
+          async function pickVariant(masterUrl, quality, referer) {
+            const { status, body } = await req(masterUrl, { referer });
+            expect(status === 200 && body.includes('#EXTM3U'), 'could not download the master playlist', body);
+
+            const lines = body.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+            const variants = [];
+            for (let i = 0; i < lines.length; i++) {
+              if (!lines[i].startsWith('#EXT-X-STREAM-INF')) continue;
+              const next = lines.slice(i + 1).find((l) => !l.startsWith('#'));
+              if (!next) continue;
+              const res = (lines[i].match(/RESOLUTION=(\d+)x(\d+)/) || [])[2];
+              const bw = Number((lines[i].match(/BANDWIDTH=(\d+)/) || [])[1] || 0);
+              variants.push({ height: Number(res || 0), bw, url: new URL(next, masterUrl).href });
+            }
+            if (!variants.length) return { url: masterUrl, variants: [], picked: null };
+
+            variants.sort((a, b) => b.height - a.height || b.bw - a.bw);
+            const want = String(quality || 'best').replace(/p$/i, '');
+            const picked =
+              want === 'best'
+                ? variants[0]
+                : variants.find((v) => String(v.height) === want) || variants[0];
+            return { url: picked.url, variants, picked };
+          }
+
+          // ---------------------------------------------------------------- main
+
+          const args = parseArgs(process.argv.slice(2));
+          if (!args.page) {
+            fatal(new Error('usage: node resolve-m3u8.mjs <episode-page-url> [--lang sub|dub] [--quality best]'));
+            process.exit(1);
+          }
+
+          const pageUrl = args.page;
+          const origin = new URL(pageUrl).origin;
+          log('episode page:', pageUrl);
+
+          // Labelled so a fatal error can bail out of the whole pipeline without
+          // process.exit() (which aborts with pending sockets).
+          main: {
+          let meta, ep, servers;
+          try {
+            // 1. episode page ---------------------------------------------------
+            const page = await req(pageUrl, { xhr: false });
+            expect(page.status === 200, `episode page returned HTTP ${page.status}`, page.body);
+            expect(
+              !/just a moment|cf-challenge|Enable JavaScript and cookies/i.test(page.body),
+              'blocked by Cloudflare on this network — the page came back as a challenge',
+              page.body,
+            );
+
+            meta = readPageMeta(page.body, pageUrl);
+            expect(meta.animeId, 'could not read the anime id from the episode page', page.body);
+            log('anime id:', meta.animeId, '| episode:', meta.episode);
+
+            // 2. episode list ---------------------------------------------------
+            const listRes = await req(`${origin}/ajax/episode/list/${meta.animeId}`, { referer: pageUrl });
+            expect(listRes.status === 200, `episode list returned HTTP ${listRes.status}`, listRes.body);
+            let listHtml = listRes.body;
+            try {
+              listHtml = JSON.parse(listRes.body).result ?? listRes.body;
+            } catch {
+              /* endpoint already returned raw html */
+            }
+
+            ep = findEpisodeIds(listHtml, meta.episode);
+            expect(ep && ep.ids, `could not find the server list for episode ${meta.episode}`, listHtml);
+            log(`episode ${ep.slug || meta.episode} (${ep.num}) -> server ids found`);
+
+            // 3. server list ----------------------------------------------------
+            const srvRes = await req(`${origin}/ajax/server/list?servers=${encodeURIComponent(ep.ids)}`, {
+              referer: pageUrl,
+            });
+            expect(srvRes.status === 200, `server list returned HTTP ${srvRes.status}`, srvRes.body);
+            let srvHtml = srvRes.body;
+            try {
+              srvHtml = JSON.parse(srvRes.body).result ?? srvRes.body;
+            } catch {
+              /* raw html */
+            }
+
+            servers = parseServers(srvHtml);
+            expect(servers.length, 'no streaming servers returned for this episode', srvHtml);
+            log('servers:', servers.map((s) => `${s.type}/${s.name}`).join(', '));
+          } catch (e) {
+            fatal(e);
+            break main;
+          }
+
+          const wantedType = args.lang === 'dub' ? 'dub' : 'sub';
+          let candidates = servers.filter((s) => s.type === wantedType);
+          if (!candidates.length) candidates = servers; // fall back to whatever exists
+          if (args.server) {
+            const q = args.server.toLowerCase();
+            const filtered = candidates.filter(
+              (s) => String(s.svId).toLowerCase() === q || (s.name || '').toLowerCase().includes(q),
+            );
+            if (filtered.length) candidates = filtered;
+          }
+          log('trying servers:', candidates.map((s) => `${s.name}(${s.svId})`).join(', '));
+
+          // 4..6. per server: player page -> getSourcesNew -> decrypt -> m3u8 ---
+          const errors = [];
+          let resolved = null;
+          for (const srv of candidates) {
+            try {
+              log(`--- ${srv.name} (sv-id ${srv.svId}) ---`);
+              const src = await req(`${origin}/ajax/server?get=${encodeURIComponent(srv.linkId)}`, {
+                referer: pageUrl,
+              });
+              expect(src.status === 200, `server endpoint returned HTTP ${src.status}`, src.body);
+              const playerUrl = JSON.parse(src.body)?.result?.url;
+              expect(playerUrl, `no player url for ${srv.name}`, src.body);
+              log('player:', playerUrl);
+
+              const player = await req(playerUrl, { referer: pageUrl });
+              expect(player.status === 200, `player page returned HTTP ${player.status}`, player.body);
+              const fileId = (player.body.match(/data-id="(\d+)"/) || [])[1];
+              expect(fileId, `no file id in the player page (${srv.name})`, player.body);
+
+              const s = new URL(playerUrl).searchParams.get('s');
+              const api =
+                `${new URL(playerUrl).origin}/stream/getSourcesNew?id=${fileId}` + (s ? `&s=${s}` : '');
+              const sources = await req(api, { referer: playerUrl });
+              expect(sources.status === 200, `getSourcesNew returned HTTP ${sources.status}`, sources.body);
+
+              const payload = JSON.parse(sources.body);
+              const decrypted = payload.file ? payload : decryptSources(payload.enc);
+              const masterUrl = decrypted.file || decrypted.url;
+              expect(masterUrl, `could not decrypt the stream url for ${srv.name}`, sources.body);
+
+              const quality = await pickVariant(masterUrl, args.quality, new URL(playerUrl).origin + '/');
+              log('master  :', masterUrl);
+              if (quality.variants.length) {
+                log('variants:', quality.variants.map((v) => `${v.height}p`).join(', '));
+                log('chosen  :', quality.picked ? `${quality.picked.height}p` : quality.url);
+              }
+
+              const result = {
+                ok: true,
+                page: pageUrl,
+                animeId: Number(meta.animeId),
+                episode: meta.episode,
+                server: srv.name,
+                serverSvId: srv.svId,
+                type: srv.type,
+                playerUrl,
+                fileId: Number(fileId),
+                master: masterUrl,
+                m3u8: quality.url,
+                variants: quality.variants.map((v) => ({ height: v.height, bandwidth: v.bw, url: v.url })),
+                subtitles: (payload.tracks || []).map((t) => ({ label: t.label, file: t.file })),
+                // The CDN only serves the stream when the player page is the referer.
+                referer: new URL(playerUrl).origin + '/',
+              };
+              if (args.out) fs.writeFileSync(args.out, JSON.stringify(result, null, 2));
+              console.log(JSON.stringify(result));
+              resolved = result;
+              break;
+            } catch (e) {
+              errors.push(`${srv.name}: ${e.message}`);
+              console.error('[resolve] server failed:', e.message);
+            }
+          }
+
+          if (!resolved) {
+            fatal(new Error('every server failed -> ' + errors.join(' | ')));
+          }
+          } // end main
+          RESOLVER_EOF
+          node --check resolve-m3u8.mjs
+          echo "resolver written ($(wc -l < resolve-m3u8.mjs) lines)"
+
+      - name: Resolve a fresh m3u8 link
+        run: |
+          set -o pipefail
+
+          ARGS=(--lang "$LANG" --quality "$QUALITY")
+          [ -n "$SERVER" ] && ARGS+=(--server "$SERVER")
+
+          # The resolved url is short lived and bound to this runner's ip,
+          # so it is resolved here and consumed below, never reused elsewhere.
+          node resolve-m3u8.mjs "$PAGE" "${ARGS[@]}" --out resolved.json
+
+          echo "--- resolved.json ---"
+          cat resolved.json
+
+      - name: Download and remux to mp4
+        run: |
+          set -o pipefail
+
+          cat > download-hls.mjs <<'DL_EOF'
+          // download-hls.mjs <m3u8> <referer> <out.ts> [limitSeconds]
+          // Downloads HLS segments, strips the fake PNG header the CDN prepends,
+          // and writes one clean MPEG-TS file.
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+
+          const [m3u8, referer, out, limitArg] = process.argv.slice(2);
+          const limit = Number(limitArg || 0);
+          const UA = process.env.UA || 'Mozilla/5.0';
+          const headers = { 'User-Agent': UA, Referer: referer, Accept: '*/*' };
+
+          const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+          let pause = 0; // shared delay between batches, grows when the CDN says 429
+
+          async function get(url, buf = true, tries = 10) {
+            let last;
+            for (let i = 1; i <= tries; i++) {
+              try {
+                const r = await fetch(url, { headers });
+                if (r.status === 429 || r.status >= 500) {
+                  // rate limited / server hiccup: back off hard, honour Retry-After
+                  const ra = Number(r.headers.get('retry-after'));
+                  const wait = ra > 0 ? ra * 1000 : Math.min(60000, 2000 * 2 ** (i - 1));
+                  pause = Math.min(3000, pause + 500);
+                  last = new Error('HTTP ' + r.status);
+                  console.log(`HTTP ${r.status}, waiting ${Math.round(wait / 1000)}s (try ${i}/${tries})`);
+                  await sleep(wait + Math.random() * 1000);
+                  continue;
+                }
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return buf ? Buffer.from(await r.arrayBuffer()) : await r.text();
+              } catch (e) {
+                last = e;
+                await sleep(1000 * i);
+              }
+            }
+            throw new Error(url + ' -> ' + last.message);
+          }
+
+          // find the first offset where 0x47 repeats every 188 bytes (real TS data)
+          function syncOffset(b) {
+            const max = Math.min(b.length - 376, 8192);
+            for (let i = 0; i < max; i++) {
+              if (b[i] === 0x47 && b[i + 188] === 0x47 && b[i + 376] === 0x47) return i;
+            }
+            return -1;
+          }
+
+          const text = await get(m3u8, false);
+          if (!text.includes('#EXTM3U')) throw new Error('not a playlist');
+
+          const segs = [];
+          let key = null, dur = 0, seq = 0;
+          for (const line of text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)) {
+            if (line.startsWith('#EXT-X-MEDIA-SEQUENCE:')) seq = Number(line.split(':')[1]);
+            else if (line.startsWith('#EXT-X-KEY:')) {
+              const method = (line.match(/METHOD=([^,]+)/) || [])[1];
+              const uri = (line.match(/URI="([^"]+)"/) || [])[1];
+              const iv = (line.match(/IV=0x([0-9a-fA-F]+)/) || [])[1];
+              key = method === 'AES-128' ? { uri: new URL(uri, m3u8).href, iv } : null;
+            } else if (line.startsWith('#EXTINF:')) dur = parseFloat(line.slice(8));
+            else if (!line.startsWith('#')) {
+              segs.push({ url: new URL(line, m3u8).href, dur, key, seq: seq + segs.length });
+              dur = 0;
+            }
+          }
+          if (!segs.length) throw new Error('playlist has no segments');
+
+          let list = segs, total = 0;
+          if (limit > 0) {
+            list = [];
+            for (const s of segs) { list.push(s); total += s.dur; if (total >= limit) break; }
+          }
+          console.log(`segments: ${list.length}/${segs.length}`);
+
+          const keyCache = new Map();
+          async function fetchSeg(s) {
+            let b = await get(s.url);
+            let off = syncOffset(b);
+            if (off < 0 && s.key) {
+              if (!keyCache.has(s.key.uri)) keyCache.set(s.key.uri, await get(s.key.uri));
+              const iv = s.key.iv
+                ? Buffer.from(s.key.iv.padStart(32, '0'), 'hex')
+                : Buffer.from(s.seq.toString(16).padStart(32, '0'), 'hex');
+              const d = crypto.createDecipheriv('aes-128-cbc', keyCache.get(s.key.uri), iv);
+              d.setAutoPadding(false);
+              b = Buffer.concat([d.update(b.subarray(0, b.length - (b.length % 16))), d.final()]);
+              off = syncOffset(b);
+            }
+            if (off < 0) throw new Error('no TS data found in segment ' + s.url);
+            return off ? b.subarray(off) : b;
+          }
+
+          const fd = fs.openSync(out, 'w');
+          const CONC = 3;
+          let done = 0;
+          for (let i = 0; i < list.length; i += CONC) {
+            const parts = await Promise.all(list.slice(i, i + CONC).map(fetchSeg));
+            for (const p of parts) fs.writeSync(fd, p);
+            done += parts.length;
+            if ((i / CONC) % 10 === 0 || done === list.length) console.log(`downloaded ${done}/${list.length}`);
+            pause = Math.max(0, pause - 100);
+            if (pause) await sleep(pause);
+          }
+          fs.closeSync(fd);
+          DL_EOF
+          node --check download-hls.mjs
+
+          FILE="${NAME_IN// /_}.mp4"
+          resolved=0
+          for attempt in 1 2 3; do
+            if [ "$attempt" -gt 1 ]; then
+              echo "::warning::attempt $((attempt-1)) failed — resolving a brand new link and retrying"
+              sleep 10
+              ARGS=(--lang "$LANG" --quality "$QUALITY")
+              [ -n "$SERVER" ] && ARGS+=(--server "$SERVER")
+              node resolve-m3u8.mjs "$PAGE" "${ARGS[@]}" --out resolved.json || continue
+            fi
+
+            M3U8=$(node -p "require('./resolved.json').m3u8")
+            REFERER=$(node -p "require('./resolved.json').referer")
+            echo "stream  : $M3U8"
+            echo "referer : $REFERER"
+
+            rm -f "$FILE" episode.ts
+
+            if node download-hls.mjs "$M3U8" "$REFERER" episode.ts "${LIMIT:-0}" \
+               && [ -s episode.ts ] \
+               && ffmpeg -hide_banner -nostdin -loglevel warning -stats -stats_period 20 \
+                    -fflags +genpts -i episode.ts \
+                    -c copy -bsf:a aac_adtstoasc -movflags +faststart \
+                    -y "$FILE" \
+               && [ -s "$FILE" ]; then
+              resolved=1
+              rm -f episode.ts
+              break
+            fi
+          done
+
+          if [ "$resolved" != "1" ]; then
+            echo "::error::conversion failed after 3 attempts — see the log above"
+            exit 1
+          fi
+
+          ls -lh "$FILE"
+
+      - name: Verify the output
+        run: |
+          set -o pipefail
+
+          FILE="${NAME_IN// /_}.mp4"
+          SIZE=$(stat -c%s "$FILE" 2>/dev/null || echo 0)
+          DURATION=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$FILE" 2>/dev/null || echo 0)
+          STREAMS=$(ffprobe -v error -show_entries stream=codec_name,width,height -of csv=p=0 "$FILE" | tr '\n' ' ')
+          SERVER_NAME=$(node -p "require('./resolved.json').server")
+          STREAM_URL=$(node -p "require('./resolved.json').m3u8")
+
+          echo "size: $SIZE bytes | duration: ${DURATION}s | streams: $STREAMS"
+
+          if [ "${SIZE:-0}" -lt 1000000 ]; then
+            echo "::error::$FILE is smaller than 1 MB — the stream was not downloaded"
+            exit 1
+          fi
+          # only enforced for full episodes, skipped for tests run with `limit`
+          if [ "${LIMIT:-0}" = "0" ] && node -e 'process.exit(Number(process.argv[1]) < 60 ? 0 : 1)' "$DURATION"; then
+            echo "::error::$FILE is shorter than 60s — the download stopped early"
+            exit 1
+          fi
+
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            {
+              echo "### $FILE"
+              echo ""
+              echo "| | |"
+              echo "|---|---|"
+              echo "| page | $PAGE |"
+              echo "| server | $SERVER_NAME |"
+              echo "| stream | $STREAM_URL |"
+              echo "| size | $SIZE bytes |"
+              echo "| duration | ${DURATION}s |"
+              echo "| streams | $STREAMS |"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi      # ---------------------------------------------------------------------
+      # AnimeLK Storage hand-off  (https://github.com/Akila-Widuruwan/mystorage)
+      #
+      #   Uploads the finished mp4 into YOUR OWN AnimeLK Storage instance.
+      #   The file is split into 16 MB chunks (exactly like the web uploader),
+      #   pushed 3 at a time to the selected channel (telegram / cfr2 / s3)
+      #   and merged on the server, so the episode appears in the web manager
+      #   and gets a normal /file/... link. Telegram channel = free storage.
+      #
+      #   Repo secrets to add (Settings -> Secrets and variables -> Actions):
+      #     STORAGE_URL      your instance base url, e.g. https://animelk.example.pages.dev
+      #     STORAGE_TOKEN    API token from Manage -> API Tokens (starts with animelk_,
+      #                      created with the "upload" permission) - preferred
+      #     STORAGE_AUTHCODE optional alternative: the site upload password,
+      #                      only if you don't use API tokens
+      # ---------------------------------------------------------------------
+
+      - name: Upload to AnimeLK Storage
+        if: inputs.target == 'animelk'
+        timeout-minutes: 30
+        env:
+          STORAGE_URL: ${{ secrets.STORAGE_URL }}
+          STORAGE_TOKEN: ${{ secrets.STORAGE_TOKEN }}
+          STORAGE_AUTHCODE: ${{ secrets.STORAGE_AUTHCODE }}
+          STORAGE_CHANNEL: ${{ inputs.storageChannel || 'telegram' }}
+          STORAGE_FOLDER: ${{ inputs.storageFolder }}
+        run: |
+          set -o pipefail
+
+          FILE="${NAME_IN// /_}.mp4"
+          CHUNK_BYTES=16777216   # 16 MB - same chunk size the web uploader uses
+          PARALLEL=3             # chunks in flight at once (same as the web uploader)
+
+          if [ -z "$STORAGE_URL" ]; then
+            echo "::error::STORAGE_URL secret is empty - set it to your AnimeLK Storage base url"
+            exit 1
+          fi
+          STORAGE_URL="${STORAGE_URL%/}"
+          if [ -z "$STORAGE_TOKEN" ] && [ -z "$STORAGE_AUTHCODE" ]; then
+            echo "::error::set the STORAGE_TOKEN secret (API token from Manage -> API Tokens) or STORAGE_AUTHCODE"
+            exit 1
+          fi
+          STORAGE_CHANNEL="${STORAGE_CHANNEL:-telegram}"
+          [ -s "$FILE" ] || { echo "::error::$FILE is missing - the download step must finish before this one"; exit 1; }
+          FILE_SIZE=$(stat -c%s "$FILE")
+          echo "file    : $FILE ($FILE_SIZE bytes)"
+          echo "storage : $STORAGE_URL (channel: $STORAGE_CHANNEL)"
+
+          # ---- auth (API token preferred, site authCode as fallback) --------
+          AUTH=()
+          AUTHQS=""
+          if [ -n "$STORAGE_TOKEN" ]; then
+            echo "::add-mask::$STORAGE_TOKEN"
+            AUTH=(-H "Authorization: Bearer $STORAGE_TOKEN")
+          else
+            echo "::add-mask::$STORAGE_AUTHCODE"
+            ENC=$(python3 -c 'import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1],safe=""))' "$STORAGE_AUTHCODE")
+            AUTHQS="&authCode=$ENC"
+          fi
+
+          EXTRA_QS=""
+          if [ -n "$STORAGE_FOLDER" ]; then
+            ENCF=$(python3 -c 'import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1],safe=""))' "$STORAGE_FOLDER")
+            EXTRA_QS="&uploadFolder=$ENCF"
+          fi
+          BASE_QS="uploadChannel=${STORAGE_CHANNEL}${EXTRA_QS}${AUTHQS}"
+
+          # ---- split the mp4 into 16 MB chunks ------------------------------
+          rm -f chunk_* chunk-reply-*
+          split -b "$CHUNK_BYTES" -d -a 3 "$FILE" chunk_
+          CHUNKS=(chunk_*)
+          TOTAL=${#CHUNKS[@]}
+          if [ "$TOTAL" -lt 1 ]; then echo "::error::split produced no chunks"; exit 1; fi
+          echo "chunks  : $TOTAL x up to $CHUNK_BYTES bytes"
+
+          # ---- init the chunked upload session ------------------------------
+          INIT_RESP=init-response.json
+          HTTP_CODE=$(curl -sS --retry 3 --retry-delay 5 --retry-all-errors --max-time 120 \
+            -o "$INIT_RESP" -w '%{http_code}' "${AUTH[@]}" \
+            -F "originalFileName=$FILE" \
+            -F "originalFileType=video/mp4" \
+            -F "totalChunks=$TOTAL" \
+            "$STORAGE_URL/upload?initChunked=true&$BASE_QS")
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::chunk init failed with HTTP $HTTP_CODE"; [ -s "$INIT_RESP" ] && cat "$INIT_RESP"; exit 1
+          fi
+          UPLOAD_ID=$(node -e "const r=JSON.parse(require('fs').readFileSync('$INIT_RESP','utf8'));process.stdout.write(String(r.uploadId||''))")
+          if [ -z "$UPLOAD_ID" ]; then
+            echo "::error::chunk init did not return an uploadId"; cat "$INIT_RESP"; exit 1
+          fi
+          echo "session : $UPLOAD_ID"
+
+          # ---- push chunks, 3 at a time, 3 retries each ---------------------
+          upload_chunk () {
+            C="$1"
+            IDX=$((10#${C##*_}))
+            TRY=1
+            local -a AH=()
+            [ -n "$STORAGE_TOKEN" ] && AH=(-H "Authorization: Bearer $STORAGE_TOKEN")
+            while [ $TRY -le 3 ]; do
+              RC_FILE="chunk-reply-$IDX.json"
+              HTTP_CODE=$(curl -sS --max-time 300 -o "$RC_FILE" -w '%{http_code}' \
+                "${AH[@]}" \
+                -F "file=@$C;filename=$C" \
+                -F "chunkIndex=$IDX" \
+                -F "totalChunks=$TOTAL" \
+                -F "uploadId=$UPLOAD_ID" \
+                -F "originalFileName=$FILE" \
+                -F "originalFileType=video/mp4" \
+                "$STORAGE_URL/upload?chunked=true&$BASE_QS")
+              CURL_RC=$?
+              if [ "$CURL_RC" = "0" ] && [ "$HTTP_CODE" = "200" ]; then
+                echo "chunk $((IDX+1))/$TOTAL ok"
+                rm -f "$RC_FILE"
+                return 0
+              fi
+              echo "::warning::chunk $IDX attempt $TRY failed (HTTP $HTTP_CODE, curl rc $CURL_RC) - retrying"
+              TRY=$((TRY+1))
+              sleep $((TRY*3))
+            done
+            echo "::error::chunk $IDX failed after 3 attempts"
+            return 1
+          }
+          export -f upload_chunk
+          export STORAGE_TOKEN STORAGE_URL BASE_QS UPLOAD_ID TOTAL FILE
+          printf '%s\n' "${CHUNKS[@]}" | xargs -P "$PARALLEL" -I'{}' bash -c 'upload_chunk "$@"' _ '{}' || {
+            echo "::error::one or more chunks failed to upload - aborting"; exit 1
+          }
+
+          # ---- merge on the server -> final /file/ link ----------------------
+          MERGE_RESP=merge-response.json
+          HTTP_CODE=$(curl -sS --retry 3 --retry-delay 5 --retry-all-errors --max-time 300 \
+            -o "$MERGE_RESP" -w '%{http_code}' "${AUTH[@]}" \
+            -F "uploadId=$UPLOAD_ID" \
+            -F "totalChunks=$TOTAL" \
+            -F "originalFileName=$FILE" \
+            -F "originalFileType=video/mp4" \
+            "$STORAGE_URL/upload?chunked=true&merge=true&returnFormat=full&$BASE_QS")
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::chunk merge failed with HTTP $HTTP_CODE"; [ -s "$MERGE_RESP" ] && cat "$MERGE_RESP"; exit 1
+          fi
+          LINK=$(node -e "const r=JSON.parse(require('fs').readFileSync('$MERGE_RESP','utf8'));process.stdout.write(String((r.result&&r.result[0]&&r.result[0].src)||''))")
+          if [ -z "$LINK" ]; then
+            echo "::error::merge did not return a link"; cat "$MERGE_RESP"; exit 1
+          fi
+          case "$LINK" in
+            http*) : ;;
+            /*) LINK="$STORAGE_URL$LINK" ;;
+          esac
+
+          echo "uploaded: $LINK"
+          echo "link=$LINK" >> "$GITHUB_OUTPUT"
+
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            {
+              echo "### Uploaded to AnimeLK Storage"
+              echo ""
+              echo "| | |"
+              echo "|---|---|"
+              echo "| link | $LINK |"
+              echo "| file | $FILE |"
+              echo "| size | $FILE_SIZE bytes |"
+              echo "| chunks | $TOTAL |"
+              echo "| channel | $STORAGE_CHANNEL |"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          rm -f chunk_* chunk-reply-*
+
+
+
+      # ─────────────────────────────────────────────────────────────────────
+      # abyss hand-off
+      #
+      #   POST https://up.abyss.to/<apiKey>      (multipart/form-data, field "file")
+      #   ->  {"slug": "file-id"}
+      #
+      # The key is NOT in this file. It lives in the repo secrets as ABYSS_KEY:
+      #   repo -> Settings -> Secrets and variables -> Actions -> New repository
+      #   secret -> Name: ABYSS_KEY   Secret: <your key>
+      #
+      # https is used on purpose: with http the api key would travel in cleartext.
+      # curl -F already sets the multipart content-type (with its boundary).
+      # ─────────────────────────────────────────────────────────────────────
+
+      - name: Upload to abyss
+        if: inputs.target == 'abyss'
+        env:
+          ABYSS_KEY: ${{ secrets.ABYSS_KEY }}
+        run: |
+          set -o pipefail
+
+          FILE="${NAME_IN// /_}.mp4"
+
+          # Clean the secret: strip spaces, newlines, carriage returns and quotes
+          # (a stray one of these makes curl fail with "Malformed input to a URL function").
+          ABYSS_KEY="$(printf '%s' "$ABYSS_KEY" | tr -d '[:space:]"'"'"'')"
+          # If the whole upload url was pasted as the secret, keep only the key part.
+          ABYSS_KEY="${ABYSS_KEY##*/}"
+
+          if [ -z "$ABYSS_KEY" ]; then
+            echo "::error::the ABYSS_KEY secret is empty — add it under Settings -> Secrets and variables -> Actions"
+            exit 1
+          fi
+          echo "::add-mask::$ABYSS_KEY"
+          echo "abyss key length: ${#ABYSS_KEY} chars"
+
+          if [ ! -s "$FILE" ]; then
+            echo "::error::$FILE is missing — the download step must finish before this one"
+            exit 1
+          fi
+          FILE_SIZE=$(stat -c%s "$FILE")
+
+          RESPONSE_FILE=abyss-response.json
+          HTTP_CODE=$(curl -sS --retry 3 --retry-delay 5 --retry-all-errors --max-time 3600 \
+            -o "$RESPONSE_FILE" -w '%{http_code}' \
+            -F "file=@$FILE" \
+            "https://up.abyss.to/$ABYSS_KEY")
+
+          echo "abyss -> HTTP $HTTP_CODE"
+          [ -s "$RESPONSE_FILE" ] && cat "$RESPONSE_FILE" && echo
+
+          if [ "$HTTP_CODE" = "401" ]; then
+            echo "::error::abyss refused the upload with 401 — the API key in the ABYSS_KEY secret is wrong or expired"
+            exit 1
+          fi
+          case "$HTTP_CODE" in
+            2*) ;;
+            *) echo "::error::abyss upload failed with HTTP $HTTP_CODE"; exit 1 ;;
+          esac
+
+          SLUG=$(node -e "const r=JSON.parse(require('fs').readFileSync('abyss-response.json','utf8'));process.stdout.write(String(r.slug||''))")
+          if [ -z "$SLUG" ]; then
+            echo "::error::abyss replied without a slug — see the response above"
+            exit 1
+          fi
+
+          echo "abyss slug: $SLUG"
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            {
+              echo "### Uploaded to abyss"
+              echo ""
+              echo "| | |"
+              echo "|---|---|"
+              echo "| slug | \`$SLUG\` |"
+              echo "| file | $FILE |"
+              echo "| size | $FILE_SIZE bytes |"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # Small debug artifact only — the mp4 goes to abyss, not to github, so the
+      # free 500 MB artifact quota is never touched. continue-on-error because a
+      # full quota must not fail an otherwise successful upload.
+      - name: Save the resolved link (debug)
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: resolved-link
+          path: resolved.json
+          retention-days: 1
+          if-no-files-found: ignore
