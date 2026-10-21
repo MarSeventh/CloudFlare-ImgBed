@@ -49,7 +49,7 @@ CloudFlare ImgBed is a self-hosted image and file hosting solution for Docker an
       <strong><a href="https://www.hncloud.com/activity/activity_2026summer.html?k=MarSeventh">Hncloud</a></strong>
     </td>
     <td align="center" width="16.67%">
-      <strong><a href="https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC">SuWei Cloud</a></strong>
+      <strong><a href="https://www.svyun.com/recommend/AELZ0UeMz8K11Zg7pEXC">Svyun</a></strong>
     </td>
     <td align="center" width="16.67%">
       <strong><a href="https://linux.do/t/topic/2578561">Linux DO</a></strong>
