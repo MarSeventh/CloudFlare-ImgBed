@@ -17,7 +17,8 @@ const ROOT_DIR = resolve(fileURLToPath(new URL('../', import.meta.url)));
 const DATA_DIR = process.env.DATA_DIR || join(ROOT_DIR, 'data');
 const BASE_URL = process.argv[2] || process.env.BASE_URL || 'http://127.0.0.1:8080';
 
-const db = new Database(join(DATA_DIR, 'database.sqlite'), { readonly: true });
+// 注意:不要用 readonly 模式打开运行中的 WAL 库(better-sqlite3 readonly 无法写 -shm,会误报 SQLITE_CORRUPT);脚本本身只执行 SELECT
+const db = new Database(join(DATA_DIR, 'database.sqlite'));
 const files = db.prepare(
     "SELECT id, file_name, channel, channel_name, timestamp, file_size FROM files ORDER BY timestamp ASC"
 ).all();
