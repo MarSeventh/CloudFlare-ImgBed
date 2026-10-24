@@ -37,7 +37,7 @@ https://github.com/user-attachments/assets/69dae597-0d17-4b7c-9c7b-04ee81bd8219
 
 ![CloudFlare ImgBed 技术架构：多端接入、多平台运行时、数据库兼容、统一存储渠道与可扩展 AI 能力](readme/architecture.apng)
 
-同一套应用核心适配 **Pages、Workers 与 Docker**，按部署环境选用 **KV / D1 / SQLite**。元数据与文件内容通过独立链路适配，渠道路由支持负载均衡与失败切换；AI 能力框架则将可配置模型、Prompt 与结构化结果融入文件工作流。
+基于“同构内核 + 插件化底座”架构，单一核心引擎可无缝运行于 Pages、Workers 或 Docker 容器，并灵活挂载 KV、D1 与 SQLite 等多模态存储。系统通过独立适配器实现元数据与文件载荷的彻底解耦；依托智能通道路由提供动态负载均衡与故障无缝兜底；更内置 AI 原生工作流框架，将可配置的模型、Prompt 与结构化输出深度融入文件处理管线。
 
 ## 🤝 合作伙伴
 

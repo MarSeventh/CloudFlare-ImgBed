@@ -37,7 +37,7 @@ https://github.com/user-attachments/assets/69dae597-0d17-4b7c-9c7b-04ee81bd8219
 
 ![CloudFlare ImgBed architecture: client interfaces, portable service runtimes, database compatibility, unified storage channels, and extensible AI capabilities](readme/architecture.apng)
 
-A shared application core runs on **Pages, Workers, or Docker**, with **KV / D1 / SQLite** selected for the deployment. Metadata and file content follow separate adapters; channel routing handles load balancing and failure fallback, while the AI capability framework brings configurable models, prompts, and structured results into file workflows.
+Built on an isomorphic core, the engine runs seamlessly across Pages, Workers, and Docker with adaptive persistence over KV, D1, or SQLite. Metadata and file payloads are strictly decoupled via dedicated adapters, while intelligent channel routing guarantees high availability through load balancing and auto-failover—all augmented by an AI-native workflow framework that brings configurable models, prompts, and structured outputs directly into your file pipeline.
 
 ## 🤝 Partners
 
