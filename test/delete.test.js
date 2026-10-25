@@ -25,7 +25,7 @@ describe('delete files', () => {
         const ctx = context(id);
         const response = await single.onRequest(ctx);
         assert.equal(response.status, 200);
-        assert.deepEqual(await response.json(), { success: true, fileId: id });
+        assert.deepEqual(await response.json(), { success: true, fileId: id, existed: true });
         assert.equal(fixture.objects.has(id), false);
         assert.equal(await fixture.db.getWithMetadata(id), null);
         const index = await fixture.readFiles(ctx);
@@ -42,10 +42,46 @@ describe('delete files', () => {
             const ctx = context('missing.png');
             const response = await single.onRequest(ctx);
             assert.equal(response.status, 200);
-            assert.equal((await response.json()).success, true);
+            const body = await response.json();
+            assert.equal(body.success, true);
+            assert.equal(body.existed, false);
             assert.deepEqual((await fixture.readFiles(ctx)).files, []);
         }
         assert.deepEqual(fixture.purges, []);
+    });
+
+    it('removes stale index entries even when the record no longer exists', async () => {
+        // 记录不存在,但索引里残留条目:DELETE 仍应清理索引(既有行为,existed=false)
+        await fixture.seed([]);
+        const ctx0 = createContext('https://test/api/manage/list', { method: 'GET', env: fixture.env });
+        // 直接向索引注入残留条目
+        await fixture.db.put('manage@index@meta', JSON.stringify({ chunkCount: 1, totalCount: 1, lastUpdated: Date.now() }));
+        await fixture.db.put('manage@index_0', JSON.stringify([{ id: 'ghost.png', metadata: { FileName: 'ghost.png' } }]));
+        const ctx = context('ghost.png');
+        const response = await single.onRequest(ctx);
+        assert.equal(response.status, 200);
+        assert.equal((await response.json()).existed, false);
+        await Promise.all(ctx.backgroundTasks);
+        const index = await fixture.readFiles(ctx);
+        assert.deepEqual(index.files, [], 'stale index entry should be removed');
+    });
+
+    it('reports per-item existed in batch responses and separates missing ids', async () => {
+        await fixture.seed([{ id: 'real.png', metadata: { Channel: 'CloudflareR2', FileType: 'image/png' } }]);
+        const payload = { fileIds: ['real.png', 'missing.png'] };
+        const ctx = createContext('https://test/api/manage/delete/batch', {
+            method: 'POST', env: fixture.env, body: JSON.stringify(payload),
+        });
+        Object.defineProperty(ctx.request, 'json', { value: async () => payload });
+        const response = await batch.onRequest(ctx);
+        assert.equal(response.status, 200);
+        const body = await response.json();
+        assert.deepEqual(body.deleted, ['real.png']);
+        assert.deepEqual(body.missing, ['missing.png']);
+        assert.deepEqual(body.failed, []);
+        const detail = body.details.find((item) => item.fileId === 'missing.png');
+        assert.equal(detail.success, true);
+        assert.equal(detail.existed, false);
     });
 
     it('retains the record and index when R2 deletion throws', async () => {
@@ -87,11 +123,12 @@ describe('delete files', () => {
         const ctx = context('batch', { method: 'POST', body: JSON.stringify({ fileIds: ['/album/photo.png/', 'album/photo.png', ' /docs/中文.txt/ ', 'failed.png'] }) });
         const response = await batch.onRequest(ctx);
         assert.equal(response.status, 200);
-        assert.deepEqual(await response.json(), {
-            success: false,
-            deleted: ['album/photo.png', 'docs/中文.txt'],
-            failed: [{ fileId: 'failed.png', error: 'Delete file failed' }],
-        });
+        const body = await response.json();
+        assert.equal(body.success, false);
+        assert.deepEqual(body.deleted, ['album/photo.png', 'docs/中文.txt']);
+        assert.deepEqual(body.missing, []); // 去重后无重复 id,全部真实存在
+        assert.deepEqual(body.failed, [{ fileId: 'failed.png', error: 'Delete file failed' }]);
+        assert.ok(body.details.length === 3);
         assert.equal(await fixture.db.getWithMetadata('album/photo.png'), null);
         assert.equal(await fixture.db.getWithMetadata('docs/中文.txt'), null);
         assert.notEqual(await fixture.db.getWithMetadata('failed.png'), null);

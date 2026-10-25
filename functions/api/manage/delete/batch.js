@@ -27,19 +27,23 @@ export async function onRequest(context) {
         const results = await mapConcurrent(fileIds, DELETE_CONCURRENCY, async (fileId) => {
             try {
                 const cdnUrl = `${url.origin}/file/${fileId.split('/').map(encodeURIComponent).join('/')}`;
-                const success = await deleteFile(context.env, fileId, cdnUrl, url);
-                return { fileId, success, error: success ? '' : 'Delete file failed' };
+                const result = await deleteFile(context.env, fileId, cdnUrl, url);
+                const success = !!(result && result.deleted);
+                return { fileId, success, existed: !!(result && result.existed), error: success ? '' : 'Delete file failed' };
             } catch (err) {
-                return { fileId, success: false, error: String(err?.message || err) };
+                return { fileId, success: false, existed: false, error: String(err?.message || err) };
             }
         });
 
-        const deleted = results.filter((item) => item.success).map((item) => item.fileId);
+        // 兼容:deleted/failed 保持旧形态;新增 missing(幂等成功但记录本不存在)与逐项 details
+        const deleted = results.filter((item) => item.success && item.existed).map((item) => item.fileId);
+        const missing = results.filter((item) => item.success && !item.existed).map((item) => item.fileId);
         const failed = results.filter((item) => !item.success).map(({ fileId, error }) => ({ fileId, error }));
-        if (deleted.length > 0) {
-            context.waitUntil(batchRemoveFilesFromIndex(context, deleted));
+        const indexCleanup = results.filter((item) => item.success).map((item) => item.fileId);
+        if (indexCleanup.length > 0) {
+            context.waitUntil(batchRemoveFilesFromIndex(context, indexCleanup));
         }
-        return jsonResponse({ success: failed.length === 0, deleted, failed });
+        return jsonResponse({ success: failed.length === 0, deleted, missing, failed, details: results });
     } catch (error) {
         return jsonResponse({ success: false, error: error.message }, 400);
     }

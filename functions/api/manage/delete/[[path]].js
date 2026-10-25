@@ -37,6 +37,7 @@ export async function onRequest(context) {
             }];
 
             const deletedFiles = [];
+            const missingFiles = [];
             const failedFiles = [];
 
             while (folderQueue.length > 0) {
@@ -57,9 +58,12 @@ export async function onRequest(context) {
                     const fileId = file.name;
                     const cdnUrl = `https://${url.hostname}/file/${fileId}`;
 
-                    const success = await deleteFile(env, fileId, cdnUrl, url);
-                    if (success) {
+                    const result = await deleteFile(env, fileId, cdnUrl, url);
+                    if (result && result.deleted && result.existed) {
                         deletedFiles.push(fileId);
+                    } else if (result && result.deleted) {
+                        // 记录本就不存在(幂等成功),单列供调用方区分
+                        missingFiles.push(fileId);
                     } else {
                         failedFiles.push(fileId);
                     }
@@ -105,17 +109,19 @@ export async function onRequest(context) {
         const fileId = params.path.split(',').join('/');
         const cdnUrl = `https://${url.hostname}/file/${fileId}`;
 
-        const success = await deleteFile(env, fileId, cdnUrl, url);
-        if (!success) {
+        const result = await deleteFile(env, fileId, cdnUrl, url);
+        if (!result || !result.deleted) {
             throw new Error('Delete file failed');
         } else {
-            // 从索引中删除文件
+            // 从索引中删除文件（无条件:记录不存在时索引也可能有残留条目,保持既有清理行为）
             waitUntil(removeFileFromIndex(context, fileId));
         }
 
         return new Response(JSON.stringify({
             success: true,
-            fileId: fileId
+            fileId: fileId,
+            // 兼容说明:保持 200 + success:true 的幂等语义;existed 供调用方区分"实际删除"与"记录原本不存在"
+            existed: result.existed
         }), {
             headers: { 'Content-Type': 'application/json', ...corsHeaders }
         });
@@ -137,10 +143,10 @@ export async function deleteFile(env, fileId, cdnUrl, url) {
         const db = getDatabase(env);
         const img = await db.getWithMetadata(fileId);
 
-        // 如果文件记录不存在，直接返回成功（幂等删除）
+        // 如果文件记录不存在，直接返回成功（幂等删除），标记 existed=false 供调用方区分
         if (!img) {
             console.warn(`File ${fileId} not found in database, skipping delete`);
-            return true;
+            return { deleted: true, existed: false };
         }
 
         // 如果是R2渠道的图片，需要删除R2中对应的图片
@@ -181,10 +187,10 @@ export async function deleteFile(env, fileId, cdnUrl, url) {
         await purgeRandomFileListCache(url.origin, normalizedFolder);
         await purgePublicFileListCache(url.origin, normalizedFolder);
 
-        return true;
+        return { deleted: true, existed: true };
     } catch (e) {
         console.error('Delete file failed:', e);
-        return false;
+        return { deleted: false, existed: true };
     }
 }
 
