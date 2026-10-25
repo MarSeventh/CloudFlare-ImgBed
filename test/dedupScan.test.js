@@ -101,4 +101,22 @@ describe('duplicate scan (read-only, Node-only)', () => {
         assert.deepEqual(body.skippedOversized, ['big.png']);
         assert.equal(body.duplicateGroups.length, 0);
     });
+
+    it('GET probes deployment capability without scanning', async () => {
+        await seedWithChunks([
+            { id: 'a.png', metadata: { FileName: 'a.png', Channel: 'CloudflareR2', TimeStamp: 1 }, content: 'x' },
+        ]);
+        const c = createContext('https://test/api/manage/dedup/scan', { method: 'GET', env: { ...fixture.env, SERVER_RUNTIME: 'node' } });
+        const res = await scan.onRequest(c);
+        assert.equal(res.status, 200);
+        assert.deepEqual(await res.json(), { supported: true });
+    });
+
+    it('GET also reports unsupported on Workers-like runtimes', async () => {
+        const env = { ...fixture.env, SERVER_RUNTIME: undefined, img_d1: { prepare: () => {} } };
+        const c = createContext('https://test/api/manage/dedup/scan', { method: 'GET', env });
+        const res = await scan.onRequest(c);
+        assert.equal(res.status, 501);
+        assert.equal((await res.json()).supported, false);
+    });
 });

@@ -8,6 +8,7 @@
  *
  * 部署限制:依赖 SERVER_RUNTIME === 'node' 能力标志(仅 Docker / Node.js
  * 服务端部署提供;Workers / Pages 包括绑定 D1 的场景均返回 501)。
+ * 能力探测:GET 请求返回 {supported} 而不执行扫描,供前端统一禁用/隐藏入口。
  *
  * 有界执行:单文件大小上限(默认 100MB,可经 ?maxFileMB 调低),超限计入
  * skippedOversized;响应带完整性与失败范围,分片读取失败显式上报。
@@ -15,17 +16,10 @@
 import { getDatabase } from '../../../utils/databaseAdapter.js';
 
 export async function onRequest(context) {
-    if (context.request.method !== 'POST') {
-        return new Response(JSON.stringify({ error: 'method not allowed, use POST' }), {
-            status: 405,
-            headers: { 'content-type': 'application/json' },
-        });
-    }
-
     const { request, env } = context;
-    const url = new URL(request.url);
 
-    // 能力标志:只有 Node 服务端部署提供(Workers/Pages 即便绑定 D1 也没有)
+    // 能力标志:只有 Node 服务端部署提供(Workers/Pages 即便绑定 D1 也没有)。
+    // 判定前置且对任意方法生效:前端可经 GET 无副作用地探测能力,统一与扫描相同的判定
     if (env?.SERVER_RUNTIME !== 'node') {
         return new Response(JSON.stringify({
             error: 'duplicate scan is only available on Docker / Node.js server deployments',
@@ -35,6 +29,21 @@ export async function onRequest(context) {
             headers: { 'content-type': 'application/json' },
         });
     }
+
+    if (request.method === 'GET') {
+        return new Response(JSON.stringify({ supported: true }), {
+            headers: { 'content-type': 'application/json' },
+        });
+    }
+
+    if (request.method !== 'POST') {
+        return new Response(JSON.stringify({ error: 'method not allowed, use POST' }), {
+            status: 405,
+            headers: { 'content-type': 'application/json' },
+        });
+    }
+
+    const url = new URL(request.url);
 
     const maxFileMB = Math.max(1, parseInt(url.searchParams.get('maxFileMB') || '100', 10));
     const maxFileBytes = maxFileMB * 1024 * 1024;
