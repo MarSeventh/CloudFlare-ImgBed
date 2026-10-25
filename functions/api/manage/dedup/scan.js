@@ -10,8 +10,10 @@
  * 服务端部署提供;Workers / Pages 包括绑定 D1 的场景均返回 501)。
  * 能力探测:GET 请求返回 {supported} 而不执行扫描,供前端统一禁用/隐藏入口。
  *
- * 有界执行:单文件大小上限(默认 100MB,可经 ?maxFileMB 调低),超限计入
- * skippedOversized;响应带完整性与失败范围,分片读取失败显式上报。
+ * 有界执行:单文件大小上限(默认 100MB,只可经 ?maxFileMB 调低,非法值回退
+ * 默认),元数据缺失或非法的记录按超限处理计入 skippedOversized;总时间预算
+ * (默认 30s,可经 ?timeoutMs 调低)超限停止扫描并标注 timedOut:true;
+ * 响应带完整性与失败范围,分片读取失败显式上报。
  */
 import { getDatabase } from '../../../utils/databaseAdapter.js';
 
@@ -39,35 +41,58 @@ export async function onRequest(context) {
     if (request.method !== 'POST') {
         return new Response(JSON.stringify({ error: 'method not allowed, use POST' }), {
             status: 405,
-            headers: { 'content-type': 'application/json' },
+            headers: { 'content-type': 'application/json', 'allow': 'GET, POST' },
         });
     }
 
     const url = new URL(request.url);
 
-    const maxFileMB = Math.max(1, parseInt(url.searchParams.get('maxFileMB') || '100', 10));
+    // 单文件大小上限:默认 100MB,只允许调低;非法值回退默认,防止 NaN 绕过保护
+    const parsedMax = parseInt(url.searchParams.get('maxFileMB') || '100', 10);
+    const maxFileMB = Number.isFinite(parsedMax) && parsedMax >= 1 ? Math.min(parsedMax, 100) : 100;
     const maxFileBytes = maxFileMB * 1024 * 1024;
+
+    // 总时间预算:默认 30s,只允许调低(0 = 立即超时,便于测试);超限停止扫描并标注 timedOut
+    const parsedTimeout = parseInt(url.searchParams.get('timeoutMs') || '30000', 10);
+    const timeoutMs = Number.isFinite(parsedTimeout) && parsedTimeout >= 0 ? Math.min(parsedTimeout, 30000) : 30000;
+    const deadline = Date.now() + timeoutMs;
+    let timedOut = false;
 
     const db = getDatabase(env);
 
-    // ===== 读取分片索引,显式报告读取失败 =====
+    // ===== 读取分片索引,显式报告读取失败(含 meta 本身损坏/缺失)=====
     const INDEX_META_KEY = 'manage@index@meta';
     const INDEX_KEY = 'manage@index';
     const metaStr = await db.get(INDEX_META_KEY);
-    const meta = metaStr ? JSON.parse(metaStr) : { chunkCount: 0 };
-    const entries = [];
+    const meta = { chunkCount: 0 };
     const chunkErrors = [];
+    if (metaStr !== null && metaStr !== undefined) {
+        try {
+            const parsed = JSON.parse(metaStr);
+            meta.chunkCount = Number.isFinite(parsed?.chunkCount) ? parsed.chunkCount : 0;
+        } catch (err) {
+            console.error('dedup scan: failed to parse index meta:', err);
+            chunkErrors.push({ chunk: 'meta', error: String(err?.message || err) });
+        }
+    } else {
+        chunkErrors.push({ chunk: 'meta', error: 'index meta missing' });
+    }
+    const entries = [];
     for (let i = 0; i < (meta.chunkCount || 0); i++) {
         try {
             const chunkStr = await db.get(`${INDEX_KEY}_${i}`);
-            const chunk = chunkStr ? JSON.parse(chunkStr) : [];
+            if (chunkStr === null || chunkStr === undefined) {
+                // 缺失分片:不能当空数组静默吞掉,否则 scanned 偏少却报完整
+                chunkErrors.push({ chunk: i, error: 'chunk missing' });
+                continue;
+            }
+            const chunk = JSON.parse(chunkStr);
             entries.push(...chunk);
         } catch (err) {
             console.error(`dedup scan: failed to read chunk ${i}:`, err);
             chunkErrors.push({ chunk: i, error: String(err?.message || err) });
         }
     }
-    const complete = chunkErrors.length === 0 && metaStr !== null;
 
     // ===== 逐条目读取记录元数据(记录缺失计入 recordErrors)=====
     const records = [];
@@ -90,9 +115,15 @@ export async function onRequest(context) {
     const readErrors = [];
     const skippedOversized = [];
     for (const record of records) {
+        if (Date.now() >= deadline) {
+            // 时间预算耗尽:停止扫描,已扫部分照常返回,显式标注
+            timedOut = true;
+            break;
+        }
         const meta = record.metadata || {};
-        const sizeBytes = Number(meta.FileSizeBytes || 0);
-        if (sizeBytes > maxFileBytes) {
+        // 大小上限 fail-closed:元数据缺失/非法时按超限跳过,不做无界读取
+        const sizeBytes = Number(meta.FileSizeBytes);
+        if (!Number.isFinite(sizeBytes) || sizeBytes <= 0 || sizeBytes > maxFileBytes) {
             skippedOversized.push(record.id);
             continue;
         }
@@ -133,8 +164,10 @@ export async function onRequest(context) {
         redundantCopies += items.length - 1;
     }
 
+    // 完整性 = 分片全部读齐 且 未超时(超时发生在记录循环之后,必须在响应前定案)
     return new Response(JSON.stringify({
-        complete,
+        complete: chunkErrors.length === 0 && !timedOut,
+        timedOut,
         chunkErrors,
         scanned: records.length,
         recordErrors,

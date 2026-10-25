@@ -29,9 +29,11 @@ describe('duplicate scan (read-only, Node-only)', () => {
             } else {
                 await fixture.db.put('manage@index_0', chunk);
             }
-            // 每个文件同时写记录(fixture.seed 语义)并放 R2 对象内容
+            // 每个文件同时写记录(fixture.seed 语义)并放 R2 对象内容;真实上传管线都会写 FileSizeBytes
             for (const file of files) {
-                await fixture.db.put(file.id, '', { metadata: file.metadata });
+                const meta = { ...file.metadata };
+                if (meta.FileSizeBytes === undefined) meta.FileSizeBytes = (file.content ?? 'file-content').length;
+                await fixture.db.put(file.id, '', { metadata: meta });
                 fixture.objects.set(file.id, file.content ?? 'file-content');
             }
         })();
@@ -118,5 +120,45 @@ describe('duplicate scan (read-only, Node-only)', () => {
         const res = await scan.onRequest(c);
         assert.equal(res.status, 501);
         assert.equal((await res.json()).supported, false);
+    });
+
+    it('reports a missing chunk as incomplete instead of silently skipping it', async () => {
+        await seedWithChunks([
+            { id: 'a.png', metadata: { FileName: 'a.png', Channel: 'CloudflareR2', TimeStamp: 1 }, content: 'x' },
+        ]);
+        // chunkCount 宣称 2,chunk_1 从未写入 → 必须计入 chunkErrors 并 complete:false
+        await fixture.db.put('manage@index@meta', JSON.stringify({ chunkCount: 2, totalCount: 1 }));
+        const body = await (await scan.onRequest(ctx())).json();
+        assert.equal(body.complete, false);
+        assert.ok(body.chunkErrors.some(e => e.chunk === 1 && /missing/.test(e.error)));
+    });
+
+    it('reports corrupt index meta as incomplete with a meta chunk error', async () => {
+        await seedWithChunks([]);
+        await fixture.db.put('manage@index@meta', '{corrupted-meta');
+        const body = await (await scan.onRequest(ctx())).json();
+        assert.equal(body.complete, false);
+        assert.ok(body.chunkErrors.some(e => e.chunk === 'meta'));
+    });
+
+    it('stops within the time budget and marks the report timedOut and incomplete', async () => {
+        await seedWithChunks([
+            { id: 'a.png', metadata: { FileName: 'a.png', Channel: 'CloudflareR2', TimeStamp: 1 }, content: 'x' },
+            { id: 'b.png', metadata: { FileName: 'b.png', Channel: 'CloudflareR2', TimeStamp: 2 }, content: 'y' },
+        ]);
+        const c = createContext('https://test/api/manage/dedup/scan?timeoutMs=0', { method: 'POST', env: { ...fixture.env, SERVER_RUNTIME: 'node' } });
+        const body = await (await scan.onRequest(c)).json();
+        assert.equal(body.complete, false);
+        assert.equal(body.timedOut, true);
+    });
+
+    it('treats an invalid maxFileMB parameter as the default cap instead of disabling it', async () => {
+        await seedWithChunks([
+            { id: 'big.png', metadata: { FileName: 'big.png', Channel: 'CloudflareR2', TimeStamp: 1, FileSizeBytes: 500 * 1024 * 1024 }, content: 'big' },
+        ]);
+        const c = createContext('https://test/api/manage/dedup/scan?maxFileMB=abc', { method: 'POST', env: { ...fixture.env, SERVER_RUNTIME: 'node' } });
+        const body = await (await scan.onRequest(c)).json();
+        // 非法参数回退默认 100MB → 该文件仍按超限跳过,而不是被 NaN 绕过
+        assert.deepEqual(body.skippedOversized, ['big.png']);
     });
 });

@@ -14,6 +14,7 @@ const routes = [
     ['../../functions/api/manage/list.js', 'onRequest'],
     ['../../functions/api/manage/delete/[[path]].js', 'onRequest'],
     ['../../functions/api/manage/delete/batch.js', 'onRequest'],
+    ['../../functions/api/manage/dedup/scan.js', 'onRequest'],
     ['../../functions/api/manage/metadata/[[path]].js', 'onRequest'],
     ['../../functions/api/manage/rename/[[path]].js', 'onRequest'],
     ['../../functions/api/manage/move/[[path]].js', 'onRequest'],
