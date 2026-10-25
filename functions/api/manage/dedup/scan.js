@@ -183,7 +183,7 @@ export async function onRequest(context) {
         redundantCopies += items.length - 1;
     }
 
-    // 完整性 = 分片全部读齐 且 未超时(超时发生在记录循环之后,必须在响应前定案)
+    // 完整性 = 分片全部读齐 且 未超时(超时可能发生在任一阶段,须在响应前定案)
     return new Response(JSON.stringify({
         complete: chunkErrors.length === 0 && !timedOut,
         timedOut,

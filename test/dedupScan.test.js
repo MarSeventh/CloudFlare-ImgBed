@@ -164,12 +164,12 @@ describe('duplicate scan (read-only, Node-only)', () => {
 
     it('fail-closed: records without a trustworthy FileSizeBytes are skipped, not read unbounded', async () => {
         await seedWithChunks([
-            { id: 'unknown.png', metadata: { FileName: 'unknown.png', Channel: 'CloudflareR2', TimeStamp: 1 }, content: 'mystery-bytes', noSize: true },
-            { id: 'known.png', metadata: { FileName: 'known.png', Channel: 'CloudflareR2', TimeStamp: 2 }, content: 'known' },
+            { id: 'unknown.png', metadata: { FileName: 'unknown.png', Channel: 'CloudflareR2', TimeStamp: 1 }, content: 'same-bytes', noSize: true },
+            { id: 'known.png', metadata: { FileName: 'known.png', Channel: 'CloudflareR2', TimeStamp: 2 }, content: 'same-bytes' },
         ]);
         const body = await (await scan.onRequest(ctx())).json();
         assert.deepEqual(body.skippedOversized, ['unknown.png']);
-        // 缺尺寸的记录不参与分组,scanned 只统计已处理条目
+        // 判别性:两条内容相同,若 fail-closed 失效而读入 unknown.png,会形成重复组
         assert.equal(body.duplicateGroups.length, 0);
         assert.equal(body.scanned, 2);
     });
