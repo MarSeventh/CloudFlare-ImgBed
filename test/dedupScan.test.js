@@ -32,7 +32,7 @@ describe('duplicate scan (read-only, Node-only)', () => {
             // 每个文件同时写记录(fixture.seed 语义)并放 R2 对象内容;真实上传管线都会写 FileSizeBytes
             for (const file of files) {
                 const meta = { ...file.metadata };
-                if (meta.FileSizeBytes === undefined) meta.FileSizeBytes = (file.content ?? 'file-content').length;
+                if (meta.FileSizeBytes === undefined && !file.noSize) meta.FileSizeBytes = (file.content ?? 'file-content').length;
                 await fixture.db.put(file.id, '', { metadata: meta });
                 fixture.objects.set(file.id, file.content ?? 'file-content');
             }
@@ -160,5 +160,29 @@ describe('duplicate scan (read-only, Node-only)', () => {
         const body = await (await scan.onRequest(c)).json();
         // 非法参数回退默认 100MB → 该文件仍按超限跳过,而不是被 NaN 绕过
         assert.deepEqual(body.skippedOversized, ['big.png']);
+    });
+
+    it('fail-closed: records without a trustworthy FileSizeBytes are skipped, not read unbounded', async () => {
+        await seedWithChunks([
+            { id: 'unknown.png', metadata: { FileName: 'unknown.png', Channel: 'CloudflareR2', TimeStamp: 1 }, content: 'mystery-bytes', noSize: true },
+            { id: 'known.png', metadata: { FileName: 'known.png', Channel: 'CloudflareR2', TimeStamp: 2 }, content: 'known' },
+        ]);
+        const body = await (await scan.onRequest(ctx())).json();
+        assert.deepEqual(body.skippedOversized, ['unknown.png']);
+        // 缺尺寸的记录不参与分组,scanned 只统计已处理条目
+        assert.equal(body.duplicateGroups.length, 0);
+        assert.equal(body.scanned, 2);
+    });
+
+    it('does not overcount scanned records after the time budget stops the scan', async () => {
+        await seedWithChunks([
+            { id: 'a.png', metadata: { FileName: 'a.png', Channel: 'CloudflareR2', TimeStamp: 1 }, content: 'x' },
+            { id: 'b.png', metadata: { FileName: 'b.png', Channel: 'CloudflareR2', TimeStamp: 2 }, content: 'y' },
+        ]);
+        const c = createContext('https://test/api/manage/dedup/scan?timeoutMs=0', { method: 'POST', env: { ...fixture.env, SERVER_RUNTIME: 'node' } });
+        const body = await (await scan.onRequest(c)).json();
+        assert.equal(body.timedOut, true);
+        // scanned 只统计已处理条目,超时后剩余的不计入
+        assert.equal(body.scanned, 0);
     });
 });

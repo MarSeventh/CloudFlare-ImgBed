@@ -12,7 +12,8 @@
  *
  * 有界执行:单文件大小上限(默认 100MB,只可经 ?maxFileMB 调低,非法值回退
  * 默认),元数据缺失或非法的记录按超限处理计入 skippedOversized;总时间预算
- * (默认 30s,可经 ?timeoutMs 调低)超限停止扫描并标注 timedOut:true;
+ * (默认 30s,可经 ?timeoutMs 调低)在分片/记录/内容三个阶段逐段检查,超限
+ * 停止扫描并标注 timedOut:true,scanned 只统计已处理条目;
  * 响应带完整性与失败范围,分片读取失败显式上报。
  */
 import { getDatabase } from '../../../utils/databaseAdapter.js';
@@ -63,10 +64,18 @@ export async function onRequest(context) {
     // ===== 读取分片索引,显式报告读取失败(含 meta 本身损坏/缺失)=====
     const INDEX_META_KEY = 'manage@index@meta';
     const INDEX_KEY = 'manage@index';
-    const metaStr = await db.get(INDEX_META_KEY);
     const meta = { chunkCount: 0 };
     const chunkErrors = [];
-    if (metaStr !== null && metaStr !== undefined) {
+    let metaStr = null;
+    let metaReadFailed = false;
+    try {
+        metaStr = await db.get(INDEX_META_KEY);
+    } catch (err) {
+        console.error('dedup scan: failed to read index meta:', err);
+        chunkErrors.push({ chunk: 'meta', error: String(err?.message || err) });
+        metaReadFailed = true;
+    }
+    if (!metaReadFailed && metaStr !== null && metaStr !== undefined) {
         try {
             const parsed = JSON.parse(metaStr);
             meta.chunkCount = Number.isFinite(parsed?.chunkCount) ? parsed.chunkCount : 0;
@@ -74,11 +83,15 @@ export async function onRequest(context) {
             console.error('dedup scan: failed to parse index meta:', err);
             chunkErrors.push({ chunk: 'meta', error: String(err?.message || err) });
         }
-    } else {
+    } else if (!metaReadFailed) {
         chunkErrors.push({ chunk: 'meta', error: 'index meta missing' });
     }
     const entries = [];
     for (let i = 0; i < (meta.chunkCount || 0); i++) {
+        if (Date.now() >= deadline) {
+            timedOut = true;
+            break;
+        }
         try {
             const chunkStr = await db.get(`${INDEX_KEY}_${i}`);
             if (chunkStr === null || chunkStr === undefined) {
@@ -98,6 +111,10 @@ export async function onRequest(context) {
     const records = [];
     const recordErrors = [];
     for (const entry of entries) {
+        if (Date.now() >= deadline) {
+            timedOut = true;
+            break;
+        }
         try {
             const rec = await db.getWithMetadata(entry.id);
             if (rec === null || rec === undefined) {
@@ -114,12 +131,14 @@ export async function onRequest(context) {
     const groups = new Map();
     const readErrors = [];
     const skippedOversized = [];
+    let processed = 0;
     for (const record of records) {
         if (Date.now() >= deadline) {
-            // 时间预算耗尽:停止扫描,已扫部分照常返回,显式标注
+            // 时间预算耗尽:停止扫描,已处理部分照常返回,显式标注
             timedOut = true;
             break;
         }
+        processed++;
         const meta = record.metadata || {};
         // 大小上限 fail-closed:元数据缺失/非法时按超限跳过,不做无界读取
         const sizeBytes = Number(meta.FileSizeBytes);
@@ -169,7 +188,7 @@ export async function onRequest(context) {
         complete: chunkErrors.length === 0 && !timedOut,
         timedOut,
         chunkErrors,
-        scanned: records.length,
+        scanned: processed,
         recordErrors,
         readErrors,
         skippedOversized,
