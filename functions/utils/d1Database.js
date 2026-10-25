@@ -135,6 +135,38 @@ D1Database.prototype.listFiles = function(options) {
     });
 };
 
+/**
+ * 列出已到期的文件，按到期时间升序
+ * 条件必须与 idx_files_expires 的表达式一致才能走索引，只读取已到期的行
+ */
+D1Database.prototype.listExpiredFiles = function(now, limit) {
+    var stmt = this.db.prepare(
+        "SELECT id, value, metadata FROM files WHERE json_extract(metadata, '$.ExpiresAt') <= ? " +
+        "ORDER BY json_extract(metadata, '$.ExpiresAt') LIMIT ?"
+    );
+    return stmt.bind(now, limit).all().then(function(response) {
+        return (response.results || []).map(function(row) {
+            return {
+                id: row.id,
+                value: row.value,
+                metadata: JSON.parse(row.metadata || '{}')
+            };
+        });
+    });
+};
+
+/**
+ * 统计已到期但尚未清理的文件数
+ */
+D1Database.prototype.countExpiredFiles = function(now) {
+    var stmt = this.db.prepare(
+        "SELECT COUNT(*) AS count FROM files WHERE json_extract(metadata, '$.ExpiresAt') <= ?"
+    );
+    return stmt.bind(now).first().then(function(result) {
+        return result ? Number(result.count) : 0;
+    });
+};
+
 // ==================== 设置操作 ====================
 
 /**

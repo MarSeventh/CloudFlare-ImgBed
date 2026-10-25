@@ -2,6 +2,7 @@ import { fetchSecurityConfig } from "../utils/sysConfig";
 import { purgeCFCache, purgeRandomFileListCache, purgePublicFileListCache } from "../utils/purgeCache";
 import { addFileToIndex } from "../utils/indexManager.js";
 import { getDatabase } from '../utils/databaseAdapter.js';
+import { trackFileExpiry } from '../utils/fileExpiryService.js';
 import { resolveFileExt } from '../utils/mimeTypes.js';
 export { isExtValid, resolveFileExt } from '../utils/mimeTypes.js';
 
@@ -360,6 +361,9 @@ export async function purgeCDNCache(env, cdnUrl, url, normalizedFolder) {
 // 结束上传：清除缓存，维护索引
 export async function endUpload(context, fileId, metadata) {
     const { env, url } = context;
+
+    // 设置了有效期的文件，KV 存储下写入到期标记
+    await trackFileExpiry(getDatabase(env), fileId, metadata);
 
     // 清除CDN缓存
     const cdnUrl = `https://${url.hostname}/file/${fileId}`;

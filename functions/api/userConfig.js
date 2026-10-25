@@ -2,7 +2,7 @@
  * 用户端页面配置 API
  * 负责读取页面配置并转换为前端可直接使用的用户配置对象
  */
-import { fetchPageConfig } from "../utils/sysConfig.js";
+import { fetchPageConfig, fetchOthersConfig } from "../utils/sysConfig.js";
 
 export async function onRequest(context) {
     const { env } = context;
@@ -26,6 +26,16 @@ export async function onRequest(context) {
 
     if (Number.isFinite(Number(PageConfig.announcementRefreshAt))) {
         userConfig.announcementRefreshAt = Number(PageConfig.announcementRefreshAt);
+    }
+
+    // 文件有效期：上传页和 API 用户据此展示可选项，最终仍由上传接口按设置校验
+    const { fileExpiry } = await fetchOthersConfig(env);
+    if (fileExpiry?.enabled) {
+        userConfig.fileExpiry = {
+            defaultExpire: fileExpiry.defaultExpire,
+            allowCustom: fileExpiry.allowCustom,
+            options: fileExpiry.allowCustom ? fileExpiry.options : [fileExpiry.defaultExpire],
+        };
     }
 
     // 检查 USER_CONFIG 是否为空或未定义

@@ -15,6 +15,7 @@ import { resolveFileType } from '../../utils/mimeTypes.js';
 import { fetchUploadConfig } from '../../utils/sysConfig.js';
 import { userAuthCheck, UnauthorizedResponse } from '../../utils/auth/userAuth.js';
 import { buildUniqueFileId, getUploadIp, isBlockedUploadIp, createResponse } from '../uploadTools.js';
+import { resolveUploadExpiry } from '../../utils/fileExpiryService.js';
 
 export async function onRequestPost(context) {
     const { request, env } = context;
@@ -45,6 +46,15 @@ export async function onRequestPost(context) {
             return createResponse(JSON.stringify({
                 error: 'Missing required fields: fileSize, fileName, sha256, fileSample'
             }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        // 直传前校验有效期参数，避免文件已传到 HuggingFace 才在提交时被拒绝
+        const expiry = await resolveUploadExpiry(context);
+        if (expiry.error) {
+            return createResponse(JSON.stringify({ error: expiry.error }), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
             });

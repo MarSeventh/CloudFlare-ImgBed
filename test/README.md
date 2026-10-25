@@ -42,6 +42,7 @@ The current Mocha entry point automatically loads `.js` test files directly insi
 | AI tags | [ai.test.js](ai.test.js) | `api/manage/ai/tags.js` | Original formats, preview-type normalization, signatures and size limits; AI invocation only for valid input |
 | Shared file-type rules | [fileTypes.test.js](fileTypes.test.js) | `utils/mimeTypes.js` | MIME normalization, case-sensitive parameters, explicit-type precedence, extension inference, unknown/ambiguous extensions and random-image keywords versus strict classification |
 | D1 adapter | [database.test.js](database.test.js) | `utils/d1Database.js` | Settings listing pagination with cursors on the real adapter over the Docker SQLite shim |
+| File expiry | [expiry.test.js](expiry.test.js) | `utils/fileExpiryHelpers.js`, `utils/fileExpiryService.js`, `api/manage/expiry.js`, `file/`, `api/manage/sysConfig/others.js`, `api/userConfig.js` | Option parsing and settings validation; options published to clients; backend-decided upload expiry and the WebDAV exemption; expired-file 404 and capped caching; cleanup on SQLite through the expression index (query plan checked) and on KV through markers, including stale markers after moves, permanent changes and extensions; failure retention; batch sizing; administrator expiry edits, marker writes on move and backup exclusion |
 | Server imports | [smoke/serverImports.mjs](smoke/serverImports.mjs) | Main routes above and `functions/dav/` | Unmodified route imports and handler exports through the production loader |
 
 Business paths in the table are relative to `functions/`, except those already starting with `functions/`. Extend the relevant suite when changing one feature. A substantial independent feature can have its own module; add its entry points, scope and boundaries here instead of accumulating unrelated behavior in one file.
@@ -53,6 +54,7 @@ Business paths in the table are relative to `functions/`, except those already s
 - Deletion covers single-file and batch APIs, not recursive folder deletion or every remote channel's failure semantics.
 - Updates cover metadata and individual R2 renames/moves, not recursive directory moves, migrations across all channels or recovery from every intermediate failure.
 - Image processing, AI and random-image tests cover the behavior listed above. Extend their suites when those features change.
+- File-expiry cleanup is tested with R2 only; other channels go through the shared `deleteFile()`. The Worker `scheduled` handler and the Docker interval are exercised manually, not in CI, and Cloudflare's per-invocation subrequest limit is modelled rather than measured.
 - Storage requests, cache invalidation and AI calls use doubles. There are no live cloud end-to-end tests, complete Docker image startup checks, browser UI tests or production Cloudflare deployment checks.
 
 Keep gaps explicit here until the corresponding tests exist. Passing CI does not establish that every basic capability has been verified.
@@ -65,6 +67,7 @@ Keep gaps explicit here until the corresponding tests exist. Passing CI does not
 | `memoryDatabase()` | Isolated records and metadata per test; metadata reads return copies and listings sort by key. It implements only the interfaces needed by tests and does not verify KV/D1/SQLite pagination, TTL or consistency semantics |
 | [helpers/context.js](helpers/context.js) | Builds requests, route parameters and environments, and collects `waitUntil` tasks. Await those tasks before asserting background results; queuing work does not establish successful completion |
 | [helpers/files.js](helpers/files.js) | Creates PNG header/dimension samples for header inspection. These samples are not complete, decodable images |
+| [helpers/database.js](helpers/database.js) | Real `D1Database` over the Docker SQLite shim (`better-sqlite3`, in memory) with `database/init.sql` applied. Use it when behavior depends on SQL, indexes or pagination rather than on `memoryDatabase()` |
 | [helpers/management.js](helpers/management.js) | Shared deletion/update environment with the real index, metadata cleanup and management view; in-memory R2 objects, channel configuration and cache doubles. `readFiles()` awaits background tasks and queries the real index to verify final results |
 
 Authentication tests use the real authentication core, password checks, sessions and token validation, with configuration and database access replaced. Upload/read route tests may replace authentication dependencies to exercise their own entry branches; `auth.test.js` protects the complete authentication boundary.

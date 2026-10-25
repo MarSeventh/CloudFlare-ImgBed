@@ -10,6 +10,7 @@ import { fetchPageConfig, fetchUploadConfig } from '../../utils/sysConfig.js';
 import { getDatabase } from '../../utils/databaseAdapter.js';
 import { moderateContent, endUpload, getUploadIp, getIPAddress, sanitizeUploadFolder, createResponse } from '../uploadTools.js';
 import { userAuthCheck, UnauthorizedResponse } from '../../utils/auth/userAuth.js';
+import { resolveUploadExpiry } from '../../utils/fileExpiryService.js';
 
 export async function onRequestPost(context) {
     const { request, env, waitUntil } = context;
@@ -113,6 +114,18 @@ export async function onRequestPost(context) {
             Tags: []
         };
 
+        // 文件有效期由后端按设置决定（提交请求需携带与获取上传地址时相同的 expire 参数）
+        const expiry = await resolveUploadExpiry({ env, request, url });
+        if (expiry.error) {
+            return createResponse(JSON.stringify({ error: expiry.error }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+        if (expiry.expiresAt) {
+            metadata.ExpiresAt = expiry.expiresAt;
+        }
+
         // 图像审查（公开仓库）
         if (!hfChannel.isPrivate) {
             try {
@@ -150,6 +163,9 @@ export async function onRequestPost(context) {
         const urlPrefix = urlPrefixConfig?.value || '';
         if (urlPrefix) {
             responseBody.publicUrl = `${urlPrefix.replace(/\/+$/, '')}/${fullId}`;
+        }
+        if (metadata.ExpiresAt) {
+            responseBody.expiresAt = metadata.ExpiresAt;
         }
 
         return createResponse(JSON.stringify(responseBody), {

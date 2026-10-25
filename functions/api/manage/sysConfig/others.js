@@ -1,5 +1,6 @@
 import { getDatabase } from '../../../utils/databaseAdapter.js';
 import { createApiToken, deleteApiToken } from '../apiTokens.js';
+import { normalizeFileExpiryConfig, validateFileExpiryConfig } from '../../../utils/fileExpiryHelpers.js';
 
 export async function onRequest(context) {
     // 其他设置相关，GET方法读取设置，POST方法保存设置
@@ -30,9 +31,17 @@ export async function onRequest(context) {
         const body = await request.json()
         const settings = body
 
+        const oldSettings = await getOthersConfig(db, env);
+
+        // 文件有效期：只接受合法的选项，最终决定权在后端；未提交该项时保留原设置
+        const fileExpiry = validateFileExpiryConfig(settings.fileExpiry ?? oldSettings.fileExpiry);
+        if (fileExpiry.error) {
+            return new Response(fileExpiry.error, { status: 400 });
+        }
+        settings.fileExpiry = { ...fileExpiry.config, fixed: false };
+
         // WebDAV internal token 管理
         const webDAV = settings.webDAV || {};
-        const oldSettings = await getOthersConfig(db, env);
         const wasEnabled = oldSettings.webDAV?.enabled;
         const isEnabled = webDAV.enabled;
 
@@ -119,6 +128,11 @@ export async function getOthersConfig(db, env) {
         fixed: false,
     }
 
+    // 文件有效期（默认关闭）
+    settings.fileExpiry = {
+        ...normalizeFileExpiryConfig(settingsKV.fileExpiry),
+        fixed: false,
+    }
 
     return settings;
 }

@@ -20,6 +20,7 @@ import {
     resolveWebDAVCredentials,
 } from '../utils/metadata/channelCredentials.js';
 import { buildCdnFileUrl } from '../utils/metadata/metadataView.js';
+import { isExpired, getExpiresAt, capCacheControl } from '../utils/fileExpiryHelpers.js';
 import {
     parseImageTransform,
     transformImageRequestViaUrl,
@@ -82,6 +83,12 @@ export async function onRequest(context) {  // Contents of context object
     if (!imgRecord.metadata) {
         imgRecord.metadata = {};
     }
+
+    // 已到期但尚未被清理的文件按不存在处理，不依赖清理任务是否准时
+    if (isExpired(imgRecord.metadata)) {
+        return new Response('Error: Image Not Found', { status: 404 });
+    }
+    context.fileExpiresAt = getExpiresAt(imgRecord.metadata);
 
     const fileName = imgRecord.metadata?.FileName || fileId;
     const encodedFileName = encodeURIComponent(fileName);
@@ -251,14 +258,15 @@ async function buildFileAccessContext(context) {
     return fileAccess;
 }
 
+// 带有效期的文件只允许私有缓存，且缓存时长不超过剩余有效时间
 function getFileCacheControl(context) {
-    return context.fileAccess?.cacheControl;
+    return capCacheControl(context.fileAccess?.cacheControl, context.fileExpiresAt);
 }
 
 function getChunkedFileCacheControl(context) {
     return getFileCacheControl(context) === FILE_CACHE_CONTROL.NO_STORE
         ? FILE_CACHE_CONTROL.NO_STORE
-        : FILE_CACHE_CONTROL.PRIVATE;
+        : capCacheControl(FILE_CACHE_CONTROL.PRIVATE, context.fileExpiresAt);
 }
 
 

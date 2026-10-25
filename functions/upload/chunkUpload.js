@@ -1274,6 +1274,9 @@ export async function uploadLargeFileToTelegram(context, file, fullId, metadata,
         if (urlPrefix) {
             responseBody[0].publicUrl = `${urlPrefix.replace(/\/+$/, '')}/${fullId}`;
         }
+        if (metadata.ExpiresAt) {
+            responseBody[0].expiresAt = metadata.ExpiresAt;
+        }
 
         return createResponse(
             JSON.stringify(responseBody),

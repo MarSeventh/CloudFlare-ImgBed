@@ -209,6 +209,8 @@ const output = `/**
 // ==================== 自动生成的导入 ====================
 
 ${imports}
+// --- 定时任务 ---
+import { cleanupExpiredFiles } from '../../functions/utils/fileExpiryService.js';
 
 // ==================== 自动生成的路由表 ====================
 
@@ -440,6 +442,14 @@ export default {
         };
 
         return await maybeServeFromCache(request, ctx, () => executeChain(middlewares, handler, context));
+    },
+
+    // 文件有效期清理：仅在部署时配置了 EXPIRY_CLEANUP_CRON 后由 Cron Trigger 触发
+    async scheduled(controller, env, ctx) {
+        const context = { env, waitUntil: ctx.waitUntil.bind(ctx) };
+        ctx.waitUntil(cleanupExpiredFiles(context).then(result => {
+            console.log(\`Expired files cleanup: \${JSON.stringify(result)}\`);
+        }));
     },
 };
 `;

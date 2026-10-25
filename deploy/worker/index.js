@@ -45,6 +45,7 @@ import * as apiAuthResetAuth from '../../functions/api/auth/resetAuth.js';
 import * as apiAuthSessionCheck from '../../functions/api/auth/sessionCheck.js';
 import * as apiBingWallpaper_index from '../../functions/api/bing/wallpaper/index.js';
 import * as apiManageApiTokens from '../../functions/api/manage/apiTokens.js';
+import * as apiManageExpiry from '../../functions/api/manage/expiry.js';
 import * as apiManageList from '../../functions/api/manage/list.js';
 import * as apiManageQuota from '../../functions/api/manage/quota.js';
 import * as apiPublicList from '../../functions/api/public/list.js';
@@ -67,6 +68,8 @@ import * as apiManageWhiteCatchAll from '../../functions/api/manage/white/[[path
 import * as davCatchAll from '../../functions/dav/[[path]].js';
 import * as fileCatchAll from '../../functions/file/[[path]].js';
 
+// --- 定时任务 ---
+import { cleanupExpiredFiles } from '../../functions/utils/fileExpiryService.js';
 
 // ==================== 自动生成的路由表 ====================
 
@@ -100,6 +103,7 @@ const routes = [
     { path: '/api/auth/sessionCheck', module: apiAuthSessionCheck, middlewares: [mw_api] },
     { path: '/api/bing/wallpaper', module: apiBingWallpaper_index, middlewares: [mw_api] },
     { path: '/api/manage/apiTokens', module: apiManageApiTokens, middlewares: [mw_api, mw_api_manage] },
+    { path: '/api/manage/expiry', module: apiManageExpiry, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/manage/list', module: apiManageList, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/manage/quota', module: apiManageQuota, middlewares: [mw_api, mw_api_manage] },
     { path: '/api/public/list', module: apiPublicList, middlewares: [mw_api] },
@@ -348,5 +352,13 @@ export default {
         };
 
         return await maybeServeFromCache(request, ctx, () => executeChain(middlewares, handler, context));
+    },
+
+    // 文件有效期清理：仅在部署时配置了 EXPIRY_CLEANUP_CRON 后由 Cron Trigger 触发
+    async scheduled(controller, env, ctx) {
+        const context = { env, waitUntil: ctx.waitUntil.bind(ctx) };
+        ctx.waitUntil(cleanupExpiredFiles(context).then(result => {
+            console.log(`Expired files cleanup: ${JSON.stringify(result)}`);
+        }));
     },
 };

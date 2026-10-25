@@ -11,7 +11,7 @@ describe('upload', () => {
         db = memoryDatabase();
         storage = {};
         waits = [];
-        tools = await loadFunction('functions/upload/uploadTools.js', { getDatabase: () => db });
+        tools = await loadFunction('functions/upload/uploadTools.js', { getDatabase: () => db, trackFileExpiry: async () => {} });
         const { UnauthorizedResponse } = await loadFunction('functions/utils/auth/userAuth.js');
         mocks = {
             ...tools,
@@ -34,6 +34,7 @@ describe('upload', () => {
             getUploadIp: () => '',
             moderateContent: async () => 'None',
             endUpload: async () => {},
+            resolveUploadExpiry: async () => ({ expiresAt: null }),
             createS3Client: () => ({ async send(command) {
                 if (command.kind === 'put' || command.kind === 'create') storage.contentType = command.input.ContentType;
                 return { UploadId: 'multipart', ETag: 'etag' };

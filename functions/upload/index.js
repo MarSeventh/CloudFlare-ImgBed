@@ -15,6 +15,7 @@ import { HuggingFaceAPI } from "../utils/storage/huggingfaceAPI";
 import { WebDAVAPI } from "../utils/storage/webdavAPI";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getDatabase } from '../utils/databaseAdapter.js';
+import { resolveUploadExpiry } from '../utils/fileExpiryService.js';
 
 
 export async function onRequest(context) {  // Contents of context object
@@ -56,6 +57,11 @@ export async function onRequest(context) {  // Contents of context object
     // 检查是否为初始化分块上传请求
     const initChunked = url.searchParams.get('initChunked') === 'true';
     if (initChunked) {
+        // 分块上传在开始前校验有效期参数，避免传完所有分块才在合并时被拒绝
+        const expiry = await resolveUploadExpiry(context);
+        if (expiry.error) {
+            return createResponse(expiry.error, { status: 400 });
+        }
         return await initializeChunkedUpload(context);
     }
 
@@ -191,6 +197,16 @@ async function processFileUpload(context, formdata = null) {
         metadata.Height = imageDimensions.height;
     }
 
+    // 文件有效期由后端按设置决定
+    const expiry = await resolveUploadExpiry(context);
+    if (expiry.error) {
+        return createResponse(expiry.error, { status: 400 });
+    }
+    if (expiry.expiresAt) {
+        metadata.ExpiresAt = expiry.expiresAt;
+        context.fileExpiresAt = expiry.expiresAt;
+    }
+
     const fileExt = resolveFileExt(fileName, fileType);
 
     // 构建文件ID
@@ -281,6 +297,9 @@ function buildUploadResponse(context, returnLink) {
     const result = { src: returnLink };
     if (context.publicUrl) {
         result.publicUrl = context.publicUrl;
+    }
+    if (context.fileExpiresAt) {
+        result.expiresAt = context.fileExpiresAt;
     }
     return createResponse(JSON.stringify([result]), {
         headers: {

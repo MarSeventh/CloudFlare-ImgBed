@@ -9,6 +9,7 @@
  *   R2_BUCKET_NAME   - R2 存储桶名称
  *   WORKER_VARS      - JSON 对象，值可直接填写或使用 { value, type: 'text' | 'secret' }
  *                     type 默认 text；secret 单独生成文件供部署后批量上传
+ *   EXPIRY_CLEANUP_CRON - 可选，文件有效期清理的 Cron 表达式（5 段格式，如每 30 分钟一次），不填则不生成定时任务
  */
 
 import { appendFileSync, writeFileSync } from 'fs';
@@ -60,6 +61,13 @@ if (env.WORKER_VARS) {
     }
 }
 
+// 文件有效期清理的定时任务，只接受 5 段 Cron 表达式
+const expiryCron = (env.EXPIRY_CLEANUP_CRON || '').trim();
+if (expiryCron && !/^[0-9A-Za-z*\/,#?-]+(\s+[0-9A-Za-z*\/,#?-]+){4}$/.test(expiryCron)) {
+    console.error('Error: EXPIRY_CLEANUP_CRON must be a 5-field cron expression, for example "*/30 * * * *".');
+    process.exit(1);
+}
+
 let toml = `name = "${name}"
 main = "index.js"
 compatibility_date = "2024-08-21"
@@ -99,6 +107,13 @@ if (env.R2_BUCKET_NAME) {
 [[r2_buckets]]
 binding = "img_r2"
 bucket_name = "${env.R2_BUCKET_NAME}"
+`;
+}
+
+if (expiryCron) {
+    toml += `
+[triggers]
+crons = [${JSON.stringify(expiryCron.replace(/\s+/g, ' '))}]
 `;
 }
 

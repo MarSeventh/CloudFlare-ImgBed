@@ -6,6 +6,7 @@
 
 import { getDatabase } from '../../../../utils/databaseAdapter.js';
 import { cleanPersistedMetadata } from '../../../../utils/metadata/metadataSecurity.js';
+import { trackFileExpiry } from '../../../../utils/fileExpiryService.js';
 
 // CORS 跨域响应头
 const corsHeaders = {
@@ -86,6 +87,8 @@ export async function onRequestPost(context) {
               metadata
             });
           }
+          // 备份不含 KV 到期标记，按恢复的 ExpiresAt 重新写入
+          await trackFileExpiry(db, key, metadata);
           return { success: true };
         } catch (error) {
           return { success: false, key, error: error.message };

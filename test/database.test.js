@@ -1,14 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import { SqliteD1 } from '../deploy/server/sqliteD1.js';
-import { D1Database } from '../functions/utils/d1Database.js';
-
-// Use the real D1 adapter on the SQLite shim that the Docker deployment runs on.
-export async function sqliteDatabase() {
-    const sqlite = new SqliteD1(':memory:');
-    sqlite.exec(await readFile('database/init.sql', 'utf8'));
-    return { sqlite, db: new D1Database(sqlite) };
-}
+import { sqliteDatabase } from './helpers/database.js';
 
 describe('D1 database adapter', () => {
     it('pages through settings with a cursor instead of stopping at the limit', async () => {

@@ -10,6 +10,7 @@ import {
     resolveWebDAVCredentials,
 } from "../../../utils/metadata/channelCredentials.js";
 import { cleanPersistedMetadataInPlace } from "../../../utils/metadata/metadataSecurity.js";
+import { trackFileExpiry } from '../../../utils/fileExpiryService.js';
 import { buildFileMetadataForManagement } from "../../../utils/metadata/metadataView.js";
 
 // CORS 跨域响应头
@@ -169,6 +170,8 @@ export async function onRequest(context) {
         // 更新 KV 存储
         await db.put(newFileId, fileData.value, { metadata });
         await db.delete(fileId);
+        // 文件 ID 变了，KV 存储下需要为新 ID 写入到期标记
+        await trackFileExpiry(db, newFileId, metadata);
 
         // 清除 CDN 缓存
         const cdnUrl = `https://${url.hostname}/file/${fileId}`;

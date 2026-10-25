@@ -131,11 +131,13 @@ export async function onRequest(context) {
 }
 
 // 删除单个文件的核心函数
-export async function deleteFile(env, fileId, cdnUrl, url) {
+// options.record：调用方已读到的记录，避免重复读取
+// options.skipPurge：跳过缓存清除（定时清理没有请求上下文，带有效期的文件也不会进入共享缓存）
+export async function deleteFile(env, fileId, cdnUrl, url, options = {}) {
     try {
         // 读取图片信息
         const db = getDatabase(env);
-        const img = await db.getWithMetadata(fileId);
+        const img = options.record || await db.getWithMetadata(fileId);
 
         // 如果文件记录不存在，直接返回成功（幂等删除）
         if (!img) {
@@ -172,6 +174,10 @@ export async function deleteFile(env, fileId, cdnUrl, url) {
         // 删除数据库中的记录
         // 注意：容量统计现在由索引自动维护，删除文件后索引更新时会自动重新计算
         await db.delete(fileId);
+
+        if (options.skipPurge) {
+            return true;
+        }
 
         // 清除CDN缓存
         await purgeCFCache(env, cdnUrl);

@@ -80,6 +80,9 @@ CREATE INDEX IF NOT EXISTS idx_files_file_type ON files(file_type);
 CREATE INDEX IF NOT EXISTS idx_files_upload_ip ON files(upload_ip);
 CREATE INDEX IF NOT EXISTS idx_files_created_at ON files(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_files_tags ON files(tags);
+-- 文件有效期：只索引设置了 ExpiresAt 的文件
+CREATE INDEX IF NOT EXISTS idx_files_expires ON files(json_extract(metadata, '$.ExpiresAt'))
+    WHERE json_extract(metadata, '$.ExpiresAt') IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_settings_category ON settings(category);
 

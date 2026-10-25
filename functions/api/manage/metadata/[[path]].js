@@ -2,6 +2,7 @@ import { addFileToIndex } from '../../../utils/indexManager.js';
 import { getDatabase } from '../../../utils/databaseAdapter.js';
 import { buildFileMetadataForManagement } from '../../../utils/metadata/metadataView.js';
 import { cleanPersistedMetadata } from '../../../utils/metadata/metadataSecurity.js';
+import { trackFileExpiry } from '../../../utils/fileExpiryService.js';
 
 // CORS 跨域响应头
 const corsHeaders = {
@@ -62,10 +63,23 @@ export async function onRequest(context) {
         }
 
         // 验证请求体中包含可更新的字段
-        if (!body || (typeof body.FileName !== 'string' && typeof body.FileType !== 'string')) {
+        const hasExpiresAt = !!body && Object.hasOwn(body, 'ExpiresAt');
+        if (!body || (typeof body.FileName !== 'string' && typeof body.FileType !== 'string' && !hasExpiresAt)) {
             return new Response(JSON.stringify({
                 success: false,
-                message: 'At least one of FileName or FileType is required.',
+                message: 'At least one of FileName, FileType or ExpiresAt is required.',
+            }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            });
+        }
+
+        // ExpiresAt：毫秒时间戳设置到期时间，null 改回永久
+        if (hasExpiresAt && body.ExpiresAt !== null &&
+            !(Number.isSafeInteger(body.ExpiresAt) && body.ExpiresAt > Date.now())) {
+            return new Response(JSON.stringify({
+                success: false,
+                message: 'ExpiresAt must be a future timestamp in milliseconds, or null for no expiry.',
             }), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json', ...corsHeaders },
@@ -95,10 +109,22 @@ export async function onRequest(context) {
         if (typeof body.FileType === 'string') {
             updatedMetadata.FileType = body.FileType;
         }
+        if (hasExpiresAt) {
+            if (body.ExpiresAt === null) {
+                delete updatedMetadata.ExpiresAt;
+            } else {
+                updatedMetadata.ExpiresAt = body.ExpiresAt;
+            }
+        }
         const metadataToSave = cleanPersistedMetadata(updatedMetadata);
 
         // 保存更新后的 metadata
         await db.put(fileId, fileData.value, { metadata: metadataToSave });
+
+        // 修改了有效期时，KV 存储下写入新的到期标记（旧标记在清理时发现不一致会自动移除）
+        if (hasExpiresAt) {
+            await trackFileExpiry(db, fileId, metadataToSave);
+        }
 
         // 更新索引
         waitUntil(addFileToIndex(context, fileId, metadataToSave));

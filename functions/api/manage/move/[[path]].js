@@ -10,6 +10,7 @@ import {
     resolveWebDAVCredentials,
 } from "../../../utils/metadata/channelCredentials.js";
 import { cleanPersistedMetadata } from "../../../utils/metadata/metadataSecurity.js";
+import { trackFileExpiry } from '../../../utils/fileExpiryService.js';
 
 export async function onRequest(context) {
     const { request, env, params, waitUntil } = context;
@@ -185,6 +186,8 @@ async function moveFile(env, fileId, newFileId, cdnUrl, url) {
         // 更新KV存储
         await db.put(newFileId, img.value, { metadata: img.metadata });
         await db.delete(fileId);
+        // 文件 ID 变了，KV 存储下需要为新 ID 写入到期标记
+        await trackFileExpiry(db, newFileId, img.metadata);
 
         // 清除CDN缓存
         await purgeCFCache(env, cdnUrl);

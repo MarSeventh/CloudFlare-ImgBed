@@ -10,7 +10,7 @@ export async function managementFixture() {
     const purges = [];
     const database = { getDatabase: () => db, checkDatabaseConfig: () => ({ usingD1: false }) };
     const index = await loadFunction('functions/utils/indexManager.js', database);
-    const tools = await loadFunction('functions/upload/uploadTools.js', database);
+    const tools = await loadFunction('functions/upload/uploadTools.js', { ...database, trackFileExpiry: async () => {} });
     const view = await loadFunction('functions/utils/metadata/metadataView.js', {
         ...metadataSecurity,
         loadChannelConfig: async () => ({}),
@@ -21,6 +21,8 @@ export async function managementFixture() {
         purgeCFCache: async (env, url) => { purges.push(['file', url]); },
         purgeRandomFileListCache: async (...args) => { purges.push(['random', ...args]); },
         purgePublicFileListCache: async (...args) => { purges.push(['public', ...args]); },
+        trackFileExpiry: async () => {},
+        maybeCleanupExpiredFiles: () => {},
     };
     const env = { img_r2: {
         async get(id) { return objects.has(id) ? { body: new Response(objects.get(id)).body } : null; },
