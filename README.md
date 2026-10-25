@@ -31,7 +31,7 @@
 
 CloudFlare ImgBed is a self-hosted image and file hosting solution for Docker and serverless environments, bringing **Telegram**, **Discord**, **Cloudflare R2**, **S3-compatible storage**, **Hugging Face**, **WebDAV**, and more into one management interface. It provides file management, authentication, directory organization, content moderation, a RESTful API, and WebDAV, with a growing range of personalized AI capabilities such as image tag recognition. It is suited to personal image hosting, website asset management, and lightweight file distribution. **[View all features →](https://cfbed.sanyue.de/en/guide/features.html)**
 
-https://github.com/user-attachments/assets/69dae597-0d17-4b7c-9c7b-04ee81bd8219
+https://github.com/user-attachments/assets/5de3b74c-7d55-44f0-834e-0728e4c3e873
 
 **Architecture at a glance**
 
