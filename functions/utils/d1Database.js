@@ -177,24 +177,37 @@ D1Database.prototype.listSettings = function(options) {
     options = options || {};
     var prefix = options.prefix || '';
     var limit = options.limit || 1000;
-    
+    var cursor = options.cursor || null;
+
     var query = 'SELECT key, value FROM settings';
     var params = [];
-    
+
     if (prefix) {
         query += ' WHERE key LIKE ?';
         params.push(prefix + '%');
     }
-    
+
+    // 与 listFiles 一致返回 cursor，否则超过 limit 的键（如大量会话）会让后面的设置永远读不到
+    if (cursor) {
+        query += prefix ? ' AND' : ' WHERE';
+        query += ' key > ?';
+        params.push(cursor);
+    }
+
     query += ' ORDER BY key LIMIT ?';
-    params.push(limit);
-    
+    params.push(limit + 1);
+
     var stmt = this.db.prepare(query);
     if (params.length > 0) {
         stmt = stmt.bind.apply(stmt, params);
     }
     return stmt.all().then(function(response) {
         var results = response.results || [];
+        var hasMore = results.length > limit;
+        if (hasMore) {
+            results.pop();
+        }
+
         var keys = results.map(function(row) {
             return {
                 name: row.key,
@@ -202,7 +215,11 @@ D1Database.prototype.listSettings = function(options) {
             };
         });
 
-        return { keys: keys };
+        return {
+            keys: keys,
+            cursor: hasMore && keys.length > 0 ? keys[keys.length - 1].name : null,
+            list_complete: !hasMore
+        };
     });
 };
 

@@ -41,6 +41,7 @@ The current Mocha entry point automatically loads `.js` test files directly insi
 | Image processing | [imageProcessing.test.js](imageProcessing.test.js) | `functions/file/imageTransform.js` | Parameter validation, processor format support, historical generic types, original-image fallback, input formats and output headers |
 | AI tags | [ai.test.js](ai.test.js) | `api/manage/ai/tags.js` | Original formats, preview-type normalization, signatures and size limits; AI invocation only for valid input |
 | Shared file-type rules | [fileTypes.test.js](fileTypes.test.js) | `utils/mimeTypes.js` | MIME normalization, case-sensitive parameters, explicit-type precedence, extension inference, unknown/ambiguous extensions and random-image keywords versus strict classification |
+| D1 adapter | [database.test.js](database.test.js) | `utils/d1Database.js` | Settings listing pagination with cursors on the real adapter over the Docker SQLite shim |
 | Server imports | [smoke/serverImports.mjs](smoke/serverImports.mjs) | Main routes above and `functions/dav/` | Unmodified route imports and handler exports through the production loader |
 
 Business paths in the table are relative to `functions/`, except those already starting with `functions/`. Extend the relevant suite when changing one feature. A substantial independent feature can have its own module; add its entry points, scope and boundaries here instead of accumulating unrelated behavior in one file.
