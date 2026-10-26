@@ -6,6 +6,7 @@ const routes = [
     ['../../functions/upload/index.js', 'onRequest'],
     ['../../functions/upload/chunkUpload.js', 'handleChunkUpload'],
     ['../../functions/upload/chunkMerge.js', 'handleChunkMerge'],
+    ['../../functions/picgo_upload/index.js', 'onRequest'],
     ['../../functions/upload/huggingface/getUploadUrl.js', 'onRequestPost'],
     ['../../functions/upload/huggingface/commitUpload.js', 'onRequestPost'],
     ['../../functions/file/[[path]].js', 'onRequest'],

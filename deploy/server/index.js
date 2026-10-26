@@ -327,7 +327,7 @@ async function handleFunctionRequest(originalRequest, pathname) {
 const app = new Hono();
 
 // 判断是否是 function 路径
-const FUNCTION_PREFIXES = ['/api/', '/upload', '/file/', '/dav/', '/random'];
+const FUNCTION_PREFIXES = ['/api/', '/upload', '/picgo_upload', '/file/', '/dav/', '/random'];
 
 function isFunctionPath(pathname) {
     return FUNCTION_PREFIXES.some(prefix => pathname.startsWith(prefix));
