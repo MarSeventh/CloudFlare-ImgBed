@@ -38,7 +38,7 @@ describe('picgo upload', () => {
     });
 
     async function route(globals = {}) {
-        return await loadFunction('functions/picgo_upload/index.js', mocks, globals);
+        return await loadFunction('functions/picgo/upload.js', mocks, globals);
     }
 
     function context(url, init = {}) {
@@ -58,16 +58,16 @@ describe('picgo upload', () => {
 
     it('rejects missing or wrong secrets with a PicGo error body', async () => {
         const { onRequest } = await route();
-        const response = await onRequest(context('https://test/picgo_upload', { body: filesForm('a.png') }));
+        const response = await onRequest(context('https://test/picgo/upload', { body: filesForm('a.png') }));
         assert.equal(response.status, 401);
         assert.deepEqual(await response.json(), { success: false, result: [], items: [], message: 'Unauthorized' });
         assert.equal(storage.length, 0);
     });
 
     for (const [name, url, headers] of [
-        ['Authorization header', 'https://test/picgo_upload?uploader=cfr2', { Authorization: 'Bearer secret' }],
-        ['x-picgo-secret header', 'https://test/picgo_upload?uploader=cfr2', { 'x-picgo-secret': 'secret' }],
-        ['secret query', 'https://test/picgo_upload?uploader=cfr2&secret=secret', {}],
+        ['Authorization header', 'https://test/picgo/upload?uploader=cfr2', { Authorization: 'Bearer secret' }],
+        ['x-picgo-secret header', 'https://test/picgo/upload?uploader=cfr2', { 'x-picgo-secret': 'secret' }],
+        ['secret query', 'https://test/picgo/upload?uploader=cfr2&secret=secret', {}],
     ]) {
         it(`accepts the PicGo secret from the ${name} as API token or authCode`, async () => {
             const { onRequest } = await route();
@@ -80,7 +80,7 @@ describe('picgo upload', () => {
 
     it('uploads every multipart file and returns PicGo result and items', async () => {
         const { onRequest } = await route();
-        const response = await onRequest(context('https://test/picgo_upload?uploader=cfr2&uploadNameType=origin&uploadFolder=picgo', {
+        const response = await onRequest(context('https://test/picgo/upload?uploader=cfr2&uploadNameType=origin&uploadFolder=picgo', {
             headers: { 'x-picgo-secret': 'secret' },
             body: filesForm('a.png', 'b.png'),
         }));
@@ -104,7 +104,7 @@ describe('picgo upload', () => {
                 return new Response(png(), { headers: { 'Content-Type': 'image/png' } });
             },
         });
-        const response = await onRequest(context('https://test/picgo_upload?uploadChannel=cfr2&uploadNameType=origin', {
+        const response = await onRequest(context('https://test/picgo/upload?uploadChannel=cfr2&uploadNameType=origin', {
             headers: { 'x-picgo-secret': 'secret', 'Content-Type': 'application/json' },
             body: JSON.stringify({ list: ['https://img.example/dir/remote.png', '/Users/me/local.png'] }),
         }));
@@ -119,7 +119,7 @@ describe('picgo upload', () => {
 
     it('fails with 500 when no file could be uploaded', async () => {
         const { onRequest } = await route();
-        const response = await onRequest(context('https://test/picgo_upload', {
+        const response = await onRequest(context('https://test/picgo/upload', {
             headers: { 'x-picgo-secret': 'secret', 'Content-Type': 'application/json' },
             body: JSON.stringify({ list: ['C:\\local.png'] }),
         }));
@@ -139,7 +139,7 @@ describe('picgo upload', () => {
     ]) {
         it(`rejects ${name} with 400`, async () => {
             const { onRequest } = await route();
-            const response = await onRequest(context('https://test/picgo_upload', {
+            const response = await onRequest(context('https://test/picgo/upload', {
                 ...init,
                 headers: { 'x-picgo-secret': 'secret', ...(typeof init.body === 'string' ? { 'Content-Type': 'application/json' } : {}) },
             }));
