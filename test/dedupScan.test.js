@@ -275,6 +275,24 @@ describe('duplicate scan (read-only, Node-only)', () => {
         assert.equal(report.complete, false);
     });
 
+    it('releases late storage results when the timeout fires before the wall clock reaches the deadline', async () => {
+        await seedWithChunks([{ id: 'late.png', metadata: { Channel: 'CloudflareR2' } }]);
+        scan = await loadFunction('functions/api/manage/dedup/scan.js', fixture.mocks, {
+            Date: class extends Date { static now() { return 1000; } },
+        });
+        let release;
+        let cancelled = false;
+        fixture.env.img_r2.get = () => new Promise(resolve => { release = resolve; });
+        const c = ctx();
+        c.request = new Request('https://test/api/manage/dedup/scan?timeoutMs=20', { method: 'POST' });
+        const report = await (await scan.onRequest(c)).json();
+        assert.equal(report.timedOut, true);
+        assert.equal(report.complete, false);
+        release({ body: new ReadableStream({ cancel() { cancelled = true; } }) });
+        await new Promise(resolve => setImmediate(resolve));
+        assert.equal(cancelled, true);
+    });
+
     it('bounds reads by the actual stored object size even when metadata lies smaller', async () => {
         // 作者复现:元数据 FileSizeBytes=1,存储对象实际 1.5MB > maxFileMB=1
         // → 不得整读,以存储返回的 obj.size 为准计入 skippedOversized

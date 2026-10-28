@@ -68,15 +68,18 @@ async function readBounded(body, cap, deadline) {
  */
 async function readRecordBytes(env, fileId, meta, maxFileBytes, deadline) {
     if (meta.Channel === 'CloudflareR2' && env.img_r2?.get) {
-        const obj = await withDeadline(async () => {
-            const result = await env.img_r2.get(fileId);
-            // 存储获取本身无法取消；迟到的响应仍需释放其文件流。
-            if (Date.now() >= deadline) {
-                void result?.body?.cancel().catch(() => {});
-                throw new ScanTimeoutError();
-            }
-            return result;
-        }, deadline);
+        let pending;
+        let obj;
+        try {
+            obj = await withDeadline(() => {
+                pending = Promise.resolve(env.img_r2.get(fileId));
+                return pending;
+            }, deadline);
+        } catch (err) {
+            // 获取超时后仍可能收到文件流，按请求结束状态释放，不再依赖系统时钟。
+            if (pending) void pending.then(result => result?.body?.cancel()).catch(() => {});
+            throw err;
+        }
         if (!obj || !obj.body) return null;
         // 实际对象大小是权威:元数据谎报更小时以 obj.size 为准跳过
         if (Number.isFinite(obj.size) && obj.size > maxFileBytes) {
@@ -229,10 +232,7 @@ export async function onRequest(context) {
             continue;
         }
         try {
-            const result = await withDeadline(
-                () => readRecordBytes(env, record.id, meta, maxFileBytes, deadline),
-                deadline,
-            );
+            const result = await readRecordBytes(env, record.id, meta, maxFileBytes, deadline);
             if (result === null) {
                 readErrors.push({ id: record.id, error: 'content not readable via storage binding' });
                 continue;
