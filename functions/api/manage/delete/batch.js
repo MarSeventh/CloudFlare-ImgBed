@@ -35,7 +35,7 @@ export async function onRequest(context) {
             }
         });
 
-        // deleted 保留原有幂等成功语义；missing 是其中记录原本不存在的子集。
+        // deleted 包含所有处理成功的 ID；missing 是其中记录不存在的子集。
         const deleted = results.filter((item) => item.success).map((item) => item.fileId);
         const missing = results.filter((item) => item.success && !item.existed).map((item) => item.fileId);
         const failed = results.filter((item) => !item.success).map(({ fileId, error }) => ({ fileId, error }));

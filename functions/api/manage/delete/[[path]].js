@@ -63,7 +63,7 @@ export async function onRequest(context) {
                     const success = !!(result && result.deleted);
                     details.push({ fileId, success, existed: !!result?.existed, error: success ? '' : 'Delete file failed' });
                     if (success) {
-                        // deleted 保留原有幂等成功语义，missing/details 区分记录是否原本存在。
+                        // 记录不存在也计入 deleted，由 missing/details 标识。
                         deletedFiles.push(fileId);
                         if (!result.existed) missingFiles.push(fileId);
                     } else {
@@ -117,14 +117,14 @@ export async function onRequest(context) {
         if (!result || !result.deleted) {
             throw new Error('Delete file failed');
         } else {
-            // 从索引中删除文件（无条件:记录不存在时索引也可能有残留条目,保持既有清理行为）
+            // 记录不存在时也可能有残留索引，因此仍需清理。
             waitUntil(removeFileFromIndex(context, fileId));
         }
 
         return new Response(JSON.stringify({
             success: true,
             fileId: fileId,
-            // 兼容说明:保持 200 + success:true 的幂等语义;existed 供调用方区分"实际删除"与"记录原本不存在"
+            // 请求成功不代表记录曾存在，existed 用于区分这两种情况。
             existed: result.existed
         }), {
             headers: { 'Content-Type': 'application/json', ...corsHeaders }

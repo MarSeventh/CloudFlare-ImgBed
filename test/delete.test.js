@@ -51,7 +51,7 @@ describe('delete files', () => {
     });
 
     it('removes stale index entries even when the record no longer exists', async () => {
-        // 记录不存在,但索引里残留条目:DELETE 仍应清理索引(既有行为,existed=false)
+        // 记录缺失时，删除请求也应清理残留索引并返回 existed=false。
         await fixture.seed([]);
         // 直接向索引注入残留条目
         await fixture.db.put('manage@index@meta', JSON.stringify({ chunkCount: 1, totalCount: 1, lastUpdated: Date.now() }));
@@ -108,7 +108,7 @@ describe('delete files', () => {
         const response = await route.onRequest(ctx);
         assert.equal(response.status, 200);
         const body = await response.json();
-        assert.equal(body.success, true); // Existing folder response contract, even for partial failure.
+        assert.equal(body.success, true); // Folder traversal completed; per-file failures are reported separately.
         assert.deepEqual(body.deleted, ids.slice(0, 2));
         assert.deepEqual(body.failed, [ids[2]]);
         assert.deepEqual(body.missing, [ids[1]]);
