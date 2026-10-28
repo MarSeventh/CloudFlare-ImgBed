@@ -53,7 +53,6 @@ describe('delete files', () => {
     it('removes stale index entries even when the record no longer exists', async () => {
         // 记录不存在,但索引里残留条目:DELETE 仍应清理索引(既有行为,existed=false)
         await fixture.seed([]);
-        const ctx0 = createContext('https://test/api/manage/list', { method: 'GET', env: fixture.env });
         // 直接向索引注入残留条目
         await fixture.db.put('manage@index@meta', JSON.stringify({ chunkCount: 1, totalCount: 1, lastUpdated: Date.now() }));
         await fixture.db.put('manage@index_0', JSON.stringify([{ id: 'ghost.png', metadata: { FileName: 'ghost.png' } }]));
@@ -67,7 +66,8 @@ describe('delete files', () => {
     });
 
     it('reports per-item existed in batch responses and separates missing ids', async () => {
-        await fixture.seed([{ id: 'real.png', metadata: { Channel: 'CloudflareR2', FileType: 'image/png' } }]);
+        await fixture.seed(['real.png', 'missing.png'].map(id => ({ id, metadata: { Channel: 'CloudflareR2', FileType: 'image/png' } })));
+        await fixture.db.delete('missing.png');
         const payload = { fileIds: ['real.png', 'missing.png'] };
         const ctx = createContext('https://test/api/manage/delete/batch', {
             method: 'POST', env: fixture.env, body: JSON.stringify(payload),
@@ -76,12 +76,45 @@ describe('delete files', () => {
         const response = await batch.onRequest(ctx);
         assert.equal(response.status, 200);
         const body = await response.json();
-        assert.deepEqual(body.deleted, ['real.png']);
+        assert.deepEqual(body.deleted, ['real.png', 'missing.png']);
         assert.deepEqual(body.missing, ['missing.png']);
         assert.deepEqual(body.failed, []);
         const detail = body.details.find((item) => item.fileId === 'missing.png');
         assert.equal(detail.success, true);
         assert.equal(detail.existed, false);
+        assert.deepEqual((await fixture.readFiles(ctx)).files, []);
+    });
+
+    it('preserves folder deletion results and cleans missing records from nested indexes', async () => {
+        const ids = ['album/real.png', 'album/missing.png', 'album/sub/failed.png'];
+        await fixture.seed(ids.map(id => ({ id, metadata: { Channel: 'CloudflareR2' } })));
+        await fixture.db.delete('album/missing.png');
+        const remove = fixture.env.img_r2.delete;
+        fixture.env.img_r2.delete = async id => {
+            if (id.endsWith('failed.png')) throw new Error('storage unavailable');
+            await remove(id);
+        };
+        const route = await loadFunction('functions/api/manage/delete/[[path]].js', fixture.mocks, {
+            fetch: async request => {
+                const folder = new URL(request.url).searchParams.get('dir');
+                return Response.json(folder === 'album'
+                    ? { files: ids.slice(0, 2).map(name => ({ name })), directories: ['album/sub'] }
+                    : { files: [{ name: ids[2] }], directories: [] });
+            },
+        });
+        const ctx = createContext('https://test/api/manage/delete/album?folder=true', {
+            method: 'DELETE', env: fixture.env, params: { path: 'album' },
+        });
+        const response = await route.onRequest(ctx);
+        assert.equal(response.status, 200);
+        const body = await response.json();
+        assert.equal(body.success, true); // Existing folder response contract, even for partial failure.
+        assert.deepEqual(body.deleted, ids.slice(0, 2));
+        assert.deepEqual(body.failed, [ids[2]]);
+        assert.deepEqual(body.missing, [ids[1]]);
+        assert.deepEqual(body.details.map(({ success, existed }) => [success, existed]), [[true, true], [true, false], [false, true]]);
+        assert.deepEqual((await fixture.readFiles(ctx)).files.map(file => file.id), [ids[2]]);
+        assert.equal(fixture.objects.has(ids[2]), true);
     });
 
     it('retains the record and index when R2 deletion throws', async () => {

@@ -39,6 +39,7 @@ export async function onRequest(context) {
             const deletedFiles = [];
             const missingFiles = [];
             const failedFiles = [];
+            const details = [];
 
             while (folderQueue.length > 0) {
                 const currentFolder = folderQueue.shift();
@@ -59,11 +60,12 @@ export async function onRequest(context) {
                     const cdnUrl = `https://${url.hostname}/file/${fileId}`;
 
                     const result = await deleteFile(env, fileId, cdnUrl, url);
-                    if (result && result.deleted && result.existed) {
+                    const success = !!(result && result.deleted);
+                    details.push({ fileId, success, existed: !!result?.existed, error: success ? '' : 'Delete file failed' });
+                    if (success) {
+                        // deleted 保留原有幂等成功语义，missing/details 区分记录是否原本存在。
                         deletedFiles.push(fileId);
-                    } else if (result && result.deleted) {
-                        // 记录本就不存在(幂等成功),单列供调用方区分
-                        missingFiles.push(fileId);
+                        if (!result.existed) missingFiles.push(fileId);
                     } else {
                         failedFiles.push(fileId);
                     }
@@ -86,7 +88,9 @@ export async function onRequest(context) {
             return new Response(JSON.stringify({
                 success: true,
                 deleted: deletedFiles,
-                failed: failedFiles
+                failed: failedFiles,
+                missing: missingFiles,
+                details
             }), {
                 headers: { 'Content-Type': 'application/json', ...corsHeaders }
             });

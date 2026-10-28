@@ -35,13 +35,12 @@ export async function onRequest(context) {
             }
         });
 
-        // 兼容:deleted/failed 保持旧形态;新增 missing(幂等成功但记录本不存在)与逐项 details
-        const deleted = results.filter((item) => item.success && item.existed).map((item) => item.fileId);
+        // deleted 保留原有幂等成功语义；missing 是其中记录原本不存在的子集。
+        const deleted = results.filter((item) => item.success).map((item) => item.fileId);
         const missing = results.filter((item) => item.success && !item.existed).map((item) => item.fileId);
         const failed = results.filter((item) => !item.success).map(({ fileId, error }) => ({ fileId, error }));
-        const indexCleanup = results.filter((item) => item.success).map((item) => item.fileId);
-        if (indexCleanup.length > 0) {
-            context.waitUntil(batchRemoveFilesFromIndex(context, indexCleanup));
+        if (deleted.length > 0) {
+            context.waitUntil(batchRemoveFilesFromIndex(context, deleted));
         }
         return jsonResponse({ success: failed.length === 0, deleted, missing, failed, details: results });
     } catch (error) {
