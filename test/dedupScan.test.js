@@ -92,6 +92,8 @@ describe('duplicate scan (read-only, Node-only)', () => {
         const body = await (await scan.onRequest(ctx())).json();
         assert.equal(body.readErrors.length, 2);
         assert.equal(body.duplicateGroups.length, 0);
+        // 有内容读取失败就不算「完整扫描」
+        assert.equal(body.complete, false);
     });
 
     it('skips oversized files and reports them separately', async () => {
@@ -102,6 +104,8 @@ describe('duplicate scan (read-only, Node-only)', () => {
         const body = await (await scan.onRequest(c)).json();
         assert.deepEqual(body.skippedOversized, ['big.png']);
         assert.equal(body.duplicateGroups.length, 0);
+        // 超限跳过也是「部分扫描」:不算完整成功
+        assert.equal(body.complete, false);
     });
 
     it('GET probes deployment capability without scanning', async () => {
@@ -184,5 +188,117 @@ describe('duplicate scan (read-only, Node-only)', () => {
         assert.equal(body.timedOut, true);
         // scanned 只统计已处理条目,超时后剩余的不计入
         assert.equal(body.scanned, 0);
+    });
+
+    // ===== R4 评审回归:实际读取量上限、deadline 可中止、complete 语义、时间戳选取 =====
+
+    it('bounds reads by the actual stored object size even when metadata lies smaller', async () => {
+        // 作者复现:元数据 FileSizeBytes=1,存储对象实际 1.5MB > maxFileMB=1
+        // → 不得整读,以存储返回的 obj.size 为准计入 skippedOversized
+        const big = 'x'.repeat(1500 * 1024);
+        await seedWithChunks([
+            { id: 'liar.png', metadata: { FileName: 'liar.png', Channel: 'CloudflareR2', TimeStamp: 1, FileSizeBytes: 1 }, content: big },
+        ]);
+        const origGet = fixture.env.img_r2.get;
+        fixture.env.img_r2.get = async (id) => {
+            const obj = await origGet(id);
+            if (!obj) return null;
+            return { body: obj.body, size: fixture.objects.get(id)?.length ?? 0 };
+        };
+        const c = createContext('https://test/api/manage/dedup/scan?maxFileMB=1', { method: 'POST', env: { ...fixture.env, SERVER_RUNTIME: 'node' } });
+        const body = await (await scan.onRequest(c)).json();
+        assert.deepEqual(body.skippedOversized, ['liar.png']);
+        assert.equal(body.duplicateGroups.length, 0);
+        assert.equal(body.complete, false);
+    });
+
+    it('aborts stream reads past the cap even when the adapter reports no object size', async () => {
+        // obj.size 缺失的适配层:靠有界读取兜底,实际消费字节数不得超过 cap 越过一个 chunk
+        const chunkSize = 64 * 1024;
+        const totalBytes = 24 * chunkSize; // 1.5MB,24 个 64KB chunk
+        let pulled = 0;
+        const payload = new TextEncoder().encode('y'.repeat(chunkSize));
+        const stream = new ReadableStream({
+            pull(controller) {
+                if (pulled >= totalBytes) { controller.close(); return; }
+                pulled += payload.length;
+                controller.enqueue(payload.slice());
+            },
+        });
+        await seedWithChunks([
+            { id: 'nostreamsize.png', metadata: { FileName: 'nostreamsize.png', Channel: 'CloudflareR2', TimeStamp: 1, FileSizeBytes: 1 }, content: '' },
+        ]);
+        const origGet = fixture.env.img_r2.get;
+        fixture.env.img_r2.get = async (id) => id === 'nostreamsize.png'
+            ? { body: stream }
+            : await origGet(id);
+        const c = createContext('https://test/api/manage/dedup/scan?maxFileMB=1', { method: 'POST', env: { ...fixture.env, SERVER_RUNTIME: 'node' } });
+        const body = await (await scan.onRequest(c)).json();
+        assert.deepEqual(body.skippedOversized, ['nostreamsize.png']);
+        // 有界:cap 1MiB,越过即止;吞完 1.5MB 会突破此断言
+        assert.ok(pulled <= 1024 * 1024 + 2 * chunkSize, `read too much: ${pulled} bytes`);
+        assert.equal(body.complete, false);
+    });
+
+    it('marks the scan timedOut when the last content read crosses the deadline', async () => {
+        // 作者复现:最后一项存储读取跨过预算返回,旧实现仍报 timedOut:false + complete:true
+        await seedWithChunks([
+            { id: 'fast.png', metadata: { FileName: 'fast.png', Channel: 'CloudflareR2', TimeStamp: 1 }, content: 'x' },
+            { id: 'slow.png', metadata: { FileName: 'slow.png', Channel: 'CloudflareR2', TimeStamp: 2 }, content: 'y' },
+        ]);
+        const origGet = fixture.env.img_r2.get;
+        fixture.env.img_r2.get = async (id) => {
+            if (id === 'slow.png') await new Promise(r => setTimeout(r, 80));
+            return origGet(id);
+        };
+        const c = createContext('https://test/api/manage/dedup/scan?timeoutMs=20', { method: 'POST', env: { ...fixture.env, SERVER_RUNTIME: 'node' } });
+        const body = await (await scan.onRequest(c)).json();
+        assert.equal(body.timedOut, true);
+        assert.equal(body.complete, false);
+    });
+
+    it('never reports complete when any record or content read failed', async () => {
+        // complete 语义收严:recordError/readError 任一存在即非完整
+        await seedWithChunks([
+            { id: 'tg.png', metadata: { FileName: 'tg.png', Channel: 'TelegramNew', TimeStamp: 1 }, content: 'x' },
+            { id: 'gone.png', metadata: { FileName: 'gone.png', Channel: 'TelegramNew', TimeStamp: 2 }, content: 'x' },
+        ]);
+        await fixture.db.delete('gone.png'); // 记录缺失 → recordError
+        const body = await (await scan.onRequest(ctx())).json();
+        assert.ok(body.recordErrors.length >= 1);
+        assert.ok(body.readErrors.length >= 1);
+        assert.equal(body.complete, false);
+    });
+
+    it('keeps the earliest valid timestamp and never treats unknown time as earliest', async () => {
+        await seedWithChunks([
+            { id: 'unknown.png', metadata: { FileName: 'unknown.png', Channel: 'CloudflareR2' }, content: 'same' },
+            { id: 'later.png', metadata: { FileName: 'later.png', Channel: 'CloudflareR2', TimeStamp: 300 }, content: 'same' },
+            { id: 'earliest.png', metadata: { FileName: 'earliest.png', Channel: 'CloudflareR2', TimeStamp: 100 }, content: 'same' },
+            { id: 'negative.png', metadata: { FileName: 'negative.png', Channel: 'CloudflareR2', TimeStamp: -5 }, content: 'same' },
+        ]);
+        const body = await (await scan.onRequest(ctx())).json();
+        assert.equal(body.duplicateGroups.length, 1);
+        const group = body.duplicateGroups[0];
+        assert.equal(group.count, 4);
+        // 缺失/非法(负数)时间戳不参与「最早」:有效时间戳里最小的才可保留
+        assert.equal(group.keep.id, 'earliest.png');
+        assert.equal(group.keepTimestampUnknown, undefined);
+    });
+
+    it('flags the group when no member has a usable timestamp', async () => {
+        await seedWithChunks([
+            { id: 'a.png', metadata: { FileName: 'a.png', Channel: 'CloudflareR2' }, content: 'same' },
+            { id: 'b.png', metadata: { FileName: 'b.png', Channel: 'CloudflareR2', TimeStamp: 0 }, content: 'same' },
+        ]);
+        const body = await (await scan.onRequest(ctx())).json();
+        const group = body.duplicateGroups[0];
+        assert.equal(group.keepTimestampUnknown, true);
+        assert.ok(['a.png', 'b.png'].includes(group.keep.id));
+    });
+
+    it('declares which channels the scan can actually read', async () => {
+        const body = await (await scan.onRequest(ctx())).json();
+        assert.deepEqual(body.readableChannels, ['CloudflareR2']);
     });
 });

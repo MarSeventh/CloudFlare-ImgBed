@@ -4,19 +4,96 @@
  * POST /api/manage/dedup/scan
  *
  * 遍历分片索引,按渠道逐文件读取内容计算 SHA-256,按内容分组报告重复。
- * 纯信息性:不删除、不改链接;每组建议保留时间戳最早的一条。
+ * 纯信息性:不删除、不改链接;每组建议保留有效时间戳最早的一条(缺失或非法
+ * 时间戳不参与「最早」,排组内末位;整组无有效时间戳时标注 keepTimestampUnknown)。
  *
  * 部署限制:依赖 SERVER_RUNTIME === 'node' 能力标志(仅 Docker / Node.js
  * 服务端部署提供;Workers / Pages 包括绑定 D1 的场景均返回 501)。
  * 能力探测:GET 请求返回 {supported} 而不执行扫描,供前端统一禁用/隐藏入口。
  *
- * 有界执行:单文件大小上限(默认 100MB,只可经 ?maxFileMB 调低,非法值回退
- * 默认),元数据缺失或非法的记录按超限处理计入 skippedOversized;总时间预算
- * (默认 30s,可经 ?timeoutMs 调低)在分片/记录/内容三个阶段逐段检查,超限
- * 停止扫描并标注 timedOut:true,scanned 只统计已处理条目;
- * 响应带完整性与失败范围,分片读取失败显式上报。
+ * 有界执行:
+ * - 大小上限(默认 100MB,只可经 ?maxFileMB 调低,非法值回退默认)同时约束
+ *   元数据与实际读取:存储返回的 obj.size 是权威,超限直接跳过;适配层不带
+ *   size 时,流式读取按实际消费字节数在上限处中止并取消底层流,元数据谎报
+ *   更小也绕不过;
+ * - 时间预算(默认 30s,可经 ?timeoutMs 调低)对每一次存储等待逐点生效:
+ *   各等待与剩余预算竞速,到点即中止本次扫描、取消在途流并标注 timedOut
+ *   (包括最后一项读取跨过预算返回的情形),scanned 只统计已处理条目;
+ * - complete 语义:未超时 且 分片/记录/内容三类错误与超限跳过全部为零。
+ *   任何文件未能真正读取都不得报「完整扫描」;readableChannels 列出实际
+ *   可读渠道(当前仅 Cloudflare R2),其余渠道计入 readErrors。
+ *
+ * 响应带完整性与失败范围(chunkErrors/recordErrors/readErrors/skippedOversized),
+ * 供前端区分「完整扫描无重复」与「部分内容未能扫描」。
  */
 import { getDatabase } from '../../../utils/databaseAdapter.js';
+
+class ScanTimeoutError extends Error {
+    constructor() {
+        super('scan time budget exceeded');
+        this.name = 'ScanTimeoutError';
+    }
+}
+
+// 每个存储等待与剩余预算竞速:到点即抛,不再等待底层返回
+async function withDeadline(run, deadline) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw new ScanTimeoutError();
+    let timer;
+    try {
+        return await Promise.race([
+            Promise.resolve().then(run),
+            new Promise((_, reject) => { timer = setTimeout(() => reject(new ScanTimeoutError()), remaining); }),
+        ]);
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+// 缺失/零/负/非数值时间戳一律视为「未知」,不参与最早记录选取
+function timestampOrUnknown(value) {
+    return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+// 有界流式读取:最多消费 cap 字节,越界立即返回;每个 chunk 受 deadline 约束;
+// 所有退出路径(越界/超时/异常/读完)都取消底层流,不悬挂不占内存
+async function readBounded(body, cap, deadline) {
+    const reader = body.getReader();
+    const chunks = [];
+    let total = 0;
+    try {
+        while (true) {
+            const step = await withDeadline(() => reader.read(), deadline);
+            if (step.done) break;
+            total += step.value?.length || 0;
+            if (total > cap) return { oversized: true };
+            chunks.push(step.value);
+        }
+        const bytes = new Uint8Array(total);
+        let offset = 0;
+        for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+        return { bytes };
+    } finally {
+        try { reader.cancel('dedup scan released the stream'); } catch {}
+    }
+}
+
+/**
+ * 经存储绑定直接读取文件内容(管理员可信路径):
+ * - R2: env.img_r2.get(id),以返回的 obj.size 为准执行大小上限,流式有界读取;
+ * - 其余渠道(Telegram/S3/Discord/HuggingFace/WebDAV):返回 null 计入 readErrors
+ *   (这些渠道无本地绑定,宁缺毋滥 —— 不用公开路由,避免白名单/重定向造成的假哈希)
+ */
+async function readRecordBytes(env, fileId, meta, maxFileBytes, deadline) {
+    if (meta.Channel === 'CloudflareR2' && env.img_r2?.get) {
+        const obj = await withDeadline(() => env.img_r2.get(fileId), deadline);
+        if (!obj || !obj.body) return null;
+        // 实际对象大小是权威:元数据谎报更小时以 obj.size 为准跳过
+        if (Number.isFinite(obj.size) && obj.size > maxFileBytes) return { oversized: true };
+        return await readBounded(obj.body, maxFileBytes, deadline);
+    }
+    return null;
+}
 
 export async function onRequest(context) {
     const { request, env } = context;
@@ -53,7 +130,7 @@ export async function onRequest(context) {
     const maxFileMB = Number.isFinite(parsedMax) && parsedMax >= 1 ? Math.min(parsedMax, 100) : 100;
     const maxFileBytes = maxFileMB * 1024 * 1024;
 
-    // 总时间预算:默认 30s,只允许调低(0 = 立即超时,便于测试);超限停止扫描并标注 timedOut
+    // 总时间预算:默认 30s,只允许调低(0 = 立即超时,便于测试);对每一次存储等待生效
     const parsedTimeout = parseInt(url.searchParams.get('timeoutMs') || '30000', 10);
     const timeoutMs = Number.isFinite(parsedTimeout) && parsedTimeout >= 0 ? Math.min(parsedTimeout, 30000) : 30000;
     const deadline = Date.now() + timeoutMs;
@@ -69,13 +146,17 @@ export async function onRequest(context) {
     let metaStr = null;
     let metaReadFailed = false;
     try {
-        metaStr = await db.get(INDEX_META_KEY);
+        metaStr = await withDeadline(() => db.get(INDEX_META_KEY), deadline);
     } catch (err) {
-        console.error('dedup scan: failed to read index meta:', err);
-        chunkErrors.push({ chunk: 'meta', error: String(err?.message || err) });
-        metaReadFailed = true;
+        if (err instanceof ScanTimeoutError) {
+            timedOut = true;
+        } else {
+            console.error('dedup scan: failed to read index meta:', err);
+            chunkErrors.push({ chunk: 'meta', error: String(err?.message || err) });
+            metaReadFailed = true;
+        }
     }
-    if (!metaReadFailed && metaStr !== null && metaStr !== undefined) {
+    if (!metaReadFailed && !timedOut && metaStr !== null && metaStr !== undefined) {
         try {
             const parsed = JSON.parse(metaStr);
             meta.chunkCount = Number.isFinite(parsed?.chunkCount) ? parsed.chunkCount : 0;
@@ -83,17 +164,14 @@ export async function onRequest(context) {
             console.error('dedup scan: failed to parse index meta:', err);
             chunkErrors.push({ chunk: 'meta', error: String(err?.message || err) });
         }
-    } else if (!metaReadFailed) {
+    } else if (!metaReadFailed && !timedOut) {
         chunkErrors.push({ chunk: 'meta', error: 'index meta missing' });
     }
     const entries = [];
     for (let i = 0; i < (meta.chunkCount || 0); i++) {
-        if (Date.now() >= deadline) {
-            timedOut = true;
-            break;
-        }
+        if (timedOut) break;
         try {
-            const chunkStr = await db.get(`${INDEX_KEY}_${i}`);
+            const chunkStr = await withDeadline(() => db.get(`${INDEX_KEY}_${i}`), deadline);
             if (chunkStr === null || chunkStr === undefined) {
                 // 缺失分片:不能当空数组静默吞掉,否则 scanned 偏少却报完整
                 chunkErrors.push({ chunk: i, error: 'chunk missing' });
@@ -102,6 +180,10 @@ export async function onRequest(context) {
             const chunk = JSON.parse(chunkStr);
             entries.push(...chunk);
         } catch (err) {
+            if (err instanceof ScanTimeoutError) {
+                timedOut = true;
+                break;
+            }
             console.error(`dedup scan: failed to read chunk ${i}:`, err);
             chunkErrors.push({ chunk: i, error: String(err?.message || err) });
         }
@@ -111,18 +193,19 @@ export async function onRequest(context) {
     const records = [];
     const recordErrors = [];
     for (const entry of entries) {
-        if (Date.now() >= deadline) {
-            timedOut = true;
-            break;
-        }
+        if (timedOut) break;
         try {
-            const rec = await db.getWithMetadata(entry.id);
+            const rec = await withDeadline(() => db.getWithMetadata(entry.id), deadline);
             if (rec === null || rec === undefined) {
                 recordErrors.push({ id: entry.id, error: 'record not found' });
                 continue;
             }
             records.push({ id: entry.id, metadata: rec.metadata || entry.metadata || {} });
         } catch (err) {
+            if (err instanceof ScanTimeoutError) {
+                timedOut = true;
+                break;
+            }
             recordErrors.push({ id: entry.id, error: String(err?.message || err) });
         }
     }
@@ -133,26 +216,29 @@ export async function onRequest(context) {
     const skippedOversized = [];
     let processed = 0;
     for (const record of records) {
-        if (Date.now() >= deadline) {
-            // 时间预算耗尽:停止扫描,已处理部分照常返回,显式标注
-            timedOut = true;
-            break;
-        }
+        if (timedOut) break;
         processed++;
         const meta = record.metadata || {};
-        // 大小上限 fail-closed:元数据缺失/非法时按超限跳过,不做无界读取
+        // 元数据侧 fail-closed:缺失/非法按超限跳过;实际读取另有 obj.size + 有界流双保险
         const sizeBytes = Number(meta.FileSizeBytes);
         if (!Number.isFinite(sizeBytes) || sizeBytes <= 0 || sizeBytes > maxFileBytes) {
             skippedOversized.push(record.id);
             continue;
         }
         try {
-            const bytes = await readRecordBytes(env, record.id, meta);
-            if (bytes === null) {
+            const result = await withDeadline(
+                () => readRecordBytes(env, record.id, meta, maxFileBytes, deadline),
+                deadline,
+            );
+            if (result === null) {
                 readErrors.push({ id: record.id, error: 'content not readable via storage binding' });
                 continue;
             }
-            const digest = await crypto.subtle.digest('SHA-256', bytes);
+            if (result.oversized) {
+                skippedOversized.push(record.id);
+                continue;
+            }
+            const digest = await crypto.subtle.digest('SHA-256', result.bytes);
             const hash = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
             if (!groups.has(hash)) groups.set(hash, []);
             groups.get(hash).push({
@@ -160,38 +246,60 @@ export async function onRequest(context) {
                 name: meta.FileName || record.id,
                 size: meta.FileSize || '',
                 channel: meta.ChannelName || meta.Channel || '',
-                timestamp: meta.TimeStamp || 0,
+                timestamp: meta.TimeStamp ?? null,
             });
         } catch (err) {
+            if (err instanceof ScanTimeoutError) {
+                timedOut = true;
+                break;
+            }
             console.error(`dedup scan: failed to read ${record.id}:`, err);
             readErrors.push({ id: record.id, error: String(err?.message || err) });
         }
     }
 
-    // ===== 分组:每组显式选时间戳最早的一条为建议保留(索引为倒序,不能取 items[0])=====
+    // ===== 分组:显式按有效时间戳升序选建议保留(索引为倒序,不能取 items[0];
+    // 缺失/非法时间戳不参与「最早」,排组内末位,整组无效时标注 keepTimestampUnknown)=====
     const duplicateGroups = [];
     let redundantCopies = 0;
     for (const [hash, items] of groups) {
         if (items.length < 2) continue;
-        const sorted = [...items].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-        duplicateGroups.push({
+        const sorted = [...items].sort((a, b) => {
+            const ta = timestampOrUnknown(a.timestamp);
+            const tb = timestampOrUnknown(b.timestamp);
+            if (ta === null && tb === null) return a.id < b.id ? -1 : 1;
+            if (ta === null) return 1;
+            if (tb === null) return -1;
+            return ta - tb;
+        });
+        const group = {
             sha256: hash,
             count: items.length,
             keep: sorted[0],
             duplicates: sorted.slice(1),
-        });
+        };
+        if (timestampOrUnknown(sorted[0].timestamp) === null) group.keepTimestampUnknown = true;
+        duplicateGroups.push(group);
         redundantCopies += items.length - 1;
     }
 
-    // 完整性 = 分片全部读齐 且 未超时(超时可能发生在任一阶段,须在响应前定案)
+    // 完整性 = 未超时 且 分片/记录/内容三类错误与超限跳过全部为零:
+    // 任何文件未能真正读取,都不得报「完整扫描」(哪怕结论恰好也是零重复)
+    const complete = !timedOut
+        && chunkErrors.length === 0
+        && recordErrors.length === 0
+        && readErrors.length === 0
+        && skippedOversized.length === 0;
+
     return new Response(JSON.stringify({
-        complete: chunkErrors.length === 0 && !timedOut,
+        complete,
         timedOut,
         chunkErrors,
         scanned: processed,
         recordErrors,
         readErrors,
         skippedOversized,
+        readableChannels: ['CloudflareR2'],
         totalGroups: groups.size,
         duplicateGroups,
         redundantCopies,
@@ -199,19 +307,4 @@ export async function onRequest(context) {
     }, null, 2), {
         headers: { 'content-type': 'application/json' },
     });
-}
-
-/**
- * 经存储绑定直接读取文件内容(管理员可信路径):
- * - R2: env.img_r2.get(id).body
- * - 其余渠道(Telegram/S3/Discord/HuggingFace/WebDAV):返回 null 计入 readErrors
- *   (这些渠道无本地绑定,宁缺毋滥 —— 不用公开路由,避免白名单/重定向造成的假哈希)
- */
-async function readRecordBytes(env, fileId, meta) {
-    if (meta.Channel === 'CloudflareR2' && env.img_r2?.get) {
-        const obj = await env.img_r2.get(fileId);
-        if (!obj || !obj.body) return null;
-        return new Uint8Array(await new Response(obj.body).arrayBuffer());
-    }
-    return null;
 }
