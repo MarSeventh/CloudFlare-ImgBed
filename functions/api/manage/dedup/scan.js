@@ -1,30 +1,10 @@
 /**
- * 存量重复文件扫描(只读,仅 Node 服务端部署)
+ * GET /api/manage/dedup/scan：探测 Node 部署支持情况。
+ * POST /api/manage/dedup/scan：读取已索引的 R2 文件，以 SHA-256 分组报告重复内容。
  *
- * POST /api/manage/dedup/scan
- *
- * 遍历分片索引,按渠道逐文件读取内容计算 SHA-256,按内容分组报告重复。
- * 纯信息性:不删除、不改链接;每组建议保留有效时间戳最早的一条(缺失或非法
- * 时间戳不参与「最早」,排组内末位;整组无有效时间戳时标注 keepTimestampUnknown)。
- *
- * 部署限制:依赖 SERVER_RUNTIME === 'node' 能力标志(仅 Docker / Node.js
- * 服务端部署提供;Workers / Pages 包括绑定 D1 的场景均返回 501)。
- * 能力探测:GET 请求返回 {supported} 而不执行扫描,供前端统一禁用/隐藏入口。
- *
- * 有界执行:
- * - 大小上限(默认 100MB,只可经 ?maxFileMB 调低,非法值回退默认)同时约束
- *   元数据与实际读取:存储返回的 obj.size 是权威,超限直接跳过;适配层不带
- *   size 时,流式读取按实际消费字节数在上限处中止并取消底层流,元数据谎报
- *   更小也绕不过;
- * - 时间预算(默认 30s,可经 ?timeoutMs 调低)对每一次存储等待逐点生效:
- *   各等待与剩余预算竞速,到点即中止本次扫描、取消在途流并标注 timedOut
- *   (包括最后一项读取跨过预算返回的情形),scanned 只统计已处理条目;
- * - complete 语义:未超时 且 分片/记录/内容三类错误与超限跳过全部为零。
- *   任何文件未能真正读取都不得报「完整扫描」;readableChannels 列出实际
- *   可读渠道(当前仅 Cloudflare R2),其余渠道计入 readErrors。
- *
- * 响应带完整性与失败范围(chunkErrors/recordErrors/readErrors/skippedOversized),
- * 供前端区分「完整扫描无重复」与「部分内容未能扫描」。
+ * 扫描不修改记录、索引或存储。每组建议保留有效时间戳最早的记录；
+ * 整组时间戳未知时显式标注。单文件上限 100 MiB，总预算 30 秒，参数只能调低。
+ * 读取异常、跳过文件、超时或索引变化均标记为不完整；其他渠道报告为不可读。
  */
 import { getDatabase } from '../../../utils/databaseAdapter.js';
 
@@ -41,10 +21,12 @@ async function withDeadline(run, deadline) {
     if (remaining <= 0) throw new ScanTimeoutError();
     let timer;
     try {
-        return await Promise.race([
+        const result = await Promise.race([
             Promise.resolve().then(run),
             new Promise((_, reject) => { timer = setTimeout(() => reject(new ScanTimeoutError()), remaining); }),
         ]);
+        if (Date.now() >= deadline) throw new ScanTimeoutError();
+        return result;
     } finally {
         clearTimeout(timer);
     }
@@ -74,7 +56,7 @@ async function readBounded(body, cap, deadline) {
         for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
         return { bytes };
     } finally {
-        try { reader.cancel('dedup scan released the stream'); } catch {}
+        void reader.cancel('dedup scan released the stream').catch(() => {});
     }
 }
 
@@ -86,10 +68,21 @@ async function readBounded(body, cap, deadline) {
  */
 async function readRecordBytes(env, fileId, meta, maxFileBytes, deadline) {
     if (meta.Channel === 'CloudflareR2' && env.img_r2?.get) {
-        const obj = await withDeadline(() => env.img_r2.get(fileId), deadline);
+        const obj = await withDeadline(async () => {
+            const result = await env.img_r2.get(fileId);
+            // 存储获取本身无法取消；迟到的响应仍需释放其文件流。
+            if (Date.now() >= deadline) {
+                void result?.body?.cancel().catch(() => {});
+                throw new ScanTimeoutError();
+            }
+            return result;
+        }, deadline);
         if (!obj || !obj.body) return null;
         // 实际对象大小是权威:元数据谎报更小时以 obj.size 为准跳过
-        if (Number.isFinite(obj.size) && obj.size > maxFileBytes) return { oversized: true };
+        if (Number.isFinite(obj.size) && obj.size > maxFileBytes) {
+            void obj.body.cancel().catch(() => {});
+            return { oversized: true };
+        }
         return await readBounded(obj.body, maxFileBytes, deadline);
     }
     return null;
@@ -159,7 +152,10 @@ export async function onRequest(context) {
     if (!metaReadFailed && !timedOut && metaStr !== null && metaStr !== undefined) {
         try {
             const parsed = JSON.parse(metaStr);
-            meta.chunkCount = Number.isFinite(parsed?.chunkCount) ? parsed.chunkCount : 0;
+            if (!Number.isSafeInteger(parsed?.chunkCount) || parsed.chunkCount < 0) {
+                throw new Error('invalid index chunk count');
+            }
+            meta.chunkCount = parsed.chunkCount;
         } catch (err) {
             console.error('dedup scan: failed to parse index meta:', err);
             chunkErrors.push({ chunk: 'meta', error: String(err?.message || err) });
@@ -178,7 +174,8 @@ export async function onRequest(context) {
                 continue;
             }
             const chunk = JSON.parse(chunkStr);
-            entries.push(...chunk);
+            if (!Array.isArray(chunk)) throw new Error('invalid index chunk');
+            for (const entry of chunk) entries.push(entry);
         } catch (err) {
             if (err instanceof ScanTimeoutError) {
                 timedOut = true;
@@ -192,15 +189,21 @@ export async function onRequest(context) {
     // ===== 逐条目读取记录元数据(记录缺失计入 recordErrors)=====
     const records = [];
     const recordErrors = [];
+    const seen = new Set();
     for (const entry of entries) {
         if (timedOut) break;
+        if (typeof entry?.id !== 'string' || !entry.id || seen.has(entry.id)) {
+            recordErrors.push({ id: entry?.id ?? null, error: 'invalid or repeated index entry' });
+            continue;
+        }
+        seen.add(entry.id);
         try {
             const rec = await withDeadline(() => db.getWithMetadata(entry.id), deadline);
-            if (rec === null || rec === undefined) {
+            if (!rec || (rec.value === null && rec.metadata === null)) {
                 recordErrors.push({ id: entry.id, error: 'record not found' });
                 continue;
             }
-            records.push({ id: entry.id, metadata: rec.metadata || entry.metadata || {} });
+            records.push({ id: entry.id, metadata: rec.metadata || {} });
         } catch (err) {
             if (err instanceof ScanTimeoutError) {
                 timedOut = true;
@@ -238,7 +241,7 @@ export async function onRequest(context) {
                 skippedOversized.push(record.id);
                 continue;
             }
-            const digest = await crypto.subtle.digest('SHA-256', result.bytes);
+            const digest = await withDeadline(() => crypto.subtle.digest('SHA-256', result.bytes), deadline);
             const hash = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
             if (!groups.has(hash)) groups.set(hash, []);
             groups.get(hash).push({
@@ -255,6 +258,19 @@ export async function onRequest(context) {
             }
             console.error(`dedup scan: failed to read ${record.id}:`, err);
             readErrors.push({ id: record.id, error: String(err?.message || err) });
+        }
+    }
+
+    // 扫描只读取索引快照，不触发索引合并；待处理操作或期间的索引变化须标记不完整。
+    let indexChanged = false;
+    if (!timedOut) {
+        try {
+            const pending = await withDeadline(() => db.list({ prefix: 'manage@index@operation_', limit: 1 }), deadline);
+            const currentMeta = await withDeadline(() => db.get(INDEX_META_KEY), deadline);
+            indexChanged = pending.keys.length > 0 || currentMeta !== metaStr;
+        } catch (err) {
+            if (err instanceof ScanTimeoutError) timedOut = true;
+            else chunkErrors.push({ chunk: 'meta', error: String(err?.message || err) });
         }
     }
 
@@ -285,7 +301,7 @@ export async function onRequest(context) {
 
     // 完整性 = 未超时 且 分片/记录/内容三类错误与超限跳过全部为零:
     // 任何文件未能真正读取,都不得报「完整扫描」(哪怕结论恰好也是零重复)
-    const complete = !timedOut
+    const complete = !timedOut && !indexChanged
         && chunkErrors.length === 0
         && recordErrors.length === 0
         && readErrors.length === 0
@@ -294,6 +310,7 @@ export async function onRequest(context) {
     return new Response(JSON.stringify({
         complete,
         timedOut,
+        indexChanged,
         chunkErrors,
         scanned: processed,
         recordErrors,

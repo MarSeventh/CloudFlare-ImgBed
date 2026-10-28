@@ -190,7 +190,90 @@ describe('duplicate scan (read-only, Node-only)', () => {
         assert.equal(body.scanned, 0);
     });
 
-    // ===== R4 评审回归:实际读取量上限、deadline 可中止、complete 语义、时间戳选取 =====
+    it('rejects malformed index shapes and repeated IDs without inventing duplicate copies', async () => {
+        for (const chunkCount of [null, -1, 1.5, '1']) {
+            await fixture.db.put('manage@index@meta', JSON.stringify({ chunkCount }));
+            const report = await (await scan.onRequest(ctx())).json();
+            assert.equal(report.complete, false);
+            assert.equal(report.chunkErrors.length, 1);
+        }
+        await seedWithChunks([{ id: 'a.png', metadata: { Channel: 'CloudflareR2' }, content: 'x' }]);
+        await fixture.db.put('manage@index_0', JSON.stringify([null, { id: 'a.png' }, { id: 'a.png' }]));
+        const report = await (await scan.onRequest(ctx())).json();
+        assert.equal(report.complete, false);
+        assert.equal(report.recordErrors.length, 2);
+        assert.equal(report.scanned, 1);
+        assert.equal(report.redundantCopies, 0);
+    });
+
+    it('does not read storage for a missing KV record with stale index metadata', async () => {
+        await seedWithChunks([{ id: 'gone.png', metadata: { Channel: 'CloudflareR2' } }]);
+        fixture.db.getWithMetadata = async () => ({ value: null, metadata: null });
+        fixture.env.img_r2.get = () => { throw new Error('must not read orphan storage'); };
+        const report = await (await scan.onRequest(ctx())).json();
+        assert.equal(report.recordErrors.length, 1);
+        assert.equal(report.readErrors.length, 0);
+        assert.equal(report.complete, false);
+    });
+
+    it('marks pending or concurrent index changes incomplete without merging them', async () => {
+        await seedWithChunks([{ id: 'a.png', metadata: { Channel: 'CloudflareR2' } }]);
+        const operationKey = 'manage@index@operation_pending';
+        await fixture.db.put(operationKey, JSON.stringify({ type: 'add' }));
+        const before = structuredClone(fixture.db.records);
+        let report = await (await scan.onRequest(ctx())).json();
+        assert.equal(report.complete, false);
+        assert.equal(report.indexChanged, true);
+        assert.deepEqual(fixture.db.records, before);
+
+        await fixture.db.delete(operationKey);
+        const originalGet = fixture.env.img_r2.get;
+        fixture.env.img_r2.get = async id => {
+            await fixture.db.put('manage@index@meta', JSON.stringify({ chunkCount: 1, totalCount: 2 }));
+            return originalGet(id);
+        };
+        report = await (await scan.onRequest(ctx())).json();
+        assert.equal(report.complete, false);
+        assert.equal(report.indexChanged, true);
+    });
+
+    it('cancels oversized object streams before consuming content', async () => {
+        await seedWithChunks([{ id: 'big.png', metadata: { Channel: 'CloudflareR2', FileSizeBytes: 1 } }]);
+        let cancelled = false;
+        fixture.env.img_r2.get = async () => ({
+            size: 200 * 1024 * 1024,
+            body: new ReadableStream({ cancel() { cancelled = true; } }),
+        });
+        const report = await (await scan.onRequest(ctx())).json();
+        assert.equal(cancelled, true);
+        assert.deepEqual(report.skippedOversized, ['big.png']);
+    });
+
+    it('cancels an object that arrives after the scan timed out', async () => {
+        await seedWithChunks([{ id: 'late.png', metadata: { Channel: 'CloudflareR2' } }]);
+        let release;
+        let cancelled = false;
+        fixture.env.img_r2.get = () => new Promise(resolve => { release = resolve; });
+        const c = ctx();
+        c.request = new Request('https://test/api/manage/dedup/scan?timeoutMs=20', { method: 'POST' });
+        const report = await (await scan.onRequest(c)).json();
+        assert.equal(report.timedOut, true);
+        release({ body: new ReadableStream({ cancel() { cancelled = true; } }) });
+        await new Promise(resolve => setImmediate(resolve));
+        assert.equal(cancelled, true);
+    });
+
+    it('includes the final hash operation in the scan deadline', async () => {
+        await seedWithChunks([{ id: 'a.png', metadata: { Channel: 'CloudflareR2' } }]);
+        scan = await loadFunction('functions/api/manage/dedup/scan.js', fixture.mocks, {
+            crypto: { subtle: { digest: () => new Promise(() => {}) } },
+        });
+        const c = ctx();
+        c.request = new Request('https://test/api/manage/dedup/scan?timeoutMs=20', { method: 'POST' });
+        const report = await (await scan.onRequest(c)).json();
+        assert.equal(report.timedOut, true);
+        assert.equal(report.complete, false);
+    });
 
     it('bounds reads by the actual stored object size even when metadata lies smaller', async () => {
         // 作者复现:元数据 FileSizeBytes=1,存储对象实际 1.5MB > maxFileMB=1

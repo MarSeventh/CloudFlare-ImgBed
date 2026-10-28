@@ -123,8 +123,6 @@ function createEnv() {
         img_d1: sqliteD1,
         img_r2: r2Storage,
         IMAGE_PROCESSOR: dockerImageProcessor,
-        // 部署能力标志:Node 服务端独有能力(供功能开关判定,Workers/Pages 无此绑定)
-        SERVER_RUNTIME: 'node',
     };
 }
 
@@ -317,7 +315,7 @@ async function handleFunctionRequest(originalRequest, pathname) {
             }
         },
         next: null, // 由 executeChain 设置
-        data: {},
+        data: { serverRuntime: 'node' },
     };
 
     // 执行中间件链和处理函数

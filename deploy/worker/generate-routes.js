@@ -436,7 +436,7 @@ export default {
             waitUntil: ctx.waitUntil.bind(ctx),
             passThroughOnException: () => {},
             next: null,
-            data: {},
+            data: { serverRuntime: 'worker' },
         };
 
         return await maybeServeFromCache(request, ctx, () => executeChain(middlewares, handler, context));

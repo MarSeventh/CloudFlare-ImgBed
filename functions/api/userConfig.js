@@ -28,6 +28,8 @@ export async function onRequest(context) {
         userConfig.announcementRefreshAt = Number(PageConfig.announcementRefreshAt);
     }
 
+    userConfig.serverRuntime = env.SERVER_RUNTIME;
+
     // 检查 USER_CONFIG 是否为空或未定义
     if (!userConfig) {
         return new Response(JSON.stringify({}), { status: 200 });
