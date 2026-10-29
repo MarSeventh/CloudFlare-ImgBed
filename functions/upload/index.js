@@ -76,9 +76,18 @@ export async function onRequest(context) {  // Contents of context object
 }
 
 
+// 单次上传请求允许的最大字节数，防止超大请求耗尽内存/带宽资源
+const MAX_UPLOAD_SIZE = 500 * 1024 * 1024; // 500MB
+
 // 通用文件上传处理函数
 async function processFileUpload(context, formdata = null) {
     const { request, url } = context;
+
+    // 校验请求体大小，拒绝超大请求，避免资源耗尽（CWE-400）
+    const contentLength = Number(request.headers.get('content-length'));
+    if (!formdata && contentLength && contentLength > MAX_UPLOAD_SIZE) {
+        return createResponse('Error: Request body exceeds the maximum allowed upload size', { status: 413 });
+    }
 
     // 解析表单数据
     formdata = formdata || await request.formData();
