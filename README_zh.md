@@ -45,7 +45,7 @@ https://github.com/user-attachments/assets/5de3b74c-7d55-44f0-834e-0728e4c3e873
   <tr>
     <td align="center" width="16%"><strong><a href="https://www.cloudflare.com/">Cloudflare</a></strong></td>
     <td align="center" width="22%"><a href="https://www.cloudflare.com/"><img src="readme/partners/cloudflare-logo.png" alt="Cloudflare Logo" height="25"></a></td>
-    <td><sub>入选Project Alexandria计划，提供高级 CDN 加速及安全防护。</sub></td>
+    <td><sub>入选 Project Alexandria 计划，提供高级 CDN 加速及安全防护。</sub></td>
   </tr>
   <tr>
     <td align="center" width="16%"><strong><a href="https://edgeone.ai/?from=github">EdgeOne</a></strong></td>
