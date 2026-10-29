@@ -53,11 +53,6 @@ Built on an isomorphic core, the engine runs seamlessly across Pages, Workers, a
     <td><sub>Provides CDN acceleration and security protection</sub></td>
   </tr>
   <tr>
-    <td align="center" width="16%"><strong><a href="https://www.packyapi.ai/register?aff=u0Ka">PackyCode</a></strong></td>
-    <td align="center" width="22%"><a href="https://www.packyapi.ai/register?aff=u0Ka"><picture><source media="(prefers-color-scheme: dark)" srcset="readme/partners/packycode-logo-dark.png"><img src="readme/partners/packycode-logo.png" alt="PackyCode logo" height="25"></picture></a></td>
-    <td><sub>Provide premium, stable, and budget-friendly LLM APIs. Generate text, images, and code all in one place. Sign up via our link for free credits and exclusive discounts!</sub></td>
-  </tr>
-  <tr>
     <td align="center" width="16%"><strong><a href="https://www.hncloud.com/activity/activity_2026summer.html?k=MarSeventh">Hncloud</a></strong></td>
     <td align="center" width="22%"><a href="https://www.hncloud.com/activity/activity_2026summer.html?k=MarSeventh"><picture><source media="(prefers-color-scheme: dark)" srcset="readme/partners/hncloud-logo-dark.png"><img src="readme/partners/hncloud-logo.png" alt="HuaNa Cloud logo" height="25"></picture></a></td>
     <td><sub>Provides stable and high-quality cloud computing resources. Sign up via our link for exclusive discounts!</sub></td>

@@ -53,11 +53,6 @@ https://github.com/user-attachments/assets/5de3b74c-7d55-44f0-834e-0728e4c3e873
     <td><sub>提供 CDN 加速及安全防护</sub></td>
   </tr>
   <tr>
-    <td align="center" width="16%"><strong><a href="https://www.packyapi.ai/register?aff=u0Ka">PackyCode</a></strong></td>
-    <td align="center" width="22%"><a href="https://www.packyapi.ai/register?aff=u0Ka"><picture><source media="(prefers-color-scheme: dark)" srcset="readme/partners/packycode-logo-dark.png"><img src="readme/partners/packycode-logo.png" alt="PackyCode Logo" height="25"></picture></a></td>
-    <td><sub>提供稳定、高性价比的顶级大模型 API 服务，一站搞定文案、图片和代码，通过本项目链接注册立享充值折扣与免费额度！</sub></td>
-  </tr>
-  <tr>
     <td align="center" width="16%"><strong><a href="https://www.hncloud.com/activity/activity_2026summer.html?k=MarSeventh">华纳云</a></strong></td>
     <td align="center" width="22%"><a href="https://www.hncloud.com/activity/activity_2026summer.html?k=MarSeventh"><picture><source media="(prefers-color-scheme: dark)" srcset="readme/partners/hncloud-logo-dark.png"><img src="readme/partners/hncloud-logo.png" alt="华纳云 Logo" height="25"></picture></a></td>
     <td><sub>提供稳定、优质的云计算资源，通过本项目链接注册立享超值优惠！</sub></td>
