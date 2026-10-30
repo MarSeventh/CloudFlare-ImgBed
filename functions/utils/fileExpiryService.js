@@ -8,15 +8,17 @@
  * 清理与修改的协调：
  * - 文件一到期，访问即返回 404，管理接口也不再允许修改（返回 409），因此到期后不会再被续期
  * - 清理只处理到期超过 CLEANUP_GRACE_MS 的文件，给到期前已发出的修改请求和 KV 跨地域同步留出时间
- * - 每个文件删除前重新读取当前记录确认仍然到期，删除记录时再按到期时间做条件删除（D1）或比对（KV），
+ * - 每个文件删除前重新读取当前记录确认仍然到期，删除记录时再按到期时间和上传时间做条件删除（D1）或比对（KV），
  *   清理期间被替换的记录不会被旧快照删除
+ * - 删除失败的文件推迟 CLEANUP_RETRY_MS 再试（D1 写入 ExpiryCleanupRetryAt，KV 把标记移到重试时间），
+ *   持续失败的文件不会一直占据每次清理的批次
  */
 import { getDatabase } from './databaseAdapter.js';
 import { fetchOthersConfig } from './sysConfig.js';
 import { batchRemoveFilesFromIndex } from './indexManager.js';
 import { deleteStoredFile } from '../api/manage/delete/[[path]].js';
 import {
-    EXPIRY_MARKER_PREFIX, resolveExpiresAt, getExpiresAt, buildExpiryMarkerKey, parseExpiryMarkerKey
+    EXPIRY_MARKER_PREFIX, resolveExpiresAt, getExpiresAt, buildExpiryMarkerKey, parseExpiryMarkerKey, isMissingRecord
 } from './fileExpiryHelpers.js';
 
 // Workers 免费计划每次调用最多 50 个子请求（KV / D1 / R2 / fetch / Cache API 都计入），留出余量
@@ -28,6 +30,8 @@ const SUBREQUESTS_PER_FILE = 3;
 const SUBREQUESTS_PER_FILE_KV = 5;
 // 到期后至少等这么久才删除；期间访问已返回 404
 export const CLEANUP_GRACE_MS = 5 * 60 * 1000;
+// 删除失败的文件推迟这么久再重试
+export const CLEANUP_RETRY_MS = 60 * 60 * 1000;
 // 统计待清理数量时 KV 最多列出的标记数
 const MAX_COUNTED_MARKERS = 1000;
 // 管理端请求顺带清理的最小间隔
@@ -123,7 +127,8 @@ async function confirmDue(db, item, cutoff) {
         return null;
     }
 
-    const record = await db.getWithMetadata(item.fileId);
+    const found = await db.getWithMetadata(item.fileId);
+    const record = isMissingRecord(found) ? null : found;
     const expiresAt = getExpiresAt(record?.metadata);
 
     if (!item.markerKey) {
@@ -135,8 +140,9 @@ async function confirmDue(db, item, cutoff) {
     if (!record) {
         return { fileId: item.fileId, markerKey: item.markerKey, record: null };
     }
-    if (expiresAt !== item.markerExpiresAt) {
-        // 有效期被修改或改回永久，标记已失效；仍有有效期的补写正确的标记
+    // 标记时间不早于记录的到期时间时有效：等于到期时间，或是删除失败后移到的重试时间
+    if (expiresAt === null || expiresAt > item.markerExpiresAt) {
+        // 有效期被延长或改回永久，标记已失效；仍有有效期的补写正确的标记
         if (expiresAt !== null) {
             await trackFileExpiry(db, item.fileId, record.metadata);
         }
@@ -146,20 +152,37 @@ async function confirmDue(db, item, cutoff) {
     return { fileId: item.fileId, markerKey: item.markerKey, record, expiresAt };
 }
 
-// 记录仍是确认时的到期时间才删除；返回是否已不存在该记录
-async function deleteRecordIfUnchanged(db, fileId, expiresAt) {
+// 记录仍是确认时的版本（到期时间和上传时间相同）才删除；返回是否已不存在该记录
+async function deleteRecordIfUnchanged(db, target) {
+    const timeStamp = target.record.metadata?.TimeStamp;
     if (!usesExpiryMarkers(db)) {
-        return await db.deleteFileIfExpiresAt(fileId, expiresAt);
+        return await db.deleteExpiredFileIfUnchanged(target.fileId, target.expiresAt, timeStamp);
     }
     // KV 没有条件写入：删除前再读一次比对，只能缩小与替换上传交错的窗口
-    const current = await db.getWithMetadata(fileId);
-    if (current && getExpiresAt(current.metadata) !== expiresAt) {
+    const current = await db.getWithMetadata(target.fileId);
+    if (isMissingRecord(current)) {
+        return true;
+    }
+    if (getExpiresAt(current.metadata) !== target.expiresAt || current.metadata?.TimeStamp !== timeStamp) {
         return false;
     }
-    if (current) {
-        await db.delete(fileId);
-    }
+    await db.delete(target.fileId);
     return true;
+}
+
+// 删除失败的文件推迟重试；推迟失败时下次清理照常重试
+async function deferRetry(db, target, now) {
+    const retryAt = now + CLEANUP_RETRY_MS;
+    try {
+        if (target.markerKey) {
+            await db.put(buildExpiryMarkerKey(retryAt, target.fileId), '');
+            await db.delete(target.markerKey);
+        } else {
+            await db.deferExpiredFileCleanup(target.fileId, target.expiresAt, retryAt);
+        }
+    } catch (error) {
+        console.warn(`Failed to defer cleanup of ${target.fileId}:`, error);
+    }
 }
 
 /**
@@ -206,8 +229,10 @@ export async function cleanupExpiredFiles(context, { now = Date.now(), limit } =
     for (const target of targets) {
         try {
             if (target.record) {
-                await deleteStoredFile(env, target.fileId, target.record);
-                if (!await deleteRecordIfUnchanged(db, target.fileId, target.expiresAt)) {
+                if (!await deleteStoredFile(env, target.fileId, target.record)) {
+                    throw new Error('storage channel reported a failed deletion');
+                }
+                if (!await deleteRecordIfUnchanged(db, target)) {
                     console.error(`Expired file ${target.fileId} was replaced during cleanup; its storage object was already deleted`);
                     failed++;
                     continue;
@@ -217,6 +242,7 @@ export async function cleanupExpiredFiles(context, { now = Date.now(), limit } =
         } catch (error) {
             console.error(`Expired file cleanup failed for ${target.fileId}:`, error);
             failed++;
+            await deferRetry(db, target, now);
             continue;
         }
 

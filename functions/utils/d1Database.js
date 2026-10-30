@@ -136,15 +136,16 @@ D1Database.prototype.listFiles = function(options) {
 };
 
 /**
- * 列出已到期的文件，按到期时间升序
+ * 列出已到期的文件，按到期时间升序；跳过删除失败后仍在等待重试的文件
  * 条件必须与 idx_files_expires 的表达式一致才能走索引，只读取已到期的行
  */
 D1Database.prototype.listExpiredFiles = function(now, limit) {
     var stmt = this.db.prepare(
         "SELECT id, value, metadata FROM files WHERE json_extract(metadata, '$.ExpiresAt') <= ? " +
+        "AND COALESCE(json_extract(metadata, '$.ExpiryCleanupRetryAt'), 0) <= ? " +
         "ORDER BY json_extract(metadata, '$.ExpiresAt') LIMIT ?"
     );
-    return stmt.bind(now, limit).all().then(function(response) {
+    return stmt.bind(now, now, limit).all().then(function(response) {
         return (response.results || []).map(function(row) {
             return {
                 id: row.id,
@@ -156,16 +157,29 @@ D1Database.prototype.listExpiredFiles = function(now, limit) {
 };
 
 /**
- * 仅当记录的到期时间仍为 expiresAt 时删除（有效期清理用），返回是否已删除
+ * 仅当记录仍是确认时的版本（到期时间和上传时间都相同）才删除（有效期清理用），返回是否已删除
  * 记录在清理期间被续期、改为永久或被同名上传替换时保留
  */
-D1Database.prototype.deleteFileIfExpiresAt = function(fileId, expiresAt) {
+D1Database.prototype.deleteExpiredFileIfUnchanged = function(fileId, expiresAt, timeStamp) {
     var stmt = this.db.prepare(
-        "DELETE FROM files WHERE id = ? AND json_extract(metadata, '$.ExpiresAt') = ?"
+        "DELETE FROM files WHERE id = ? AND json_extract(metadata, '$.ExpiresAt') = ? " +
+        "AND json_extract(metadata, '$.TimeStamp') IS ?"
     );
-    return stmt.bind(fileId, expiresAt).run().then(function(result) {
+    return stmt.bind(fileId, expiresAt, timeStamp === undefined ? null : timeStamp).run().then(function(result) {
         return Boolean(result && result.meta && result.meta.changes > 0);
     });
+};
+
+/**
+ * 删除失败的到期文件推迟到 retryAt 再处理，避免持续失败的文件一直占据每次清理的批次
+ * 只在记录仍是同一到期时间时写入
+ */
+D1Database.prototype.deferExpiredFileCleanup = function(fileId, expiresAt, retryAt) {
+    var stmt = this.db.prepare(
+        "UPDATE files SET metadata = json_set(metadata, '$.ExpiryCleanupRetryAt', ?) " +
+        "WHERE id = ? AND json_extract(metadata, '$.ExpiresAt') = ?"
+    );
+    return stmt.bind(retryAt, fileId, expiresAt).run();
 };
 
 /**

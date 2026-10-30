@@ -21,7 +21,7 @@ import {
 } from '../utils/metadata/channelCredentials.js';
 import { buildCdnFileUrl } from '../utils/metadata/metadataView.js';
 import {
-    isExpired, getExpiresAt, capCacheControl, buildExpiringFileEtag, etagMatches
+    isExpired, getExpiresAt, capCacheControl, buildExpiringFileEtag, etagMatches, isMissingRecord
 } from '../utils/fileExpiryHelpers.js';
 import {
     parseImageTransform,
@@ -274,7 +274,7 @@ export async function isCachedResponseServable(context) {
     try {
         const fileId = decodeURIComponent(context.params.path).split(',').join('/');
         const record = await getDatabase(context.env).getWithMetadata(fileId);
-        return record !== null && getExpiresAt(record.metadata) === null;
+        return !isMissingRecord(record) && getExpiresAt(record.metadata) === null;
     } catch (error) {
         console.warn('Failed to validate cached file response:', error.message);
         return false;

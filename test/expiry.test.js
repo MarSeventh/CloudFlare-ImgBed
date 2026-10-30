@@ -13,6 +13,22 @@ const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
 const NOW = Date.UTC(2026, 9, 25);
 
+// Cloudflare KV's getWithMetadata returns { value: null, metadata: null } for missing keys, not null
+function nativeKv() {
+    const kv = memoryDatabase();
+    const read = kv.getWithMetadata.bind(kv);
+    kv.getWithMetadata = async key => (await read(key)) ?? { value: null, metadata: null };
+    // Like KV, honour the list limit
+    const list = kv.list.bind(kv);
+    kv.list = async (options = {}) => {
+        const result = await list(options);
+        return options.limit && result.keys.length > options.limit
+            ? { keys: result.keys.slice(0, options.limit), list_complete: false }
+            : result;
+    };
+    return kv;
+}
+
 const enabledConfig = (overrides = {}) => helpers.normalizeFileExpiryConfig({
     enabled: true, defaultExpire: '7d', allowCustom: true, options: ['12h', '7d', 'forever'], ...overrides,
 });
@@ -165,7 +181,7 @@ describe('file expiry', () => {
         let db, route;
 
         beforeEach(async () => {
-            db = memoryDatabase();
+            db = createDatabaseAdapter({ img_url: nativeKv() });
             route = await loadFunction('functions/file/[[path]].js', {
                 getDatabase: () => db, ...helpers, ...fileTools, ...imageTransform,
                 fetchSecurityConfig: async () => ({ access: { whiteListMode: false } }),
@@ -236,7 +252,7 @@ describe('file expiry', () => {
         let db, route, cache, tasks, storageReads, previousCaches;
 
         beforeEach(async () => {
-            db = memoryDatabase();
+            db = createDatabaseAdapter({ img_url: nativeKv() });
             route = await loadFunction('functions/file/[[path]].js', {
                 getDatabase: () => db, ...helpers, ...fileTools, ...imageTransform,
                 fetchSecurityConfig: async () => ({ access: { whiteListMode: false } }),
@@ -304,14 +320,27 @@ describe('file expiry', () => {
             await db.put('gone.png', '', { metadata });
             await fetchFile('due.png');
             await fetchFile('gone.png');
-
-            await db.put('due.png', '', { metadata: { ...metadata, ExpiresAt: Date.now() - 1 } });
-            await db.delete('gone.png');
-            for (const method of ['HEAD', 'GET']) {
-                assert.equal((await fetchFile('due.png', method)).status, 404, method);
-                assert.equal((await fetchFile('gone.png', method)).status, 404, method);
+            // On KV a missing record falls back to the legacy Telegraph path; answer it with a 404 here
+            const previousFetch = globalThis.fetch;
+            globalThis.fetch = async () => new Response('missing', { status: 404 });
+            try {
+                await db.put('due.png', '', { metadata: { ...metadata, ExpiresAt: Date.now() - 1 } });
+                await db.delete('gone.png');
+                for (const method of ['HEAD', 'GET']) {
+                    assert.equal((await fetchFile('due.png', method)).status, 404, method);
+                    assert.equal((await fetchFile('gone.png', method)).status, 404, method);
+                }
+            } finally {
+                globalThis.fetch = previousFetch;
             }
-            assert.equal(cache.entries.size, 0);
+            assert.equal(cache.entries.has('https://test/file/due.png'), false);
+        });
+
+        it('treats a missing KV record as not servable from cache', async () => {
+            const context = { env: {}, params: { path: 'missing.png' } };
+            assert.equal(await route.isCachedResponseServable(context), false);
+            await db.put('missing.png', '', { metadata: { Channel: 'CloudflareR2' } });
+            assert.equal(await route.isCachedResponseServable(context), true);
         });
     });
 
@@ -362,8 +391,9 @@ describe('file expiry', () => {
                 const { sqlite } = await sqliteDatabase();
                 const plan = sqlite.db.prepare(
                     "EXPLAIN QUERY PLAN SELECT id, value, metadata FROM files WHERE json_extract(metadata, '$.ExpiresAt') <= ? " +
+                    "AND COALESCE(json_extract(metadata, '$.ExpiryCleanupRetryAt'), 0) <= ? " +
                     "ORDER BY json_extract(metadata, '$.ExpiresAt') LIMIT ?"
-                ).all(NOW, 5);
+                ).all(NOW, NOW, 5);
                 assert.deepEqual(plan.map(row => row.detail), ['SEARCH files USING INDEX idx_files_expires (<expr><?)']);
             });
 
@@ -454,6 +484,55 @@ describe('file expiry', () => {
                 assert.deepEqual(await service.countExpiredFiles(context.env, NOW), { count: 1, capped: false });
             });
 
+            it('keeps files whose channel reports a failed deletion instead of dropping their record', async () => {
+                const { db } = await sqliteDatabase();
+                // WebDAV without channel credentials: the channel helper returns false instead of throwing
+                await db.put('remote.png', '', { metadata: { Channel: 'WebDAV', ExpiresAt: NOW - HOUR } });
+                const { service, context } = await loadCleanup(db, {});
+
+                assert.deepEqual(await service.cleanupExpiredFiles(context, { now: NOW }), { deleted: 0, failed: 1, hasMore: false });
+                assert.notEqual(await db.getWithMetadata('remote.png'), null);
+            });
+
+            it('defers persistently failing files so later due files are still cleaned', async () => {
+                const { db } = await sqliteDatabase();
+                const objects = new Map([['broken.png', 'content'], ['fine.png', 'content']]);
+                await db.put('broken.png', '', { metadata: { Channel: 'CloudflareR2', ExpiresAt: NOW - 2 * HOUR } });
+                await db.put('fine.png', '', { metadata: { Channel: 'CloudflareR2', ExpiresAt: NOW - HOUR } });
+                let fail = true;
+                const env = { img_r2: { async delete(id) {
+                    if (id === 'broken.png' && fail) throw new Error('storage unavailable');
+                    objects.delete(id);
+                } } };
+                const { service, context } = await loadCleanup(db, env);
+
+                // Batches of one: the oldest file fails first, then must not block the next one
+                assert.deepEqual(await service.cleanupExpiredFiles(context, { now: NOW, limit: 1 }), { deleted: 0, failed: 1, hasMore: true });
+                assert.deepEqual(await service.cleanupExpiredFiles(context, { now: NOW, limit: 1 }), { deleted: 1, failed: 0, hasMore: true });
+                assert.deepEqual([...objects.keys()], ['broken.png']);
+                assert.deepEqual(await service.cleanupExpiredFiles(context, { now: NOW, limit: 1 }), { deleted: 0, failed: 0, hasMore: false });
+
+                fail = false;
+                // Retry times are compared with the same cutoff as expiry times
+                const retry = NOW + service.CLEANUP_RETRY_MS + service.CLEANUP_GRACE_MS;
+                assert.deepEqual(await service.cleanupExpiredFiles(context, { now: retry, limit: 1 }), { deleted: 1, failed: 0, hasMore: true });
+                assert.equal(objects.size, 0);
+                assert.equal(await db.getWithMetadata('broken.png'), null);
+            });
+
+            it('keeps a replacement that happens to carry the same expiry time', async () => {
+                const { db } = await sqliteDatabase();
+                await db.put('photo.png', '', { metadata: { Channel: 'CloudflareR2', TimeStamp: 1, ExpiresAt: NOW - HOUR } });
+                const env = { img_r2: { async delete() {
+                    // e.g. restored from a backup between the recheck and the record deletion
+                    await db.put('photo.png', 'new', { metadata: { Channel: 'CloudflareR2', TimeStamp: 2, ExpiresAt: NOW - HOUR } });
+                } } };
+                const { service, context } = await loadCleanup(db, env);
+
+                assert.deepEqual(await service.cleanupExpiredFiles(context, { now: NOW }), { deleted: 0, failed: 1, hasMore: false });
+                assert.equal((await db.getWithMetadata('photo.png')).metadata.TimeStamp, 2);
+            });
+
             it('deletes nothing when the index cannot be updated and finishes on the next run', async () => {
                 const { db } = await sqliteDatabase();
                 const objects = new Map([['due.png', 'content']]);
@@ -475,7 +554,7 @@ describe('file expiry', () => {
             let kv, db, objects, cleanup;
 
             beforeEach(async () => {
-                kv = memoryDatabase();
+                kv = nativeKv();
                 db = createDatabaseAdapter({ img_url: kv });
                 objects = new Map();
                 cleanup = await loadCleanup(db, r2(objects));
@@ -516,7 +595,7 @@ describe('file expiry', () => {
 
                 assert.deepEqual(await service.countExpiredFiles(context.env, NOW), { count: 1, capped: false });
                 assert.deepEqual(await service.cleanupExpiredFiles(context, { now: NOW }), { deleted: 1, failed: 0, hasMore: false });
-                assert.equal(await db.getWithMetadata('due.png'), null);
+                assert.equal(kv.records.has('due.png'), false);
                 assert.equal(objects.has('due.png'), false);
                 assert.deepEqual(markers(), [
                     helpers.buildExpiryMarkerKey(NOW - 60 * 1000, 'recent.png'),
@@ -551,13 +630,37 @@ describe('file expiry', () => {
                 };
 
                 assert.deepEqual(await service.cleanupExpiredFiles(context, { now: NOW }), { deleted: 1, failed: 0, hasMore: false });
-                assert.equal(await db.getWithMetadata('due.png'), null);
+                assert.equal(kv.records.has('due.png'), false);
                 assert.deepEqual(await indexedIds(index, context), []);
                 assert.equal(markers().length, 1);
 
                 // The leftover marker points at a missing record: the next run finishes it
                 assert.deepEqual(await service.cleanupExpiredFiles(context, { now: NOW }), { deleted: 0, failed: 0, hasMore: false });
                 assert.deepEqual(markers(), []);
+            });
+
+            it('moves the marker of a failing file to its retry time so later files are still cleaned', async () => {
+                await put('broken.png', NOW - 2 * HOUR);
+                await put('fine.png', NOW - HOUR);
+                let fail = true;
+                const env = { img_r2: { async delete(id) {
+                    if (id === 'broken.png' && fail) throw new Error('storage unavailable');
+                    objects.delete(id);
+                } } };
+                const { service, context } = await loadCleanup(db, env);
+
+                assert.deepEqual(await service.cleanupExpiredFiles(context, { now: NOW, limit: 1 }), { deleted: 0, failed: 1, hasMore: true });
+                const retry = NOW + service.CLEANUP_RETRY_MS;
+                assert.deepEqual(markers(), [
+                    helpers.buildExpiryMarkerKey(NOW - HOUR, 'fine.png'),
+                    helpers.buildExpiryMarkerKey(retry, 'broken.png'),
+                ]);
+                assert.deepEqual(await service.cleanupExpiredFiles(context, { now: NOW, limit: 1 }), { deleted: 1, failed: 0, hasMore: true });
+
+                fail = false;
+                assert.deepEqual(await service.cleanupExpiredFiles(context, { now: retry + service.CLEANUP_GRACE_MS }), { deleted: 1, failed: 0, hasMore: false });
+                assert.deepEqual(markers(), []);
+                assert.equal(objects.size, 0);
             });
 
             it('keeps the marker when the index cannot be updated so the next run can finish', async () => {
@@ -592,7 +695,7 @@ describe('file expiry', () => {
                 };
 
                 assert.deepEqual(await cleanup.service.cleanupExpiredFiles(cleanup.context, { now: NOW }), { deleted: 1, failed: 2, hasMore: false });
-                assert.equal(await read('due.png'), null);
+                assert.equal(kv.records.has('due.png'), false);
                 assert.ok(objects.has('unreadable.png') && objects.has('extended.png'));
             });
 

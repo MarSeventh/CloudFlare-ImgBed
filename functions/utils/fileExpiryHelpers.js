@@ -136,6 +136,11 @@ export function getExpiresAt(metadata) {
     return metadata?.ExpiresAt != null && Number.isFinite(expiresAt) ? expiresAt : null;
 }
 
+// 原生 KV 的 getWithMetadata 在键不存在时返回 { value: null, metadata: null }，D1 和测试替身返回 null
+export function isMissingRecord(record) {
+    return !record || record.value === null || record.value === undefined;
+}
+
 export function isExpired(metadata, now = Date.now()) {
     const expiresAt = getExpiresAt(metadata);
     return expiresAt !== null && expiresAt <= now;
