@@ -172,14 +172,14 @@ D1Database.prototype.deleteExpiredFileIfUnchanged = function(fileId, expiresAt, 
 
 /**
  * 删除失败的到期文件推迟到 retryAt 再处理，避免持续失败的文件一直占据每次清理的批次
- * 只在记录仍是同一到期时间时写入
+ * 只在记录仍是确认时的版本（到期时间和上传时间相同）时写入
  */
-D1Database.prototype.deferExpiredFileCleanup = function(fileId, expiresAt, retryAt) {
+D1Database.prototype.deferExpiredFileCleanup = function(fileId, expiresAt, timeStamp, retryAt) {
     var stmt = this.db.prepare(
         "UPDATE files SET metadata = json_set(metadata, '$.ExpiryCleanupRetryAt', ?) " +
-        "WHERE id = ? AND json_extract(metadata, '$.ExpiresAt') = ?"
+        "WHERE id = ? AND json_extract(metadata, '$.ExpiresAt') = ? AND json_extract(metadata, '$.TimeStamp') IS ?"
     );
-    return stmt.bind(retryAt, fileId, expiresAt).run();
+    return stmt.bind(retryAt, fileId, expiresAt, timeStamp === undefined ? null : timeStamp).run();
 };
 
 /**

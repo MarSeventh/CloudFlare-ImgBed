@@ -174,11 +174,14 @@ async function deleteRecordIfUnchanged(db, target) {
 async function deferRetry(db, target, now) {
     const retryAt = now + CLEANUP_RETRY_MS;
     try {
-        if (target.markerKey) {
-            await db.put(buildExpiryMarkerKey(retryAt, target.fileId), '');
-            await db.delete(target.markerKey);
+        if (target.markerKeys.length > 0) {
+            const retryKey = buildExpiryMarkerKey(retryAt, target.fileId);
+            await db.put(retryKey, '');
+            for (const markerKey of target.markerKeys) {
+                if (markerKey !== retryKey) await db.delete(markerKey);
+            }
         } else {
-            await db.deferExpiredFileCleanup(target.fileId, target.expiresAt, retryAt);
+            await db.deferExpiredFileCleanup(target.fileId, target.expiresAt, target.record.metadata?.TimeStamp, retryAt);
         }
     } catch (error) {
         console.warn(`Failed to defer cleanup of ${target.fileId}:`, error);
@@ -201,11 +204,18 @@ export async function cleanupExpiredFiles(context, { now = Date.now(), limit } =
     const hasMore = due.length >= batchSize;
 
     let failed = 0;
+    // 同一文件可能有多个到期标记（如重试标记和元数据改写后补回的原标记），按文件合并，只删除一次
     const targets = [];
+    const targetsById = new Map();
     for (const item of due) {
         try {
             const target = await confirmDue(db, item, cutoff);
-            if (target) {
+            const existing = target && targetsById.get(target.fileId);
+            if (existing) {
+                if (target.markerKey) existing.markerKeys.push(target.markerKey);
+            } else if (target) {
+                target.markerKeys = target.markerKey ? [target.markerKey] : [];
+                targetsById.set(target.fileId, target);
                 targets.push(target);
             }
         } catch (error) {
@@ -247,11 +257,11 @@ export async function cleanupExpiredFiles(context, { now = Date.now(), limit } =
         }
 
         // 标记删除失败不影响已完成的删除：下次清理发现记录已不存在，会再次移除索引并删除标记
-        if (target.markerKey) {
+        for (const markerKey of target.markerKeys) {
             try {
-                await db.delete(target.markerKey);
+                await db.delete(markerKey);
             } catch (error) {
-                console.warn(`Failed to delete expiry marker ${target.markerKey}, will retry:`, error);
+                console.warn(`Failed to delete expiry marker ${markerKey}, will retry:`, error);
             }
         }
     }

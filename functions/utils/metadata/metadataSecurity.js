@@ -13,6 +13,11 @@ const SENSITIVE_METADATA_KEYS = [
   'WebDAVHeaders',
 ];
 
+// 服务端内部状态（如有效期清理的重试时间），不返回给管理端，也不进入备份
+const INTERNAL_METADATA_KEYS = [
+  'ExpiryCleanupRetryAt',
+];
+
 const CONFIG_DERIVED_METADATA_KEYS = [
   'S3Location',
   'S3Endpoint',
@@ -74,6 +79,9 @@ export function stripSensitiveMetadataInPlace(metadata = {}) {
 
   // 凭据字段不随管理端接口响应返回，也不重新写回 metadata
   for (const key of SENSITIVE_METADATA_KEYS) {
+    delete metadata[key];
+  }
+  for (const key of INTERNAL_METADATA_KEYS) {
     delete metadata[key];
   }
 

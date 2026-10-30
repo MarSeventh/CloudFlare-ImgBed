@@ -663,6 +663,26 @@ describe('file expiry', () => {
                 assert.equal(objects.size, 0);
             });
 
+            it('cleans a file once when a metadata write restored its original marker after a deferral', async () => {
+                await put('photo.png', NOW - 2 * HOUR);
+                let fail = true;
+                const env = { img_r2: { async delete(id) {
+                    if (fail) throw new Error('storage unavailable');
+                    objects.delete(id);
+                } } };
+                const { service, context } = await loadCleanup(db, env);
+                assert.deepEqual(await service.cleanupExpiredFiles(context, { now: NOW }), { deleted: 0, failed: 1, hasMore: false });
+
+                // A later metadata write (tags, block list ...) makes the adapter write the original marker again
+                await db.put('photo.png', '', { metadata: { Channel: 'CloudflareR2', ExpiresAt: NOW - 2 * HOUR, Tags: ['x'] } });
+                assert.equal(markers().length, 2);
+
+                fail = false;
+                const later = NOW + service.CLEANUP_RETRY_MS + service.CLEANUP_GRACE_MS;
+                assert.deepEqual(await service.cleanupExpiredFiles(context, { now: later }), { deleted: 1, failed: 0, hasMore: false });
+                assert.deepEqual(markers(), []);
+            });
+
             it('keeps the marker when the index cannot be updated so the next run can finish', async () => {
                 await put('due.png', NOW - HOUR);
                 const { service, context, index } = cleanup;
@@ -791,6 +811,13 @@ describe('file expiry', () => {
             });
             assert.equal((await move.onRequest(ctx)).status, 200);
             assert.ok(fixture.db.records.has(helpers.buildExpiryMarkerKey(NOW, 'archive/photo.png')));
+        });
+
+        it('keeps the internal cleanup retry time out of management views and backups', async () => {
+            const metadataSecurity = await import('../functions/utils/metadata/metadataSecurity.js');
+            const metadata = { Channel: 'CloudflareR2', ExpiresAt: NOW, ExpiryCleanupRetryAt: NOW + HOUR };
+            assert.deepEqual(metadataSecurity.stripSensitiveMetadata(metadata), { Channel: 'CloudflareR2', ExpiresAt: NOW });
+            assert.equal('ExpiryCleanupRetryAt' in metadataSecurity.cleanPersistedMetadata(metadata), false);
         });
 
         it('leaves expiry markers out of settings backups', async () => {
