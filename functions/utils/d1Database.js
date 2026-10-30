@@ -156,6 +156,19 @@ D1Database.prototype.listExpiredFiles = function(now, limit) {
 };
 
 /**
+ * 仅当记录的到期时间仍为 expiresAt 时删除（有效期清理用），返回是否已删除
+ * 记录在清理期间被续期、改为永久或被同名上传替换时保留
+ */
+D1Database.prototype.deleteFileIfExpiresAt = function(fileId, expiresAt) {
+    var stmt = this.db.prepare(
+        "DELETE FROM files WHERE id = ? AND json_extract(metadata, '$.ExpiresAt') = ?"
+    );
+    return stmt.bind(fileId, expiresAt).run().then(function(result) {
+        return Boolean(result && result.meta && result.meta.changes > 0);
+    });
+};
+
+/**
  * 统计已到期但尚未清理的文件数
  */
 D1Database.prototype.countExpiredFiles = function(now) {

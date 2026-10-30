@@ -2,7 +2,8 @@ import { addFileToIndex } from '../../../utils/indexManager.js';
 import { getDatabase } from '../../../utils/databaseAdapter.js';
 import { buildFileMetadataForManagement } from '../../../utils/metadata/metadataView.js';
 import { cleanPersistedMetadata } from '../../../utils/metadata/metadataSecurity.js';
-import { trackFileExpiry } from '../../../utils/fileExpiryService.js';
+import { getExpiresAt, isExpired } from '../../../utils/fileExpiryHelpers.js';
+import { purgeCFCache } from '../../../utils/purgeCache.js';
 
 // CORS 跨域响应头
 const corsHeaders = {
@@ -101,6 +102,18 @@ export async function onRequest(context) {
             });
         }
 
+        // 已到期的文件对外已按不存在处理，等待清理，不能再续期或修改；
+        // 清理任务据此在到期后可以放心删除，不会与续期请求交错（见 fileExpiryService.cleanupExpiredFiles）
+        if (isExpired(fileData.metadata)) {
+            return new Response(JSON.stringify({
+                success: false,
+                message: 'File has expired and is waiting for cleanup.',
+            }), {
+                status: 409,
+                headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            });
+        }
+
         // 合并允许更新的字段到现有 metadata
         const updatedMetadata = { ...fileData.metadata };
         if (typeof body.FileName === 'string') {
@@ -118,12 +131,16 @@ export async function onRequest(context) {
         }
         const metadataToSave = cleanPersistedMetadata(updatedMetadata);
 
-        // 保存更新后的 metadata
+        // 保存更新后的 metadata（KV 存储下由适配器写入新的到期标记，旧标记在清理时发现不一致会自动移除）
         await db.put(fileId, fileData.value, { metadata: metadataToSave });
 
-        // 修改了有效期时，KV 存储下写入新的到期标记（旧标记在清理时发现不一致会自动移除）
-        if (hasExpiresAt) {
-            await trackFileExpiry(db, fileId, metadataToSave);
+        // 到期时间提前（含永久改为有期限）时，清除配置了 API Token 的 CDN 缓存；
+        // Worker 缓存在命中时校验，无需 Token
+        const oldExpiresAt = getExpiresAt(fileData.metadata) ?? Infinity;
+        const newExpiresAt = getExpiresAt(metadataToSave) ?? Infinity;
+        if (newExpiresAt < oldExpiresAt) {
+            const url = new URL(request.url);
+            waitUntil(purgeCFCache(env, `https://${url.hostname}/file/${fileId}`));
         }
 
         // 更新索引

@@ -20,7 +20,9 @@ import {
     resolveWebDAVCredentials,
 } from '../utils/metadata/channelCredentials.js';
 import { buildCdnFileUrl } from '../utils/metadata/metadataView.js';
-import { isExpired, getExpiresAt, capCacheControl } from '../utils/fileExpiryHelpers.js';
+import {
+    isExpired, getExpiresAt, capCacheControl, buildExpiringFileEtag, etagMatches
+} from '../utils/fileExpiryHelpers.js';
 import {
     parseImageTransform,
     transformImageRequestViaUrl,
@@ -114,6 +116,24 @@ export async function onRequest(context) {  // Contents of context object
     if (urlTransformResponse) {
         return urlTransformResponse;
     }
+
+    // 带有效期的文件：浏览器缓存过期后凭 ETag 向服务端确认，未变化时返回 304，不再读取存储
+    const etag = context.fileExpiresAt !== null && !context.imageTransform.requested
+        ? buildExpiringFileEtag(imgRecord.metadata)
+        : null;
+    if (etag && etagMatches(request.headers.get('If-None-Match'), etag)) {
+        return new Response(null, {
+            status: 304,
+            headers: { 'ETag': etag, 'Cache-Control': getFileCacheControl(context) },
+        });
+    }
+
+    return withEtag(await serveFileContent(context, db, imgRecord, fileId, encodedFileName, fileType), etag);
+}
+
+// 按存储渠道读取文件内容
+async function serveFileContent(context, db, imgRecord, fileId, encodedFileName, fileType) {
+    const { request, env, url } = context;
 
     /* Cloudflare R2渠道 */
     if (imgRecord.metadata?.Channel === 'CloudflareR2') {
@@ -234,6 +254,30 @@ export async function onRequest(context) {  // Contents of context object
         return await transformImageResponse(context, newRes);
     } catch (error) {
         return new Response('Error: ' + error, { status: 500 });
+    }
+}
+
+function withEtag(response, etag) {
+    if (!etag || (response.status !== 200 && response.status !== 206)) {
+        return response;
+    }
+    const tagged = new Response(response.body, response);
+    tagged.headers.set('ETag', etag);
+    return tagged;
+}
+
+/**
+ * Worker 入口命中缓存后、返回前调用（见 deploy/worker/workerCache.js）
+ * 只有仍存在且永久的文件可以使用共享缓存：缓存写入后文件可能已被删除、改为有期限或到期
+ */
+export async function isCachedResponseServable(context) {
+    try {
+        const fileId = decodeURIComponent(context.params.path).split(',').join('/');
+        const record = await getDatabase(context.env).getWithMetadata(fileId);
+        return record !== null && getExpiresAt(record.metadata) === null;
+    } catch (error) {
+        console.warn('Failed to validate cached file response:', error.message);
+        return false;
     }
 }
 

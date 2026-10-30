@@ -4,11 +4,17 @@
  * 到期时间只保存在元数据 ExpiresAt 中：
  * - D1 / SQLite：通过 idx_files_expires 表达式索引按到期时间查询
  * - KV：上传时额外写一个空标记键 manage@expiry@<到期时间>@<fileId>，按键名顺序即到期顺序
+ *
+ * 清理与修改的协调：
+ * - 文件一到期，访问即返回 404，管理接口也不再允许修改（返回 409），因此到期后不会再被续期
+ * - 清理只处理到期超过 CLEANUP_GRACE_MS 的文件，给到期前已发出的修改请求和 KV 跨地域同步留出时间
+ * - 每个文件删除前重新读取当前记录确认仍然到期，删除记录时再按到期时间做条件删除（D1）或比对（KV），
+ *   清理期间被替换的记录不会被旧快照删除
  */
 import { getDatabase } from './databaseAdapter.js';
 import { fetchOthersConfig } from './sysConfig.js';
 import { batchRemoveFilesFromIndex } from './indexManager.js';
-import { deleteFile } from '../api/manage/delete/[[path]].js';
+import { deleteStoredFile } from '../api/manage/delete/[[path]].js';
 import {
     EXPIRY_MARKER_PREFIX, resolveExpiresAt, getExpiresAt, buildExpiryMarkerKey, parseExpiryMarkerKey
 } from './fileExpiryHelpers.js';
@@ -17,9 +23,11 @@ import {
 const DEFAULT_SUBREQUEST_BUDGET = 45;
 // 每次清理的固定开销：查询到期文件、记录一次索引操作
 const FIXED_SUBREQUESTS = 3;
-// 每个文件：删除存储对象 + 删除记录；KV 另需读取记录、删除标记
-const SUBREQUESTS_PER_FILE = 2;
-const SUBREQUESTS_PER_FILE_KV = 4;
+// 每个文件：重新读取记录 + 删除存储对象 + 条件删除记录；KV 删除记录前需再读一次，另需删除标记
+const SUBREQUESTS_PER_FILE = 3;
+const SUBREQUESTS_PER_FILE_KV = 5;
+// 到期后至少等这么久才删除；期间访问已返回 404
+export const CLEANUP_GRACE_MS = 5 * 60 * 1000;
 // 统计待清理数量时 KV 最多列出的标记数
 const MAX_COUNTED_MARKERS = 1000;
 // 管理端请求顺带清理的最小间隔
@@ -61,7 +69,8 @@ function usesExpiryMarkers(db) {
 }
 
 /**
- * 写入新记录或修改 ExpiresAt 后调用；KV 写入到期标记，D1 无需处理
+ * 补写 KV 到期标记；D1 无需处理
+ * 正常写入记录时由 databaseAdapter 的 KV 适配器自动先写标记，这里供清理任务修正失效标记
  */
 export async function trackFileExpiry(db, fileId, metadata) {
     const expiresAt = getExpiresAt(metadata);
@@ -84,20 +93,17 @@ export function getCleanupBatchSize(env, usingMarkers) {
     return Math.max(1, Math.floor((budget - FIXED_SUBREQUESTS) / perFile));
 }
 
-async function listDueFiles(db, now, limit) {
+async function listDueFiles(db, cutoff, limit) {
     if (!usesExpiryMarkers(db)) {
-        const rows = await db.listExpiredFiles(now, limit);
-        return rows.map(row => ({
-            fileId: row.id,
-            record: { value: row.value, metadata: row.metadata },
-        }));
+        const rows = await db.listExpiredFiles(cutoff, limit);
+        return rows.map(row => ({ fileId: row.id }));
     }
 
     const { keys } = await db.list({ prefix: EXPIRY_MARKER_PREFIX, limit });
     const due = [];
     for (const { name } of keys) {
         const marker = parseExpiryMarkerKey(name);
-        if (marker && marker.expiresAt > now) {
+        if (marker && marker.expiresAt > cutoff) {
             break;
         }
         due.push({ markerKey: name, fileId: marker?.fileId, markerExpiresAt: marker?.expiresAt });
@@ -106,8 +112,60 @@ async function listDueFiles(db, now, limit) {
 }
 
 /**
- * 清理已到期的文件：删除存储对象、记录和索引
- * 每次数量有上限，删不完的留到下次；删除失败的文件下次重试
+ * 重新读取当前记录，确认仍应删除
+ * @returns {Promise<{fileId, markerKey?, record, expiresAt}|null>} 需要删除的目标；
+ *   record 为 null 表示记录已不存在，只需补做索引移除和标记删除（上次清理中途失败或文件已被删除）
+ */
+async function confirmDue(db, item, cutoff) {
+    if (!item.fileId) {
+        // 无法解析的标记直接丢弃
+        await db.delete(item.markerKey);
+        return null;
+    }
+
+    const record = await db.getWithMetadata(item.fileId);
+    const expiresAt = getExpiresAt(record?.metadata);
+
+    if (!item.markerKey) {
+        return record && expiresAt !== null && expiresAt <= cutoff
+            ? { fileId: item.fileId, record, expiresAt }
+            : null;
+    }
+
+    if (!record) {
+        return { fileId: item.fileId, markerKey: item.markerKey, record: null };
+    }
+    if (expiresAt !== item.markerExpiresAt) {
+        // 有效期被修改或改回永久，标记已失效；仍有有效期的补写正确的标记
+        if (expiresAt !== null) {
+            await trackFileExpiry(db, item.fileId, record.metadata);
+        }
+        await db.delete(item.markerKey);
+        return null;
+    }
+    return { fileId: item.fileId, markerKey: item.markerKey, record, expiresAt };
+}
+
+// 记录仍是确认时的到期时间才删除；返回是否已不存在该记录
+async function deleteRecordIfUnchanged(db, fileId, expiresAt) {
+    if (!usesExpiryMarkers(db)) {
+        return await db.deleteFileIfExpiresAt(fileId, expiresAt);
+    }
+    // KV 没有条件写入：删除前再读一次比对，只能缩小与替换上传交错的窗口
+    const current = await db.getWithMetadata(fileId);
+    if (current && getExpiresAt(current.metadata) !== expiresAt) {
+        return false;
+    }
+    if (current) {
+        await db.delete(fileId);
+    }
+    return true;
+}
+
+/**
+ * 清理到期超过 CLEANUP_GRACE_MS 的文件：先从索引移除，再删除存储对象、记录，最后删除 KV 标记
+ * 任一步失败时记录或标记仍在，下次清理会再次找到并重试；索引移除可重复执行
+ * 每个文件单独处理错误，一个文件失败不影响同批其他文件
  * @returns {Promise<{deleted: number, failed: number, hasMore: boolean}>}
  */
 export async function cleanupExpiredFiles(context, { now = Date.now(), limit } = {}) {
@@ -115,50 +173,83 @@ export async function cleanupExpiredFiles(context, { now = Date.now(), limit } =
     const db = getDatabase(env);
     const usingMarkers = usesExpiryMarkers(db);
     const batchSize = limit ?? getCleanupBatchSize(env, usingMarkers);
-    const due = await listDueFiles(db, now, batchSize);
+    const cutoff = now - CLEANUP_GRACE_MS;
+    const due = await listDueFiles(db, cutoff, batchSize);
+    const hasMore = due.length >= batchSize;
 
-    const deleted = [];
     let failed = 0;
+    const targets = [];
     for (const item of due) {
-        let record = item.record;
-
-        if (item.markerKey) {
-            record = item.fileId ? await db.getWithMetadata(item.fileId) : null;
-            const expiresAt = getExpiresAt(record?.metadata);
-            if (expiresAt !== item.markerExpiresAt) {
-                // 记录已删除、有效期被修改或改回永久时，标记已失效；仍有有效期的补写正确的标记
-                if (record && expiresAt !== null) {
-                    await trackFileExpiry(db, item.fileId, record.metadata);
-                }
-                await db.delete(item.markerKey);
-                continue;
+        try {
+            const target = await confirmDue(db, item, cutoff);
+            if (target) {
+                targets.push(target);
             }
-        }
-
-        const result = await deleteFile(env, item.fileId, null, null, { record, skipPurge: true });
-        // 兼容 deleteFile 返回布尔值或 { deleted, existed } 对象
-        if (result === true || result?.deleted === true) {
-            deleted.push(item.fileId);
-            if (item.markerKey) {
-                await db.delete(item.markerKey);
-            }
-        } else {
+        } catch (error) {
+            console.error(`Expired file check failed for ${item.fileId}:`, error);
             failed++;
         }
     }
 
-    if (deleted.length > 0) {
-        await batchRemoveFilesFromIndex(context, deleted);
+    if (targets.length === 0) {
+        return { deleted: 0, failed, hasMore };
     }
 
-    return { deleted: deleted.length, failed, hasMore: due.length >= batchSize };
+    // 先移除索引：之后删除失败时文件已到期不可访问，下次清理会再次移除；
+    // 反过来先删记录，索引移除失败后就没有可重试的线索
+    const indexResult = await batchRemoveFilesFromIndex(context, targets.map(target => target.fileId));
+    if (!indexResult.success) {
+        return { deleted: 0, failed: failed + targets.length, hasMore };
+    }
+
+    let deleted = 0;
+    for (const target of targets) {
+        try {
+            if (target.record) {
+                await deleteStoredFile(env, target.fileId, target.record);
+                if (!await deleteRecordIfUnchanged(db, target.fileId, target.expiresAt)) {
+                    console.error(`Expired file ${target.fileId} was replaced during cleanup; its storage object was already deleted`);
+                    failed++;
+                    continue;
+                }
+                deleted++;
+            }
+        } catch (error) {
+            console.error(`Expired file cleanup failed for ${target.fileId}:`, error);
+            failed++;
+            continue;
+        }
+
+        // 标记删除失败不影响已完成的删除：下次清理发现记录已不存在，会再次移除索引并删除标记
+        if (target.markerKey) {
+            try {
+                await db.delete(target.markerKey);
+            } catch (error) {
+                console.warn(`Failed to delete expiry marker ${target.markerKey}, will retry:`, error);
+            }
+        }
+    }
+
+    return { deleted, failed, hasMore };
 }
 
 /**
- * 管理端请求顺带清理一批（Pages 没有定时任务时依靠它和手动清理）
+ * 后台入口（Worker Cron Trigger、Docker 定时器）调用
+ * 它们不经过 functions/_middleware.js，在这里显式标记部署平台
+ */
+export async function runExpiryCleanupJob(env, runtime, waitUntil, options = {}) {
+    const context = { env: { ...env, SERVER_RUNTIME: runtime }, waitUntil };
+    return await cleanupExpiredFiles(context, options);
+}
+
+/**
+ * Pages 管理端请求顺带清理一批（Pages 没有定时任务，依靠它和手动清理）；Worker 和 Docker 使用各自的定时入口
  * 同一实例内限频，不额外写入状态；功能关闭时跳过，避免未使用该功能的 KV 部署消耗 list 额度
  */
 export function maybeCleanupExpiredFiles(context, now = Date.now()) {
+    if (context.env.SERVER_RUNTIME !== 'pages') {
+        return;
+    }
     if (now - lastOpportunisticRun < OPPORTUNISTIC_INTERVAL_MS) {
         return;
     }
@@ -174,20 +265,21 @@ export function maybeCleanupExpiredFiles(context, now = Date.now()) {
 }
 
 /**
- * 统计已到期但尚未清理的文件数；KV 最多统计 1000 个
+ * 统计可以清理（到期超过 CLEANUP_GRACE_MS）但尚未清理的文件数；KV 最多统计 1000 个
  * @returns {Promise<{count: number, capped: boolean}>}
  */
 export async function countExpiredFiles(env, now = Date.now()) {
     const db = getDatabase(env);
+    const cutoff = now - CLEANUP_GRACE_MS;
     if (!usesExpiryMarkers(db)) {
-        return { count: await db.countExpiredFiles(now), capped: false };
+        return { count: await db.countExpiredFiles(cutoff), capped: false };
     }
 
     const { keys, list_complete } = await db.list({ prefix: EXPIRY_MARKER_PREFIX, limit: MAX_COUNTED_MARKERS });
     let count = 0;
     for (const { name } of keys) {
         const marker = parseExpiryMarkerKey(name);
-        if (marker && marker.expiresAt > now) {
+        if (marker && marker.expiresAt > cutoff) {
             return { count, capped: false };
         }
         count++;

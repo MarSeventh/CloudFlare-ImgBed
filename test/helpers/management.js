@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { loadFunction, memoryDatabase } from './loadFunction.js';
 import * as metadataSecurity from '../../functions/utils/metadata/metadataSecurity.js';
+import * as expiryHelpers from '../../functions/utils/fileExpiryHelpers.js';
 
 // Keep the route, metadata cleaning and index operations real. Only storage,
 // configuration access and cache invalidation are replaced at the boundary.
@@ -10,18 +11,17 @@ export async function managementFixture() {
     const purges = [];
     const database = { getDatabase: () => db, checkDatabaseConfig: () => ({ usingD1: false }) };
     const index = await loadFunction('functions/utils/indexManager.js', database);
-    const tools = await loadFunction('functions/upload/uploadTools.js', { ...database, trackFileExpiry: async () => {} });
+    const tools = await loadFunction('functions/upload/uploadTools.js', database);
     const view = await loadFunction('functions/utils/metadata/metadataView.js', {
         ...metadataSecurity,
         loadChannelConfig: async () => ({}),
         findConfiguredChannel: () => null,
     });
     const mocks = {
-        ...database, ...index, ...tools, ...metadataSecurity, ...view,
+        ...database, ...index, ...tools, ...metadataSecurity, ...view, ...expiryHelpers,
         purgeCFCache: async (env, url) => { purges.push(['file', url]); },
         purgeRandomFileListCache: async (...args) => { purges.push(['random', ...args]); },
         purgePublicFileListCache: async (...args) => { purges.push(['public', ...args]); },
-        trackFileExpiry: async () => {},
         maybeCleanupExpiredFiles: () => {},
     };
     const env = { img_r2: {

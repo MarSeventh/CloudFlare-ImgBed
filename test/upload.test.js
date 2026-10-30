@@ -11,7 +11,7 @@ describe('upload', () => {
         db = memoryDatabase();
         storage = {};
         waits = [];
-        tools = await loadFunction('functions/upload/uploadTools.js', { getDatabase: () => db, trackFileExpiry: async () => {} });
+        tools = await loadFunction('functions/upload/uploadTools.js', { getDatabase: () => db });
         const { UnauthorizedResponse } = await loadFunction('functions/utils/auth/userAuth.js');
         mocks = {
             ...tools,

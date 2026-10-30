@@ -14,6 +14,7 @@ import { fileURLToPath, pathToFileURL } from 'url';
 import { SqliteD1 } from './sqliteD1.js';
 import { LocalR2Storage } from './r2Storage.js';
 import { dockerImageProcessor } from './imageProcessor.js';
+import { startExpiryCleanupTimer } from './expiryCleanup.js';
 
 const NativeResponse = globalThis.Response;
 
@@ -418,28 +419,10 @@ serve({
 });
 
 // ==================== 文件有效期清理 ====================
-// Docker 没有 Cron Trigger，由服务进程按间隔清理；EXPIRY_CLEANUP_INTERVAL_MINUTES=0 时关闭
-// 没有子请求限制，每次可以多清理一些
 
-const expiryCleanupMinutes = Number(process.env.EXPIRY_CLEANUP_INTERVAL_MINUTES ?? 10);
-if (Number.isFinite(expiryCleanupMinutes) && expiryCleanupMinutes > 0) {
-    const { cleanupExpiredFiles } = await import(pathToFileURL(join(FUNCTIONS_DIR, 'utils', 'fileExpiryService.js')).href);
-    let cleanupRunning = false;
-    setInterval(async () => {
-        if (cleanupRunning) return;
-        cleanupRunning = true;
-        const pending = [];
-        try {
-            const context = { env: createEnv(), waitUntil: (promise) => pending.push(promise) };
-            const result = await cleanupExpiredFiles(context, { limit: 100 });
-            await Promise.allSettled(pending);
-            if (result.deleted > 0 || result.failed > 0) {
-                console.log(`Expired files cleanup: ${JSON.stringify(result)}`);
-            }
-        } catch (error) {
-            console.error('Expired files cleanup failed:', error);
-        } finally {
-            cleanupRunning = false;
-        }
-    }, expiryCleanupMinutes * 60 * 1000).unref();
-}
+const { runExpiryCleanupJob } = await import(pathToFileURL(join(FUNCTIONS_DIR, 'utils', 'fileExpiryService.js')).href);
+startExpiryCleanupTimer({
+    runExpiryCleanupJob,
+    createEnv,
+    intervalMinutes: Number(process.env.EXPIRY_CLEANUP_INTERVAL_MINUTES ?? 10),
+});

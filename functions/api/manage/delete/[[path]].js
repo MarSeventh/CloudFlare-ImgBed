@@ -140,14 +140,42 @@ export async function onRequest(context) {
     }
 }
 
+// 按渠道删除存储中的文件对象，不处理数据库记录
+// 有效期清理先删除存储、再按条件删除记录，因此单独导出
+export async function deleteStoredFile(env, fileId, img) {
+    // 如果是R2渠道的图片，需要删除R2中对应的图片
+    if (img.metadata?.Channel === 'CloudflareR2') {
+        const R2DataBase = env.img_r2;
+        await R2DataBase.delete(fileId);
+    }
+
+    // S3 渠道的图片，需要删除S3中对应的图片
+    if (img.metadata?.Channel === 'S3') {
+        await deleteS3File(env, img);
+    }
+
+    // Discord 渠道的图片，需要删除 Discord 中对应的消息
+    if (img.metadata?.Channel === 'Discord') {
+        await deleteDiscordFile(env, img);
+    }
+
+    // HuggingFace 渠道的图片，需要删除 HuggingFace 中对应的文件
+    if (img.metadata?.Channel === 'HuggingFace') {
+        await deleteHuggingFaceFile(env, img);
+    }
+
+    // WebDAV 渠道的图片，需要删除 WebDAV 中对应的文件
+    if (img.metadata?.Channel === 'WebDAV') {
+        await deleteWebDAVFile(env, img);
+    }
+}
+
 // 删除单个文件的核心函数
-// options.record：调用方已读到的记录，避免重复读取
-// options.skipPurge：跳过缓存清除（定时清理没有请求上下文，带有效期的文件也不会进入共享缓存）
-export async function deleteFile(env, fileId, cdnUrl, url, options = {}) {
+export async function deleteFile(env, fileId, cdnUrl, url) {
     try {
         // 读取图片信息
         const db = getDatabase(env);
-        const img = options.record || await db.getWithMetadata(fileId);
+        const img = await db.getWithMetadata(fileId);
 
         // 如果文件记录不存在，直接返回成功（幂等删除），标记 existed=false 供调用方区分
         if (!img) {
@@ -155,39 +183,11 @@ export async function deleteFile(env, fileId, cdnUrl, url, options = {}) {
             return { deleted: true, existed: false };
         }
 
-        // 如果是R2渠道的图片，需要删除R2中对应的图片
-        if (img.metadata?.Channel === 'CloudflareR2') {
-            const R2DataBase = env.img_r2;
-            await R2DataBase.delete(fileId);
-        }
-
-        // S3 渠道的图片，需要删除S3中对应的图片
-        if (img.metadata?.Channel === 'S3') {
-            await deleteS3File(env, img);
-        }
-
-        // Discord 渠道的图片，需要删除 Discord 中对应的消息
-        if (img.metadata?.Channel === 'Discord') {
-            await deleteDiscordFile(env, img);
-        }
-
-        // HuggingFace 渠道的图片，需要删除 HuggingFace 中对应的文件
-        if (img.metadata?.Channel === 'HuggingFace') {
-            await deleteHuggingFaceFile(env, img);
-        }
-
-        // WebDAV 渠道的图片，需要删除 WebDAV 中对应的文件
-        if (img.metadata?.Channel === 'WebDAV') {
-            await deleteWebDAVFile(env, img);
-        }
+        await deleteStoredFile(env, fileId, img);
 
         // 删除数据库中的记录
         // 注意：容量统计现在由索引自动维护，删除文件后索引更新时会自动重新计算
         await db.delete(fileId);
-
-        if (options.skipPurge) {
-            return true;
-        }
 
         // 清除CDN缓存
         await purgeCFCache(env, cdnUrl);

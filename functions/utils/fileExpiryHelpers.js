@@ -17,6 +17,8 @@ const MAX_EXPIRE_MS = 3650 * DAY_MS;
 const MAX_EXPIRE_OPTIONS = 20;
 // 时间戳补零到 13 位，保证标记键按字典序排列即按到期时间排列
 const MARKER_TIME_WIDTH = 13;
+// 带有效期的文件浏览器最多缓存 1 小时，到期时间被提前后最迟 1 小时生效
+export const MAX_EXPIRING_CACHE_SECONDS = 3600;
 
 export const DEFAULT_FILE_EXPIRY_CONFIG = {
     enabled: false,
@@ -140,8 +142,8 @@ export function isExpired(metadata, now = Date.now()) {
 }
 
 /**
- * 带有效期的文件只允许浏览器私有缓存，且缓存时长不超过剩余有效时间
- * 不进入 Worker / CDN 共享缓存：管理员提前到期时间或删除后无需清缓存即可生效
+ * 带有效期的文件只允许浏览器私有缓存，缓存时长不超过剩余有效时间和 1 小时
+ * 不进入 Worker / CDN 共享缓存；浏览器缓存过期后凭 ETag 向服务端确认，见 buildExpiringFileEtag
  */
 export function capCacheControl(cacheControl, expiresAt, now = Date.now()) {
     if (!cacheControl || expiresAt === null || expiresAt === undefined) {
@@ -154,7 +156,33 @@ export function capCacheControl(cacheControl, expiresAt, now = Date.now()) {
     const remaining = Math.max(0, Math.floor((expiresAt - now) / 1000));
     return cacheControl
         .replace(/\bpublic\b/, 'private')
-        .replace(match[0], `max-age=${Math.min(remaining, Number(match[1]))}`);
+        .replace(match[0], `max-age=${Math.min(remaining, Number(match[1]), MAX_EXPIRING_CACHE_SECONDS)}`);
+}
+
+/**
+ * 带有效期文件的 ETag：内容（上传时间）或响应头相关字段（文件名、类型）变化时随之变化
+ * 有效期不参与计算，修改有效期不会让浏览器重新下载；到期后服务端直接返回 404
+ */
+export function buildExpiringFileEtag(metadata) {
+    const source = [metadata?.TimeStamp, metadata?.FileSizeBytes ?? metadata?.FileSize, metadata?.FileName, metadata?.FileType].join('\n');
+    // FNV-1a 32 位，只用于区分版本
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < source.length; i++) {
+        hash ^= source.charCodeAt(i);
+        hash = Math.imul(hash, 0x01000193);
+    }
+    return `"exp-${(hash >>> 0).toString(36)}"`;
+}
+
+// If-None-Match 可能带多个值或弱校验前缀 W/
+export function etagMatches(ifNoneMatch, etag) {
+    if (!ifNoneMatch || !etag) {
+        return false;
+    }
+    return ifNoneMatch.split(',').some(value => {
+        const candidate = value.trim().replace(/^W\//, '');
+        return candidate === '*' || candidate === etag;
+    });
 }
 
 export function buildExpiryMarkerKey(expiresAt, fileId) {
