@@ -302,7 +302,8 @@ export function maybeCleanupExpiredFiles(context, now = Date.now()) {
 
 /**
  * 统计当前可以清理的文件数：到期超过 CLEANUP_GRACE_MS，且不在删除失败后的重试等待中
- * KV 按到期标记统计并按文件去重，最多读取 1000 个标记
+ * KV 按到期标记统计并按文件去重，最多读取 1000 个标记，是近似值：续期、改为永久或删除后留下的旧标记
+ * 在下次清理移除前也会计入，capped 表示标记超过单次读取上限
  * @returns {Promise<{count: number, capped: boolean}>}
  */
 export async function countExpiredFiles(env, now = Date.now()) {

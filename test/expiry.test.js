@@ -764,10 +764,30 @@ describe('file expiry', () => {
             const { HuggingFaceAPI } = await import('../functions/utils/storage/huggingfaceAPI.js');
             const previousFetch = globalThis.fetch;
             try {
-                for (const [status, expected] of [[404, true], [403, false], [500, false]]) {
-                    globalThis.fetch = async () => new Response(null, { status });
-                    assert.equal(await new DiscordAPI('token').deleteMessage('channel', 'message'), expected, `discord ${status}`);
-                    assert.equal(await new HuggingFaceAPI('token', 'owner/repo').deleteFile('a.png'), expected, `huggingface ${status}`);
+                const discord = [
+                    ['deleted', 204, null, true],
+                    ['unknown message', 404, { code: 10008, message: 'Unknown Message' }, true],
+                    ['unknown channel', 404, { code: 10003, message: 'Unknown Channel' }, false],
+                    ['404 without a body', 404, null, false],
+                    ['forbidden', 403, null, false],
+                    ['server error', 500, null, false],
+                ];
+                for (const [label, status, body, expected] of discord) {
+                    globalThis.fetch = async () => new Response(body && JSON.stringify(body), { status });
+                    assert.equal(await new DiscordAPI('token').deleteMessage('channel', 'message'), expected, `discord ${label}`);
+                }
+
+                const huggingface = [
+                    ['deleted', 200, null, true],
+                    ['missing file', 404, 'EntryNotFound', true],
+                    ['missing repository', 404, 'RepoNotFound', false],
+                    ['missing branch', 404, 'RevisionNotFound', false],
+                    ['404 without an error code', 404, null, false],
+                    ['forbidden', 403, null, false],
+                ];
+                for (const [label, status, errorCode, expected] of huggingface) {
+                    globalThis.fetch = async () => new Response(null, { status, headers: errorCode ? { 'X-Error-Code': errorCode } : {} });
+                    assert.equal(await new HuggingFaceAPI('token', 'owner/repo').deleteFile('a.png'), expected, `huggingface ${label}`);
                 }
             } finally {
                 globalThis.fetch = previousFetch;
