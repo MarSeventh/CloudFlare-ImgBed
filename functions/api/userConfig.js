@@ -28,6 +28,8 @@ export async function onRequest(context) {
         userConfig.announcementRefreshAt = Number(PageConfig.announcementRefreshAt);
     }
 
+    userConfig.serverRuntime = env.SERVER_RUNTIME;
+
     // 文件有效期：上传页和 API 用户据此展示可选项，最终仍由上传接口按设置校验
     const { fileExpiry } = await fetchOthersConfig(env);
     if (fileExpiry?.enabled) {

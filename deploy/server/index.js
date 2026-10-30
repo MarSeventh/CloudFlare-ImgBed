@@ -315,7 +315,7 @@ async function handleFunctionRequest(originalRequest, pathname) {
             }
         },
         next: null, // 由 executeChain 设置
-        data: {},
+        data: { serverRuntime: 'node' },
     };
 
     // 执行中间件链和处理函数

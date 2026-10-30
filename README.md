@@ -45,17 +45,12 @@ Built on an isomorphic core, the engine runs seamlessly across Pages, Workers, a
   <tr>
     <td align="center" width="16%"><strong><a href="https://www.cloudflare.com/">Cloudflare</a></strong></td>
     <td align="center" width="22%"><a href="https://www.cloudflare.com/"><img src="readme/partners/cloudflare-logo.png" alt="Cloudflare logo" height="25"></a></td>
-    <td><sub>Provides CDN acceleration and security protection</sub></td>
+    <td><sub>Selected for Project Alexandria, receiving advanced CDN acceleration and security protection.</sub></td>
   </tr>
   <tr>
     <td align="center" width="16%"><strong><a href="https://edgeone.ai/?from=github">EdgeOne</a></strong></td>
     <td align="center" width="22%"><a href="https://edgeone.ai/?from=github"><picture><source media="(prefers-color-scheme: dark)" srcset="readme/partners/edgeone-logo-dark.png"><img src="readme/partners/edgeone-logo.png" alt="EdgeOne logo" height="25"></picture></a></td>
-    <td><sub>Provides CDN acceleration and security protection</sub></td>
-  </tr>
-  <tr>
-    <td align="center" width="16%"><strong><a href="https://www.packyapi.ai/register?aff=u0Ka">PackyCode</a></strong></td>
-    <td align="center" width="22%"><a href="https://www.packyapi.ai/register?aff=u0Ka"><picture><source media="(prefers-color-scheme: dark)" srcset="readme/partners/packycode-logo-dark.png"><img src="readme/partners/packycode-logo.png" alt="PackyCode logo" height="25"></picture></a></td>
-    <td><sub>Provide premium, stable, and budget-friendly LLM APIs. Generate text, images, and code all in one place. Sign up via our link for free credits and exclusive discounts!</sub></td>
+    <td><sub>Selected for the developer partnership program, receiving advanced CDN acceleration and security protection</sub></td>
   </tr>
   <tr>
     <td align="center" width="16%"><strong><a href="https://www.hncloud.com/activity/activity_2026summer.html?k=MarSeventh">Hncloud</a></strong></td>
