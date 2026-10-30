@@ -301,7 +301,8 @@ export function maybeCleanupExpiredFiles(context, now = Date.now()) {
 }
 
 /**
- * 统计可以清理（到期超过 CLEANUP_GRACE_MS）但尚未清理的文件数；KV 最多统计 1000 个
+ * 统计当前可以清理的文件数：到期超过 CLEANUP_GRACE_MS，且不在删除失败后的重试等待中
+ * KV 按到期标记统计并按文件去重，最多读取 1000 个标记
  * @returns {Promise<{count: number, capped: boolean}>}
  */
 export async function countExpiredFiles(env, now = Date.now()) {
@@ -312,13 +313,13 @@ export async function countExpiredFiles(env, now = Date.now()) {
     }
 
     const { keys, list_complete } = await db.list({ prefix: EXPIRY_MARKER_PREFIX, limit: MAX_COUNTED_MARKERS });
-    let count = 0;
+    const fileIds = new Set();
     for (const { name } of keys) {
         const marker = parseExpiryMarkerKey(name);
         if (marker && marker.expiresAt > cutoff) {
-            return { count, capped: false };
+            return { count: fileIds.size, capped: false };
         }
-        count++;
+        fileIds.add(marker?.fileId ?? name);
     }
-    return { count, capped: list_complete === false };
+    return { count: fileIds.size, capped: list_complete === false };
 }

@@ -177,6 +177,30 @@ describe('file expiry', () => {
         });
     });
 
+    describe('HuggingFace direct upload', () => {
+        it('rejects an invalid expiry before committing the file to HuggingFace', async () => {
+            const commits = [];
+            const route = await loadFunction('functions/upload/huggingface/commitUpload.js', {
+                HuggingFaceAPI: class { async commitLfsFile(...args) { commits.push(args); return {}; } },
+                resolveFileType: () => 'image/png',
+                fetchPageConfig: async () => ({ config: [] }),
+                fetchUploadConfig: async () => ({ huggingface: { channels: [{ name: 'hf', token: 't', repo: 'owner/repo' }] } }),
+                getDatabase: () => memoryDatabase(),
+                moderateContent: async () => 'None', endUpload: async () => {}, getUploadIp: () => '', getIPAddress: async () => '',
+                sanitizeUploadFolder: value => value,
+                createResponse: (body, init) => new Response(body, init),
+                userAuthCheck: async () => true, UnauthorizedResponse: () => new Response(null, { status: 401 }),
+                resolveUploadExpiry: async () => ({ error: 'Invalid expire option' }),
+            });
+            const response = await route.onRequestPost(createContext('https://test/upload/huggingface/commitUpload?expire=30d', {
+                method: 'POST',
+                body: JSON.stringify({ fullId: 'a.png', filePath: 'a.png', sha256: 'x', fileSize: 1, fileName: 'a.png' }),
+            }));
+            assert.equal(response.status, 400);
+            assert.deepEqual(commits, []);
+        });
+    });
+
     describe('file access', () => {
         let db, route;
 
@@ -481,7 +505,10 @@ describe('file expiry', () => {
                 assert.notEqual(await db.getWithMetadata('broken.png'), null);
                 assert.equal(await db.getWithMetadata('fine.png'), null);
                 assert.deepEqual([...objects.keys()], ['broken.png']);
-                assert.deepEqual(await service.countExpiredFiles(context.env, NOW), { count: 1, capped: false });
+                // Waiting for its retry, the failed file is not counted as cleanable until then
+                assert.deepEqual(await service.countExpiredFiles(context.env, NOW), { count: 0, capped: false });
+                const retry = NOW + service.CLEANUP_RETRY_MS + service.CLEANUP_GRACE_MS;
+                assert.deepEqual(await service.countExpiredFiles(context.env, retry), { count: 1, capped: false });
             });
 
             it('keeps files whose channel reports a failed deletion instead of dropping their record', async () => {
@@ -679,6 +706,7 @@ describe('file expiry', () => {
 
                 fail = false;
                 const later = NOW + service.CLEANUP_RETRY_MS + service.CLEANUP_GRACE_MS;
+                assert.deepEqual(await service.countExpiredFiles(context.env, later), { count: 1, capped: false });
                 assert.deepEqual(await service.cleanupExpiredFiles(context, { now: later }), { deleted: 1, failed: 0, hasMore: false });
                 assert.deepEqual(markers(), []);
             });
@@ -729,6 +757,21 @@ describe('file expiry', () => {
                 assert.deepEqual(await service.cleanupExpiredFiles(context, { now: NOW }), { deleted: 0, failed: 1, hasMore: false });
                 assert.equal((await db.getWithMetadata('photo.png')).metadata.FileName, 'new upload');
             });
+        });
+
+        it('treats a Discord message or HuggingFace file that is already gone as deleted', async () => {
+            const { DiscordAPI } = await import('../functions/utils/storage/discordAPI.js');
+            const { HuggingFaceAPI } = await import('../functions/utils/storage/huggingfaceAPI.js');
+            const previousFetch = globalThis.fetch;
+            try {
+                for (const [status, expected] of [[404, true], [403, false], [500, false]]) {
+                    globalThis.fetch = async () => new Response(null, { status });
+                    assert.equal(await new DiscordAPI('token').deleteMessage('channel', 'message'), expected, `discord ${status}`);
+                    assert.equal(await new HuggingFaceAPI('token', 'owner/repo').deleteFile('a.png'), expected, `huggingface ${status}`);
+                }
+            } finally {
+                globalThis.fetch = previousFetch;
+            }
         });
 
         it('sizes each run from the subrequest budget', async () => {

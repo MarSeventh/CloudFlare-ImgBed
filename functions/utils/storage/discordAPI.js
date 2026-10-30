@@ -171,8 +171,8 @@ export class DiscordAPI {
                 headers: this.defaultHeaders
             });
 
-            // Discord 删除成功返回 204 No Content
-            if (response.status === 204 || response.ok) {
+            // Discord 删除成功返回 204 No Content；404 表示消息已不存在，删除的目的已经达到
+            if (response.status === 204 || response.ok || response.status === 404) {
                 return true;
             }
 

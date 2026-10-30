@@ -73,6 +73,16 @@ export async function onRequestPost(context) {
             });
         }
 
+        // 文件有效期由后端按设置决定（提交请求需携带与获取上传地址时相同的 expire 参数）；
+        // 在提交远端文件之前校验，被拒绝的请求不会在 HuggingFace 留下没有记录的文件
+        const expiry = await resolveUploadExpiry({ env, request, url });
+        if (expiry.error) {
+            return createResponse(JSON.stringify({ error: expiry.error }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
         const huggingfaceAPI = new HuggingFaceAPI(hfChannel.token, hfChannel.repo, hfChannel.isPrivate || false);
 
         // 提交 LFS 文件引用
@@ -114,14 +124,6 @@ export async function onRequestPost(context) {
             Tags: []
         };
 
-        // 文件有效期由后端按设置决定（提交请求需携带与获取上传地址时相同的 expire 参数）
-        const expiry = await resolveUploadExpiry({ env, request, url });
-        if (expiry.error) {
-            return createResponse(JSON.stringify({ error: expiry.error }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json' }
-            });
-        }
         if (expiry.expiresAt) {
             metadata.ExpiresAt = expiry.expiresAt;
         }

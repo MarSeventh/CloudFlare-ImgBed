@@ -498,7 +498,8 @@ export class HuggingFaceAPI {
             body
         });
 
-        return response.ok;
+        // 404 表示文件已不存在，删除的目的已经达到（与 WebDAV 删除一致）
+        return response.ok || response.status === 404;
     }
 
     /**

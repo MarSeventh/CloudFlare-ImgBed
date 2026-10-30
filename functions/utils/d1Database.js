@@ -183,13 +183,14 @@ D1Database.prototype.deferExpiredFileCleanup = function(fileId, expiresAt, timeS
 };
 
 /**
- * 统计已到期但尚未清理的文件数
+ * 统计当前可以清理的文件数：已到期，且不在删除失败后的重试等待中（条件与 listExpiredFiles 一致）
  */
 D1Database.prototype.countExpiredFiles = function(now) {
     var stmt = this.db.prepare(
-        "SELECT COUNT(*) AS count FROM files WHERE json_extract(metadata, '$.ExpiresAt') <= ?"
+        "SELECT COUNT(*) AS count FROM files WHERE json_extract(metadata, '$.ExpiresAt') <= ? " +
+        "AND COALESCE(json_extract(metadata, '$.ExpiryCleanupRetryAt'), 0) <= ?"
     );
-    return stmt.bind(now).first().then(function(result) {
+    return stmt.bind(now, now).first().then(function(result) {
         return result ? Number(result.count) : 0;
     });
 };
