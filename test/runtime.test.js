@@ -7,7 +7,7 @@ describe('deployment runtime', () => {
         it(`sets ${runtime} from the entry context and exposes it to the frontend`, async () => {
             const userConfig = await loadFunction('functions/api/userConfig.js', {
                 fetchPageConfig: async () => ({ config: [{ id: 'serverRuntime', value: 'incorrect' }] }),
-                fetchOthersConfig: async () => ({}),
+                fetchUploadConfig: async () => ({}),
             });
             const context = {
                 env: { SERVER_RUNTIME: 'node', img_d1: {} },

@@ -14,7 +14,7 @@
  *   持续失败的文件不会一直占据每次清理的批次
  */
 import { getDatabase } from './databaseAdapter.js';
-import { fetchOthersConfig } from './sysConfig.js';
+import { fetchOthersConfig, fetchUploadConfig } from './sysConfig.js';
 import { batchRemoveFilesFromIndex } from './indexManager.js';
 import { deleteStoredFile } from '../api/manage/delete/[[path]].js';
 import {
@@ -45,17 +45,18 @@ let lastOpportunisticRun = 0;
  */
 export async function resolveUploadExpiry(context) {
     const { env, request, url } = context;
-    const othersConfig = await fetchOthersConfig(env);
-    if (!othersConfig.fileExpiry?.enabled) {
+    const { fileExpiry } = await fetchUploadConfig(env);
+    if (!fileExpiry?.enabled) {
         return { expiresAt: null };
     }
 
     // WebDAV 客户端经内部 Token 转发上传，同步工具遇到文件自行消失会出问题，不设置有效期
+    const othersConfig = await fetchOthersConfig(env);
     if (isWebDAVInternalRequest(request, othersConfig.webDAV)) {
         return { expiresAt: null };
     }
 
-    return resolveExpiresAt(othersConfig.fileExpiry, url.searchParams.get('expire'));
+    return resolveExpiresAt(fileExpiry, url.searchParams.get('expire'));
 }
 
 function isWebDAVInternalRequest(request, webDAVConfig) {
@@ -291,8 +292,8 @@ export function maybeCleanupExpiredFiles(context, now = Date.now()) {
     }
     lastOpportunisticRun = now;
     context.waitUntil((async () => {
-        const othersConfig = await fetchOthersConfig(context.env);
-        if (othersConfig.fileExpiry?.enabled) {
+        const { fileExpiry } = await fetchUploadConfig(context.env);
+        if (fileExpiry?.enabled) {
             await cleanupExpiredFiles(context, { now });
         }
     })().catch(error => {

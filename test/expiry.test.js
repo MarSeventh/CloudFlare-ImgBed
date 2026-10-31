@@ -108,22 +108,35 @@ describe('file expiry', () => {
             assert.equal(helpers.parseExpiryMarkerKey('manage@expiry@bad'), null);
         });
 
-        it('keeps saved expiry settings when a save omits them and rejects invalid ones', async () => {
+        it('saves and validates expiry under upload settings, preserving it on channel-only saves', async () => {
             const db = memoryDatabase();
-            await db.put('manage@sysConfig@others', JSON.stringify({ fileExpiry: { enabled: true, defaultExpire: '1d', options: ['1d'] } }));
-            const others = await loadFunction('functions/api/manage/sysConfig/others.js', {
+            const upload = await loadFunction('functions/api/manage/sysConfig/upload.js', {
                 getDatabase: () => db, ...helpers,
             });
-            const post = body => others.onRequest(createContext('https://test/api/manage/sysConfig/others', {
+            const post = body => upload.onRequest(createContext('https://test/api/manage/sysConfig/upload', {
                 method: 'POST', body: JSON.stringify(body), env: {},
             }));
-
-            assert.equal((await post({ webDAV: {} })).status, 200);
-            assert.equal(JSON.parse(await db.get('manage@sysConfig@others')).fileExpiry.enabled, true);
-
+            assert.equal((await post({ fileExpiry: enabledConfig() })).status, 200);
+            assert.equal((await upload.getUploadConfig(db, {})).fileExpiry.enabled, true);
+            assert.equal((await post({ telegram: { channels: [] } })).status, 200);
+            assert.equal(JSON.parse(await db.get('manage@sysConfig@upload')).fileExpiry.enabled, true);
             const rejected = await post({ fileExpiry: { enabled: true, defaultExpire: '1d', options: ['1y'] } });
             assert.equal(rejected.status, 400);
-            assert.equal(JSON.parse(await db.get('manage@sysConfig@others')).fileExpiry.options[0], '1d');
+            assert.deepEqual(JSON.parse(await db.get('manage@sysConfig@upload')).fileExpiry.options, enabledConfig().options);
+        });
+
+        it('does not read or migrate expiry from other settings', async () => {
+            const db = memoryDatabase();
+            await db.put('manage@sysConfig@others', JSON.stringify({ fileExpiry: enabledConfig() }));
+            const upload = await loadFunction('functions/api/manage/sysConfig/upload.js', { getDatabase: () => db, ...helpers });
+            const others = await loadFunction('functions/api/manage/sysConfig/others.js', { getDatabase: () => db });
+            assert.equal((await upload.getUploadConfig(db, {})).fileExpiry.enabled, false);
+            assert.equal((await others.getOthersConfig(db, {})).fileExpiry, undefined);
+            await others.onRequest(createContext('https://test/api/manage/sysConfig/others', {
+                method: 'POST', body: JSON.stringify({ fileExpiry: enabledConfig(), webDAV: {} }), env: {},
+            }));
+            assert.equal(JSON.parse(await db.get('manage@sysConfig@others')).fileExpiry, undefined);
+            assert.equal(await db.get('manage@sysConfig@upload'), null);
         });
     });
 
@@ -131,7 +144,7 @@ describe('file expiry', () => {
         async function userConfig(fileExpiry) {
             const route = await loadFunction('functions/api/userConfig.js', {
                 fetchPageConfig: async () => ({ config: [] }),
-                fetchOthersConfig: async () => ({ fileExpiry }),
+                fetchUploadConfig: async () => ({ fileExpiry }),
             });
             return (await route.onRequest(createContext('https://test/api/userConfig'))).json();
         }
@@ -152,7 +165,8 @@ describe('file expiry', () => {
     describe('uploads', () => {
         async function loadResolver(others) {
             return loadFunction('functions/utils/fileExpiryService.js', {
-                ...helpers, fetchOthersConfig: async () => others,
+                ...helpers, fetchUploadConfig: async () => ({ fileExpiry: others.fileExpiry }),
+                fetchOthersConfig: async () => ({ webDAV: others.webDAV }),
             });
         }
 
@@ -382,7 +396,8 @@ describe('file expiry', () => {
             });
             const service = await loadFunction('functions/utils/fileExpiryService.js', {
                 getDatabase: () => db, ...index, ...deletion, ...helpers,
-                fetchOthersConfig: async () => ({ fileExpiry: enabledConfig(), webDAV: {} }), ...extra,
+                fetchUploadConfig: async () => ({ fileExpiry: enabledConfig() }),
+                fetchOthersConfig: async () => ({ webDAV: {} }), ...extra,
             });
             const context = { env, backgroundTasks: [], waitUntil(promise) { this.backgroundTasks.push(promise); } };
             return { service, index, context, purges };
@@ -899,7 +914,7 @@ describe('file expiry', () => {
             const service = await loadFunction('functions/utils/fileExpiryService.js', {
                 ...helpers,
                 getDatabase: env => { seen.push(env.SERVER_RUNTIME); return { listExpiredFiles: async () => [] }; },
-                fetchOthersConfig: async () => ({ fileExpiry: enabledConfig() }),
+                fetchUploadConfig: async () => ({ fileExpiry: enabledConfig() }),
                 batchRemoveFilesFromIndex: async () => ({ success: true }),
                 deleteStoredFile: async () => {},
                 ...overrides,
