@@ -165,6 +165,73 @@ describe('upload', () => {
         assert.deepEqual(storage, {});
     });
 
+    it('enforces format restrictions before ordinary uploads, independent of MIME and response format', async () => {
+        mocks.fetchUploadConfig = async () => ({ fileFormat: { enabled: true, mode: 'blacklist', extensions: ['exe'] } });
+        const route = await loadFunction('functions/upload/index.js', mocks);
+        for (const channel of ['cfr2', 's3', 'telegram', 'discord', 'huggingface', 'webdav', 'external']) {
+            const form = new FormData();
+            form.set('file', new File([png()], 'blocked.EXE', { type: 'image/png' }));
+            const response = await route.onRequest(context(`https://test/upload?uploadChannel=${channel}&responseFormat=object`, form));
+            assert.equal(response.status, 400);
+            assert.equal((await response.json()).code, 'UPLOAD_FORMAT_NOT_ALLOWED');
+            assert.equal(response.headers.get('Access-Control-Allow-Origin'), '*');
+            assert.equal(db.records.size, 0);
+            assert.deepEqual(storage, {});
+        }
+    });
+
+    it('allows matching uploads without filtering the generated name', async () => {
+        const originalConfig = await mocks.fetchUploadConfig();
+        mocks.fetchUploadConfig = async () => ({ ...originalConfig, fileFormat: { enabled: true, mode: 'whitelist', extensions: ['jpg'] } });
+        const route = await loadFunction('functions/upload/index.js', mocks);
+        const form = new FormData();
+        form.set('file', new File([png()], 'photo.JPG', { type: 'image/png' }));
+        const response = await route.onRequest(context('https://test/upload?uploadChannel=cfr2&uploadNameType=short', form));
+        assert.equal(response.status, 200, await response.clone().text());
+        assert.equal((await response.json()).length, 1);
+        await Promise.all(waits);
+    });
+
+    it('checks initialization and existing chunk sessions before writing chunks or merging', async () => {
+        const chunk = await loadFunction('functions/upload/chunkUpload.js', mocks);
+        const merge = await loadFunction('functions/upload/chunkMerge.js', { ...mocks, ...chunk });
+        const form = new FormData();
+        form.set('originalFileName', 'file.exe');
+        form.set('totalChunks', '1');
+        const ctx = context('https://test/upload?uploadChannel=cfr2', form);
+        const restricted = { fileFormat: { enabled: true, mode: 'whitelist', extensions: ['png'] } };
+        ctx.uploadConfig = restricted;
+        assert.equal((await chunk.initializeChunkedUpload(ctx)).status, 400);
+        assert.equal(db.records.size, 0);
+        ctx.uploadConfig = await mocks.fetchUploadConfig();
+        ctx.request = new Request(ctx.url, { method: 'POST', body: form });
+        const { uploadId } = await (await chunk.initializeChunkedUpload(ctx)).json();
+        const saved = structuredClone([...db.records]);
+        ctx.uploadConfig = restricted;
+        form.set('uploadId', uploadId);
+        form.set('chunkIndex', '0');
+        form.set('file', new File([png()], 'part.png', { type: 'image/png' }));
+        ctx.request = new Request(ctx.url, { method: 'POST', body: form });
+        assert.equal((await (await chunk.handleChunkUpload(ctx)).json()).code, 'UPLOAD_FORMAT_NOT_ALLOWED');
+        ctx.request = new Request(ctx.url, { method: 'POST', body: form });
+        assert.equal((await (await merge.handleChunkMerge(ctx)).json()).code, 'UPLOAD_FORMAT_NOT_ALLOWED');
+        assert.deepEqual([...db.records], saved);
+        assert.deepEqual(storage, {});
+    });
+
+    it('blocks HuggingFace upload URLs and commits before any upstream writes', async () => {
+        mocks.fetchUploadConfig = async () => ({ fileFormat: { enabled: true, mode: 'blacklist', extensions: ['exe'] } });
+        mocks.HuggingFaceAPI = class { constructor() { assert.fail('Storage client must not be created'); } };
+        const body = { fileName: 'blocked.exe', fullId: 'generated.png', filePath: 'file.png', sha256: 'hash', fileSize: 24, fileSample: 'sample', fileType: 'image/png' };
+        for (const endpoint of ['getUploadUrl', 'commitUpload']) {
+            const route = await loadFunction(`functions/upload/huggingface/${endpoint}.js`, mocks);
+            const response = await route.onRequestPost(context(`https://test/upload/huggingface/${endpoint}`, JSON.stringify(body)));
+            assert.equal(response.status, 400);
+            assert.equal((await response.json()).code, 'UPLOAD_FORMAT_NOT_ALLOWED');
+            assert.equal(db.records.size, 0);
+        }
+    });
+
     it('retains Telegram special-format routing and serverCompress=false', async () => {
         const route = await loadFunction('functions/upload/index.js', mocks);
         for (const [name, type, query, method] of [

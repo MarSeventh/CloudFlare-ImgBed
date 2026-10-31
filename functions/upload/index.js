@@ -2,7 +2,7 @@ import { createS3Client } from '../utils/storage/s3Client.js';
 import { userAuthCheck, UnauthorizedResponse } from "../utils/auth/userAuth";
 import { fetchUploadConfig, fetchSecurityConfig, fetchPageConfig } from "../utils/sysConfig";
 import {
-    createResponse, createUploadResponse, getUploadIp, getIPAddress, resolveFileExt,
+    createResponse, createUploadResponse, checkUploadFormat, getUploadIp, getIPAddress, resolveFileExt,
     moderateContent, purgeCDNCache, isBlockedUploadIp, buildUniqueFileId, endUpload, getImageDimensions,
     sanitizeUploadFolder
 } from "./uploadTools";
@@ -142,6 +142,8 @@ async function processFileUpload(context, formdata = null) {
     const time = new Date().getTime();
     const file = formdata.get('file');
     let fileName = file.name;
+    const formatError = checkUploadFormat(fileName, context.uploadConfig);
+    if (formatError) return formatError;
     // 部分客户端（同步工具、脚本）不提供有效的 Content-Type，按扩展名兜底推断。
     // 否则图片会被记成 application/octet-stream，导致随机图类型过滤、尺寸提取、
     // 图片处理校验全部失效。

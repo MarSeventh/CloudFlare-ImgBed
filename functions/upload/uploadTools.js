@@ -3,6 +3,7 @@ import { purgeCFCache, purgeRandomFileListCache, purgePublicFileListCache } from
 import { addFileToIndex } from "../utils/indexManager.js";
 import { getDatabase } from '../utils/databaseAdapter.js';
 import { resolveFileExt } from '../utils/mimeTypes.js';
+import { isUploadFormatAllowed } from '../utils/uploadFormat.js';
 export { isExtValid, resolveFileExt } from '../utils/mimeTypes.js';
 
 // 统一的响应创建函数
@@ -29,6 +30,14 @@ export function createUploadResponse(context, results) {
     return createResponse(JSON.stringify(body), {
         headers: { 'Content-Type': 'application/json' }
     });
+}
+
+export function checkUploadFormat(fileName, uploadConfig) {
+    if (isUploadFormatAllowed(fileName, uploadConfig?.fileFormat)) return null;
+    return createResponse(JSON.stringify({
+        code: 'UPLOAD_FORMAT_NOT_ALLOWED',
+        error: 'This file format is not allowed for upload',
+    }), { status: 400, headers: { 'Content-Type': 'application/json' } });
 }
 
 // 生成短链接

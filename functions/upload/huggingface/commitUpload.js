@@ -8,7 +8,7 @@ import { HuggingFaceAPI } from '../../utils/storage/huggingfaceAPI.js';
 import { resolveFileType } from '../../utils/mimeTypes.js';
 import { fetchPageConfig, fetchUploadConfig } from '../../utils/sysConfig.js';
 import { getDatabase } from '../../utils/databaseAdapter.js';
-import { moderateContent, endUpload, getUploadIp, getIPAddress, sanitizeUploadFolder, createResponse } from '../uploadTools.js';
+import { moderateContent, endUpload, getUploadIp, getIPAddress, sanitizeUploadFolder, createResponse, checkUploadFormat } from '../uploadTools.js';
 import { userAuthCheck, UnauthorizedResponse } from '../../utils/auth/userAuth.js';
 import { resolveUploadExpiry } from '../../utils/fileExpiryService.js';
 
@@ -48,6 +48,8 @@ export async function onRequestPost(context) {
 
         // 获取 HuggingFace 配置
         const uploadConfig = await fetchUploadConfig(env);
+        const formatError = checkUploadFormat(fileName || fullId, uploadConfig);
+        if (formatError) return formatError;
         const hfSettings = uploadConfig.huggingface;
 
         if (!hfSettings || !hfSettings.channels || hfSettings.channels.length === 0) {

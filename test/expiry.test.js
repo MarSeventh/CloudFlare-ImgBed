@@ -203,6 +203,7 @@ describe('file expiry', () => {
                 moderateContent: async () => 'None', endUpload: async () => {}, getUploadIp: () => '', getIPAddress: async () => '',
                 sanitizeUploadFolder: value => value,
                 createResponse: (body, init) => new Response(body, init),
+                checkUploadFormat: (await loadFunction('functions/upload/uploadTools.js')).checkUploadFormat,
                 userAuthCheck: async () => true, UnauthorizedResponse: () => new Response(null, { status: 401 }),
                 resolveUploadExpiry: async () => ({ error: 'Invalid expire option' }),
             });

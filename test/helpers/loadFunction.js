@@ -4,8 +4,8 @@ import { dirname, resolve } from 'node:path';
 
 let sequence = 0;
 
-// Exercise real modules while isolating external dependencies. MIME imports
-// always use the shared utility; serverImports.mjs also checks unmodified imports
+// Exercise real modules while isolating external dependencies. MIME and upload-format
+// imports always use the shared utilities; serverImports.mjs also checks unmodified imports
 // with the production loader, which this isolated loader cannot validate.
 export async function loadFunction(path, mocks = {}, globals = {}) {
     const filename = resolve(path);
@@ -13,7 +13,7 @@ export async function loadFunction(path, mocks = {}, globals = {}) {
     globalThis[key] = { mocks, globals };
     let source = await readFile(filename, 'utf8');
     source = source.replace(/^import\s+\{([\s\S]*?)\}\s+from\s+['"]([^'"]+)['"];\r?\n/gm, (_, names, specifier) => {
-        if (/\/mimeTypes(?:\.js)?$/.test(specifier)) {
+        if (/\/(?:mimeTypes|uploadFormat)(?:\.js)?$/.test(specifier)) {
             const mimePath = specifier.endsWith('.js') ? specifier : `${specifier}.js`;
             return `import {${names}} from ${JSON.stringify(pathToFileURL(resolve(dirname(filename), mimePath)).href)};\n`;
         }

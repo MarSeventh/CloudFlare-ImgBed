@@ -1,6 +1,6 @@
 import { createS3Client } from '../utils/storage/s3Client.js';
 /* ========== 分块合并处理 ========== */
-import { createResponse, createUploadResponse, getUploadIp, getIPAddress, selectConsistentChannel, buildUniqueFileId, endUpload, sanitizeUploadFolder } from './uploadTools';
+import { createResponse, createUploadResponse, checkUploadFormat, getUploadIp, getIPAddress, selectConsistentChannel, buildUniqueFileId, endUpload, sanitizeUploadFolder } from './uploadTools';
 import { retryFailedChunks, cleanupFailedMultipartUploads, checkChunkUploadStatuses, cleanupChunkData, cleanupUploadSession } from './chunkUpload';
 import { CompleteMultipartUploadCommand } from "@aws-sdk/client-s3";
 import { getDatabase } from '../utils/databaseAdapter.js';
@@ -44,6 +44,9 @@ export async function handleChunkMerge(context) {
             sessionInfo.totalChunks !== totalChunks) {
             return createResponse('Error: Session parameters mismatch', { status: 400 });
         }
+
+        const formatError = checkUploadFormat(sessionInfo.originalFileName, context.uploadConfig);
+        if (formatError) return formatError;
 
         // 检查会话是否过期
         if (Date.now() > sessionInfo.expiresAt) {

@@ -1,4 +1,5 @@
 import { normalizeFileExpiryConfig, validateFileExpiryConfig } from '../../../utils/fileExpiryHelpers.js';
+import { normalizeUploadFormatConfig, validateUploadFormatConfig } from '../../../utils/uploadFormat.js';
 import { getDatabase } from '../../../utils/databaseAdapter.js';
 import { normalizeWebDAVHeaders } from '../../../utils/storage/webdavAPI.js';
 import { normalizeS3UserAgent } from '../../../utils/storage/s3Client.js';
@@ -37,6 +38,11 @@ export async function onRequest(context) {
             return new Response(fileExpiry.error, { status: 400 });
         }
         settings.fileExpiry = { ...fileExpiry.config, fixed: false };
+        const fileFormat = validateUploadFormatConfig(settings.fileFormat ?? oldSettings.fileFormat);
+        if (fileFormat.error) {
+            return new Response(fileFormat.error, { status: 400 });
+        }
+        settings.fileFormat = fileFormat.config;
 
         try {
             for (const channel of settings.s3?.channels || []) {
@@ -343,6 +349,7 @@ export async function getUploadConfig(db, env) {
     settings.webdav = webdav
 
     settings.fileExpiry = { ...normalizeFileExpiryConfig(settingsKV.fileExpiry), fixed: false };
+    settings.fileFormat = normalizeUploadFormatConfig(settingsKV.fileFormat);
 
     return settings;
 }
