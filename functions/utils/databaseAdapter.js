@@ -4,6 +4,7 @@
  */
 
 import { D1Database } from './d1Database.js';
+import { getExpiresAt, buildExpiryMarkerKey } from './fileExpiryHelpers.js';
 
 /**
  * 创建数据库适配器
@@ -36,6 +37,12 @@ class KVAdapter {
     // 直接代理到KV的方法
     async put(key, value, options) {
         options = options || {};
+        // 有效期文件记录先写到期标记再写记录：标记写入失败时记录不会写入，不会出现清理任务找不到的文件；
+        // 记录写入失败留下的标记，清理时发现记录不存在会删除。所有写入记录的路径（上传、修改、移动、恢复）都经过这里
+        const expiresAt = key.startsWith('manage@') ? null : getExpiresAt(options.metadata);
+        if (expiresAt !== null) {
+            await this.kv.put(buildExpiryMarkerKey(expiresAt, key), '');
+        }
         return await this.kv.put(key, value, options);
     }
 

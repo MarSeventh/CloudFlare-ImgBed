@@ -4,6 +4,7 @@ import {
 } from '../../utils/indexManager.js';
 import { getDatabase } from '../../utils/databaseAdapter.js';
 import { createMetadataViewContext, serializeFileRecordForManagement } from '../../utils/metadata/metadataView.js';
+import { maybeCleanupExpiredFiles } from '../../utils/fileExpiryService.js';
 
 // CORS 跨域响应头
 const corsHeaders = {
@@ -16,6 +17,9 @@ const corsHeaders = {
 export async function onRequest(context) {
     const { request, waitUntil } = context;
     const url = new URL(request.url);
+
+    // 管理端打开文件列表时顺带清理一批到期文件（Pages 没有定时任务，依靠它和手动清理）
+    maybeCleanupExpiredFiles(context);
 
     // 解析查询参数
     let start = parseInt(url.searchParams.get('start'), 10) || 0;

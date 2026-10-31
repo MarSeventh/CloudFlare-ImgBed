@@ -209,6 +209,9 @@ const output = `/**
 // ==================== 自动生成的导入 ====================
 
 ${imports}
+// --- Worker Cache 与定时任务 ---
+import { maybeServeFromCache } from './workerCache.js';
+import { runExpiryCleanupJob } from '../../functions/utils/fileExpiryService.js';
 
 // ==================== 自动生成的路由表 ====================
 
@@ -278,112 +281,6 @@ async function executeChain(middlewares, handler, context) {
 }
 
 
-// ==================== Worker Cache ====================
-
-// 统一缓存键，HEAD 与 GET 共用完整 GET 响应缓存
-function createCacheKeyRequest(request) {
-    return new Request(request.url, {
-        method: 'GET',
-        headers: request.headers,
-    });
-}
-
-// 解析 Cache-Control 指令，支持 max-age/s-maxage 等数值字段
-function parseCacheDirective(cacheControl, directive) {
-    if (!cacheControl) return null;
-
-    const directives = cacheControl.split(',');
-    for (const rawDirective of directives) {
-        const part = rawDirective.trim();
-        const eqIndex = part.indexOf('=');
-        const name = (eqIndex === -1 ? part : part.slice(0, eqIndex)).trim().toLowerCase();
-
-        if (name !== directive) continue;
-        if (eqIndex === -1) return true;
-
-        const value = part.slice(eqIndex + 1).trim().replace(/^"|"$/g, '');
-        const seconds = Number.parseInt(value, 10);
-        return Number.isFinite(seconds) ? seconds : null;
-    }
-
-    return null;
-}
-
-function responseHasCacheDirective(cacheControl, directive) {
-    return parseCacheDirective(cacheControl, directive) !== null;
-}
-
-function getResponseCacheTtl(response) {
-    const cacheControl = response.headers.get('Cache-Control') || '';
-    const sMaxAge = parseCacheDirective(cacheControl, 's-maxage');
-    if (typeof sMaxAge === 'number') return sMaxAge;
-
-    const maxAge = parseCacheDirective(cacheControl, 'max-age');
-    if (typeof maxAge === 'number') return maxAge;
-
-    return null;
-}
-
-function isCacheLookupRequest(request) {
-    return request.method === 'GET' || request.method === 'HEAD';
-}
-
-// 只写入完整 GET 响应，Range 请求仅尝试命中已有完整缓存
-function isCacheStoreRequest(request) {
-    return request.method === 'GET' && !request.headers.has('Range');
-}
-
-function isCacheableResponse(request, response) {
-    if (!isCacheStoreRequest(request)) return false;
-    if (response.status !== 200) return false;
-    if (response.headers.has('Set-Cookie')) return false;
-
-    const cacheControl = response.headers.get('Cache-Control') || '';
-    if (!responseHasCacheDirective(cacheControl, 'public')) return false;
-    if (responseHasCacheDirective(cacheControl, 'private')) return false;
-    if (responseHasCacheDirective(cacheControl, 'no-store')) return false;
-    if (responseHasCacheDirective(cacheControl, 'no-cache')) return false;
-
-    const ttl = getResponseCacheTtl(response);
-    return ttl !== null && ttl > 0;
-}
-
-function responseFromHeadCache(cachedResponse) {
-    return new Response(null, {
-        status: cachedResponse.status,
-        statusText: cachedResponse.statusText,
-        headers: cachedResponse.headers,
-    });
-}
-
-async function maybeServeFromCache(request, ctx, producer) {
-    if (!isCacheLookupRequest(request)) {
-        return await producer();
-    }
-
-    const cache = caches.default;
-    const cacheKey = createCacheKeyRequest(request);
-    const cachedResponse = await cache.match(cacheKey);
-
-    if (cachedResponse) {
-        return request.method === 'HEAD'
-            ? responseFromHeadCache(cachedResponse)
-            : cachedResponse;
-    }
-
-    const response = await producer();
-
-    // 按业务代码返回的 Cache-Control 决定是否写入 Worker Cache
-    if (isCacheableResponse(request, response)) {
-        ctx.waitUntil(cache.put(cacheKey, response.clone()).catch(error => {
-            console.warn('Failed to store response in Worker cache:', error.message);
-        }));
-    }
-
-    return response;
-}
-
-
 // ==================== Worker 入口 ====================
 
 export default {
@@ -439,7 +336,20 @@ export default {
             data: { serverRuntime: 'worker' },
         };
 
-        return await maybeServeFromCache(request, ctx, () => executeChain(middlewares, handler, context));
+        // 路由模块可导出 isCachedResponseServable，在返回 Worker 缓存前确认缓存仍然有效
+        const isCachedServable = typeof mod.isCachedResponseServable === 'function'
+            ? () => mod.isCachedResponseServable(context)
+            : null;
+
+        return await maybeServeFromCache(request, ctx, () => executeChain(middlewares, handler, context), isCachedServable);
+    },
+
+    // 文件有效期清理：仅在部署时配置了 EXPIRY_CLEANUP_CRON 后由 Cron Trigger 触发
+    // 后台入口不经过 functions/_middleware.js，由 runExpiryCleanupJob 显式标记平台
+    async scheduled(controller, env, ctx) {
+        ctx.waitUntil(runExpiryCleanupJob(env, 'worker', ctx.waitUntil.bind(ctx)).then(result => {
+            console.log(\`Expired files cleanup: \${JSON.stringify(result)}\`);
+        }));
     },
 };
 `;

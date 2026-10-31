@@ -34,6 +34,7 @@ describe('upload', () => {
             getUploadIp: () => '',
             moderateContent: async () => 'None',
             endUpload: async () => {},
+            resolveUploadExpiry: async () => ({ expiresAt: null }),
             createS3Client: () => ({ async send(command) {
                 if (command.kind === 'put' || command.kind === 'create') storage.contentType = command.input.ContentType;
                 return { UploadId: 'multipart', ETag: 'etag' };

@@ -18,6 +18,9 @@ const routes = [
     ['../../functions/api/manage/metadata/[[path]].js', 'onRequest'],
     ['../../functions/api/manage/rename/[[path]].js', 'onRequest'],
     ['../../functions/api/manage/move/[[path]].js', 'onRequest'],
+    ['../../functions/api/manage/expiry.js', 'onRequest'],
+    ['../../functions/api/manage/batch/restore/chunk.js', 'onRequestPost'],
+    ['../../functions/utils/fileExpiryService.js', 'cleanupExpiredFiles'],
 ];
 
 for (const [path, handler] of routes) {

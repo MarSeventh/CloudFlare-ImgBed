@@ -14,6 +14,7 @@ import { fileURLToPath, pathToFileURL } from 'url';
 import { SqliteD1 } from './sqliteD1.js';
 import { LocalR2Storage } from './r2Storage.js';
 import { dockerImageProcessor } from './imageProcessor.js';
+import { startExpiryCleanupTimer } from './expiryCleanup.js';
 
 const NativeResponse = globalThis.Response;
 
@@ -415,4 +416,13 @@ serve({
     console.log(`Server running at http://0.0.0.0:${info.port}`);
     console.log(`Data directory: ${DATA_DIR}`);
     console.log(`Mode: Docker (Native Node.js)`);
+});
+
+// ==================== 文件有效期清理 ====================
+
+const { runExpiryCleanupJob } = await import(pathToFileURL(join(FUNCTIONS_DIR, 'utils', 'fileExpiryService.js')).href);
+startExpiryCleanupTimer({
+    runExpiryCleanupJob,
+    createEnv,
+    intervalMinutes: Number(process.env.EXPIRY_CLEANUP_INTERVAL_MINUTES ?? 10),
 });

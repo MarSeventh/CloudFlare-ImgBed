@@ -176,6 +176,15 @@ export class DiscordAPI {
                 return true;
             }
 
+            // 只有 Unknown Message（10008）表示消息已不存在，删除的目的已经达到；
+            // 频道不存在、无权访问等其他 404 仍按失败处理
+            if (response.status === 404) {
+                const error = await response.json().catch(() => null);
+                if (error?.code === 10008) {
+                    return true;
+                }
+            }
+
             console.error('Discord deleteMessage error:', response.status, response.statusText);
             return false;
         } catch (error) {

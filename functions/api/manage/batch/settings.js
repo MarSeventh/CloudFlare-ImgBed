@@ -50,6 +50,7 @@ function errorResponse(message, status = 400) {
  * - manage@index@meta (索引元数据)
  * - manage@indexMeta (旧版索引元数据)
  * - manage@session@* (会话数据)
+ * - manage@expiry@* (文件到期标记)
  * 
  * @param {string} key - KV 键名
  * @returns {boolean} 是否为需要排除的键
@@ -77,6 +78,11 @@ function isIndexRelatedKey(key) {
 
   // 匹配会话数据键 (manage@session@*)
   if (key.startsWith('manage@session@')) {
+    return true;
+  }
+
+  // 匹配文件到期标记 (manage@expiry@*)，恢复文件时会按元数据重新生成
+  if (key.startsWith('manage@expiry@')) {
     return true;
   }
   

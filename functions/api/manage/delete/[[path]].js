@@ -140,6 +140,39 @@ export async function onRequest(context) {
     }
 }
 
+// 按渠道删除存储中的文件对象，不处理数据库记录；返回 false 表示渠道删除失败
+// 有效期清理先删除存储、再按条件删除记录，并据返回值决定是否保留记录重试，因此单独导出
+export async function deleteStoredFile(env, fileId, img) {
+    // 如果是R2渠道的图片，需要删除R2中对应的图片
+    if (img.metadata?.Channel === 'CloudflareR2') {
+        const R2DataBase = env.img_r2;
+        await R2DataBase.delete(fileId);
+    }
+
+    // S3 渠道的图片，需要删除S3中对应的图片
+    if (img.metadata?.Channel === 'S3') {
+        return await deleteS3File(env, img);
+    }
+
+    // Discord 渠道的图片，需要删除 Discord 中对应的消息
+    if (img.metadata?.Channel === 'Discord') {
+        return await deleteDiscordFile(env, img);
+    }
+
+    // HuggingFace 渠道的图片，需要删除 HuggingFace 中对应的文件
+    if (img.metadata?.Channel === 'HuggingFace') {
+        return await deleteHuggingFaceFile(env, img);
+    }
+
+    // WebDAV 渠道的图片，需要删除 WebDAV 中对应的文件
+    if (img.metadata?.Channel === 'WebDAV') {
+        return await deleteWebDAVFile(env, img);
+    }
+
+    // R2 删除失败会抛出；Telegram、外链等渠道只删除记录
+    return true;
+}
+
 // 删除单个文件的核心函数
 export async function deleteFile(env, fileId, cdnUrl, url) {
     try {
@@ -153,31 +186,7 @@ export async function deleteFile(env, fileId, cdnUrl, url) {
             return { deleted: true, existed: false };
         }
 
-        // 如果是R2渠道的图片，需要删除R2中对应的图片
-        if (img.metadata?.Channel === 'CloudflareR2') {
-            const R2DataBase = env.img_r2;
-            await R2DataBase.delete(fileId);
-        }
-
-        // S3 渠道的图片，需要删除S3中对应的图片
-        if (img.metadata?.Channel === 'S3') {
-            await deleteS3File(env, img);
-        }
-
-        // Discord 渠道的图片，需要删除 Discord 中对应的消息
-        if (img.metadata?.Channel === 'Discord') {
-            await deleteDiscordFile(env, img);
-        }
-
-        // HuggingFace 渠道的图片，需要删除 HuggingFace 中对应的文件
-        if (img.metadata?.Channel === 'HuggingFace') {
-            await deleteHuggingFaceFile(env, img);
-        }
-
-        // WebDAV 渠道的图片，需要删除 WebDAV 中对应的文件
-        if (img.metadata?.Channel === 'WebDAV') {
-            await deleteWebDAVFile(env, img);
-        }
+        await deleteStoredFile(env, fileId, img);
 
         // 删除数据库中的记录
         // 注意：容量统计现在由索引自动维护，删除文件后索引更新时会自动重新计算

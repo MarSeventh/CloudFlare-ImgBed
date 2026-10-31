@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { loadFunction, memoryDatabase } from './loadFunction.js';
 import * as metadataSecurity from '../../functions/utils/metadata/metadataSecurity.js';
+import * as expiryHelpers from '../../functions/utils/fileExpiryHelpers.js';
 
 // Keep the route, metadata cleaning and index operations real. Only storage,
 // configuration access and cache invalidation are replaced at the boundary.
@@ -17,10 +18,11 @@ export async function managementFixture() {
         findConfiguredChannel: () => null,
     });
     const mocks = {
-        ...database, ...index, ...tools, ...metadataSecurity, ...view,
+        ...database, ...index, ...tools, ...metadataSecurity, ...view, ...expiryHelpers,
         purgeCFCache: async (env, url) => { purges.push(['file', url]); },
         purgeRandomFileListCache: async (...args) => { purges.push(['random', ...args]); },
         purgePublicFileListCache: async (...args) => { purges.push(['public', ...args]); },
+        maybeCleanupExpiredFiles: () => {},
     };
     const env = { img_r2: {
         async get(id) { return objects.has(id) ? { body: new Response(objects.get(id)).body } : null; },

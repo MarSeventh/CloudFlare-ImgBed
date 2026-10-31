@@ -5,13 +5,14 @@ import { managementFixture } from './helpers/management.js';
 import * as fileTools from '../functions/file/fileTools.js';
 import * as imageTransform from '../functions/file/imageTransform.js';
 import * as adaptive from '../functions/random/adaptive.js';
+import * as fileExpiryHelpers from '../functions/utils/fileExpiryHelpers.js';
 
 describe('read and list files', () => {
     let db, mocks;
 
     beforeEach(() => {
         db = memoryDatabase();
-        mocks = { getDatabase: () => db, checkDatabaseConfig: () => ({ usingD1: false }) };
+        mocks = { getDatabase: () => db, checkDatabaseConfig: () => ({ usingD1: false }), ...fileExpiryHelpers };
     });
 
     function context(url) { return createContext(url); }

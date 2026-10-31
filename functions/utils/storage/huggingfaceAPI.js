@@ -498,7 +498,9 @@ export class HuggingFaceAPI {
             body
         });
 
-        return response.ok;
+        // 只有 EntryNotFound 表示文件已不存在，删除的目的已经达到（与 WebDAV 删除一致）；
+        // 仓库或分支不存在（RepoNotFound、RevisionNotFound）等其他 404 仍按失败处理
+        return response.ok || (response.status === 404 && response.headers.get('X-Error-Code') === 'EntryNotFound');
     }
 
     /**
