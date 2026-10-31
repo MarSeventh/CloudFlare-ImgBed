@@ -15,7 +15,7 @@ npm run test:server
 npx --no-install wrangler pages functions build functions --outdir data/ci-pages-build
 ```
 
-`npm test` requires neither a running server nor cloud credentials. Tests use isolated in-memory databases and storage doubles. They do not read or write application data in `data/` or contact real storage services.
+`npm test` requires neither a running server nor cloud credentials. Tests use isolated in-memory databases and storage doubles. Worker configuration tests run a copy of the generator in a temporary directory and remove it after each test. They do not read or write application data in `data/` or contact real storage services.
 
 Run a single module or filter by a test name:
 
@@ -33,7 +33,8 @@ The current Mocha entry point automatically loads `.js` test files directly insi
 
 | Module | Test file | Production entry points | Covered behavior |
 | --- | --- | --- | --- |
-| Upload | [upload.test.js](upload.test.js) | `functions/upload/` | Upload permissions and IP blocking; directory cleanup and original-name collision avoidance; R2/S3/WebDAV types and metadata; Telegram special formats and compression settings; R2/S3 multipart initialization, upload and completion; HuggingFace direct upload and commit |
+| Upload | [upload.test.js](upload.test.js) | `functions/upload/` | Upload permissions and IP blocking; directory cleanup and original-name collision avoidance; R2/S3/WebDAV types and metadata; Telegram special formats and compression settings; R2/S3 multipart initialization, upload and completion; HuggingFace direct upload and commit; opt-in object responses and default arrays for ordinary uploads and R2/S3 chunk completion, including URL/expiry fields and unchanged authentication errors |
+| Worker deployment configuration | [workerConfig.test.js](workerConfig.test.js) | `deploy/worker/generate-toml.js` | Default output preservation; root scalars, nested tables and escaping; bindings, variables, secrets and cleanup Cron preservation; managed-key, array, null and invalid JSON/number/Unicode rejection before output; custom values excluded from generator logs |
 | Reading and querying | [read.test.js](read.test.js) | `functions/file/`, `api/manage/list.js`, `random/` | R2 GET/HEAD/Range and response types; invalid IDs and missing records; external redirects; administrator preview permissions and private caching; listing directory boundaries, pagination, recursion, counts, search and type filters; random-image `content=` compatibility |
 | Deletion | [delete.test.js](delete.test.js) | `api/manage/delete/` | R2 deletion and idempotency; single/batch/folder existence results and missing-record index cleanup; partial failures with file and index preservation on storage errors; actual S3 object keys; batch-ID normalization, deduplication and limits; index updates and cache invalidation |
 | Duplicate scan | [dedupScan.test.js](dedupScan.test.js) | `api/manage/dedup/scan` | Node capability probe; read-only content grouping and earliest valid timestamp selection; corrupt/missing index and record handling; duplicate index IDs; pending/concurrent index changes; partial reports; actual byte limits and stream cancellation; deadlines covering storage reads and hashing; release of late storage responses even when timers and the wall clock disagree |

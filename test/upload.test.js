@@ -128,6 +128,43 @@ describe('upload', () => {
         }
     }
 
+    for (const format of ['', 'array', 'object', 'unknown']) {
+        for (const channel of ['cfr2', 's3', 'webdav', 'telegram']) {
+            it(`returns ${format || 'default'} upload responses with URL and expiry fields for ${channel}`, async () => {
+                const expiresAt = Date.now() + 3600000;
+                const route = await loadFunction('functions/upload/index.js', {
+                    ...mocks,
+                    fetchPageConfig: async () => ({ config: [{ id: 'urlPrefix', value: 'https://cdn.test/' }] }),
+                    resolveUploadExpiry: async () => ({ expiresAt }),
+                });
+                const form = new FormData();
+                form.set('file', new File([png()], 'photo.png', { type: 'image/png' }));
+                const response = await route.onRequest(context(`https://test/upload?uploadChannel=${channel}&autoRetry=false&returnFormat=full&responseFormat=${format}`, form));
+                assert.equal(response.status, 200, await response.clone().text());
+                assert.equal(response.headers.get('Content-Type'), 'application/json');
+                assert.equal(response.headers.get('Access-Control-Allow-Origin'), '*');
+                const body = await response.json();
+                assert.equal(Array.isArray(body), format !== 'object');
+                const result = format === 'object' ? body : body[0];
+                assert.match(result.src, /^https:\/\/test\/file\/.+/);
+                assert.deepEqual(result, {
+                    src: result.src,
+                    publicUrl: `https://cdn.test/${result.src.split('/file/')[1]}`,
+                    expiresAt,
+                });
+                await Promise.all(waits);
+            });
+        }
+    }
+
+    it('keeps upload error responses unchanged in object mode', async () => {
+        const route = await loadFunction('functions/upload/index.js', { ...mocks, userAuthCheck: async () => false });
+        const response = await route.onRequest(context('https://test/upload?responseFormat=object'));
+        assert.equal(response.status, 401);
+        assert.equal(await response.text(), 'Unauthorized');
+        assert.deepEqual(storage, {});
+    });
+
     it('retains Telegram special-format routing and serverCompress=false', async () => {
         const route = await loadFunction('functions/upload/index.js', mocks);
         for (const [name, type, query, method] of [
@@ -148,56 +185,67 @@ describe('upload', () => {
         await Promise.all(waits);
     });
 
-    for (const [channel, fileType, expected] of [
-        ['cfr2', 'application/octet-stream; charset=binary', 'image/png'],
-        ['s3', 'application/octet-stream; charset=binary', 'image/png'],
-        ['cfr2', 'application/pdf', 'application/pdf'],
-        ['s3', 'application/pdf', 'application/pdf'],
-    ]) {
-        it(`normalizes ${channel} chunk session, multipart headers and merged metadata: ${fileType}`, async () => {
-            const chunk = await loadFunction('functions/upload/chunkUpload.js', mocks, {
-                // The existing route leaves its timeout scheduled after a successful
-                // upload. Do not keep the test process alive for that timeout.
-                setTimeout: (...args) => setTimeout(...args).unref(),
+    for (const responseFormat of ['array', 'object']) {
+        for (const [channel, fileType, expected] of [
+            ['cfr2', 'application/octet-stream; charset=binary', 'image/png'],
+            ['s3', 'application/octet-stream; charset=binary', 'image/png'],
+            ['cfr2', 'application/pdf', 'application/pdf'],
+            ['s3', 'application/pdf', 'application/pdf'],
+        ]) {
+            it(`normalizes ${channel} chunk session, multipart headers and ${responseFormat} merged metadata: ${fileType}`, async () => {
+                const expiresAt = Date.now() + 3600000;
+                mocks.resolveUploadExpiry = async () => ({ expiresAt });
+                mocks.fetchPageConfig = async () => ({ config: [{ id: 'urlPrefix', value: 'https://cdn.test/' }] });
+                const chunk = await loadFunction('functions/upload/chunkUpload.js', mocks, {
+                    // The existing route leaves its timeout scheduled after a successful
+                    // upload. Do not keep the test process alive for that timeout.
+                    setTimeout: (...args) => setTimeout(...args).unref(),
+                });
+                const form = new FormData();
+                form.set('originalFileName', 'photo.png');
+                form.set('originalFileType', fileType);
+                form.set('totalChunks', '1');
+                const uploadContext = context(`https://test/upload?uploadChannel=${channel}${responseFormat === 'object' ? '&responseFormat=object' : ''}`, form);
+                uploadContext.uploadConfig = await mocks.fetchUploadConfig();
+                const initialized = await chunk.initializeChunkedUpload(uploadContext);
+                assert.equal(initialized.status, 200);
+                const initBody = await initialized.json();
+                assert.equal(initBody.success, true);
+                const { uploadId } = initBody;
+                const session = JSON.parse(await db.get(`upload_session_${uploadId}`));
+                assert.equal(session.originalFileType, expected);
+
+                const partForm = new FormData();
+                for (const [key, value] of form.entries()) partForm.set(key, value);
+                partForm.set('uploadId', uploadId);
+                partForm.set('chunkIndex', '0');
+                partForm.set('file', new File([png()], 'part'));
+                uploadContext.request = new Request(uploadContext.url, { method: 'POST', body: partForm });
+                const uploaded = await chunk.handleChunkUpload(uploadContext);
+                assert.equal(uploaded.status, 200);
+                assert.equal(storage.contentType, expected);
+                assert.equal((await db.getWithMetadata(`chunk_${uploadId}_000`)).metadata.status, 'completed');
+
+                const merge = await loadFunction('functions/upload/chunkMerge.js', { ...mocks, ...chunk });
+                const mergeForm = new FormData();
+                mergeForm.set('originalFileName', 'photo.png');
+                mergeForm.set('uploadId', uploadId);
+                mergeForm.set('totalChunks', '1');
+                // No MIME in merge request: reuse the type stored in the session.
+                uploadContext.request = new Request(uploadContext.url, { method: 'POST', body: mergeForm });
+                const merged = await merge.handleChunkMerge(uploadContext);
+                assert.equal(merged.status, 200, await merged.clone().text());
+                const body = await merged.json();
+                assert.equal(Array.isArray(body), responseFormat === 'array');
+                const result = responseFormat === 'object' ? body : body[0];
+                const { src } = result;
+                assert.deepEqual(result, { src, publicUrl: `https://cdn.test/${src.slice('/file/'.length)}`, expiresAt });
+                const metadata = (await db.getWithMetadata(src.slice('/file/'.length))).metadata;
+                assert.equal(metadata.FileType, expected);
+                assert.equal(metadata.FileSizeBytes, 24);
+                await Promise.all(waits);
             });
-            const form = new FormData();
-            form.set('originalFileName', 'photo.png');
-            form.set('originalFileType', fileType);
-            form.set('totalChunks', '1');
-            const uploadContext = context(`https://test/upload?uploadChannel=${channel}`, form);
-            uploadContext.uploadConfig = await mocks.fetchUploadConfig();
-            const initialized = await chunk.initializeChunkedUpload(uploadContext);
-            assert.equal(initialized.status, 200);
-            const { uploadId } = await initialized.json();
-            const session = JSON.parse(await db.get(`upload_session_${uploadId}`));
-            assert.equal(session.originalFileType, expected);
-
-            const partForm = new FormData();
-            for (const [key, value] of form.entries()) partForm.set(key, value);
-            partForm.set('uploadId', uploadId);
-            partForm.set('chunkIndex', '0');
-            partForm.set('file', new File([png()], 'part'));
-            uploadContext.request = new Request(uploadContext.url, { method: 'POST', body: partForm });
-            const uploaded = await chunk.handleChunkUpload(uploadContext);
-            assert.equal(uploaded.status, 200);
-            assert.equal(storage.contentType, expected);
-            assert.equal((await db.getWithMetadata(`chunk_${uploadId}_000`)).metadata.status, 'completed');
-
-            const merge = await loadFunction('functions/upload/chunkMerge.js', { ...mocks, ...chunk });
-            const mergeForm = new FormData();
-            mergeForm.set('originalFileName', 'photo.png');
-            mergeForm.set('uploadId', uploadId);
-            mergeForm.set('totalChunks', '1');
-            // No MIME in merge request: reuse the type stored in the session.
-            uploadContext.request = new Request(uploadContext.url, { method: 'POST', body: mergeForm });
-            const merged = await merge.handleChunkMerge(uploadContext);
-            assert.equal(merged.status, 200, await merged.clone().text());
-            const [{ src }] = await merged.json();
-            const metadata = (await db.getWithMetadata(src.slice('/file/'.length))).metadata;
-            assert.equal(metadata.FileType, expected);
-            assert.equal(metadata.FileSizeBytes, 24);
-            await Promise.all(waits);
-        });
+        }
     }
 
     it('accepts absent MIME at chunk initialization and keeps required filename validation', async () => {

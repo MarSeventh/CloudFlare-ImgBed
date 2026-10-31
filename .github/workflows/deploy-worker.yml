@@ -28,6 +28,7 @@ on:
 #   WORKER_NAME           - Worker 名称（默认 cloudflare-imgbed，手动触发时可在界面覆盖）
 #   WORKER_VARS           - JSON 格式的业务环境变量，支持 value 和可选 type（text/secret，默认 text）。
 #                           非必要不建议配置，业务设置请在管理面板中配置。
+#   WRANGLER_CONFIG      - JSON 格式的额外 Wrangler 配置，如 workers_dev、observability
 #   EXPIRY_CLEANUP_CRON   - 文件有效期清理的 Cron 表达式（如 */30 * * * *），启用文件有效期时配置；
 #                           免费计划每个账号最多 5 个 Cron Trigger
 
@@ -75,6 +76,7 @@ jobs:
           KV_NAMESPACE_ID: ${{ secrets.KV_NAMESPACE_ID }}
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
           WORKER_VARS: ${{ secrets.WORKER_VARS }}
+          WRANGLER_CONFIG: ${{ secrets.WRANGLER_CONFIG }}
           EXPIRY_CLEANUP_CRON: ${{ secrets.EXPIRY_CLEANUP_CRON }}
         run: node deploy/worker/generate-toml.js
 

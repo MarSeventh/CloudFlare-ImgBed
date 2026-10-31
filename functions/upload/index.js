@@ -2,7 +2,7 @@ import { createS3Client } from '../utils/storage/s3Client.js';
 import { userAuthCheck, UnauthorizedResponse } from "../utils/auth/userAuth";
 import { fetchUploadConfig, fetchSecurityConfig, fetchPageConfig } from "../utils/sysConfig";
 import {
-    createResponse, getUploadIp, getIPAddress, resolveFileExt,
+    createResponse, createUploadResponse, getUploadIp, getIPAddress, resolveFileExt,
     moderateContent, purgeCDNCache, isBlockedUploadIp, buildUniqueFileId, endUpload, getImageDimensions,
     sanitizeUploadFolder
 } from "./uploadTools";
@@ -301,11 +301,7 @@ function buildUploadResponse(context, returnLink) {
     if (context.fileExpiresAt) {
         result.expiresAt = context.fileExpiresAt;
     }
-    return createResponse(JSON.stringify([result]), {
-        headers: {
-            'Content-Type': 'application/json',
-        },
-    });
+    return createUploadResponse(context, [result]);
 }
 
 // 上传到Cloudflare R2

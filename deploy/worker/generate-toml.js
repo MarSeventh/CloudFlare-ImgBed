@@ -9,6 +9,7 @@
  *   R2_BUCKET_NAME   - R2 存储桶名称
  *   WORKER_VARS      - JSON 对象，值可直接填写或使用 { value, type: 'text' | 'secret' }
  *                     type 默认 text；secret 单独生成文件供部署后批量上传
+ *   WRANGLER_CONFIG - 可选，追加 Wrangler 配置的 JSON 对象
  *   EXPIRY_CLEANUP_CRON - 可选，文件有效期清理的 Cron 表达式（5 段格式，如每 30 分钟一次），不填则不生成定时任务
  */
 
@@ -21,6 +22,63 @@ const outputPath = join(__dirname, 'wrangler.toml');
 
 const env = process.env;
 const name = env.WORKER_NAME || 'cloudflare-imgbed';
+
+// JSON 字符串转义适用于 TOML 基本字符串，另外转义 TOML 禁止的 DEL 字符。
+const tomlString = (value) => JSON.stringify(value).replace(/\u007f/g, '\\u007f');
+
+const managedKeys = new Set([
+    'name', 'main', 'compatibility_date', 'compatibility_flags', 'assets', 'images',
+    'd1_databases', 'kv_namespaces', 'r2_buckets', 'vars', 'triggers'
+]);
+
+// 每层先写普通字段，再写子表，避免字段落入前一个子表。
+function serializeConfig(config, path = []) {
+    let fields = '';
+    let tables = '';
+    for (const [key, value] of Object.entries(config)) {
+        if (path.length === 0 && managedKeys.has(key)) {
+            throw new Error(`WRANGLER_CONFIG cannot override script-managed key: ${key}.`);
+        }
+        if (!key.isWellFormed() || (typeof value === 'string' && !value.isWellFormed())) {
+            throw new Error('WRANGLER_CONFIG strings must contain valid Unicode.');
+        }
+        if (Array.isArray(value)) {
+            throw new Error('WRANGLER_CONFIG does not support arrays or arrays of tables.');
+        }
+        if (value !== null && typeof value === 'object') {
+            const tablePath = [...path, key];
+            const child = serializeConfig(value, tablePath);
+            tables += `\n[${tablePath.map(tomlString).join('.')}]\n` + child.fields + child.tables;
+        } else if (typeof value === 'string' || typeof value === 'boolean' ||
+                   (typeof value === 'number' && Number.isFinite(value))) {
+            fields += `${tomlString(key)} = ${tomlString(value)}\n`;
+        } else {
+            throw new Error('WRANGLER_CONFIG values must be strings, finite numbers, booleans, or objects; null is not supported.');
+        }
+    }
+    return { fields, tables };
+}
+
+let customConfig = { fields: '', tables: '' };
+if (env.WRANGLER_CONFIG) {
+    let config;
+    try {
+        config = JSON.parse(env.WRANGLER_CONFIG);
+    } catch {
+        console.error('Error: WRANGLER_CONFIG must be a valid JSON object.');
+        process.exit(1);
+    }
+    if (config === null || typeof config !== 'object' || Array.isArray(config)) {
+        console.error('Error: WRANGLER_CONFIG must be a JSON object.');
+        process.exit(1);
+    }
+    try {
+        customConfig = serializeConfig(config);
+    } catch (error) {
+        console.error(`Error: ${error.message}`);
+        process.exit(1);
+    }
+}
 
 // 先验证全部配置，避免错误的 secret 配置被降级成普通变量或被静默跳过。
 const textVars = Object.create(null);
@@ -122,13 +180,13 @@ toml += `
 # Secret 类型的变量在部署后单独上传，不写入此配置。
 `;
 
-// JSON 字符串转义适用于 TOML 基本字符串，另外转义 TOML 禁止的 DEL 字符。
-const tomlString = (value) => JSON.stringify(value).replace(/\u007f/g, '\\u007f');
 const configWithoutVars = toml;
 for (const [key, value] of Object.entries(textVars)) {
     toml += `${tomlString(key)} = ${tomlString(value)}\n`;
 }
 
+// 自定义根字段必须位于第一个表之前；日志仅使用未包含自定义值的配置。
+toml = customConfig.fields + toml + customConfig.tables;
 writeFileSync(outputPath, toml, 'utf8');
 
 const hasSecrets = Object.keys(secretVars).length > 0;

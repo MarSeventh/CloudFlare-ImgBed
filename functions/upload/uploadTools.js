@@ -23,6 +23,14 @@ export function createResponse(body, options = {}) {
     });
 }
 
+// 普通上传和分块合并共用成功响应格式，默认保留数组形式。
+export function createUploadResponse(context, results) {
+    const body = context.url.searchParams.get('responseFormat') === 'object' ? results[0] : results;
+    return createResponse(JSON.stringify(body), {
+        headers: { 'Content-Type': 'application/json' }
+    });
+}
+
 // 生成短链接
 export function generateShortId(length = 8) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';

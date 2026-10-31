@@ -1,6 +1,6 @@
 import { createS3Client } from '../utils/storage/s3Client.js';
 /* ========== 分块合并处理 ========== */
-import { createResponse, getUploadIp, getIPAddress, selectConsistentChannel, buildUniqueFileId, endUpload, sanitizeUploadFolder } from './uploadTools';
+import { createResponse, createUploadResponse, getUploadIp, getIPAddress, selectConsistentChannel, buildUniqueFileId, endUpload, sanitizeUploadFolder } from './uploadTools';
 import { retryFailedChunks, cleanupFailedMultipartUploads, checkChunkUploadStatuses, cleanupChunkData, cleanupUploadSession } from './chunkUpload';
 import { CompleteMultipartUploadCommand } from "@aws-sdk/client-s3";
 import { getDatabase } from '../utils/databaseAdapter.js';
@@ -140,10 +140,7 @@ async function startMerge(context, uploadId, totalChunks, originalFileName, orig
                 }
             }
 
-            return createResponse(JSON.stringify(result.result), {
-                status: 200,
-                headers: { 'Content-Type': 'application/json' }
-            });
+            return createUploadResponse(context, result.result);
         } else {
             throw new Error(result.error || 'Merge failed');
         }
