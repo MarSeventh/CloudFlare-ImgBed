@@ -1,3 +1,4 @@
+import { acquireFileLocks } from '../../../utils/replacementLock.js';
 import { getDatabase } from '../../../utils/databaseAdapter.js';
 import { moveFileToTrash } from '../../../utils/trash.js';
 import { resolveFilePath } from '../../../utils/fileIdentity.js';
@@ -10,14 +11,11 @@ import { cloneReplacementContent, removeStoredContent, storageIdentity, supports
 const reply = (body, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 const fail = (message, status = 400) => Object.assign(new Error(message), { status });
 const signature = record => JSON.stringify(record);
-// Prevent overlapping replacements in one isolate. KV has no cross-isolate CAS;
-// snapshots are also rechecked immediately before committing or deleting.
-const active = new Set();
 
 export async function onRequest(context) {
     const { env, request } = context;
     if (request.method !== 'POST') return reply({ success: false, message: 'Method not allowed' }, 405);
-    let snapshot; let committed = false; let locks = [];
+    let snapshot; let committed = false; let release;
     try {
         const auth = await authenticate({ env, request, requiredPermission: 'replace', authScope: AUTH_SCOPE.ADMIN });
         if (!auth.authorized) return reply({ success: false, message: '需要内容替换权限' }, 401);
@@ -35,11 +33,10 @@ export async function onRequest(context) {
         const targetPath = await resolveFilePath(db, body.target);
         if (!sourcePath || !targetPath || sourcePath.endsWith('/') || targetPath.endsWith('/')) throw fail('文件不存在', 404);
         if (sourcePath === targetPath) throw fail('源文件与被替换文件不能相同');
+        release = acquireFileLocks(env, [sourcePath, targetPath]);
         if (!(await db.getWithMetadata(sourcePath))?.metadata || !(await db.getWithMetadata(targetPath))?.metadata) throw fail('文件不存在', 404);
         if (body.expectedSourcePath !== sourcePath || body.expectedTargetPath !== targetPath) throw fail('文件位置已变化，请重新选择', 409);
-        const keys = [sourcePath, targetPath].map(path => new URL(request.url).origin + '/' + path);
-        if (keys.some(key => active.has(key))) throw fail('文件正在替换中，请稍后重试', 409);
-        keys.forEach(key => active.add(key)); locks = keys;
+        if (await resolveFilePath(db, decodeURIComponent(raw)) !== sourcePath || await resolveFilePath(db, body.target) !== targetPath) throw fail('文件位置已变化，请重新选择', 409);
         const source = await db.ensureFileIdentity(sourcePath);
         const target = await db.ensureFileIdentity(targetPath);
         if (!source?.metadata?.FixedId || !target?.metadata?.FixedId) throw fail('文件不存在或不是可替换的文件', 404);
@@ -96,5 +93,5 @@ export async function onRequest(context) {
         if (snapshot && !committed) await snapshot.rollback();
         console.error('File replacement failed:', error.message);
         return reply({ success: false, message: error.status ? error.message : '替换失败，请刷新检查文件状态后重试' }, error.status || 500);
-    } finally { locks.forEach(key => active.delete(key)); }
+    } finally { release?.(); }
 }

@@ -172,6 +172,7 @@
                         @tags="handleTagManagement(item.name)"
                         @rename="openQuickRename(item)"
                         @replace="openReplaceDialog(item)"
+                        @replace-local="openLocalReplaceDialog(item)"
                         @copy="handleCopy(index, item.name)"
                         @move="handleMove(index, item.name)"
                         @delete="handleDelete(index, item.name)"
@@ -223,6 +224,7 @@
                         @tags="handleTagManagement(item.name)"
                         @rename="openQuickRename(item)"
                         @replace="openReplaceDialog(item)"
+                        @replace-local="openLocalReplaceDialog(item)"
                         @copy="handleCopy(index, item.name)"
                         @folderCopy="handleFolderCopy(item.name)"
                         @move="handleMove(index, item.name)"
@@ -401,6 +403,7 @@
             @navigate="navigateToFolder"
             @goBack="handleGoBack"
         />
+        <UploadReplacementDialog v-model="showLocalReplaceDialog" :target="replaceTarget" @replaced="handleReplaced" />
         <ReplaceFileDialog v-model="showReplaceDialog" :source="replaceSource"
             :current-directory="currentPath" @replaced="handleReplaced" />
         <!-- 移动文件对话框 -->
@@ -425,6 +428,7 @@ import BatchTagDialog from '@/components/dashboard/BatchTagDialog.vue';
 import SkeletonLoader from '@/components/dashboard/SkeletonLoader.vue';
 import FileCard from '@/components/dashboard/FileCard.vue';
 import FolderCard from '@/components/dashboard/FolderCard.vue';
+import UploadReplacementDialog from '@/components/dashboard/UploadReplacementDialog.vue';
 import ReplaceFileDialog from '@/components/dashboard/ReplaceFileDialog.vue';
 import QuickUpload from '@/components/dashboard/QuickUpload.vue';
 import MoveFileDialog from '@/components/dashboard/MoveFileDialog.vue';
@@ -510,6 +514,7 @@ data() {
         channelNameOptions: [], // 动态从文件列表中提取
         // 移动文件对话框相关状态
         showReplaceDialog: false, replaceSource: null,
+        showLocalReplaceDialog: false, replaceTarget: null,
         showMoveDialog: false, // 移动文件对话框
         moveTargetPath: '/', // 移动目标路径
         moveFileKey: '', // 当前移动的文件key
@@ -518,6 +523,7 @@ data() {
     }
 },
 components: {
+    UploadReplacementDialog,
     QuickUpload,
     BatchTelegramDialog,
     DashboardTabs,
@@ -832,6 +838,9 @@ methods: {
                 break;
             case 'move':
                 this.handleMove(index, file.name);
+                break;
+            case 'replaceLocal':
+                this.openLocalReplaceDialog(file);
                 break;
             case 'replace':
                 this.openReplaceDialog(file);
@@ -1397,6 +1406,11 @@ methods: {
         } else if (command === 'white') {
             this.handleBatchWhite();
         }
+    },
+    openLocalReplaceDialog(file) {
+        if (!file || this.isFolder(file)) return;
+        this.replaceTarget = { ...file, metadata: { ...file.metadata } };
+        this.showLocalReplaceDialog = true;
     },
     openReplaceDialog(file) {
         if (!file || this.isFolder(file)) return;

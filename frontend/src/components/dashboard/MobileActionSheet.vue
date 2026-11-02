@@ -26,6 +26,10 @@
                                 <font-awesome-icon icon="file-export" class="bottom-sheet-icon"></font-awesome-icon>
                                 <span>{{ $t('mobileAction.moveFile') }}</span>
                             </div>
+                            <div class="bottom-sheet-item" @click="handleAction('replaceLocal')">
+                                <font-awesome-icon icon="upload" class="bottom-sheet-icon" />
+                                <span>{{ $t('replaceFile.localTitle') }}</span>
+                            </div>
                             <div class="bottom-sheet-item" @click="handleAction('replace')">
                                 <font-awesome-icon icon="file-signature" class="bottom-sheet-icon" />
                                 <span>{{ $t('replaceFile.title') }}</span>

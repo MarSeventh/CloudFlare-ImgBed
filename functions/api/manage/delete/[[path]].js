@@ -1,3 +1,4 @@
+import { acquireFileLocks } from '../../../utils/replacementLock.js';
 import { getDatabase } from '../../../utils/databaseAdapter.js';
 import { resolveFilePath } from '../../../utils/fileIdentity.js';
 import { authenticate, AUTH_SCOPE } from '../../../utils/auth/authCore.js';
@@ -17,11 +18,15 @@ export async function onRequest(context) {
         const raw = Array.isArray(context.params.path) ? context.params.path.join('/') : String(context.params.path || '');
         const path = decodeURIComponent(raw);
         const deleted = [], failed = [], warnings = [];
+        let conflicted = false;
         const remove = async filePath => {
-            await withTrashLock(url.origin, filePath, () => moveFileToTrash(db, filePath));
-            deleted.push(filePath);
-            if (!(await removeFileFromIndex(context, filePath)).success) warnings.push('索引刷新失败，请稍后重建索引');
-            await invalidateTrashCaches(context, filePath);
+            const release = acquireFileLocks(env, [filePath]);
+            try {
+                await withTrashLock(url.origin, filePath, () => moveFileToTrash(db, filePath));
+                deleted.push(filePath);
+                if (!(await removeFileFromIndex(context, filePath)).success) warnings.push('索引刷新失败，请稍后重建索引');
+                await invalidateTrashCaches(context, filePath);
+            } finally { release(); }
         };
         if (url.searchParams.get('folder') === 'true') {
             if (!validFolder(path)) throw trashError('目录路径无效', 400);
@@ -31,7 +36,7 @@ export async function onRequest(context) {
                 const page = await db.list({ prefix: path + '/', limit: 1000, ...(cursor ? { cursor } : {}) });
                 for (const key of page.keys || []) {
                     if (!key.name.startsWith(path + '/') || !key.metadata?.Channel || key.metadata.TimeStamp == null) continue;
-                    try { await remove(key.name); } catch { failed.push(key.name); }
+                    try { await remove(key.name); } catch (error) { failed.push(key.name); if (error.status === 409) conflicted = true; }
                 }
                 cursor = page.list_complete === false ? page.cursor : null;
             } while (cursor);
@@ -44,7 +49,7 @@ export async function onRequest(context) {
                     await updateFolderEntries(db, path);
                 }
             }
-            return reply({ success: !failed.length, deleted, failed, warnings, trashed: true });
+            return reply({ success: !failed.length, deleted, failed, warnings, trashed: true }, conflicted ? 409 : 200);
         }
         const resolved = await resolveFilePath(db, path);
         if (!resolved) throw trashError('文件不存在', 404);

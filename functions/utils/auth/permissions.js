@@ -26,7 +26,7 @@ export function managePermission(request) {
     const read = request.method === 'GET' || request.method === 'HEAD';
     if (route[0] === 'trash') return read ? 'list' : request.method === 'DELETE' ? 'purge' : 'delete';
     if (route[0] === 'delete') return 'delete';
-    if (route[0] === 'replace') return 'replace';
+    if (route[0] === 'replace' || route[0] === 'replace-file') return 'replace';
     if (route[0] === 'rename' || route[0] === 'move') return 'organize';
     if (route[0] === 'tags' || route[0] === 'notes') return read ? 'list' : 'organize';
     if (route[0] === 'list' && read) {

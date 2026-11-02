@@ -935,6 +935,14 @@
         }
     },
     "replaceFile": {
+        "targetRefreshed": "Target refreshed. Review the current path and type, then confirm again.",
+        "refreshTarget": "Refresh target",
+        "localTitle": "Replace content from local file",
+        "localHint": "Choose a local file with the same MIME type (max 20 MiB). Keeps links, name, folder, tags, upload time, access list and notes. Creates no file or trash record. Uses the target channel; HuggingFace, External and Telegraph are currently unsupported.",
+        "chooseLocal": "Choose local file",
+        "localTypeError": "The file MIME type must match the target. Choose another file.",
+        "localSizeError": "The maximum file size is 20 MiB.",
+
         "title": "Replace file",
         "source": "Source:",
         "target": "File to replace:",

@@ -103,6 +103,11 @@
                             <font-awesome-icon icon="file-export"></font-awesome-icon>
                         </button>
                     </el-tooltip>
+                    <el-tooltip :content="$t('replaceFile.localTitle')" placement="top">
+                        <button class="action-btn" :aria-label="$t('replaceFile.localTitle')" @click.stop="$emit('replaceLocal')">
+                            <font-awesome-icon icon="upload" />
+                        </button>
+                    </el-tooltip>
                     <el-tooltip :content="$t('replaceFile.title')" placement="top">
                         <button class="action-btn" :aria-label="$t('replaceFile.title')" @click.stop="$emit('replace')">
                             <font-awesome-icon icon="file-signature" />
@@ -139,7 +144,7 @@ export default {
         previewSrcList: { type: Array, default: () => [] },
         disableTooltip: { type: Boolean, default: false }
     },
-    emits: ['update:selected', 'detail', 'tags', 'rename', 'copy', 'replace', 'move', 'delete', 'download', 'touchstart', 'touchend', 'touchmove'],
+    emits: ['update:selected', 'detail', 'tags', 'rename', 'copy', 'replace', 'replaceLocal', 'move', 'delete', 'download', 'touchstart', 'touchend', 'touchmove'],
     data() {
         return {
             localSelected: this.selected,

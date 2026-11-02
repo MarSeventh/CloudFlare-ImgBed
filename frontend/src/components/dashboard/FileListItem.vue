@@ -96,6 +96,11 @@
                         <font-awesome-icon icon="download"/>
                     </button>
                 </el-tooltip>
+                <el-tooltip :content="$t('replaceFile.localTitle')" placement="top">
+                    <button class="list-action-btn" :aria-label="$t('replaceFile.localTitle')" @click.stop="$emit('replaceLocal')">
+                        <font-awesome-icon icon="upload" />
+                    </button>
+                </el-tooltip>
                 <el-tooltip :content="$t('replaceFile.title')" placement="top">
                         <button class="list-action-btn" :aria-label="$t('replaceFile.title')" @click.stop="$emit('replace')">
                             <font-awesome-icon icon="file-signature" />
@@ -138,7 +143,7 @@ export default {
         fileLink: { type: String, default: '' },
         visibleColumns: { type: Array, required: true }
     },
-    emits: ['update:selected', 'enter', 'detail', 'tags', 'rename', 'copy', 'folderCopy', 'replace', 'move', 'delete', 'download', 'touchstart', 'touchend', 'touchmove'],
+    emits: ['update:selected', 'enter', 'detail', 'tags', 'rename', 'copy', 'folderCopy', 'replace', 'replaceLocal', 'move', 'delete', 'download', 'touchstart', 'touchend', 'touchmove'],
     data() {
         return {
             localSelected: this.selected,

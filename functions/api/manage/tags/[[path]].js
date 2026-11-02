@@ -1,3 +1,4 @@
+import { acquireFileLocks } from '../../../utils/replacementLock.js';
 import { purgeCFCache } from "../../../utils/purgeCache.js";
 import { addFileToIndex } from "../../../utils/indexManager.js";
 import { getDatabase } from "../../../utils/databaseAdapter.js";
@@ -58,7 +59,7 @@ export async function onRequest(context) {
             error: 'Internal server error',
             message: error.message
         }), {
-            status: 500,
+            status: error.status || 500,
             headers: { 'Content-Type': 'application/json' }
         });
     }
@@ -108,6 +109,7 @@ async function handleGetTags(db, fileId) {
 async function handleUpdateTags(context, db, fileId, hostname) {
     const { request, waitUntil } = context;
 
+    let release;
     try {
         // Parse request body
         const body = await request.json();
@@ -147,6 +149,8 @@ async function handleUpdateTags(context, db, fileId, hostname) {
                 headers: { 'Content-Type': 'application/json' }
             });
         }
+
+        release = acquireFileLocks(context.env, [fileId]);
 
         // Get file metadata
         const fileData = await db.getWithMetadata(fileId);
@@ -194,6 +198,7 @@ async function handleUpdateTags(context, db, fileId, hostname) {
         });
 
     } catch (error) {
+        if (error.status) throw error;
         throw new Error(`Failed to update tags: ${error.message}`);
-    }
+    } finally { release?.(); }
 }

@@ -17,7 +17,7 @@ export async function purgeCFCache(env, cdnUrl) {
 
         // 如果没有配置Cloudflare API，跳过缓存清除
         if (!cfZoneId || !cfEmail || !cfApiKey) {
-            return;
+            return 'unconfigured';
         }
 
         // 清除CDN缓存
@@ -33,10 +33,12 @@ export async function purgeCFCache(env, cdnUrl) {
         };
         for (let start = 0; start < files.length; start += 30) {
             options.body = JSON.stringify({ files: files.slice(start, start + 30) });
-            await fetch(`https://api.cloudflare.com/client/v4/zones/${ cfZoneId }/purge_cache`, options);
+            const response = await fetch(`https://api.cloudflare.com/client/v4/zones/${ cfZoneId }/purge_cache`, options);
+            if (!response.ok || (await response.json()).success === false) throw new Error('Cloudflare cache purge failed');
         }
     } catch (error) {
         console.error('Failed to purge CF cache:', error.message || error);
+        return false;
     }
 }
 
@@ -53,6 +55,7 @@ export async function purgeRandomFileListCache(origin, ...dirs) {
         }
     } catch (error) {
         console.error('Failed to clear randomFileList cache:', error);
+        return false;
     }
 }
 
@@ -71,5 +74,6 @@ export async function purgePublicFileListCache(origin, ...dirs) {
         }
     } catch (error) {
         console.error('Failed to clear publicFileList cache:', error);
+        return false;
     }
 }

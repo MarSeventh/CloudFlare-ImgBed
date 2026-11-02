@@ -1,3 +1,4 @@
+import { acquireFileLocks } from '../../../utils/replacementLock.js';
 import { getDatabase } from '../../../utils/databaseAdapter.js';
 import { buildFileMetadataForManagement } from '../../../utils/metadata/metadataView.js';
 
@@ -9,10 +10,16 @@ export async function onRequest(context) {
         path = decodeURIComponent(context.params.path).split(',').join('/');
     } catch { return new Response('Invalid path', { status: 400 }); }
     const db = getDatabase(context.env);
-    const record = await db.ensureFileIdentity(path);
-    if (!record?.metadata?.FixedId) return new Response('File not found or unsupported legacy record', { status: 404 });
-    return Response.json({ fixedId: record.metadata.FixedId,
-        permanentPath: `/file/${record.metadata.FixedId}`,
-        metadata: await buildFileMetadataForManagement(db, context.env, record.metadata)
-    }, { headers: { 'Cache-Control': 'no-store' } });
+    let release;
+    try {
+        release = acquireFileLocks(context.env, [path]);
+        const record = await db.ensureFileIdentity(path);
+        if (!record?.metadata?.FixedId) return new Response('File not found or unsupported legacy record', { status: 404 });
+        return Response.json({ fixedId: record.metadata.FixedId,
+            permanentPath: `/file/${record.metadata.FixedId}`,
+            metadata: await buildFileMetadataForManagement(db, context.env, record.metadata)
+        }, { headers: { 'Cache-Control': 'no-store' } });
+    } catch (error) {
+        return Response.json({ message: error.status ? error.message : 'Identity initialization failed' }, { status: error.status || 500 });
+    } finally { release?.(); }
 }

@@ -1,3 +1,4 @@
+import { acquireFileLocks } from '../../../utils/replacementLock.js';
 import { updateFolderEntries } from '../../../utils/organizationCatalog.js';
 import { S3Client, CopyObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { purgeCFCache, purgeRandomFileListCache, purgePublicFileListCache } from "../../../utils/purgeCache";
@@ -33,6 +34,7 @@ export async function onRequest(context) {
 
             const processedFiles = [];
             const failedFiles = [];
+            let conflicted = false;
 
             while (folderQueue.length > 0) {
                 const currentFolder = folderQueue.shift();
@@ -56,7 +58,9 @@ export async function onRequest(context) {
                     const newFileId = `${folderDist}/${fileName}`;
                     const cdnUrl = `https://${url.hostname}/file/${fileId}`;
 
-                    const success = await moveFile(env, fileId, newFileId, cdnUrl, url);
+                    let success = false;
+                    try { success = await moveFile(env, fileId, newFileId, cdnUrl, url); }
+                    catch (error) { if (error.status !== 409) throw error; conflicted = true; }
                     if (success) {
                         processedFiles.push({ fileId: fileId, newFileId: newFileId });
                     } else {
@@ -92,16 +96,16 @@ export async function onRequest(context) {
 
             // 返回处理结果
             return new Response(JSON.stringify({
-                success: true,
+                success: !failedFiles.length,
                 processed: processedFiles,
                 failed: failedFiles
-            }));
+            }), { status: conflicted ? 409 : 200 });
 
         } catch (e) {
             return new Response(JSON.stringify({
                 success: false,
                 error: e.message
-            }), { status: 400 });
+            }), { status: e.status || 400 });
         }
     }
 
@@ -131,13 +135,15 @@ export async function onRequest(context) {
         return new Response(JSON.stringify({
             success: false,
             error: e.message
-        }), { status: 400 });
+        }), { status: e.status || 400 });
     }
 }
 
 // 移动单个文件的核心函数
 async function moveFile(env, fileId, newFileId, cdnUrl, url) {
+    let release;
     try {
+        release = acquireFileLocks(env, [fileId, newFileId]);
         const db = getDatabase(env);
 
         // 读取图片信息
@@ -210,9 +216,10 @@ async function moveFile(env, fileId, newFileId, cdnUrl, url) {
 
         return true;
     } catch (e) {
+        if (e.status === 409) throw e;
         console.error('Move file failed:', e);
         return false;
-    }
+    } finally { release?.(); }
 }
 
 // 移动 S3 渠道的图片

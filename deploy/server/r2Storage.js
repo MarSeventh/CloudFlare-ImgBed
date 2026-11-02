@@ -59,7 +59,7 @@ export class LocalR2Storage {
      * 存储文件（模拟 R2 的 put 方法）
      * 支持多种输入类型
      */
-    async put(key, value) {
+    async put(key, value, options = {}) {
         const filePath = this._filePath(key);
         mkdirSync(dirname(filePath), { recursive: true });
 
@@ -85,7 +85,12 @@ export class LocalR2Storage {
             buffer = Buffer.from(String(value), 'utf-8');
         }
 
-        writeFileSync(filePath, buffer);
+        // Match R2's create-only condition used by replacement staging.
+        if (options.onlyIf?.etagDoesNotMatch === '*') {
+            try { writeFileSync(filePath, buffer, { flag: 'wx' }); }
+            catch (error) { if (error.code === 'EEXIST') return null; throw error; }
+        } else writeFileSync(filePath, buffer);
+        return {};
     }
 
     /**

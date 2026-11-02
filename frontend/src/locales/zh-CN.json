@@ -935,6 +935,14 @@
         }
     },
     "replaceFile": {
+        "targetRefreshed": "目标已刷新，请核对当前路径和类型后再次确认。",
+        "refreshTarget": "刷新目标",
+        "localTitle": "从本地替换内容",
+        "localHint": "选择与目标 MIME 类型相同的本地文件（最大 20 MiB）。保留目标链接、名称、目录、标签、上传时间、访问名单和备注，不新增文件或回收站记录。使用目标现有渠道；HuggingFace、外链和 Telegraph 暂不支持。",
+        "chooseLocal": "选择本地文件",
+        "localTypeError": "文件 MIME 类型必须与目标相同，请重新选择。",
+        "localSizeError": "文件最大为 20 MiB。",
+
         "title": "替换文件",
         "source": "源文件：",
         "target": "被替换文件：",

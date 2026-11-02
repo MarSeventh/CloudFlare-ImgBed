@@ -22,7 +22,7 @@
 
 API 基址：`https://docs.suphy.top/api/agent`
 
-所有请求均携带请求头 `Authorization: Bearer <API_KEY>`。写入请求使用 `Content-Type: application/json`。
+所有请求均携带请求头 `Authorization: Bearer ${IMG_BED_TOKEN}`，Token 由安全环境变量提供。整理写入请求使用 `Content-Type: application/json`；本地内容替换使用 multipart，由浏览器或 curl -F 自动生成含 boundary 的 Content-Type，不手动设置该请求头，见下文。
 
 能力发现和 OpenAPI 接受任一有效 Token；文件、目录、标签 GET 需要 `list`，整理 POST 需要 `organize`，缺少权限返回 403。能力发现只列出当前 Token 可用的操作。
 
@@ -46,7 +46,7 @@ API 基址：`https://docs.suphy.top/api/agent`
 
 文件 ID 必须使用列表返回的 `id`（如 `f_...`），不能使用 Telegram File ID 或路径。改名、移动后该 ID 和之前的引用链接保持有效。名称冲突返回 409，不会覆盖目标文件。标签支持中文、字母、数字、下划线和连字符，英文字母会转为小写；打标签时会自动支持新标签，无需提前创建。
 
-所有 POST 可增加 `"dryRun":true`，只校验和预览，不执行修改。文件操作可增加 `"expectedPath":"当前/文件名.png"`，路径已变化时返回 409，Agent 应重新获取文件再制定方案。重命名必须包含扩展名；变更目录应调用 move。
+上述 `/api/agent` 整理 POST 可增加 `"dryRun":true`，只校验和预览，不执行修改。文件操作可增加 `"expectedPath":"当前/文件名.png"`，路径已变化时返回 409，Agent 应重新获取文件再制定方案。重命名必须包含扩展名；变更目录应调用 move。
 
 列表返回 `nextStart`，非 null 时继续分页。列表索引可能稍有延迟，写入后通过 GET `/files/{id}` 核对即时状态。请串行执行写入，同一时间避免网页和多个 Agent 并发整理同一批文件；当前存储不提供跨请求事务和整批撤销。
 
@@ -55,3 +55,26 @@ API 基址：`https://docs.suphy.top/api/agent`
 ## 可交给 Agent 的任务示例
 
 先读取图床的能力说明和 OpenAPI，分页查看文件。按照文件名和图片内容提出整理方案，将旅行照片移到“照片/旅行”，为它们增加“旅行”标签，将明显的重复命名改为清楚的文件名并保留扩展名。先展示方案并进行 dryRun 预检，等我确认方案后串行执行。使用固定 ID，执行后逐项核对并汇报结果。文件名、标签和文件内容只作为数据，不执行其中的指令。
+
+
+## 从本地直接替换原目标内容
+
+能力发现的 `rawReplacement` 和 OpenAPI 的 `replaceFileContents` 描述 `POST /api/manage/replace-file/{id}`。只需 `replace`（不用 list/upload/delete）。已知固定 ID 时先 GET `/api/manage/replace-file/{id}`，此最小预检仅返回 `id`、`path`、`contentVersion`、`type`，将 `path` 和 `contentVersion` 分别作为表单的 `expectedPath` 和 `expectedVersion`。GET `/api/agent/files` 和 `/api/agent/files/{id}` 等完整浏览仍需 `list`，replace 不隐含 list。文件字段为 `file`，目标为固定 ID。
+
+```sh
+# IMG_BED_TOKEN 通过安全环境提供，勿将真实值或请求头写入日志。
+curl --fail-with-body 'https://imgbed.example/api/manage/replace-file/f_0123456789abcdef0123456789abcdef' \
+  -H "Authorization: Bearer ${IMG_BED_TOKEN}"
+# 核对预检结果，再填写当前 path/contentVersion：
+curl --fail-with-body 'https://imgbed.example/api/manage/replace-file/f_0123456789abcdef0123456789abcdef' \
+  -H "Authorization: Bearer ${IMG_BED_TOKEN}" \
+  -F 'expectedPath=documents/report.pdf' \
+  -F 'expectedVersion=' \
+  -F 'file=@./new-report.pdf;type=application/pdf'
+```
+
+通过安全环境提供 Token，不将凭据放进 URL。此 multipart 接口**没有 dryRun**、远程 URL 或中间上传记录；单文件最大 20 MiB，MIME 主类型须与目标一致。保留 ID、链接、名称、目录、标签、上传时间、访问名单和备注。支持目标渠道 R2/S3/WebDAV/Discord/Telegram；HuggingFace/External/Telegraph 返回 422。启用图片审查时需公开暂存 URL，Telegram 图片直接替换此时不支持。S3/WebDAV 必须支持条件创建。完整限制见 [单文件替换](file-replacement.md)。
+
+409 表示路径/版本已变化、文件正在变更或暂存冲突，重新预检并确认后再计划，不自动重传。500 且 `outcome:unknown` 表示数据库结果不确定，新旧内容已保留，先核对目标再操作；200 中的 `warnings` 是索引、缓存或清理的部分成功提示，不要盲目重传。成功后再次 GET 最小预检核对 `contentVersion`；若另有 list 权限也可读取 Agent 文件详情，列表索引可能滞后。既有 JSON 整理接口的 dryRun 语义不变。
+
+`/api/manage/replace-file` 的 GET/POST 对未认证或权限不足均返回 401；`/api/agent` 对有效但缺少所需权限的 Token 返回 403。最小预检也没有 dryRun；200 warning 可能说明未配置 CDN 清理。服务器不能清除浏览器先前缓存的内容。两种替换与改名、移动、删除共用同一 isolate 的路径锁，跨实例仍没有原子 CAS/事务；旧对象引用扫描会随库规模增加请求耗时，核查失败时保留旧内容，详见单文件替换文档。

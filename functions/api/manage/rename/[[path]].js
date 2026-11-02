@@ -12,6 +12,8 @@ import { buildFileMetadataForManagement } from "../../../utils/metadata/metadata
 import { validateFileName } from '../../../utils/fileNaming.js';
 import { authenticate, AUTH_SCOPE } from '../../../utils/auth/authCore.js';
 
+import { acquireFileLocks } from '../../../utils/replacementLock.js';
+
 // CORS 跨域响应头
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -42,6 +44,7 @@ export async function onRequest(context) {
         });
     }
 
+    let release;
     try {
         // 从 params.path 解析 fileId（需要 decodeURIComponent 处理中文等特殊字符）
         const fileId = decodeURIComponent(params.path).split(',').join('/');
@@ -98,6 +101,8 @@ export async function onRequest(context) {
 
         const url = new URL(request.url);
         const db = getDatabase(env);
+
+        release = acquireFileLocks(env, [fileId, newFileId]);
 
         // 获取当前文件数据
         const fileData = await db.ensureFileIdentity(fileId);
@@ -221,10 +226,10 @@ export async function onRequest(context) {
             success: false,
             message: error.message || 'Internal server error.',
         }), {
-            status: 500,
+            status: error.status || 500,
             headers: { 'Content-Type': 'application/json', ...corsHeaders },
         });
-    }
+    } finally { release?.(); }
 }
 
 // 移动 S3 渠道的图片

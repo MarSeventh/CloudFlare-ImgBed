@@ -75,7 +75,7 @@ export async function invalidateTrashCaches(context, path) {
     const url = new URL(context.request.url);
     const parts = path.split('/').slice(0, -1);
     const dirs = ['', ...parts.map((_, i) => parts.slice(0, i + 1).join('/'))];
-    await Promise.all([
+    return await Promise.all([
         purgeCFCache(context.env, `${url.origin}/file/${path.split('/').map(encodeURIComponent).join('/')}`),
         purgePublicFileListCache(url.origin, ...dirs),
         purgeRandomFileListCache(url.origin, ...dirs)
