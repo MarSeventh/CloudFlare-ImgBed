@@ -819,9 +819,21 @@ describe('file expiry', () => {
     });
 
     describe('management', () => {
-        async function metadataRoute() {
+        async function metadataRoute(usingKV = false) {
             const fixture = await managementFixture();
-            const route = await loadFunction('functions/api/manage/metadata/[[path]].js', fixture.mocks);
+            const db = usingKV ? createDatabaseAdapter({ img_url: fixture.db }) : fixture.db;
+            if (usingKV) {
+                const seed = fixture.seed;
+                fixture.seed = async files => {
+                    await seed(files);
+                    for (const file of files) {
+                        await db.put(file.id, file.value ?? 'record-value', { metadata: file.metadata });
+                    }
+                };
+            }
+            const route = await loadFunction('functions/api/manage/metadata/[[path]].js', {
+                ...fixture.mocks, getDatabase: () => db,
+            });
             const patch = body => {
                 const context = createContext('https://test/api/manage/metadata/photo.png', {
                     method: 'PATCH', body: JSON.stringify(body), env: fixture.env, params: { path: 'photo.png' },
@@ -831,23 +843,81 @@ describe('file expiry', () => {
                     return response;
                 });
             };
-            return { fixture, patch };
+            return { fixture, patch, db };
         }
 
         it('lets administrators change or clear the expiry and keeps KV markers in step', async () => {
-            const { fixture, patch } = await metadataRoute();
+            const { fixture, patch } = await metadataRoute(true);
+            const markers = () => [...fixture.db.records.keys()].filter(key => key.startsWith(helpers.EXPIRY_MARKER_PREFIX));
             const soon = Date.now() + HOUR;
             await fixture.seed([{ id: 'photo.png', metadata: { Channel: 'CloudflareR2', ExpiresAt: soon } }]);
+            assert.deepEqual(markers(), [helpers.buildExpiryMarkerKey(soon, 'photo.png')]);
 
             const later = Date.now() + DAY;
             assert.equal((await patch({ ExpiresAt: later })).status, 200);
             assert.equal((await fixture.db.getWithMetadata('photo.png')).metadata.ExpiresAt, later);
+            assert.deepEqual(markers(), [helpers.buildExpiryMarkerKey(later, 'photo.png')]);
+            assert.equal((await patch({ ExpiresAt: later, FileName: 'renamed.png' })).status, 200);
+            assert.equal((await patch({ FileType: 'image/png' })).status, 200);
+            assert.deepEqual(markers(), [helpers.buildExpiryMarkerKey(later, 'photo.png')]);
+            assert.equal((await patch({ ExpiresAt: soon })).status, 200);
+            assert.deepEqual(markers(), [helpers.buildExpiryMarkerKey(soon, 'photo.png')]);
             assert.equal((await patch({ ExpiresAt: null })).status, 200);
             assert.equal('ExpiresAt' in (await fixture.db.getWithMetadata('photo.png')).metadata, false);
+            assert.deepEqual(markers(), []);
+            assert.equal(fixture.objects.has('photo.png'), true);
 
             for (const invalid of [Date.now() - 1, '2026-10-25', 1.5]) {
                 assert.equal((await patch({ ExpiresAt: invalid })).status, 400);
             }
+        });
+
+        it('preserves the old KV marker when writing the new marker or record fails', async () => {
+            for (const failedWrite of ['marker', 'record']) {
+                const { fixture, patch } = await metadataRoute(true);
+                const soon = Date.now() + HOUR;
+                const later = Date.now() + DAY;
+                await fixture.seed([{ id: 'photo.png', metadata: { Channel: 'CloudflareR2', ExpiresAt: soon } }]);
+                const write = fixture.db.put.bind(fixture.db);
+                fixture.db.put = async (key, ...args) => {
+                    if (key === (failedWrite === 'marker' ? helpers.buildExpiryMarkerKey(later, 'photo.png') : 'photo.png')) {
+                        throw new Error('kv write failed');
+                    }
+                    return write(key, ...args);
+                };
+                assert.equal((await patch({ ExpiresAt: later })).status, 500);
+                assert.equal((await fixture.db.getWithMetadata('photo.png')).metadata.ExpiresAt, soon);
+                assert.ok(fixture.db.records.has(helpers.buildExpiryMarkerKey(soon, 'photo.png')));
+            }
+        });
+
+        it('keeps a saved permanent change successful when deleting the old KV marker fails', async () => {
+            const { fixture, patch } = await metadataRoute(true);
+            const soon = Date.now() + HOUR;
+            await fixture.seed([{ id: 'photo.png', metadata: { Channel: 'CloudflareR2', ExpiresAt: soon } }]);
+            const oldMarker = helpers.buildExpiryMarkerKey(soon, 'photo.png');
+            const remove = fixture.db.delete.bind(fixture.db);
+            fixture.db.delete = async key => {
+                if (key === oldMarker) throw new Error('kv delete failed');
+                return remove(key);
+            };
+            const response = await patch({ ExpiresAt: null });
+            assert.equal(response.status, 200);
+            assert.equal('ExpiresAt' in (await response.json()).metadata, false);
+            assert.equal('ExpiresAt' in (await fixture.db.getWithMetadata('photo.png')).metadata, false);
+            assert.ok(fixture.db.records.has(oldMarker));
+            assert.equal(fixture.objects.has('photo.png'), true);
+        });
+
+        it('does not delete marker keys for databases with an expiry index', async () => {
+            const { fixture, patch, db } = await metadataRoute();
+            db.listExpiredFiles = async () => [];
+            const removed = [];
+            db.delete = async key => { removed.push(key); };
+            await fixture.seed([{ id: 'photo.png', metadata: { Channel: 'CloudflareR2', ExpiresAt: Date.now() + HOUR } }]);
+            assert.equal((await patch({ ExpiresAt: null })).status, 200);
+            assert.deepEqual(removed, []);
+            assert.equal('ExpiresAt' in (await fixture.db.getWithMetadata('photo.png')).metadata, false);
         });
 
         it('purges configured CDN caches only when the expiry moves earlier', async () => {

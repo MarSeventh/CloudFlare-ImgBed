@@ -3,6 +3,7 @@ import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { purgeCFCache, purgeRandomFileListCache, purgePublicFileListCache } from "../../../utils/purgeCache";
 import { removeFileFromIndex, batchRemoveFilesFromIndex } from "../../../utils/indexManager.js";
 import { getDatabase } from '../../../utils/databaseAdapter.js';
+import { buildExpiryMarkerKey, getExpiresAt, isMissingRecord } from '../../../utils/fileExpiryHelpers.js';
 import { DiscordAPI } from '../../../utils/storage/discordAPI.js';
 import { HuggingFaceAPI } from '../../../utils/storage/huggingfaceAPI.js';
 import { WebDAVAPI } from '../../../utils/storage/webdavAPI.js';
@@ -181,16 +182,28 @@ export async function deleteFile(env, fileId, cdnUrl, url) {
         const img = await db.getWithMetadata(fileId);
 
         // 如果文件记录不存在，直接返回成功（幂等删除），标记 existed=false 供调用方区分
-        if (!img) {
+        if (isMissingRecord(img)) {
             console.warn(`File ${fileId} not found in database, skipping delete`);
             return { deleted: true, existed: false };
         }
 
-        await deleteStoredFile(env, fileId, img);
+        if (!await deleteStoredFile(env, fileId, img)) {
+            throw new Error('storage channel reported a failed deletion');
+        }
 
         // 删除数据库中的记录
         // 注意：容量统计现在由索引自动维护，删除文件后索引更新时会自动重新计算
         await db.delete(fileId);
+
+        const expiresAt = getExpiresAt(img.metadata);
+        if (expiresAt !== null && typeof db.listExpiredFiles !== 'function') {
+            try {
+                await db.delete(buildExpiryMarkerKey(expiresAt, fileId));
+            } catch (error) {
+                // 文件已删除；残留标记由后续清理任务重试移除。
+                console.warn('Failed to remove deleted file expiry marker:', error);
+            }
+        }
 
         // 清除CDN缓存
         await purgeCFCache(env, cdnUrl);

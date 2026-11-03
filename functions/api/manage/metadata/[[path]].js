@@ -2,7 +2,7 @@ import { addFileToIndex } from '../../../utils/indexManager.js';
 import { getDatabase } from '../../../utils/databaseAdapter.js';
 import { buildFileMetadataForManagement } from '../../../utils/metadata/metadataView.js';
 import { cleanPersistedMetadata } from '../../../utils/metadata/metadataSecurity.js';
-import { getExpiresAt, isExpired } from '../../../utils/fileExpiryHelpers.js';
+import { buildExpiryMarkerKey, getExpiresAt, isExpired } from '../../../utils/fileExpiryHelpers.js';
 import { purgeCFCache } from '../../../utils/purgeCache.js';
 
 // CORS 跨域响应头
@@ -130,15 +130,24 @@ export async function onRequest(context) {
             }
         }
         const metadataToSave = cleanPersistedMetadata(updatedMetadata);
+        const oldExpiresAt = getExpiresAt(fileData.metadata);
+        const newExpiresAt = getExpiresAt(metadataToSave);
 
-        // 保存更新后的 metadata（KV 存储下由适配器写入新的到期标记，旧标记在清理时发现不一致会自动移除）
+        // 先保存新标记和记录，再移除旧标记，避免保存失败后文件失去清理入口。
         await db.put(fileId, fileData.value, { metadata: metadataToSave });
+        if (hasExpiresAt && oldExpiresAt !== null && oldExpiresAt !== newExpiresAt &&
+            typeof db.listExpiredFiles !== 'function') {
+            try {
+                await db.delete(buildExpiryMarkerKey(oldExpiresAt, fileId));
+            } catch (error) {
+                // 文件修改已保存；残留标记由后续清理任务移除。
+                console.error('Failed to remove previous expiry marker:', error);
+            }
+        }
 
         // 到期时间提前（含永久改为有期限）时，清除配置了 API Token 的 CDN 缓存；
         // Worker 缓存在命中时校验，无需 Token
-        const oldExpiresAt = getExpiresAt(fileData.metadata) ?? Infinity;
-        const newExpiresAt = getExpiresAt(metadataToSave) ?? Infinity;
-        if (newExpiresAt < oldExpiresAt) {
+        if ((newExpiresAt ?? Infinity) < (oldExpiresAt ?? Infinity)) {
             const url = new URL(request.url);
             waitUntil(purgeCFCache(env, `https://${url.hostname}/file/${fileId}`));
         }

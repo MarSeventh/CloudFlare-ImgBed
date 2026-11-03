@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { loadFunction } from './helpers/loadFunction.js';
 import { createContext } from './helpers/context.js';
 import { managementFixture } from './helpers/management.js';
+import { createDatabaseAdapter } from '../functions/utils/databaseAdapter.js';
+import { buildExpiryMarkerKey, EXPIRY_MARKER_PREFIX } from '../functions/utils/fileExpiryHelpers.js';
 import * as batchTools from '../functions/utils/deleteBatch.js';
 
 describe('delete files', () => {
@@ -9,6 +11,15 @@ describe('delete files', () => {
 
     beforeEach(async () => {
         fixture = await managementFixture();
+        const db = createDatabaseAdapter({ img_url: fixture.db });
+        fixture.mocks.getDatabase = () => db;
+        const seed = fixture.seed;
+        fixture.seed = async files => {
+            await seed(files);
+            for (const file of files) {
+                await db.put(file.id, file.value ?? 'record-value', { metadata: file.metadata });
+            }
+        };
         single = await loadFunction('functions/api/manage/delete/[[path]].js', fixture.mocks);
         batch = await loadFunction('functions/api/manage/delete/batch.js', { ...fixture.mocks, ...batchTools, ...single });
     });
@@ -21,13 +32,17 @@ describe('delete files', () => {
 
     it('deletes the R2 object, database record and index entry and invalidates caches', async () => {
         const id = '相册/photo.png';
-        await fixture.seed([{ id, metadata: { Channel: 'CloudflareR2', FileType: 'image/png' } }]);
+        const expiresAt = Date.now() + 86400000;
+        const marker = buildExpiryMarkerKey(expiresAt, id);
+        await fixture.seed([{ id, metadata: { Channel: 'CloudflareR2', FileType: 'image/png', ExpiresAt: expiresAt } }]);
+        assert.ok(fixture.db.records.has(marker));
         const ctx = context(id);
         const response = await single.onRequest(ctx);
         assert.equal(response.status, 200);
         assert.deepEqual(await response.json(), { success: true, fileId: id, existed: true });
         assert.equal(fixture.objects.has(id), false);
         assert.equal(await fixture.db.getWithMetadata(id), null);
+        assert.equal(fixture.db.records.has(marker), false);
         const index = await fixture.readFiles(ctx);
         assert.equal(index.success, true);
         assert.deepEqual(index.files, []);
@@ -66,7 +81,8 @@ describe('delete files', () => {
     });
 
     it('reports per-item existed in batch responses and separates missing ids', async () => {
-        await fixture.seed(['real.png', 'missing.png'].map(id => ({ id, metadata: { Channel: 'CloudflareR2', FileType: 'image/png' } })));
+        const expiresAt = Date.now() + 86400000;
+        await fixture.seed(['real.png', 'missing.png'].map(id => ({ id, metadata: { Channel: 'CloudflareR2', FileType: 'image/png', ExpiresAt: expiresAt } })));
         await fixture.db.delete('missing.png');
         const payload = { fileIds: ['real.png', 'missing.png'] };
         const ctx = createContext('https://test/api/manage/delete/batch', {
@@ -79,6 +95,7 @@ describe('delete files', () => {
         assert.deepEqual(body.deleted, ['real.png', 'missing.png']);
         assert.deepEqual(body.missing, ['missing.png']);
         assert.deepEqual(body.failed, []);
+        assert.equal(fixture.db.records.has(buildExpiryMarkerKey(expiresAt, 'real.png')), false);
         const detail = body.details.find((item) => item.fileId === 'missing.png');
         assert.equal(detail.success, true);
         assert.equal(detail.existed, false);
@@ -87,7 +104,8 @@ describe('delete files', () => {
 
     it('preserves folder deletion results and cleans missing records from nested indexes', async () => {
         const ids = ['album/real.png', 'album/missing.png', 'album/sub/failed.png'];
-        await fixture.seed(ids.map(id => ({ id, metadata: { Channel: 'CloudflareR2' } })));
+        const expiresAt = Date.now() + 86400000;
+        await fixture.seed(ids.map(id => ({ id, metadata: { Channel: 'CloudflareR2', ExpiresAt: expiresAt } })));
         await fixture.db.delete('album/missing.png');
         const remove = fixture.env.img_r2.delete;
         fixture.env.img_r2.delete = async id => {
@@ -115,10 +133,13 @@ describe('delete files', () => {
         assert.deepEqual(body.details.map(({ success, existed }) => [success, existed]), [[true, true], [true, false], [false, true]]);
         assert.deepEqual((await fixture.readFiles(ctx)).files.map(file => file.id), [ids[2]]);
         assert.equal(fixture.objects.has(ids[2]), true);
+        assert.equal(fixture.db.records.has(buildExpiryMarkerKey(expiresAt, ids[0])), false);
+        assert.equal(fixture.db.records.has(buildExpiryMarkerKey(expiresAt, ids[2])), true);
     });
 
     it('retains the record and index when R2 deletion throws', async () => {
-        await fixture.seed([{ id: 'photo.png', metadata: { Channel: 'CloudflareR2' } }]);
+        const expiresAt = Date.now() + 86400000;
+        await fixture.seed([{ id: 'photo.png', metadata: { Channel: 'CloudflareR2', ExpiresAt: expiresAt } }]);
         fixture.env.img_r2.delete = async () => { throw new Error('storage unavailable'); };
         const ctx = context('photo.png');
         const response = await single.onRequest(ctx);
@@ -127,6 +148,75 @@ describe('delete files', () => {
         assert.notEqual(await fixture.db.getWithMetadata('photo.png'), null);
         assert.equal(fixture.objects.has('photo.png'), true);
         assert.deepEqual((await fixture.readFiles(ctx)).files.map(file => file.id), ['photo.png']);
+        assert.deepEqual(fixture.purges, []);
+        assert.ok(fixture.db.records.has(buildExpiryMarkerKey(expiresAt, 'photo.png')));
+    });
+
+    it('keeps deletion successful and updates the index when removing the expiry marker fails', async () => {
+        const id = 'photo.png';
+        const expiresAt = Date.now() + 86400000;
+        const marker = buildExpiryMarkerKey(expiresAt, id);
+        await fixture.seed([{ id, metadata: { Channel: 'CloudflareR2', ExpiresAt: expiresAt } }]);
+        const remove = fixture.db.delete.bind(fixture.db);
+        fixture.db.delete = async key => {
+            if (key === marker) throw new Error('kv unavailable');
+            return remove(key);
+        };
+        const ctx = context(id);
+        const response = await single.onRequest(ctx);
+        assert.equal(response.status, 200);
+        assert.equal((await response.json()).existed, true);
+        assert.equal(fixture.objects.has(id), false);
+        assert.equal(await fixture.db.getWithMetadata(id), null);
+        assert.deepEqual((await fixture.readFiles(ctx)).files, []);
+        assert.ok(fixture.db.records.has(marker));
+        assert.ok(fixture.purges.some(([kind]) => kind === 'file'));
+    });
+
+    it('preserves the expiry marker if deleting the file record fails', async () => {
+        const id = 'photo.png';
+        const expiresAt = Date.now() + 86400000;
+        const marker = buildExpiryMarkerKey(expiresAt, id);
+        await fixture.seed([{ id, metadata: { Channel: 'CloudflareR2', ExpiresAt: expiresAt } }]);
+        const remove = fixture.db.delete.bind(fixture.db);
+        fixture.db.delete = async key => {
+            if (key === id) throw new Error('kv unavailable');
+            return remove(key);
+        };
+        const ctx = context(id);
+        const response = await single.onRequest(ctx);
+        assert.equal(response.status, 400);
+        assert.notEqual(await fixture.db.getWithMetadata(id), null);
+        assert.ok(fixture.db.records.has(marker));
+        assert.deepEqual((await fixture.readFiles(ctx)).files.map(file => file.id), [id]);
+    });
+
+    it('preserves the record, marker and index when the storage channel returns false', async () => {
+        const id = 'photo.png';
+        const expiresAt = Date.now() + 86400000;
+        await fixture.seed([{ id, metadata: { Channel: 'WebDAV', WebDAVFilePath: id, ExpiresAt: expiresAt } }]);
+        const route = await loadFunction('functions/api/manage/delete/[[path]].js', {
+            ...fixture.mocks,
+            resolveWebDAVCredentials: async () => ({ baseUrl: 'https://storage.test', filePath: id }),
+            WebDAVAPI: class { async deleteFile() { return false; } },
+        });
+        const ctx = context(id);
+        assert.equal((await route.onRequest(ctx)).status, 400);
+        assert.notEqual(await fixture.db.getWithMetadata(id), null);
+        assert.ok(fixture.db.records.has(buildExpiryMarkerKey(expiresAt, id)));
+        assert.deepEqual((await fixture.readFiles(ctx)).files.map(file => file.id), [id]);
+    });
+
+    it('recognizes native KV missing-record responses without attempting marker removal', async () => {
+        const read = fixture.db.getWithMetadata.bind(fixture.db);
+        fixture.db.getWithMetadata = async key => await read(key) ?? { value: null, metadata: null };
+        const removed = [];
+        const remove = fixture.db.delete.bind(fixture.db);
+        fixture.db.delete = async key => { removed.push(key); return remove(key); };
+        const response = await single.onRequest(context('missing.png'));
+        assert.equal(response.status, 200);
+        assert.equal((await response.json()).existed, false);
+        assert.equal(removed.some(key => key.startsWith(EXPIRY_MARKER_PREFIX)), false);
         assert.deepEqual(fixture.purges, []);
     });
 
