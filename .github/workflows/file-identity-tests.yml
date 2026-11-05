@@ -21,7 +21,13 @@ jobs:
       - run: node --test tests/overview.test.mjs tests/token-copy.test.mjs tests/token-expiration-edit.test.mjs
       - run: node --import ./deploy/server/register.mjs --test tests/file-notes.test.mjs tests/file-notes-ui.test.mjs
       - run: node --import ./deploy/server/register.mjs --test tests/agent-organization.test.mjs tests/tag-catalog-filters.test.mjs tests/telegram-send.test.mjs tests/file-replacement.test.mjs tests/file-replacement-ui.test.mjs tests/quick-upload.test.mjs tests/token-permissions.test.mjs
+      - run: node --import ./deploy/server/register.mjs --test tests/raw-file-replacement.test.mjs
+      - name: Every test file must be run above
+        run: |
+          missing=0
+          for f in tests/*.test.mjs; do
+            grep -q "$f" .github/workflows/file-identity-tests.yml || { echo "::error::$f is not run by CI"; missing=1; }
+          done
+          exit $missing
       - run: npx wrangler pages functions build functions --outdir .wrangler/identity-build
-
-
 

@@ -4,8 +4,10 @@ permissions:
   contents: write
 
 on:
-  schedule:
-    - cron: "0 0 * * *" # every day
+  # This fork diverges substantially from upstream (fixed IDs, recycle bin,
+  # agent API, replacement). A scheduled merge into main would either fail on
+  # conflicts or land upstream changes without running tests, so syncing is
+  # manual: run this workflow, or merge upstream on a branch and open a PR.
   workflow_dispatch:
 
 jobs:
