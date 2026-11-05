@@ -20,7 +20,7 @@ jobs:
       - run: node --import ./deploy/server/register.mjs --test tests/file-details.test.mjs
       - run: node --test tests/overview.test.mjs tests/token-copy.test.mjs tests/token-expiration-edit.test.mjs
       - run: node --import ./deploy/server/register.mjs --test tests/file-notes.test.mjs tests/file-notes-ui.test.mjs
-      - run: node --import ./deploy/server/register.mjs --test tests/agent-organization.test.mjs tests/tag-catalog-filters.test.mjs tests/telegram-send.test.mjs tests/file-replacement.test.mjs tests/file-replacement-ui.test.mjs tests/quick-upload.test.mjs tests/token-permissions.test.mjs
+      - run: node --import ./deploy/server/register.mjs --test tests/agent-organization.test.mjs tests/tag-catalog-filters.test.mjs tests/telegram-send.test.mjs tests/telegram-allowlist.test.mjs tests/file-replacement.test.mjs tests/file-replacement-ui.test.mjs tests/quick-upload.test.mjs tests/token-permissions.test.mjs
       - run: node --import ./deploy/server/register.mjs --test tests/raw-file-replacement.test.mjs tests/storage-reference-scan.test.mjs
       - name: Every test file must be run above
         run: |

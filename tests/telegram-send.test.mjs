@@ -6,14 +6,14 @@ import { onRequest as route } from '../functions/api/manage/telegramSend.js';
 function fixture() {
  const map=new Map(),calls=[];let reads=0;const env={TG_UPLOAD_ALLOWED_USER_IDS:'555,555,invalid',img_url:{get:async k=>map.get(k)?.value??null,getWithMetadata:async k=>structuredClone(map.get(k)||{value:null,metadata:null}),put:async(k,value,o={})=>map.set(k,structuredClone({value,metadata:o.metadata})),delete:async k=>map.delete(k)}};
  const db=getDatabase(env);const channels=[{name:'primary',botToken:'123:fake',enabled:true},{name:'disabled',botToken:'9:disabled',enabled:false},{name:'other',botToken:'456:fake',enabled:true}];
- const services={authorize:async()=>true,getDatabase:()=>db,getUploadConfig:async()=>({telegram:{channels}}),readFile:async()=>{reads++;return new Response('original-file',{headers:{'Content-Type':'image/png'}});},call:async(c,method,body)=>{calls.push({channel:c.name,method,body});return{ok:true,messageId:10};}};
+ const services={authorize:async()=>true,getDatabase:()=>db,getUploadConfig:async()=>({telegram:{channels}}),getSecurityConfig:async()=>({telegramBot:{allowedUsers:[{id:'777',note:'Bob'},{id:'555',note:'Me'}]}}),readFile:async()=>{reads++;return new Response('original-file',{headers:{'Content-Type':'image/png'}});},call:async(c,method,body)=>{calls.push({channel:c.name,method,body});return{ok:true,messageId:10};}};
  const context=(body,method='POST')=>({env,request:new Request('https://example.test/api/manage/telegramSend',{method,...(method==='POST'?{body:JSON.stringify(body)}:{})})});
  const send=body=>createTelegramSendHandler(services)(context({fileId:'a.png',channel:'primary',recipient:'555',...body}));
  const file=async(metadata={})=>db.put('a.png','',{metadata:{Channel:'TelegramNew',ChannelName:'primary',TimeStamp:1,FileName:'a.png',FileType:'image/png',TgFileId:'tg-file-id',...metadata}});
  return{env,map,db,calls,services,context,send,file,get reads(){return reads;}};
 }
 test('options reveal only channel names and suggested numeric IDs; never send on GET',async()=>{
- const f=fixture();const response=await createTelegramSendHandler(f.services)(f.context(null,'GET'));const body=await response.json();assert.deepEqual(body.channels,[{name:'primary'},{name:'other'}]);assert.deepEqual(body.recipients,['555']);assert.match(response.headers.get('Cache-Control'),/no-store/);assert.ok(!JSON.stringify(body).includes(':fake'));assert.equal(f.calls.length,0);
+ const f=fixture();const response=await createTelegramSendHandler(f.services)(f.context(null,'GET'));const body=await response.json();assert.deepEqual(body.channels,[{name:'primary'},{name:'other'}]);assert.deepEqual(body.recipients,[{id:'555',note:'Me'},{id:'777',note:'Bob'}]);assert.match(response.headers.get('Cache-Control'),/no-store/);assert.ok(!JSON.stringify(body).includes(':fake'));assert.equal(f.calls.length,0);
 });
 test('same-bot existing documents resend by file ID and current caption, without downloading or modifying metadata',async()=>{
  const f=fixture();await f.file();const before=structuredClone([...f.map]);const id=(await f.db.getWithMetadata('a.png')).metadata.FixedId;const response=await f.send({fileId:id});assert.equal(response.status,200);assert.equal((await response.json()).success,true);assert.equal(f.reads,0);assert.deepEqual(f.calls.map(c=>[c.method,c.body.document,c.body.chat_id]),[['sendDocument','tg-file-id','555']]);assert.deepEqual([...f.map],before);
@@ -50,4 +50,8 @@ test('production endpoint reads original R2 bytes with admin access and uploads 
  globalThis.fetch=async(input,options)=>{sent.push(options.body);return Response.json({ok:true,result:{message_id:12}});};
  try{const response=await route({env:f.env,data:{},waitUntil:()=>{},request:new Request('https://example.test/api/manage/telegramSend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileId:'a.png',recipient:'555',channel:'Telegram_env'})})});assert.equal(response.status,200,await response.clone().text());assert.equal(sent.length,1);assert.ok(sent[0] instanceof FormData);assert.equal(await sent[0].get('document').text(),'r2-original');}
  finally{globalThis.fetch=originalFetch;globalThis.caches=originalCaches;}
+});
+test('recipients outside the Telegram allowlist are rejected before any delivery',async()=>{
+ const f=fixture();await f.file();const response=await f.send({recipient:'999'});assert.equal(response.status,403);assert.equal((await response.json()).error,'recipient_not_allowed');assert.equal(f.calls.length,0);assert.equal(f.reads,0);
+ assert.equal((await f.send({recipient:'777'})).status,200);
 });

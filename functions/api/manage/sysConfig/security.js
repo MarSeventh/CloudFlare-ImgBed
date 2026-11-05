@@ -2,6 +2,7 @@ import { getDatabase } from '../../../utils/databaseAdapter.js';
 import { hashPassword, isHashed } from '../../../utils/auth/passwordHash.js';
 import { destroySessionsByAuthType } from '../../../utils/auth/sessionManager.js';
 import { normalizeSessionMaxAgeDays } from '../../../utils/auth/sessionConfig.js';
+import { parseEnvAllowedUsers, storedAllowedUsers, validateAllowedUsers } from '../../../utils/telegramAllowlist.js';
 
 export async function onRequest(context) {
     // 安全设置相关，GET方法读取设置，POST方法保存设置
@@ -31,6 +32,13 @@ export async function onRequest(context) {
             maskedSettings.auth.admin._hasPassword = true;
             maskedSettings.auth.admin.adminPassword = ''; // 不向前端暴露密码/哈希
         }
+        // Full API token values are only revealed by apiTokens/copy, which requires
+        // an admin session. The dashboard lists tokens via /api/manage/apiTokens.
+        delete maskedSettings.apiTokens;
+        // Environment allowlist entries are shown read-only and never saved here.
+        const envUsers = parseEnvAllowedUsers(env);
+        maskedSettings.telegramBot.envUserIds = envUsers.ids;
+        maskedSettings.telegramBot.envInvalid = envUsers.invalid;
 
         return new Response(JSON.stringify(maskedSettings), {
             headers: {
@@ -51,6 +59,11 @@ export async function onRequest(context) {
         settings.access = newSettings.access || settings.access
         settings.access.userSessionMaxAge = normalizeSessionMaxAgeDays(settings.access.userSessionMaxAge)
         settings.access.adminSessionMaxAge = normalizeSessionMaxAgeDays(settings.access.adminSessionMaxAge)
+        if (newSettings.telegramBot !== undefined) {
+            const result = validateAllowedUsers(newSettings.telegramBot?.allowedUsers);
+            if (result.error) return Response.json({ error: result.error }, { status: 400 });
+            settings.telegramBot = { allowedUsers: result.users };
+        }
 
         // 处理认证设置：空密码表示不修改，_clear 标记表示清除密码
         let userPasswordChanged = false;
@@ -169,6 +182,9 @@ export async function getSecurityConfig(db, env) {
         adminSessionMaxAge: normalizeSessionMaxAgeDays(kvAccess.adminSessionMaxAge ?? 14),
     }
     settings.access = access
+
+    // Telegram Bot 授权用户（仅后台添加的部分；环境变量 TG_UPLOAD_ALLOWED_USER_IDS 不写入此处）
+    settings.telegramBot = { allowedUsers: storedAllowedUsers(settingsKV.telegramBot?.allowedUsers) }
 
     // API Token 管理
     const kvApiTokens = settingsKV.apiTokens || {}

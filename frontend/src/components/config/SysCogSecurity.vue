@@ -158,6 +158,48 @@
                     <el-input v-model="uploadSettings.moderate.nsfwApiPath" placeholder="https://nsfwjs.your.domain"/>
                 </el-form-item>
             </el-form>
+
+            <h4 class="second-title">{{ $t('sysSecurity.tgAllowTitle') }}
+                <el-tooltip :content="$t('sysSecurity.tgAllowTooltip')" placement="top">
+                    <font-awesome-icon icon="question-circle" style="margin-left: 5px; cursor: pointer;"/>
+                </el-tooltip>
+            </h4>
+            <el-alert v-if="telegramBot.envInvalid" :title="$t('sysSecurity.tgAllowEnvInvalid')" type="warning" :closable="false" show-icon class="tg-allow-alert"/>
+            <div class="token-table-container tg-allow-table-container">
+                <el-table :data="tgAllowRows" class="token-table" row-key="id" :empty-text="$t('sysSecurity.tgAllowEmpty')">
+                    <el-table-column :label="$t('sysSecurity.tgAllowUserId')" min-width="140" header-align="center">
+                        <template #default="{ row }">
+                            <div class="table-cell-content"><span class="token-display">{{ row.id }}</span></div>
+                        </template>
+                    </el-table-column>
+                    <el-table-column :label="$t('sysSecurity.tgAllowNote')" min-width="160" header-align="center">
+                        <template #default="{ row }">
+                            <div class="table-cell-content">
+                                <span v-if="row.env" class="tg-allow-muted">—</span>
+                                <el-input v-else v-model="row.note" size="small" maxlength="64" :placeholder="$t('sysSecurity.tgAllowNotePlaceholder')" :aria-label="$t('sysSecurity.tgAllowNote') + ' ' + row.id"/>
+                            </div>
+                        </template>
+                    </el-table-column>
+                    <el-table-column :label="$t('sysSecurity.tgAllowSource')" width="130" header-align="center">
+                        <template #default="{ row }">
+                            <div class="table-cell-content">
+                                <el-tooltip v-if="row.env" :content="$t('sysSecurity.tgAllowEnvHint')" placement="top">
+                                    <el-tag size="small" type="warning">{{ $t('sysSecurity.tgAllowEnvTag') }}</el-tag>
+                                </el-tooltip>
+                                <el-button v-else size="small" type="danger" @click="removeTgUser(row.id)">{{ $t('sysSecurity.tgAllowRemove') }}</el-button>
+                            </div>
+                        </template>
+                    </el-table-column>
+                </el-table>
+            </div>
+            <div class="tg-allow-add">
+                <el-input v-model="newTgUser.id" class="tg-allow-id" maxlength="16" inputmode="numeric" :placeholder="$t('sysSecurity.tgAllowIdPlaceholder')" :aria-label="$t('sysSecurity.tgAllowIdPlaceholder')" @keyup.enter="addTgUser"/>
+                <el-input v-model="newTgUser.note" class="tg-allow-note" maxlength="64" :placeholder="$t('sysSecurity.tgAllowNotePlaceholder')" :aria-label="$t('sysSecurity.tgAllowNotePlaceholder')" @keyup.enter="addTgUser"/>
+                <el-button type="primary" @click="addTgUser">
+                    <font-awesome-icon icon="plus" style="margin-right: 4px;"/>{{ $t('sysSecurity.tgAllowAdd') }}
+                </el-button>
+            </div>
+            <p class="tg-allow-hint">{{ $t('sysSecurity.tgAllowHint') }}</p>
         </div>
 
         <!-- 一级设置：访问管理 -->
@@ -353,6 +395,9 @@ data() {
             moderate: {}
         },
         accessSettings: {},
+        // Telegram Bot 授权用户：allowedUsers 可编辑并保存；envUserIds 来自环境变量，只读
+        telegramBot: { allowedUsers: [], envUserIds: [], envInvalid: false },
+        newTgUser: { id: '', note: '' },
         apiTokens: [], // API Token列表
         // 加载状态
         loading: true,
@@ -410,6 +455,13 @@ data() {
     };
 },
 computed: {
+    // Environment entries first (read-only), then the editable dashboard entries
+    // themselves, so inline note edits update telegramBot.allowedUsers directly.
+    tgAllowRows() {
+        const envIds = this.telegramBot.envUserIds || [];
+        return [...envIds.map(id => ({ id, env: true })),
+            ...(this.telegramBot.allowedUsers || []).filter(user => !envIds.includes(user.id))];
+    },
     agentInstructions() {
         return this.$t('sysSecurity.agentInstructions', { base: window.location.origin });
     },
@@ -516,6 +568,27 @@ methods: {
     prepareAgentToken() {
         this.newToken = { name: 'AI Agent', owner: 'Agent', permissions: ['list', 'organize'], neverExpire: false, expirationValue: 7, expirationUnit: 'd', autoDelete: false };
         this.showCreateTokenDialog = true;
+    },
+
+    addTgUser() {
+        const id = String(this.newTgUser.id || '').trim();
+        if (!/^[1-9]\d{0,15}$/.test(id) || !Number.isSafeInteger(Number(id))) {
+            this.$message.error(this.$t('sysSecurity.tgAllowInvalidId'));
+            return;
+        }
+        if (this.tgAllowRows.some(row => row.id === id)) {
+            this.$message.warning(this.$t('sysSecurity.tgAllowDuplicate'));
+            return;
+        }
+        if (this.telegramBot.allowedUsers.length >= 200) {
+            this.$message.error(this.$t('sysSecurity.tgAllowTooMany'));
+            return;
+        }
+        this.telegramBot.allowedUsers.push({ id, note: String(this.newTgUser.note || '').trim() });
+        this.newTgUser = { id: '', note: '' };
+    },
+    removeTgUser(id) {
+        this.telegramBot.allowedUsers = this.telegramBot.allowedUsers.filter(user => user.id !== id);
     },
 
     handleUserPassInput() {
@@ -799,7 +872,9 @@ methods: {
             const settings = {
                 auth: this.authSettings,
                 upload: this.uploadSettings,
-                access: this.accessSettings
+                access: this.accessSettings,
+                // Only dashboard entries are saved; environment IDs are never persisted.
+                telegramBot: { allowedUsers: this.telegramBot.allowedUsers.map(({ id, note }) => ({ id, note: note || '' })) }
             };
             // 不保存确认密码相关字段
             delete settings.auth.user.confirmNewUserPassword;
@@ -821,7 +896,12 @@ methods: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(settings)
-            }).then(res => res.json()).then((data) => {
+            }).then(async res => {
+                const data = await res.json().catch(() => ({}));
+                // Validation errors (e.g. an invalid Telegram user ID) must not look like a successful save.
+                if (!res.ok) throw Object.assign(new Error(data.error || res.status), { shown: true });
+                return data;
+            }).then((data) => {
                 // 管理端密码变更后，当前会话已被清除，需要重新登录
                 if (data.adminPasswordChanged) {
                     const msg = this.$t('sysSecurity.adminPasswordChangedRelogin');
@@ -854,8 +934,9 @@ methods: {
                 this.showAdminPassConfirm = false;
                 this.clearUserPassword = false;
                 this.clearAdminPassword = false;
-            }).catch(() => {
+            }).catch((error) => {
                 // 如果请求过程中 session 已失效导致 fetchWithAuth 跳转，忽略后续错误
+                if (error?.shown) this.$message.error(this.$t('sysSecurity.settingsSaveFailed', { reason: error.message }));
             });
         });
     }
@@ -869,6 +950,11 @@ mounted() {
         this.authSettings = data.auth;
         this.uploadSettings = data.upload;
         this.accessSettings = data.access;
+        this.telegramBot = {
+            allowedUsers: (data.telegramBot?.allowedUsers || []).map(({ id, note }) => ({ id, note: note || '' })),
+            envUserIds: data.telegramBot?.envUserIds || [],
+            envInvalid: data.telegramBot?.envInvalid === true
+        };
 
         // 密码从后端返回为空（安全考虑），记录原始空值
         this.oriUserPassword = '';
@@ -1084,6 +1170,14 @@ mounted() {
 
 :deep(.token-permission-dialog) { max-height: 92vh; display: flex; flex-direction: column; }
 :deep(.token-permission-dialog .el-dialog__body) { overflow-y: auto; min-height: 0; }
+.tg-allow-alert { margin-bottom: 12px; }
+.tg-allow-table-container { margin-top: 0; }
+.tg-allow-add { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.tg-allow-add .tg-allow-id { width: 180px; }
+.tg-allow-add .tg-allow-note { width: 220px; }
+.tg-allow-hint { color: var(--el-text-color-secondary); font-size: 12px; line-height: 1.6; margin: 8px 0 0; }
+.tg-allow-muted { color: var(--el-text-color-placeholder); }
+@media (max-width: 480px) { .tg-allow-add .tg-allow-id, .tg-allow-add .tg-allow-note { width: 100%; } }
 .token-copy-cell { flex-wrap: nowrap; }
 .token-copy-cell .token-display { min-width: 0; white-space: nowrap; }
 .token-copy-cell .el-button { flex-shrink: 0; }

@@ -1,12 +1,13 @@
 import { createTelegramSendHandler } from '../../utils/telegramSend.js';
 import { getDatabase } from '../../utils/databaseAdapter.js';
 import { getUploadConfig } from './sysConfig/upload.js';
+import { getSecurityConfig } from './sysConfig/security.js';
 import { authenticate, AUTH_SCOPE } from '../../utils/auth/authCore.js';
 import { TelegramAPI } from '../../utils/storage/telegramAPI.js';
 import { onRequest as readFile } from '../../file/[[path]].js';
 
 export const onRequest = createTelegramSendHandler({
-    getDatabase, getUploadConfig,
+    getDatabase, getUploadConfig, getSecurityConfig,
     async authorize({ env, request }) {
         return (await authenticate({ env, request, requiredPermission: 'manage', authScope: AUTH_SCOPE.ADMIN })).authorized;
     },

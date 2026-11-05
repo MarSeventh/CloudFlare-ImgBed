@@ -1,5 +1,6 @@
 import { chooseFilePath, uploadFileName } from './fileNaming.js';
 import { resolveFilePath, isFixedId } from './fileIdentity.js';
+import { telegramAllowedUsers } from './telegramAllowlist.js';
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const SECRET_HEADER = 'X-Telegram-Bot-Api-Secret-Token';
@@ -40,8 +41,11 @@ export function createTelegramWebhookHandler(services) {
         new Uint8Array(expectedHash).forEach((byte, i) => { mismatch |= byte ^ new Uint8Array(suppliedHash)[i]; });
         if (mismatch) return response('Unauthorized', 401);
 
-        const allowedIds = String(env.TG_UPLOAD_ALLOWED_USER_IDS || '').split(',').map(id => id.trim()).filter(Boolean);
-        if (!allowedIds.length || allowedIds.some(id => !/^[1-9]\d*$/.test(id))) {
+        // Union of TG_UPLOAD_ALLOWED_USER_IDS and the dashboard list. A malformed
+        // environment entry still closes the entrance instead of being ignored.
+        const allowlist = telegramAllowedUsers(env, await services.fetchSecurityConfig(env));
+        const allowedIds = allowlist.users.map(user => user.id);
+        if (!allowedIds.length || allowlist.misconfigured) {
             return response('Upload allowlist not configured', 503);
         }
         // Validate configuration before any side effect, and without letting a

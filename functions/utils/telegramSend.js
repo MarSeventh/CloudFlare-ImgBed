@@ -1,5 +1,6 @@
 import { resolveFilePath } from './fileIdentity.js';
 import { findConfiguredChannel } from './metadata/channelConfig.js';
+import { telegramAllowedUsers } from './telegramAllowlist.js';
 
 export const TELEGRAM_REUPLOAD_LIMIT = 20 * 1024 * 1024;
 const json = (body, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -33,9 +34,11 @@ export function createTelegramSendHandler(services) {
             const db = services.getDatabase(env);
             const config = await services.getUploadConfig(db, env);
             const channels = (config.telegram?.channels || []).filter(c => c.enabled !== false && c.botToken);
+            // Recipients are limited to the Telegram allowlist (env ∪ dashboard).
+            const recipients = telegramAllowedUsers(env, await services.getSecurityConfig(db, env)).users
+                .map(({ id, note }) => ({ id, note }));
             if (request.method === 'GET') return json({ channels: channels.map(c => ({ name: c.name })),
-                recipients: [...new Set(String(env.TG_UPLOAD_ALLOWED_USER_IDS || '').split(',').map(v => v.trim()).filter(v => /^[1-9]\d{0,15}$/.test(v)))],
-                reuploadLimit: TELEGRAM_REUPLOAD_LIMIT });
+                recipients, reuploadLimit: TELEGRAM_REUPLOAD_LIMIT });
             let body;
             try {
                 const raw = await request.text();
@@ -46,6 +49,7 @@ export function createTelegramSendHandler(services) {
                 !Number.isSafeInteger(Number(body.recipient)) || typeof body.channel !== 'string' ||
                 typeof body.fileId !== 'string' || !body.fileId || body.fileId.length > 700 ||
                 body.fileId.startsWith('manage@') || body.fileId.startsWith('chunk_')) return failure('invalid_request');
+            if (!recipients.some(user => user.id === body.recipient)) return failure('recipient_not_allowed', 403);
             const channel = channels.find(c => c.name === body.channel);
             if (!channel) return failure('bot_not_configured');
             const path = await resolveFilePath(db, body.fileId);
