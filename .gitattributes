@@ -1,0 +1,15 @@
+# Keep line endings stable across Windows/Linux checkouts so diffs against
+# upstream (MarSeventh/CloudFlare-ImgBed, LF) stay reviewable.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.gz binary
+
+# Build output committed for Cloudflare Pages; collapse it in reviews.
+frontend-dist/** linguist-generated=true
