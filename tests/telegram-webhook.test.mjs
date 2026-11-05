@@ -195,3 +195,40 @@ test('malformed JSON and unsupported HTTP methods are rejected', async () => {
     assert.equal((await f.run(undefined, {}, 'GET')).status, 405);
     assert.equal(f.calls.length, 0);
 });
+
+test('moderation uses the public file route and never receives the bot token', async () => {
+    const f = fixture(); const checked = [];
+    f.services.moderateContent = async (_env, url) => { checked.push(url); return 'adult'; };
+    assert.equal((await f.run()).status, 200);
+    assert.deepEqual(checked, ['https://img.example.com/file/Telegram/photo.jpg']);
+    assert.ok(checked.every(url => !url.includes('456:fake') && !url.includes('/bot')));
+    assert.equal(f.records.get('Telegram/photo.jpg').metadata.Label, 'adult');
+    assert.equal(f.indexed[0].metadata.Label, 'adult');
+});
+
+test('a retry after an applied-but-failed record write reuses the reserved path', async () => {
+    const f = fixture(); const getDatabase = f.services.getDatabase; let failOnce = true;
+    f.services.getDatabase = env => {
+        const db = getDatabase(env), put = db.put;
+        return { ...db, async put(key, value, options) {
+            await put(key, value, options);
+            if (!key.startsWith('manage@') && failOnce) { failOnce = false; throw new Error('uncertain write'); }
+        } };
+    };
+    assert.equal((await f.run()).status, 503);
+    assert.equal((await f.run()).status, 200);
+    assert.deepEqual([...f.records.keys()], ['Telegram/photo.jpg']);
+    assert.equal(f.calls.filter(c => c.method === 'copyMessage').length, 1);
+    assert.equal(f.indexed.length, 1);
+});
+
+test('a reserved path taken by another file is not mistaken for this upload', async () => {
+    const f = fixture();
+    const db = f.services.getDatabase(f.env);
+    await db.put('manage@telegramImport@456_123_7', 'Telegram/photo.jpg');
+    await db.put('Telegram/photo.jpg', '', { metadata: { FileName: 'photo.jpg', TgFileId: 'someone-else', TimeStamp: 1, Channel: 'TelegramNew' } });
+    assert.equal((await f.run()).status, 200);
+    assert.equal(f.records.get('Telegram/photo.jpg').metadata.TgFileId, 'someone-else');
+    assert.equal(f.records.get('Telegram/photo (2).jpg').metadata.TgFileId, 'large');
+    assert.equal(f.calls.filter(c => c.method === 'copyMessage').length, 1);
+});

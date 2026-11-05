@@ -1,5 +1,5 @@
 import { chooseFilePath, uploadFileName } from './fileNaming.js';
-import { resolveFilePath } from './fileIdentity.js';
+import { resolveFilePath, isFixedId } from './fileIdentity.js';
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const SECRET_HEADER = 'X-Telegram-Bot-Api-Secret-Token';
@@ -43,6 +43,14 @@ export function createTelegramWebhookHandler(services) {
         const allowedIds = String(env.TG_UPLOAD_ALLOWED_USER_IDS || '').split(',').map(id => id.trim()).filter(Boolean);
         if (!allowedIds.length || allowedIds.some(id => !/^[1-9]\d*$/.test(id))) {
             return response('Upload allowlist not configured', 503);
+        }
+        // Validate configuration before any side effect, and without letting a
+        // missing value surface as a generic "temporarily failed" error.
+        let publicURL = null;
+        try { publicURL = new URL(env.TG_UPLOAD_PUBLIC_URL || ''); } catch { /* reported below */ }
+        if (!publicURL || publicURL.protocol !== 'https:' || publicURL.username || publicURL.password ||
+            publicURL.pathname !== '/' || publicURL.search || publicURL.hash) {
+            return response('Public URL must be an HTTPS origin', 503);
         }
         let update;
         try {
@@ -91,11 +99,6 @@ export function createTelegramWebhookHandler(services) {
                 await reply('此文件无法通过 Bot 导入：单个文件需不超过 20 MB。较大文件请通过图床网页上传。');
                 return response('OK');
             }
-            const publicURL = new URL(env.TG_UPLOAD_PUBLIC_URL || '');
-            if (publicURL.protocol !== 'https:' || publicURL.username || publicURL.password ||
-                publicURL.pathname !== '/' || publicURL.search || publicURL.hash) {
-                return response('Public URL must be an HTTPS origin', 503);
-            }
             const folder = services.sanitizeUploadFolder(env.TG_UPLOAD_FOLDER || 'Telegram');
             let name = uploadFileName(file.file_name || 'file.bin');
             // The same bot/chat/message always maps to one record on Telegram retries.
@@ -106,14 +109,22 @@ export function createTelegramWebhookHandler(services) {
             const legacyFileId = `${folder ? folder + '/' : ''}tg_${botId}_${message.chat.id}_${message.message_id}.${extension}`;
             const db = services.getDatabase(env);
             const receiptKey = `manage@telegramImport@${botId}_${message.chat.id}_${message.message_id}`;
-            const receipt = await db.get(receiptKey);
+            let receipt = await db.get(receiptKey);
             let fileId = receipt ? await resolveFilePath(db, receipt) : await resolveFilePath(db, legacyFileId) || legacyFileId;
             if (!fileId) return response('Previously imported file was deleted');
-            if (!receipt && !(await db.getWithMetadata(fileId))?.metadata) {
+            let existing = await db.getWithMetadata(fileId);
+            // A receipt that is still a plain path was reserved before its record was
+            // written. Reuse it only while it is empty or holds this same upload.
+            const reservedPathTaken = receipt && !isFixedId(receipt) && existing?.metadata &&
+                existing.metadata.TgFileId !== file.file_id;
+            if ((!receipt && !existing?.metadata) || reservedPathTaken) {
                 fileId = await chooseFilePath(db, folder, name);
-                name = fileId.split('/').pop();
+                // Reserve the chosen path before any side effect, so a retry after a
+                // partial failure reuses it instead of allocating "name (2)".
+                receipt = fileId;
+                await db.put(receiptKey, receipt);
+                existing = null;
             }
-            const existing = await db.getWithMetadata(fileId);
             let metadata = existing?.metadata;
             if (!metadata) {
                 const telegramFile = await api.call('getFile', { file_id: file.file_id });
@@ -121,31 +132,38 @@ export function createTelegramWebhookHandler(services) {
                     await reply('此文件无法读取，请使用图床网页上传。');
                     return response('OK');
                 }
-                const label = await services.moderateContent(env,
-                    `${api.fileDomain}/file/bot${channel.botToken}/${telegramFile.file_path}`);
                 // Copy within Telegram; no binary download/re-upload or image recompression.
                 await api.call('copyMessage', { chat_id: channel.chatId,
                     from_chat_id: message.chat.id, message_id: message.message_id });
                 metadata = {
-                    FileName: name, FileType: file.mime_type,
+                    FileName: fileId.split('/').pop(), FileType: file.mime_type,
                     FileSize: (file.file_size / 1024 / 1024).toFixed(2), FileSizeBytes: file.file_size,
                     UploadIP: null, UploadAddress: 'Telegram Bot', ListType: 'None',
-                    TimeStamp: Date.now(), Label: label, Directory: folder ? folder + '/' : '', Tags: [],
+                    TimeStamp: Date.now(), Label: 'None', Directory: folder ? folder + '/' : '', Tags: [],
                     Channel: 'TelegramNew', ChannelName: channel.name, TgFileId: file.file_id,
                     TgImportIndexed: false, NamePolicyVersion: 1,
                     ...(file.width && file.height ? { Width: file.width, Height: file.height } : {})
                 };
                 await db.put(fileId, '', { metadata });
             }
-            if (!receipt) await db.put(receiptKey, metadata.FixedId || fileId);
+            // Point the receipt at the immutable ID once the record exists.
+            const finalReceipt = metadata.FixedId || fileId;
+            if (receipt !== finalReceipt) await db.put(receiptKey, finalReceipt);
             if (!metadata.TgImportIndexed) {
+                const url = new URL(request.url);
+                const cacheUrl = `${publicURL.origin}/file/${fileId}`;
+                // Moderate through this site's own file route (as upstream does for S3
+                // and HuggingFace) instead of a Bot API URL, which embeds the bot token
+                // and would hand it to the third-party moderation service.
+                await services.purgeCDNCache(env, cacheUrl, url, folder).catch(() => {});
+                const label = await services.moderateContent(env,
+                    `${publicURL.origin}/file/${fileId.split('/').map(encodeURIComponent).join('/')}`);
+                metadata = { ...metadata, Label: label };
                 const indexResult = await services.addFileToIndex(context, fileId, metadata);
                 if (!indexResult.success) throw new Error('Index write failed');
                 metadata = { ...metadata, TgImportIndexed: true };
                 await db.put(fileId, '', { metadata });
-                const url = new URL(request.url);
-                context.waitUntil(services.purgeCDNCache(env,
-                    `${publicURL.origin}/file/${fileId}`, url, folder).catch(() => {
+                context.waitUntil(services.purgeCDNCache(env, cacheUrl, url, folder).catch(() => {
                     console.error('Telegram upload cache refresh failed');
                 }));
             }

@@ -42,7 +42,7 @@ powershell -ExecutionPolicy Bypass -File ./deploy/telegram/setup-webhook.ps1
 - 仅导入启用后收到的私聊消息；不会扫描历史频道或私聊记录。相册以独立文件保存，不保留 Telegram 相册分组。
 - 重复投递使用相同文件记录；索引写入失败会让 Telegram 重试，并从已有记录继续。KV 最终一致性、进程中断及外部 API/数据库无法共用事务，因此极端情况下仍可能在频道产生重复副本；不承诺严格的一次性投递。
 - 链接回复失败不会撤销成功上传；可从图床后台查找文件。入库失败返回 503，由 Telegram 重试；日志仅包含通用错误，不记录 Token 或消息正文。
-- 图床设置的图片审查会继续执行；目录的公开访问与白名单规则也继续适用。文件登记的上传来源为 Telegram Bot，不把 Telegram 服务器 IP 当成用户 IP。
+- 图床设置的图片审查会继续执行：文件登记后，审查服务通过 `TG_UPLOAD_PUBLIC_URL` 下的 `/file/...` 地址读取内容，不会收到含 Bot Token 的 Telegram 下载地址。若开启了白名单模式等使审查服务无法匿名读取文件的设置，审查结果为 `None`。目录的公开访问与白名单规则也继续适用。文件登记的上传来源为 Telegram Bot，不把 Telegram 服务器 IP 当成用户 IP。
 - 不要随意改名或删除该 Telegram 存储渠道，以免已有文件无法解析凭据。
 - 接收地址必须能被 Telegram 访问；Cloudflare Access 登录、WAF 验证页或防机器人挑战阻挡此地址时，需要为该路径配置合适规则，入口仍验证 Webhook 密钥和用户白名单。
 - 停用时先调用 Telegram `deleteWebhook`，再删除 `TG_WEBHOOK_SECRET` 并重新部署。停用不会删除已经入库的文件。
