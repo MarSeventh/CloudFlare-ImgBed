@@ -4,7 +4,7 @@ import { authenticate, AUTH_SCOPE } from '../../../utils/auth/authCore.js';
 import { addFileToIndex } from '../../../utils/indexManager.js';
 import { registerEntry } from '../../../utils/organizationCatalog.js';
 import { removeStoredContent, storageIdentity } from '../../../utils/replacementStorage.js';
-import { TRASH_PREFIX, saveTrashEntry, trashPage, loadTrashEntry, withTrashLock, invalidateTrashCaches, trashError } from '../../../utils/trash.js';
+import { TRASH_PREFIX, saveTrashEntry, trashPage, trashSharesStorage, loadTrashEntry, withTrashLock, invalidateTrashCaches, trashError } from '../../../utils/trash.js';
 
 const reply = (body, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 
@@ -56,27 +56,27 @@ export async function onRequest(context) {
             // Only a recovery record can reach physical deletion, never a live ID.
             const storageDeleted = ['CloudflareR2', 'S3', 'WebDAV', 'Discord', 'HuggingFace'].includes(entry.record?.metadata?.Channel);
             if (entry.kind === 'file') {
-                let cursor;
-                do {
-                    const page = await db.list({ limit: 1000, ...(cursor ? { cursor } : {}) });
-                    for (const key of page.keys || []) {
-                        if (!storageDeleted || key.metadata?.Channel !== entry.record.metadata.Channel) continue;
-                        const active = key.metadata.IsChunked ? await db.getWithMetadata(key.name) : { metadata: key.metadata, value: '' };
-                        if (storageDeleted && active?.metadata && storageIdentity(key.name, active) === storageIdentity(entry.path, entry.record)) {
-                            throw trashError('存储内容仍被文件库引用，不能永久删除');
+                // Channels without storage cleanup cannot free shared bytes; skip the scans.
+                if (storageDeleted) {
+                    const identity = storageIdentity(entry.path, entry.record);
+                    let cursor;
+                    do {
+                        // Active records: list metadata suffices except for chunk lists (in the value).
+                        const page = await db.list({ limit: 1000, ...(cursor ? { cursor } : {}) });
+                        for (const key of page.keys || []) {
+                            if (key.metadata?.Channel !== entry.record.metadata.Channel) continue;
+                            const active = key.metadata.IsChunked ? await db.getWithMetadata(key.name) : { metadata: key.metadata, value: '' };
+                            if (active?.metadata && storageIdentity(key.name, active) === identity) {
+                                throw trashError('存储内容仍被文件库引用，不能永久删除');
+                            }
                         }
-                    }
-                    cursor = page.list_complete === false ? page.cursor : null;
-                } while (cursor);
+                        if (page.list_complete === false && !page.cursor) throw new Error('Incomplete storage reference scan');
+                        cursor = page.list_complete === false ? page.cursor : null;
+                    } while (cursor);
+                }
                 // Two recovery records may share imported/legacy backing content.
                 // Remove only this record until the last reference is purged.
-                let sharedRecovery = false;
-                if (storageDeleted) do {
-                    const page = await trashPage(db, cursor, 100);
-                    if (page.entries.some(other => other.id !== id && other.record &&
-                        storageIdentity(other.path, other.record) === storageIdentity(entry.path, entry.record))) sharedRecovery = true;
-                    cursor = page.cursor;
-                } while (cursor && !sharedRecovery);
+                const sharedRecovery = storageDeleted && await trashSharesStorage(db, id, entry.path, entry.record);
                 entry.state = 'purging';
                 await saveTrashEntry(db, entry);
                 if (!sharedRecovery) await removeStoredContent(env, entry.path, entry.record);

@@ -128,8 +128,4 @@ export async function removeStoredContent(env, path, record) {
     }
 }
 
-export function storageIdentity(path, record) {
-    const m = record.metadata;
-    return JSON.stringify([m.Channel, m.ChannelName, m.R2FileKey || (m.Channel === 'CloudflareR2' ? path : ''),
-        m.S3FileKey, m.WebDAVFilePath, m.HfFilePath, m.DiscordMessageId, m.IsChunked ? record.value : '']);
-}
+export { storageIdentity } from './storageIdentity.js';

@@ -8,6 +8,7 @@ import { WebDAVAPI } from './storage/webdavAPI.js';
 import { DiscordAPI } from './storage/discordAPI.js';
 import { TelegramAPI } from './storage/telegramAPI.js';
 import { getImageDimensions, moderateContent } from '../upload/uploadTools.js';
+import { someTrashRecord } from './trash.js';
 
 export const RAW_REPLACEMENT_LIMIT = 20 * 1024 * 1024;
 const fail = (message, status = 400) => Object.assign(new Error(message), { status });
@@ -135,49 +136,54 @@ export async function stageRawReplacement(env, path, target, file) {
 
 // Cleanup must not delete an object still referenced by another active or
 // trashed record. Resolve physical locations, not just display channel names.
-async function locations(env, path, record) {
-    const db = getDatabase(env), m = record.metadata;
+// The upload config is loaded once per scan and passed in: resolving
+// credentials per record cost one database read each and exhausted the
+// per-request operation limit on libraries with a few hundred files.
+// Mirrors resolveS3/WebDAV/DiscordCredentials (channelCredentials.js).
+function locations(config, path, record) {
+    const m = record.metadata;
+    const channel = group => {
+        const c = findConfiguredChannel(config, group, m);
+        if (!c) throw new Error('Missing storage config');
+        return c;
+    };
     if (m.Channel === 'CloudflareR2') return [JSON.stringify(['r2', m.R2FileKey || path])];
     if (m.Channel === 'S3') {
-        const c = await resolveS3Credentials(db, env, m);
-        if (c.source === 'missing') throw new Error('Missing storage config');
-        return [JSON.stringify(['s3', endpointIdentity(c.endpoint), c.bucketName, c.key])];
+        const c = channel('s3');
+        return [JSON.stringify(['s3', endpointIdentity(c.endpoint), c.bucketName, m.S3FileKey])];
     }
     if (m.Channel === 'WebDAV') {
-        const c = await resolveWebDAVCredentials(db, env, m);
-        if (c.source === 'missing') throw new Error('Missing storage config');
-        return [new WebDAVAPI(c).buildObjectUrl(c.filePath)];
+        const c = channel('webdav');
+        return [new WebDAVAPI({ baseUrl: c.baseUrl || '' }).buildObjectUrl(m.WebDAVFilePath)];
     }
     if (m.Channel === 'Discord') {
-        const c = await resolveDiscordCredentials(db, env, m);
-        if (c.source === 'missing') throw new Error('Missing storage config');
-        return (m.IsChunked ? JSON.parse(record.value).map(part => part.messageId) : [c.messageId])
+        const c = channel('discord');
+        return (m.IsChunked ? JSON.parse(record.value).map(part => part.messageId) : [m.DiscordMessageId])
             .map(id => JSON.stringify(['discord', String(c.channelId), String(id)]));
     }
     return []; // Telegram deletion in this app never removes file bytes.
 }
 
 export async function oldContentIsShared(env, path, old, staged) {
-    const db = getDatabase(env), oldLocations = new Set(await locations(env, path, old));
+    const db = getDatabase(env), config = await getUploadConfig(db, env), channel = old.metadata.Channel;
+    const oldLocations = new Set(locations(config, path, old));
     if (!oldLocations.size) return false;
-    const aliases = async (p, r) => r?.metadata?.Channel === old.metadata.Channel && (await locations(env, p, r)).some(loc => oldLocations.has(loc));
-    if (await aliases(path, staged)) return true;
-    for (const prefix of ['', 'manage@trash@']) {
-        let cursor;
-        do {
-            const page = await db.list({ prefix, limit: 1000, ...(cursor ? { cursor } : {}) });
-            for (const key of page.keys || []) {
-                if (prefix && key.name.startsWith('manage@trash@')) {
-                    const entry = JSON.parse(key.value ?? await db.get(key.name));
-                    if (entry?.record && entry.state !== 'purged' && await aliases(entry.path, entry.record)) return true;
-                } else if (!key.name.startsWith('manage@') && !key.name.endsWith('/')) {
-                    // Fetch values too: Discord chunk locations live in the value.
-                    if (await aliases(key.name, await db.getWithMetadata(key.name))) return true;
-                }
-            }
-            if (page.list_complete === false && !page.cursor) throw new Error('Incomplete storage reference scan');
-            cursor = page.list_complete === false ? page.cursor : null;
-        } while (cursor);
-    }
-    return false;
+    const aliases = (p, r) => r?.metadata?.Channel === channel && locations(config, p, r).some(loc => oldLocations.has(loc));
+    // The record at `path` was just replaced by `staged`; list results may
+    // still show the old metadata there, so check the new record directly.
+    if (aliases(path, staged)) return true;
+    let cursor;
+    do {
+        const page = await db.list({ prefix: '', limit: 1000, ...(cursor ? { cursor } : {}) });
+        for (const key of page.keys || []) {
+            if (key.name === path || key.name.startsWith('manage@') || key.name.endsWith('/')) continue;
+            if (key.metadata?.Channel !== channel) continue;
+            // List metadata suffices except for Discord chunk lists, which live in the value.
+            const record = key.metadata.IsChunked ? await db.getWithMetadata(key.name) : { value: '', metadata: key.metadata };
+            if (aliases(key.name, record)) return true;
+        }
+        if (page.list_complete === false && !page.cursor) throw new Error('Incomplete storage reference scan');
+        cursor = page.list_complete === false ? page.cursor : null;
+    } while (cursor);
+    return someTrashRecord(db, { channel }, entry => aliases(entry.path, entry.record));
 }

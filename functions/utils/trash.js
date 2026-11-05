@@ -1,5 +1,6 @@
 import { getDatabase } from './databaseAdapter.js';
 import { isFixedId } from './fileIdentity.js';
+import { storageIdentity, storageDigest } from './storageIdentity.js';
 
 export const TRASH_PREFIX = 'manage@trash@';
 export const trashError = (message, status = 409) => Object.assign(new Error(message), { status });
@@ -8,9 +9,44 @@ const locks = new Set();
 export async function saveTrashEntry(db, entry) {
     // Small KV list metadata avoids fetching recovery payloads for every list.
     // D1 listSettings already returns values. Long Unicode paths use that fallback.
-    const metadata = { TrashPath: entry.path, TrashKind: entry.kind };
+    // State/channel/storage digest let reference scans skip unrelated entries.
+    const metadata = { TrashPath: entry.path, TrashKind: entry.kind, TrashState: entry.state };
+    if (entry.record?.metadata) {
+        metadata.TrashChannel = entry.record.metadata.Channel;
+        metadata.TrashStorage = await storageDigest(entry.path, entry.record);
+    }
     const options = new TextEncoder().encode(JSON.stringify(metadata)).length <= 1000 ? { metadata } : {};
     await db.put(TRASH_PREFIX + entry.id, JSON.stringify(entry), options);
+}
+
+// Visit recovery records that may reference a channel's storage, fetching only
+// entries whose list metadata does not rule them out. Entries written before
+// these hints existed (or with oversized metadata) are always fetched.
+export async function someTrashRecord(db, { channel, digest, excludeId } = {}, predicate) {
+    let cursor;
+    do {
+        const page = await db.list({ prefix: TRASH_PREFIX, limit: 1000, ...(cursor ? { cursor } : {}) });
+        for (const key of page.keys || []) {
+            if (excludeId && key.name === TRASH_PREFIX + excludeId) continue;
+            const hint = key.metadata;
+            if (hint?.TrashState === 'purged' || hint?.TrashKind === 'folder') continue;
+            if (channel && hint?.TrashChannel && hint.TrashChannel !== channel) continue;
+            if (digest && hint?.TrashStorage && hint.TrashStorage !== digest) continue;
+            const value = key.value ?? await db.get(key.name);
+            const entry = value && JSON.parse(value);
+            if (entry?.record && entry.state !== 'purged' && await predicate(entry)) return true;
+        }
+        if (page.list_complete === false && !page.cursor) throw new Error('Incomplete recycle bin scan');
+        cursor = page.list_complete === false ? page.cursor : null;
+    } while (cursor);
+    return false;
+}
+
+// True when another recovery record shares this record's backing content.
+export async function trashSharesStorage(db, id, path, record) {
+    const identity = storageIdentity(path, record);
+    return someTrashRecord(db, { channel: record.metadata.Channel, digest: await storageDigest(path, record), excludeId: id },
+        other => storageIdentity(other.path, other.record) === identity);
 }
 
 // KV has no distributed compare-and-swap. Serialize local requests and recheck
