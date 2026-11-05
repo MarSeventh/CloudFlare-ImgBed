@@ -189,6 +189,8 @@
 
 - **Telegram 私聊上传**：给 Bot 发送图片或文件，自动保存到频道并进入图床管理，详见[配置说明](readme/telegram-bot-upload.md)。需设置 Webhook 密钥与用户白名单。
 
+- **回收站**：删除接口 `/api/manage/delete` 只移入回收站、不释放存储空间，永久删除需单独的 `purge` 权限。这与上游行为不同，旧的删除脚本请参阅[回收站说明](readme/recycle-bin.md)。
+
 - **前端开源**：参见[MarSeventh/Sanyue-ImgHub](https://github.com/MarSeventh/Sanyue-ImgHub)项目。
 
 - **桌面端开源**：参见[MarSeventh/satellite](https://github.com/MarSeventh/satellite)项目。

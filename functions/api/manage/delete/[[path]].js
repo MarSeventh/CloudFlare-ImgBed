@@ -6,7 +6,15 @@ import { catalogEntries, updateFolderEntries, validFolder } from '../../../utils
 import { removeFileFromIndex } from '../../../utils/indexManager.js';
 import { saveTrashEntry, moveFileToTrash, withTrashLock, invalidateTrashCaches, trashError } from '../../../utils/trash.js';
 
-const reply = (body, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
+// Upstream returned CORS headers here; keep them so existing cross-origin
+// API clients can still read the result (preflight is answered by _middleware).
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '86400',
+};
+const reply = (body, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store', ...corsHeaders } });
 
 export async function onRequest(context) {
     const { request, env } = context;

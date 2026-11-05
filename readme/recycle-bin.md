@@ -10,6 +10,15 @@
 | 永久删除 | 永久删除 `purge` | `DELETE /api/manage/trash/{id}` |
 | 替换并移走源文件 | 内容替换 `replace` + 文件删除 `delete` | 原替换接口，`deleteSource:true` |
 
+## 与上游的接口差异（升级必读）
+
+上游 `MarSeventh/CloudFlare-ImgBed` 的 `DELETE /api/manage/delete/{path}` 会直接删除底层存储内容。本仓库中同一接口改为**移入回收站**，响应仍为 `success`，但存储空间不会释放。依赖旧行为清理空间的脚本或客户端需要改为两步：
+
+1. `DELETE /api/manage/delete/{pathOrFixedId}`：移入回收站，回收站 ID 即文件的固定 ID（`f_…`）。
+2. `DELETE /api/manage/trash/{id}`：永久删除，Token 需额外具备 `purge` 权限。
+
+旧 Token 的 `delete` 权限不会自动获得 `purge`，因此升级后原有删除脚本只会把文件移入回收站，需要管理员为对应 Token 明确勾选“永久删除”。
+
 七项授权相互独立。永久删除不隐含普通删除，普通删除和系统管理也不直接获得永久删除。旧 Token 不会自动新增 `purge`；需要管理员明确编辑授权。管理员登录会话保持完整管理能力。系统管理能创建 Token，仍然是高权限。
 
 ## 数据与恢复
