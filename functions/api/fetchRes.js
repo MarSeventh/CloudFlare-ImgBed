@@ -99,6 +99,43 @@ function isPrivateHostname(hostname) {
     return false;
 }
 
+/**
+ * Check whether a target hostname may be fetched. Its name must not be
+ * internal (isPrivateHostname), and where the runtime provides a resolver
+ * (env.DNS_LOOKUP, set by the Node.js/Docker server) every address it
+ * resolves to must not be internal either: a wildcard DNS name such as
+ * 192.168.0.1.nip.io passes the name check but reaches the LAN (#746).
+ * Cloudflare Pages/Workers have no resolver here; their fetch does not
+ * reach the deployment's private network.
+ *
+ * @param {string} hostname - hostname from a parsed URL
+ * @param {Function} [lookup] - async (hostname) => [{ address, family }] | string[]
+ * @returns {Promise<null|'internal'|'unresolved'>} null when allowed
+ */
+async function checkTarget(hostname, lookup) {
+    if (isPrivateHostname(hostname)) return 'internal';
+    if (typeof lookup !== 'function') return null;
+
+    let h = hostname.toLowerCase();
+    if (h.startsWith('[') && h.endsWith(']')) {
+        h = h.slice(1, -1);
+    }
+    // An IP literal was fully checked above; nothing to resolve.
+    if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h) || h.includes(':')) return null;
+
+    let resolved;
+    try {
+        resolved = await lookup(h);
+    } catch (e) {
+        return 'unresolved';
+    }
+    const addresses = (Array.isArray(resolved) ? resolved : [resolved])
+        .map(entry => (typeof entry === 'string' ? entry : entry?.address));
+    if (addresses.length === 0) return 'unresolved';
+    if (addresses.some(address => !address || isPrivateHostname(address))) return 'internal';
+    return null;
+}
+
 export async function onRequest(context) {
     // 获取请求体中URL的内容
     const {
@@ -153,9 +190,15 @@ export async function onRequest(context) {
         });
     }
 
-    // Block private / loopback / link-local / metadata targets.
-    if (isPrivateHostname(parsed.hostname)) {
-        return new Response(JSON.stringify({ error: 'Access to internal addresses is not allowed' }), {
+    // Block private / loopback / link-local / metadata targets, by name and,
+    // where a resolver is available, by the addresses the name resolves to.
+    const lookup = env?.DNS_LOOKUP;
+    const blocked = await checkTarget(parsed.hostname, lookup);
+    if (blocked) {
+        const error = blocked === 'unresolved'
+            ? 'Unable to resolve target host'
+            : 'Access to internal addresses is not allowed';
+        return new Response(JSON.stringify({ error }), {
             status: 400,
             headers: { 'Content-Type': 'application/json' }
         });
@@ -170,7 +213,7 @@ export async function onRequest(context) {
         const next = new URL(response.headers.get('location'), currentUrl);
         if ((next.protocol !== 'http:' && next.protocol !== 'https:') ||
             next.username || next.password ||
-            isPrivateHostname(next.hostname)) {
+            await checkTarget(next.hostname, lookup)) {
             return new Response(JSON.stringify({ error: 'Redirect to disallowed target' }), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }

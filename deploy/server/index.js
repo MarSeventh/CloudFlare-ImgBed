@@ -11,6 +11,7 @@ import { getConnInfo } from '@hono/node-server/conninfo';
 import { existsSync, readFileSync, readdirSync, statSync, mkdirSync } from 'fs';
 import { join, resolve, dirname } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
+import { lookup as dnsLookup } from 'dns/promises';
 import { SqliteD1 } from './sqliteD1.js';
 import { LocalR2Storage } from './r2Storage.js';
 import { dockerImageProcessor } from './imageProcessor.js';
@@ -124,6 +125,9 @@ function createEnv() {
         img_d1: sqliteD1,
         img_r2: r2Storage,
         IMAGE_PROCESSOR: dockerImageProcessor,
+        // Lets /api/fetchRes check the addresses a target hostname resolves
+        // to, so a wildcard DNS name cannot reach the LAN (#746).
+        DNS_LOOKUP: (hostname) => dnsLookup(hostname, { all: true, verbatim: true }),
     };
 }
 
