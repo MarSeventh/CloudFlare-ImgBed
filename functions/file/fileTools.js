@@ -54,12 +54,24 @@ export const FILE_CACHE_CONTROL = {
     NO_STORE: 'private, no-store, max-age=0',
 };
 
+// 浏览器会直接渲染并执行脚本的活动内容类型，不能以内联方式返回
+const ACTIVE_CONTENT_TYPES = new Set([
+    'image/svg+xml',
+    'text/html',
+    'application/xhtml+xml',
+    'text/xml',
+    'application/xml',
+]);
+
 // 公共响应头设置函数
 export function setCommonHeaders(headers, encodedFileName, fileType, cacheControl = FILE_CACHE_CONTROL.PUBLIC) {
-    headers.set('Content-Disposition', `inline; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
+    const normalizedType = typeof fileType === 'string' ? fileType.split(';')[0].trim().toLowerCase() : '';
+    const disposition = ACTIVE_CONTENT_TYPES.has(normalizedType) ? 'attachment' : 'inline';
+    headers.set('Content-Disposition', `${disposition}; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`);
     headers.set('Access-Control-Allow-Origin', '*');
     headers.set('Accept-Ranges', 'bytes');
     headers.set('Vary', 'Range');
+    headers.set('X-Content-Type-Options', 'nosniff');
 
     if (fileType) {
         headers.set('Content-Type', fileType);
