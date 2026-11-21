@@ -211,6 +211,7 @@ const output = `/**
 ${imports}
 // --- Worker Cache 与定时任务 ---
 import { maybeServeFromCache } from './workerCache.js';
+import { withProjectHeaders } from '../../functions/utils/projectHeaders.js';
 import { runExpiryCleanupJob } from '../../functions/utils/fileExpiryService.js';
 
 // ==================== 自动生成的路由表 ====================
@@ -292,9 +293,9 @@ export default {
 
         if (!matched) {
             if (env.ASSETS) {
-                return env.ASSETS.fetch(request);
+                return withProjectHeaders(await env.ASSETS.fetch(request));
             }
-            return new Response('Not Found', { status: 404 });
+            return withProjectHeaders(new Response('Not Found', { status: 404 }));
         }
 
         const { route, params } = matched;
@@ -313,7 +314,7 @@ export default {
         }
 
         if (!handler) {
-            return new Response('Method Not Allowed', { status: 405 });
+            return withProjectHeaders(new Response('Method Not Allowed', { status: 405 }));
         }
 
         const middlewares = collectMiddlewares(route.middlewares);
@@ -341,7 +342,9 @@ export default {
             ? () => mod.isCachedResponseServable(context)
             : null;
 
-        return await maybeServeFromCache(request, ctx, () => executeChain(middlewares, handler, context), isCachedServable);
+        // 缓存命中不经过根中间件，在响应出口补齐项目标头。
+        const response = await maybeServeFromCache(request, ctx, () => executeChain(middlewares, handler, context), isCachedServable);
+        return withProjectHeaders(response);
     },
 
     // 文件有效期清理：仅在部署时配置了 EXPIRY_CLEANUP_CRON 后由 Cron Trigger 触发
