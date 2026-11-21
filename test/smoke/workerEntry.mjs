@@ -38,13 +38,36 @@ async function call(path, method = 'GET', headers = {}) {
         waitUntil: promise => tasks.push(promise),
     });
     await Promise.all(tasks);
+    assert.equal(response.headers.get('X-Project'), 'CloudFlare-ImgBed');
+    assert.equal(response.headers.get('X-Powered-By'), 'SanyueQi');
     return response;
 }
+
+// Responses outside the route middleware must also carry the project headers.
+assert.equal((await call('/missing')).status, 404);
+assert.equal((await call('/api/auth/adminLogin')).status, 405);
+env.ASSETS = { fetch: async () => new Response('body { color: red; }', {
+    headers: { 'Content-Type': 'text/css', 'Cache-Control': 'public, max-age=3600' },
+}) };
+const asset = await call('/css/app.css');
+assert.equal(asset.headers.get('Content-Type'), 'text/css');
+assert.equal(asset.headers.get('Cache-Control'), 'public, max-age=3600');
+assert.equal(await asset.text(), 'body { color: red; }');
+delete env.ASSETS;
 
 // Permanent file: cached publicly, then given an expiry, then due
 await setFile('photo.png', {});
 assert.equal((await call('/file/photo.png')).headers.get('Cache-Control'), 'public, max-age=2592000');
 assert.equal(entries.size, 1);
+// Model a response cached before project headers were introduced.
+const cached = entries.get('https://img.test/file/photo.png');
+cached.headers.delete('X-Project');
+cached.headers.set('X-Powered-By', 'upstream');
+assert.equal(await (await call('/file/photo.png')).text(), 'x');
+const head = await call('/file/photo.png', 'HEAD');
+assert.equal(head.status, 200);
+assert.equal(head.body, null);
+assert.equal(cached.headers.has('X-Project'), false, 'do not mutate the stored cache entry');
 
 await setFile('photo.png', { ExpiresAt: Date.now() + 7 * 24 * HOUR });
 const limited = await call('/file/photo.png');
@@ -67,4 +90,4 @@ await Promise.all(tasks);
 assert.equal(objects.has('old.png'), false);
 assert.equal(await sqlite.prepare('SELECT id FROM files WHERE id = ?').bind('old.png').first(), null);
 
-console.log('Worker entry passed: cache check, ETag revalidation and scheduled cleanup');
+console.log('Worker entry passed: response headers, cache check, ETag revalidation and scheduled cleanup');

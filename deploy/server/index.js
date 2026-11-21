@@ -15,6 +15,7 @@ import { SqliteD1 } from './sqliteD1.js';
 import { LocalR2Storage } from './r2Storage.js';
 import { dockerImageProcessor } from './imageProcessor.js';
 import { startExpiryCleanupTimer } from './expiryCleanup.js';
+import { withProjectHeaders } from '../../functions/utils/projectHeaders.js';
 
 const NativeResponse = globalThis.Response;
 
@@ -402,11 +403,8 @@ async function fetchWithNativeResponse(request, env, executionCtx) {
     if (!response) {
         return response;
     }
-    return new NativeResponse(response.body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: response.headers,
-    });
+    // 同时覆盖 Functions、静态文件、SPA 回退以及适配层生成的错误响应。
+    return withProjectHeaders(response, NativeResponse);
 }
 
 serve({
