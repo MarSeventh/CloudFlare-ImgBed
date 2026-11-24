@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { readBuildManifest } from './prepare-registry-package.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
-const defaultRoot = resolve(dirname(scriptPath), '..');
+const defaultRoot = resolve(dirname(scriptPath), '../../..');
 const defaultManifestPath = join('frontend-dist', '.sanyue-build.json');
 const defaultRegistryUrl = 'https://registry.npmjs.org/';
 

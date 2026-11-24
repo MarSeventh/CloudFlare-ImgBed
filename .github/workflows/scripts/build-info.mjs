@@ -8,7 +8,7 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
-const DEFAULT_ROOT = resolve(dirname(SCRIPT_PATH), '..');
+const DEFAULT_ROOT = resolve(dirname(SCRIPT_PATH), '../../..');
 const MANIFEST_NAME = '.sanyue-build.json';
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;

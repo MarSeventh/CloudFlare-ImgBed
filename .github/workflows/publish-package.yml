@@ -34,21 +34,21 @@ jobs:
       - name: Generate build manifest
         id: build_info
         run: >-
-          node scripts/build-info.mjs
+          node .github/workflows/scripts/build-info.mjs
           --write-manifest
           --github-output "$GITHUB_OUTPUT"
 
       - name: Check exact Registry version
         id: registry_check
         run: >-
-          node scripts/check-registry-version.mjs
+          node .github/workflows/scripts/check-registry-version.mjs
           --manifest "$BUILD_MANIFEST"
           --github-output "$GITHUB_OUTPUT"
 
       - name: Prepare Registry package
         if: steps.registry_check.outputs.should_publish == 'true'
         run: >-
-          node scripts/prepare-registry-package.mjs
+          node .github/workflows/scripts/prepare-registry-package.mjs
           --manifest "$BUILD_MANIFEST"
           --staging "$REGISTRY_STAGING_DIR"
 
@@ -57,7 +57,7 @@ jobs:
         working-directory: ${{ env.REGISTRY_STAGING_DIR }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public --tag assets
+        run: npm publish --access public --tag assets --ignore-scripts
 
       - name: Report matching Registry version
         if: steps.registry_check.outputs.should_skip == 'true'

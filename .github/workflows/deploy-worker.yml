@@ -32,6 +32,9 @@ on:
 #   EXPIRY_CLEANUP_CRON   - 文件有效期清理的 Cron 表达式（如 */30 * * * *），启用文件有效期时配置；
 #                           免费计划每个账号最多 5 个 Cron Trigger
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -52,6 +55,8 @@ jobs:
       - name: Checkout
         if: steps.check.outputs.skip != 'true'
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         if: steps.check.outputs.skip != 'true'
@@ -62,7 +67,7 @@ jobs:
       - name: Generate build identity
         id: build_info
         if: steps.check.outputs.skip != 'true'
-        run: node scripts/build-info.mjs --write-manifest --github-output "$GITHUB_OUTPUT" > /dev/null
+        run: node .github/workflows/scripts/build-info.mjs --write-manifest --github-output "$GITHUB_OUTPUT" > /dev/null
 
       - name: Install dependencies
         if: steps.check.outputs.skip != 'true'

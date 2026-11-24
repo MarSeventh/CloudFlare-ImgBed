@@ -6,7 +6,6 @@ import {
   mkdir,
   readFile,
   readlink,
-  rm,
   symlink,
   writeFile,
 } from 'node:fs/promises';
@@ -16,7 +15,7 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 const scriptPath = fileURLToPath(import.meta.url);
-const defaultRoot = resolve(dirname(scriptPath), '..');
+const defaultRoot = resolve(dirname(scriptPath), '../../..');
 const defaultManifestPath = join('frontend-dist', '.sanyue-build.json');
 const manifestFields = [
   'schemaVersion',
@@ -220,8 +219,9 @@ export async function prepareRegistryPackage(options) {
   const manifest = await readBuildManifest(manifestPath);
   const trackedFiles = await listTrackedFiles(root);
 
-  await rm(stagingPath, { force: true, recursive: true });
-  await mkdir(stagingPath, { recursive: true });
+  // Never delete an existing user-supplied directory (including a symlink).
+  // CI provides an existing parent directory; staging itself must be new.
+  await mkdir(stagingPath);
 
   let copiedFileCount = 0;
   for (const trackedPath of trackedFiles) {

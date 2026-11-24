@@ -16,7 +16,7 @@ import { promisify } from 'node:util';
 import {
   prepareRegistryPackage,
   validateBuildManifest,
-} from './prepare-registry-package.mjs';
+} from '../../.github/workflows/scripts/prepare-registry-package.mjs';
 
 const execFileAsync = promisify(execFile);
 const commit = '0123456789abcdef0123456789abcdef01234567';
@@ -176,4 +176,23 @@ test('rejects a staging directory inside the repository', async (context) => {
     await readFile(join(fixture.repositoryPath, 'frontend-dist', 'app.js'), 'utf8'),
     'app\n',
   );
+});
+
+
+test('rejects an existing staging directory without deleting its contents', async (context) => {
+  const fixture = await initializeFixture();
+  context.after(async () => rm(fixture.fixtureRoot, { force: true, recursive: true }));
+  await mkdir(fixture.stagingPath);
+  const sentinelPath = join(fixture.stagingPath, 'keep.txt');
+  await writeFile(sentinelPath, 'keep user data');
+
+  await assert.rejects(
+    prepareRegistryPackage({
+      root: fixture.repositoryPath,
+      manifestPath: fixture.manifestPath,
+      stagingPath: fixture.stagingPath,
+    }),
+    { code: 'EEXIST' },
+  );
+  assert.equal(await readFile(sentinelPath, 'utf8'), 'keep user data');
 });

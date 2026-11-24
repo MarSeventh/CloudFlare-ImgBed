@@ -10,7 +10,7 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 const testDirectory = dirname(fileURLToPath(import.meta.url));
-const scriptPath = resolve(testDirectory, 'check-registry-version.mjs');
+const scriptPath = resolve(testDirectory, '../../.github/workflows/scripts/check-registry-version.mjs');
 const commit = '0123456789abcdef0123456789abcdef01234567';
 const manifest = {
   schemaVersion: 1,

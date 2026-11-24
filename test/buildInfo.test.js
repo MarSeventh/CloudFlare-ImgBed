@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-import { createBuildInfo, hashFrontendDist, validateBuildInfo } from '../scripts/build-info.mjs';
+import { createBuildInfo, hashFrontendDist, validateBuildInfo } from '../.github/workflows/scripts/build-info.mjs';
 
 const COMMIT = '0123456789abcdef0123456789abcdef01234567';
 
@@ -42,7 +42,7 @@ describe('build identity', () => {
 
     it('writes the manifest and GitHub outputs from the CLI', () => {
         const outputPath = join(root, 'github-output');
-        const scriptPath = resolve('scripts/build-info.mjs');
+        const scriptPath = resolve('.github/workflows/scripts/build-info.mjs');
         const result = spawnSync(process.execPath, [
             scriptPath,
             '--root', root,

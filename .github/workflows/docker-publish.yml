@@ -10,6 +10,9 @@ env:
   REGISTRY: docker.io
   IMAGE_NAME: ${{ github.repository }}
 
+permissions:
+  contents: read
+
 jobs:
   build-and-push:
     if: github.repository == 'MarSeventh/CloudFlare-ImgBed'
@@ -17,6 +20,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
@@ -26,7 +31,7 @@ jobs:
       - name: Generate build identity
         id: build_info
         shell: bash
-        run: node scripts/build-info.mjs --write-manifest --github-output "$GITHUB_OUTPUT"
+        run: node .github/workflows/scripts/build-info.mjs --write-manifest --github-output "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
