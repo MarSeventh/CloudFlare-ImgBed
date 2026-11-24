@@ -27,20 +27,26 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: '22'
-          cache: npm
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Run regression tests
-        run: npm test
+        run: pnpm test
+
+      - name: Test Registry package tooling
+        run: pnpm test:registry
 
       - name: Check server module imports
-        run: npm run test:server
+        run: pnpm test:server
 
       - name: Build Pages Functions
-        run: npx --no-install wrangler pages functions build functions --outdir data/ci-pages-build
+        run: pnpm exec wrangler pages functions build functions --outdir data/ci-pages-build

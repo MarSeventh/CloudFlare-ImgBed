@@ -18,9 +18,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Read version from package.json
-        id: version
-        run: echo "VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Generate build identity
+        id: build_info
+        shell: bash
+        run: node scripts/build-info.mjs --write-manifest --github-output "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -42,9 +54,13 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=${{ steps.version.outputs.VERSION }}
+            type=raw,value=${{ steps.build_info.outputs.version }}
             type=ref,event=branch
             type=raw,value=latest
+          labels: |
+            org.opencontainers.image.version=${{ steps.build_info.outputs.version }}
+            org.opencontainers.image.revision=${{ steps.build_info.outputs.commit }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v7
@@ -54,3 +70,10 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
+          build-args: |
+            APP_VERSION=${{ steps.build_info.outputs.version }}
+            APP_COMMIT_SHA=${{ steps.build_info.outputs.commit }}
+            APP_BUILD_ID=${{ steps.build_info.outputs.build_id }}
+            APP_BUILD_DIRTY=${{ steps.build_info.outputs.dirty }}
+            ASSET_PACKAGE_VERSION=${{ steps.build_info.outputs.package_version }}
+            FRONTEND_DIST_SHA256=${{ steps.build_info.outputs.frontend_dist_sha256 }}

@@ -1,0 +1,72 @@
+name: Publish Registry Package
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Official repository secret required for the publish step.
+# NPM_TOKEN must have permission to publish the cloudflare-imgbed package.
+jobs:
+  publish-package:
+    if: github.repository == 'MarSeventh/CloudFlare-ImgBed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BUILD_MANIFEST: frontend-dist/.sanyue-build.json
+      REGISTRY_STAGING_DIR: ${{ runner.temp }}/registry-package
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org
+
+      - name: Generate build manifest
+        id: build_info
+        run: >-
+          node scripts/build-info.mjs
+          --write-manifest
+          --github-output "$GITHUB_OUTPUT"
+
+      - name: Check exact Registry version
+        id: registry_check
+        run: >-
+          node scripts/check-registry-version.mjs
+          --manifest "$BUILD_MANIFEST"
+          --github-output "$GITHUB_OUTPUT"
+
+      - name: Prepare Registry package
+        if: steps.registry_check.outputs.should_publish == 'true'
+        run: >-
+          node scripts/prepare-registry-package.mjs
+          --manifest "$BUILD_MANIFEST"
+          --staging "$REGISTRY_STAGING_DIR"
+
+      - name: Publish Registry package
+        if: steps.registry_check.outputs.should_publish == 'true'
+        working-directory: ${{ env.REGISTRY_STAGING_DIR }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: pnpm publish --access public --tag assets --no-git-checks
+
+      - name: Report matching Registry version
+        if: steps.registry_check.outputs.should_skip == 'true'
+        env:
+          PACKAGE_NAME: ${{ steps.registry_check.outputs.package_name }}
+          PACKAGE_VERSION: ${{ steps.registry_check.outputs.package_version }}
+        run: echo "$PACKAGE_NAME@$PACKAGE_VERSION already matches; skipping publication."

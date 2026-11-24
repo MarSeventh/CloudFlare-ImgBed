@@ -9,6 +9,9 @@
  *   R2_BUCKET_NAME   - R2 存储桶名称
  *   WORKER_VARS      - JSON 对象，值可直接填写或使用 { value, type: 'text' | 'secret' }
  *                     type 默认 text；secret 单独生成文件供部署后批量上传
+ *   APP_VERSION / APP_COMMIT_SHA / APP_BUILD_ID / APP_BUILD_DIRTY
+ *   ASSET_PACKAGE_VERSION / FRONTEND_DIST_SHA256
+ *                   - 构建身份，由部署流程注入；非空时写入 [vars]
  *   WRANGLER_CONFIG - 可选，追加 Wrangler 配置的 JSON 对象
  *   EXPIRY_CLEANUP_CRON - 可选，文件有效期清理的 Cron 表达式（5 段格式，如每 30 分钟一次），不填则不生成定时任务
  */
@@ -22,6 +25,22 @@ const outputPath = join(__dirname, 'wrangler.toml');
 
 const env = process.env;
 const name = env.WORKER_NAME || 'cloudflare-imgbed';
+const systemVarNames = [
+    'APP_VERSION',
+    'APP_COMMIT_SHA',
+    'APP_BUILD_ID',
+    'APP_BUILD_DIRTY',
+    'ASSET_PACKAGE_VERSION',
+    'FRONTEND_DIST_SHA256',
+];
+const reservedWorkerVars = new Set(systemVarNames);
+const systemVars = Object.create(null);
+for (const key of systemVarNames) {
+    const value = env[key];
+    if (typeof value === 'string' && value.length > 0) {
+        systemVars[key] = value;
+    }
+}
 
 // JSON 字符串转义适用于 TOML 基本字符串，另外转义 TOML 禁止的 DEL 字符。
 const tomlString = (value) => JSON.stringify(value).replace(/\u007f/g, '\\u007f');
@@ -97,6 +116,10 @@ if (env.WORKER_VARS) {
         process.exit(1);
     }
     for (const [key, entry] of Object.entries(vars)) {
+        if (reservedWorkerVars.has(key)) {
+            console.error(`Error: WORKER_VARS cannot override reserved system variable: ${key}.`);
+            process.exit(1);
+        }
         let type = 'text';
         let value = entry;
         if (entry !== null && typeof entry === 'object') {
@@ -181,6 +204,9 @@ toml += `
 `;
 
 const configWithoutVars = toml;
+for (const [key, value] of Object.entries(systemVars)) {
+    toml += `${tomlString(key)} = ${tomlString(value)}\n`;
+}
 for (const [key, value] of Object.entries(textVars)) {
     toml += `${tomlString(key)} = ${tomlString(value)}\n`;
 }
@@ -209,7 +235,7 @@ const safeToml = configWithoutVars
 
 console.log('Generated deploy/worker/wrangler.toml:');
 console.log(safeToml);
-for (const key of Object.keys(textVars)) {
+for (const key of [...Object.keys(systemVars), ...Object.keys(textVars)]) {
     console.log(`${JSON.stringify(key)} = "***"`);
 }
 console.log(`Prepared ${Object.keys(secretVars).length} secret(s) for upload after deployment.`);

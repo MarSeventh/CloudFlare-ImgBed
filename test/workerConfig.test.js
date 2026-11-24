@@ -6,6 +6,14 @@ import { spawnSync } from 'node:child_process';
 
 describe('Worker deployment config', function () {
     this.timeout(10000);
+    const systemVarNames = [
+        'APP_VERSION',
+        'APP_COMMIT_SHA',
+        'APP_BUILD_ID',
+        'APP_BUILD_DIRTY',
+        'ASSET_PACKAGE_VERSION',
+        'FRONTEND_DIST_SHA256',
+    ];
     let directory;
 
     beforeEach(() => {
@@ -16,7 +24,16 @@ describe('Worker deployment config', function () {
 
     function generate(config, extra = {}) {
         const env = { ...process.env };
-        for (const key of ['WRANGLER_CONFIG', 'WORKER_NAME', 'WORKER_VARS', 'D1_DATABASE_ID', 'KV_NAMESPACE_ID', 'R2_BUCKET_NAME', 'EXPIRY_CLEANUP_CRON']) {
+        for (const key of [
+            'WRANGLER_CONFIG',
+            'WORKER_NAME',
+            'WORKER_VARS',
+            'D1_DATABASE_ID',
+            'KV_NAMESPACE_ID',
+            'R2_BUCKET_NAME',
+            'EXPIRY_CLEANUP_CRON',
+            ...systemVarNames,
+        ]) {
             delete env[key];
         }
         Object.assign(env, { RUNNER_TEMP: directory, GITHUB_OUTPUT: join(directory, 'outputs'), ...extra });
@@ -47,6 +64,34 @@ binding = "IMAGES"
 `);
         assert.equal(generate('{}').toml, baseline.toml);
         assert.equal(generate('').toml, baseline.toml);
+        assert.equal(generate(undefined, { APP_VERSION: '' }).toml, baseline.toml);
+    });
+
+    it('injects non-empty build identity vars and hides their values from logs', () => {
+        const buildIdentity = {
+            APP_VERSION: '2.7.8',
+            APP_COMMIT_SHA: '0123456789abcdef0123456789abcdef01234567',
+            APP_BUILD_ID: '0123456789abcdef0123',
+            APP_BUILD_DIRTY: 'false',
+            ASSET_PACKAGE_VERSION: '2.7.8-commit.0123456789abcdef0123',
+            FRONTEND_DIST_SHA256: 'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
+        };
+        const workerValue = 'worker-visible-value';
+        const result = generate(undefined, {
+            ...buildIdentity,
+            WORKER_VARS: JSON.stringify({ USER_SETTING: workerValue }),
+        });
+
+        assert.equal(result.status, 0, result.stderr);
+        for (const [key, value] of Object.entries(buildIdentity)) {
+            assert.ok(result.toml.includes(`${JSON.stringify(key)} = ${JSON.stringify(value)}\n`), key);
+        }
+        assert.ok(result.toml.includes(`"USER_SETTING" = ${JSON.stringify(workerValue)}\n`));
+
+        const logs = result.stdout + result.stderr;
+        for (const value of [...Object.values(buildIdentity), workerValue]) {
+            assert.equal(logs.includes(value), false, value);
+        }
     });
 
     it('places scalars at the root, nested fields in their tables, and keeps bindings, vars and Cron', () => {
@@ -87,6 +132,28 @@ binding = "IMAGES"
             assert.match(result.stderr, /cannot override script-managed key/);
             assert.equal(result.stderr.includes('sensitive-value'), false);
             assert.equal(result.toml, null);
+            assert.equal(existsSync(join(directory, 'outputs')), false);
+        });
+    }
+
+    for (const [index, key] of systemVarNames.entries()) {
+        it(`rejects WORKER_VARS override of reserved system variable ${key}`, () => {
+            const systemValue = `system-value-${index}`;
+            const workerValue = `worker-value-${index}`;
+            const entry = index % 2 === 0
+                ? workerValue
+                : { value: workerValue, type: 'secret' };
+            const result = generate(undefined, {
+                [key]: systemValue,
+                WORKER_VARS: JSON.stringify({ [key]: entry }),
+            });
+
+            assert.notEqual(result.status, 0);
+            assert.match(result.stderr, /cannot override reserved system variable/);
+            assert.equal((result.stdout + result.stderr).includes(systemValue), false);
+            assert.equal((result.stdout + result.stderr).includes(workerValue), false);
+            assert.equal(result.toml, null);
+            assert.equal(existsSync(join(directory, 'worker-secrets.json')), false);
             assert.equal(existsSync(join(directory, 'outputs')), false);
         });
     }

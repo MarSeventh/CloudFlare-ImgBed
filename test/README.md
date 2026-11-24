@@ -9,33 +9,36 @@ This directory organizes regression tests by functionality and serves as the sta
 Use Node.js 22 and the repository's existing Mocha setup from the main repository root:
 
 ```sh
-npm ci
-npm test
-npm run test:server
-npx --no-install wrangler pages functions build functions --outdir data/ci-pages-build
+pnpm install --frozen-lockfile
+pnpm test
+pnpm test:registry
+pnpm test:server
+pnpm exec wrangler pages functions build functions --outdir data/ci-pages-build
 ```
 
-`npm test` requires neither a running server nor cloud credentials. Tests use isolated in-memory databases and storage doubles. Worker configuration tests run a copy of the generator in a temporary directory and remove it after each test. They do not read or write application data in `data/` or contact real storage services.
+`pnpm test` and `pnpm test:registry` require neither a running server nor cloud credentials. Tests use isolated in-memory databases and storage doubles. Worker configuration tests run a copy of the generator in a temporary directory and remove it after each test. Registry tests use temporary Git repositories and a local HTTP server; they do not publish packages or contact the public Registry. The checks do not read or write application data in `data/` or contact real storage services.
 
 Run a single module or filter by a test name:
 
 ```sh
-npm test -- test/upload.test.js
-npm test -- test/read.test.js
-npm test -- test/delete.test.js
-npm test -- test/update.test.js
-npm test -- test/update.test.js --grep "rename"
+pnpm test -- test/upload.test.js
+pnpm test -- test/read.test.js
+pnpm test -- test/delete.test.js
+pnpm test -- test/update.test.js
+pnpm test -- test/update.test.js --grep "rename"
 ```
 
-The current Mocha entry point automatically loads `.js` test files directly inside `test/`. Files in `helpers/` are not standalone suites; `smoke/serverImports.mjs`, `smoke/workerEntry.mjs` and `smoke/serverHeaders.mjs` run separately through `npm run test:server`. When adding suites in subdirectories, update test discovery and confirm CI finds them.
+The current Mocha entry point automatically loads `.js` test files directly inside `test/`. Files in `helpers/` are not standalone suites; `smoke/serverImports.mjs`, `smoke/workerEntry.mjs` and `smoke/serverHeaders.mjs` run separately through `pnpm test:server`. Registry packaging tests use Node's test runner through `pnpm test:registry`. When adding suites in subdirectories, update test discovery and confirm CI finds them.
 
 ## Module overview
 
 | Module | Test file | Production entry points | Covered behavior |
 | --- | --- | --- | --- |
+| Build identity | [buildInfo.test.js](buildInfo.test.js) | `scripts/build-info.mjs` | Stable business-version validation; complete commit and 20-character build ID mapping; deterministic frontend asset digest excluding the generated manifest; manifest and GitHub Actions output generation |
+| Registry package publication | [prepare-registry-package.test.mjs](../scripts/prepare-registry-package.test.mjs), [check-registry-version.test.mjs](../scripts/check-registry-version.test.mjs) | `scripts/prepare-registry-package.mjs`, `scripts/check-registry-version.mjs` | Fixed build-manifest schema; tracked-file-only staging with generated package metadata and manifest inclusion; exact Registry-version handling for unpublished, matching and conflicting builds without contacting the public Registry |
 | Upload | [upload.test.js](upload.test.js) | `functions/upload/` | Upload permissions and IP blocking; directory cleanup and original-name collision avoidance; R2/S3/WebDAV types and metadata; Telegram special formats and compression settings; R2/S3 multipart initialization, upload and completion; HuggingFace direct upload and commit; opt-in object responses and default arrays for ordinary uploads and R2/S3 chunk completion, including URL/expiry fields and unchanged authentication errors |
 | Upload format restrictions | [uploadFormat.test.js](uploadFormat.test.js), [upload.test.js](upload.test.js) | `utils/uploadFormat.js`, `api/manage/sysConfig/upload.js`, `functions/upload/` | Disabled defaults; whitelist/blacklist, case normalization, compound suffixes and extensionless files; settings validation and preservation during channel saves; ordinary upload rejection before storage, allowed uploads, chunk initialization and existing-session checks, HuggingFace URL/commit rejection, with MIME unable to override filename rules |
-| Worker deployment configuration | [workerConfig.test.js](workerConfig.test.js) | `deploy/worker/generate-toml.js` | Default output preservation; root scalars, nested tables and escaping; bindings, variables, secrets and cleanup Cron preservation; managed-key, array, null and invalid JSON/number/Unicode rejection before output; custom values excluded from generator logs |
+| Worker deployment configuration | [workerConfig.test.js](workerConfig.test.js) | `deploy/worker/generate-toml.js` | Default output preservation; root scalars, nested tables and escaping; bindings, variables, secrets and cleanup Cron preservation; protected build-identity injection and override rejection; managed-key, array, null and invalid JSON/number/Unicode rejection before output; custom and identity values excluded from generator logs |
 | Reading and querying | [read.test.js](read.test.js) | `functions/file/`, `api/manage/list.js`, `random/` | R2 GET/HEAD/Range and response types; invalid IDs and missing records; external redirects; administrator preview permissions and private caching; listing directory boundaries, pagination, recursion, counts, search and type filters; random-image `content=` compatibility |
 | Deletion | [delete.test.js](delete.test.js) | `api/manage/delete/` | R2 deletion and idempotency, including native KV missing-record responses; single/batch/folder deletion removing the current KV expiry marker after the file record, preserving markers on storage/record failure and completing index updates on marker-delete failure; single/batch/folder existence results and missing-record index cleanup; partial failures with file and index preservation on storage errors; actual S3 object keys; batch-ID normalization, deduplication and limits; index updates and cache invalidation |
 | Duplicate scan | [dedupScan.test.js](dedupScan.test.js) | `api/manage/dedup/scan` | Node capability probe; read-only content grouping and earliest valid timestamp selection; corrupt/missing index and record handling; duplicate index IDs; pending/concurrent index changes; partial reports; actual byte limits and stream cancellation; deadlines covering storage reads and hashing; release of late storage responses even when timers and the wall clock disagree |
@@ -89,15 +92,16 @@ Isolated loading cannot detect every module-resolution issue. CI therefore also 
 4. Where practical, include a regression that fails before the fix and passes afterward. Retain assertions for previously correct behavior; avoid testing only the new branch or reproducing implementation logic in assertions.
 5. Create independent state and restore modified globals. Do not use real credentials, production data, arbitrary fixed delays or external network dependencies. Clean up timer tasks so they cannot hold the process open.
 6. **Update this README in the same PR**: module overview, coverage limits and affected helper descriptions. Changes to entry points, dependencies or execution also require updated commands and CI configuration.
-7. Run the affected module, then `npm test` and `npm run test:server`. Also build Pages Functions when changing shared production modules, imports or build behavior. Report actual results and unverified environments in the PR.
+7. Run the affected module, then `pnpm test`, `pnpm test:registry` and `pnpm test:server`. Also build Pages Functions when changing shared production modules, imports or build behavior. Report actual results and unverified environments in the PR.
 
 ## CI
 
 The main repository's `.github/workflows/regression.yml` runs on PRs targeting `dev` or `main`, pushes to those branches and manual dispatches. It:
 
 1. Installs dependencies from the lockfile.
-2. Runs `npm test`.
-3. Runs `npm run test:server`.
-4. Builds Pages Functions.
+2. Runs `pnpm test`.
+3. Runs `pnpm test:registry`.
+4. Runs `pnpm test:server`.
+5. Builds Pages Functions.
 
 The runner reports test counts; this document maintains functional scope rather than a fixed numeric pass criterion. CI supports code review. Changes that need real channel or deployment validation should describe that verification in the PR.
