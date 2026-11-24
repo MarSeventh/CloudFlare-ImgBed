@@ -33,24 +33,23 @@ For security vulnerabilities, check the repository's Security page for reporting
 
 ## Local development and validation
 
-Use Node.js 22. The main repository uses pnpm and `pnpm-lock.yaml`; for the frontend and documentation repositories, follow the package-manager declaration and lockfile in that repository. Run each set of commands from the corresponding repository root.
+Use Node.js 22, npm and the repository's `package-lock.json`. Run each set of commands from the corresponding repository root.
 
 ### Main repository
 
 ```sh
-pnpm install --frozen-lockfile
-pnpm start
+npm ci
+npm start
 ```
 
-`pnpm start` runs the local Pages development server on port `8080`, with local state under `data/`. To exercise the Node.js server deployment, use `pnpm start:docker`; this runs the server directly and does not build a Docker image. See the [deployment configuration guide](https://cfbed.sanyue.de/en/deployment/configuration) for environment and storage settings.
+`npm start` runs the local Pages development server on port `8080`, with local state under `data/`. To exercise the Node.js server deployment, use `npm run start:docker`; this runs the server directly and does not build a Docker image. See the [deployment configuration guide](https://cfbed.sanyue.de/en/deployment/configuration) for environment and storage settings.
 
 Before submitting:
 
 ```sh
-pnpm test
-pnpm test:registry
-pnpm test:server
-pnpm exec wrangler pages functions build functions --outdir data/ci-pages-build
+npm test
+npm run test:server
+npx --no-install wrangler pages functions build functions --outdir data/ci-pages-build
 ```
 
 - Automated regressions need no running server or cloud credentials. See [test/README.md](test/README.md) for coverage and limits.

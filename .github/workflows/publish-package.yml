@@ -25,11 +25,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.33.0
-
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
@@ -62,7 +57,7 @@ jobs:
         working-directory: ${{ env.REGISTRY_STAGING_DIR }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: pnpm publish --access public --tag assets --no-git-checks
+        run: npm publish --access public --tag assets
 
       - name: Report matching Registry version
         if: steps.registry_check.outputs.should_skip == 'true'

@@ -1,22 +1,14 @@
 FROM node:22-slim AS dependencies
 
-ARG PNPM_VERSION=10.33.0
-
 WORKDIR /app
 
-RUN corepack enable && corepack prepare "pnpm@${PNPM_VERSION}" --activate
-
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json package-lock.json ./
 COPY deploy/profiles ./deploy/profiles
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends python3 make g++ && \
-    pnpm install \
-        --filter @cloudflare-imgbed/common \
-        --filter @cloudflare-imgbed/server \
-        --prod \
-        --frozen-lockfile && \
-    rm -rf /root/.cache/node/corepack /root/.local/share/pnpm/store /var/lib/apt/lists/* /tmp/*
+    npm ci --workspace=@cloudflare-imgbed/common --workspace=@cloudflare-imgbed/server --omit=dev && \
+    rm -rf /root/.npm /var/lib/apt/lists/* /tmp/*
 
 FROM node:22-slim AS runtime
 

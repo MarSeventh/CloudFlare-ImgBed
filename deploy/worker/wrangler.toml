@@ -1,5 +1,5 @@
 # Cloudflare Workers 部署配置
-# 使用方式: pnpm exec wrangler deploy --config deploy/worker/wrangler.toml
+# 使用方式: npx wrangler deploy --config deploy/worker/wrangler.toml
 #
 # 部署前需要配置以下 binding：
 # 1. D1 数据库 - 取消注释并填入你的 database_id

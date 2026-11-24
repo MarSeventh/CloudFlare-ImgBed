@@ -1,8 +1,6 @@
 .wrangler/*
 data/*
 node_modules
-npm-debug.log
-pnpm-debug.log
 /wrangler.toml
 /deploy/worker/worker-secrets.json
 /frontend-dist/.sanyue-build.json

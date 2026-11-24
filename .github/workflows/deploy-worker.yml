@@ -53,28 +53,20 @@ jobs:
         if: steps.check.outputs.skip != 'true'
         uses: actions/checkout@v6
 
-      - name: Setup pnpm
-        if: steps.check.outputs.skip != 'true'
-        uses: pnpm/action-setup@v4
-
       - name: Setup Node.js
         if: steps.check.outputs.skip != 'true'
         uses: actions/setup-node@v5
         with:
           node-version: '22'
-          cache: pnpm
 
       - name: Generate build identity
         id: build_info
         if: steps.check.outputs.skip != 'true'
         run: node scripts/build-info.mjs --write-manifest --github-output "$GITHUB_OUTPUT" > /dev/null
 
-      - name: Install Worker production dependencies
+      - name: Install dependencies
         if: steps.check.outputs.skip != 'true'
-        run: |
-          pnpm install --prod --frozen-lockfile \
-            --filter @cloudflare-imgbed/common \
-            --filter @cloudflare-imgbed/worker
+        run: npm ci --workspace=@cloudflare-imgbed/common --workspace=@cloudflare-imgbed/worker --omit=dev
 
       - name: Generate worker routes
         if: steps.check.outputs.skip != 'true'

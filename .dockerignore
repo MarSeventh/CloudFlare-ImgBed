@@ -1,6 +1,5 @@
 node_modules
 npm-debug.log
-pnpm-debug.log
 Dockerfile
 .dockerignore
 .git
