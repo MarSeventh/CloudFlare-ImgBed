@@ -3,6 +3,7 @@ data/*
 node_modules
 /wrangler.toml
 /deploy/worker/worker-secrets.json
+/frontend-dist/.sanyue-build.json
 .DS_Store
 
 *.sqlite

@@ -12,13 +12,30 @@ RUN apt-get update && \
 
 FROM node:22-slim AS runtime
 
+ARG APP_VERSION
+ARG APP_COMMIT_SHA
+ARG APP_BUILD_ID
+ARG APP_BUILD_DIRTY
+ARG ASSET_PACKAGE_VERSION
+ARG FRONTEND_DIST_SHA256
+
 RUN apt-get update && \
     apt-get install -y --no-install-recommends ca-certificates curl && \
     update-ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-ENV NODE_ENV=production
+ENV NODE_ENV=production \
+    APP_VERSION=${APP_VERSION} \
+    APP_COMMIT_SHA=${APP_COMMIT_SHA} \
+    APP_BUILD_ID=${APP_BUILD_ID} \
+    APP_BUILD_DIRTY=${APP_BUILD_DIRTY} \
+    ASSET_PACKAGE_VERSION=${ASSET_PACKAGE_VERSION} \
+    FRONTEND_DIST_SHA256=${FRONTEND_DIST_SHA256}
+
+LABEL org.opencontainers.image.version="${APP_VERSION}" \
+      org.opencontainers.image.revision="${APP_COMMIT_SHA}" \
+      org.opencontainers.image.source="https://github.com/MarSeventh/CloudFlare-ImgBed"
 
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY package.json ./

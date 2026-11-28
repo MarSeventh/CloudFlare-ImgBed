@@ -39,6 +39,9 @@ jobs:
       - name: Run regression tests
         run: npm test
 
+      - name: Test Registry package tooling
+        run: npm run test:registry
+
       - name: Check server module imports
         run: npm run test:server
 
